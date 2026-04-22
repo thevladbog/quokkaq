@@ -981,10 +981,13 @@ func (h *TicketHandler) GetUnitQueueStatus(w http.ResponseWriter, r *http.Reques
 		})
 		return
 	}
-	if body, ok := loadQueueStatusFromCache(unitID); ok {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(body)
-		return
+	if cached, ok := loadQueueStatusFromCache(unitID); ok {
+		var summary services.UnitQueueSummary
+		if err := json.Unmarshal(cached, &summary); err == nil {
+			RespondJSON(w, summary)
+			return
+		}
+		unitQueueStatusCache.Delete(unitID)
 	}
 	summary, err := h.eta.GetUnitQueueSummary(unitID)
 	if err != nil {

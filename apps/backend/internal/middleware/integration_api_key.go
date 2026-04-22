@@ -104,9 +104,10 @@ func IntegrationAPIKeyAuth(db *gorm.DB) func(http.Handler) http.Handler {
 			if row.UnitID != nil {
 				ctx = context.WithValue(ctx, IntegrationKeyUnitIDKey, *row.UnitID)
 			}
-			go func(id string) {
-				_ = repository.NewIntegrationAPIKeyRepository(db).TouchLastUsed(context.Background(), id)
-			}(row.ID)
+			touchCtx := context.WithoutCancel(r.Context())
+			go func(ctx context.Context, id string) {
+				_ = repository.NewIntegrationAPIKeyRepository(db).TouchLastUsed(ctx, id)
+			}(touchCtx, row.ID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

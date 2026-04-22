@@ -33,6 +33,10 @@
       "rules": ["G101"]
     },
     {
+      "path": ".*/internal/services/microsoft_calendar_oauth\\.go",
+      "rules": ["G101"]
+    },
+    {
       "path": ".*/internal/handlers/helpers\\.go",
       "rules": ["G705"]
     },

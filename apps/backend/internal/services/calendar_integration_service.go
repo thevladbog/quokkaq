@@ -77,13 +77,13 @@ func (s *CalendarIntegrationService) clientForIntegration(ctx context.Context, i
 	case models.CalendarIntegrationKindMicrosoftGraph:
 		return nil, ErrCalendarIntegrationKindUnknown
 	case models.CalendarIntegrationKindYandexCalDAV:
-		raw, err := ssocrypto.DecryptAES256GCM(integ.AppPasswordEncrypted)
+		raw, err := ssocrypto.DecryptAES256GCM(integ.CredentialCiphertext)
 		if err != nil {
 			return nil, err
 		}
 		return caldavclient.NewYandexClient(strings.TrimSpace(integ.CaldavBaseURL), integ.Username, string(raw))
 	case models.CalendarIntegrationKindGoogleCalDAV:
-		raw, err := ssocrypto.DecryptAES256GCM(integ.AppPasswordEncrypted)
+		raw, err := ssocrypto.DecryptAES256GCM(integ.CredentialCiphertext)
 		if err != nil {
 			return nil, err
 		}
@@ -344,7 +344,7 @@ func (s *CalendarIntegrationService) CreateIntegration(companyID string, req *Cr
 	if encErr != nil {
 		return nil, encErr
 	}
-	row.AppPasswordEncrypted = enc
+	row.CredentialCiphertext = enc
 	if err := s.repo.CreateIntegration(&row); err != nil {
 		return nil, err
 	}
@@ -399,7 +399,7 @@ func (s *CalendarIntegrationService) CreateGoogleIntegration(companyID, unitID, 
 		CaldavBaseURL:        models.GoogleCalDAVBaseURL,
 		CalendarPath:         calPath,
 		Username:             email,
-		AppPasswordEncrypted: enc,
+		CredentialCiphertext: enc,
 		Timezone:             tz,
 	}
 	if err := s.repo.CreateIntegration(&row); err != nil {
@@ -452,7 +452,7 @@ func (s *CalendarIntegrationService) CreateMicrosoftGraphIntegration(companyID, 
 		CaldavBaseURL:        "https://graph.microsoft.com",
 		CalendarPath:         calID,
 		Username:             upn,
-		AppPasswordEncrypted: encStr,
+		CredentialCiphertext: encStr,
 		Timezone:             tz,
 	}
 	if err := s.repo.CreateIntegration(&row); err != nil {
@@ -541,7 +541,7 @@ func (s *CalendarIntegrationService) UpdateIntegration(companyID, integrationID 
 			if encErr != nil {
 				return nil, encErr
 			}
-			row.AppPasswordEncrypted = enc
+			row.CredentialCiphertext = enc
 		}
 	}
 	if err := s.repo.UpdateIntegration(row); err != nil {
@@ -610,7 +610,7 @@ func (s *CalendarIntegrationService) UpsertIntegration(unitID, companyID string,
 		row.Timezone = "Europe/Moscow"
 	}
 	if hasExisting {
-		row.AppPasswordEncrypted = existing.AppPasswordEncrypted
+		row.CredentialCiphertext = existing.CredentialCiphertext
 		row.ID = existing.ID
 		row.CreatedAt = existing.CreatedAt
 		row.Kind = existing.Kind
@@ -624,7 +624,7 @@ func (s *CalendarIntegrationService) UpsertIntegration(unitID, companyID string,
 		if encErr != nil {
 			return nil, encErr
 		}
-		row.AppPasswordEncrypted = enc
+		row.CredentialCiphertext = enc
 	} else if !hasExisting {
 		return nil, ErrCalendarAppPasswordRequired
 	}

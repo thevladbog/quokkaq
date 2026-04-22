@@ -24,7 +24,7 @@ func (s *CalendarIntegrationService) syncMicrosoftGraphCalendar(ctx context.Cont
 		_ = s.markSyncError(integ.ID, "microsoft oauth not configured")
 		return fmt.Errorf("microsoft oauth not configured")
 	}
-	rawRT, err := ssocrypto.DecryptAES256GCM(integ.AppPasswordEncrypted)
+	rawRT, err := ssocrypto.DecryptAES256GCM(integ.CredentialCiphertext)
 	if err != nil {
 		_ = s.markSyncError(integ.ID, err.Error())
 		return err

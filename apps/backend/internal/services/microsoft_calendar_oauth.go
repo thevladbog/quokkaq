@@ -30,6 +30,12 @@ var (
 
 var microsoftOAuthHTTPClient = &http.Client{Timeout: 20 * time.Second}
 
+// Public Microsoft identity platform OAuth 2.0 endpoints (not secrets).
+const (
+	microsoftCalendarOAuthV2AuthorizeURL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
+	microsoftCalendarOAuthV2TokenURL     = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+)
+
 // MicrosoftCalendarOAuthStatePayload is stored in Redis for the Microsoft OAuth redirect chain.
 type MicrosoftCalendarOAuthStatePayload struct {
 	CompanyID    string `json:"companyId"`
@@ -50,8 +56,8 @@ func microsoftOAuth2Config() *oauth2.Config {
 		ClientSecret: sec,
 		RedirectURL:  redir,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-			TokenURL: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+			AuthURL:  microsoftCalendarOAuthV2AuthorizeURL,
+			TokenURL: microsoftCalendarOAuthV2TokenURL,
 		},
 		Scopes: []string{
 			"offline_access",
