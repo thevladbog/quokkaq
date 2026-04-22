@@ -62,8 +62,8 @@ export function LandingPricing({
                   isFree?: boolean;
                   pricingModel?: string;
                 };
-                const isPopular = plan.isPromoted === true;
                 const isEnterprise = plan.code === 'enterprise';
+                const isPopular = plan.isPromoted === true && !isEnterprise;
                 const isCustom = plan.code === 'enterprise' && !planExt.isFree;
                 const isFree = planExt.isFree === true;
                 const isPerUnit = planExt.pricingModel === 'per_unit';
@@ -286,6 +286,9 @@ export function LandingPricing({
               })
             : copy.pricing.plans.map((plan, index) => {
                 const isCustomFallback = plan.isCustom === true;
+                const fallbackCtaId = `pricing_fallback_plan_cta__${String(index)}__${encodeURIComponent(
+                  plan.name
+                )}`;
                 return (
                   <div
                     key={plan.name}
@@ -364,7 +367,7 @@ export function LandingPricing({
                     </ul>
 
                     <MarketingTrackedCtaLink
-                      ctaId='pricing_fallback_plan_cta'
+                      ctaId={fallbackCtaId}
                       href={`${localeHomePath(locale)}#book-demo`}
                       prefetch={false}
                       className={`focus-ring mt-auto inline-flex min-h-11 items-center justify-center rounded-xl px-6 py-3 text-sm font-semibold transition ${

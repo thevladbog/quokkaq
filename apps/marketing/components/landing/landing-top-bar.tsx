@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 
 import { HomeControls } from '@/app/home-controls';
 import { pushMarketingEvent } from '@/lib/marketing-analytics';
@@ -25,10 +26,24 @@ const headerCtaClass =
 const mobileNavRowClass =
   'focus-ring block w-full rounded-lg px-3 py-2.5 text-left text-base font-medium text-[color:var(--color-text)] transition hover:bg-[color:var(--color-surface-elevated)]';
 
+function getFocusableElements(root: HTMLElement): HTMLElement[] {
+  const selector =
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  return [...root.querySelectorAll<HTMLElement>(selector)].filter(
+    (el) =>
+      !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true'
+  );
+}
+
+const MD_MIN_WIDTH = '(min-width: 768px)';
+
 export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const mobilePanelId = useId();
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileDialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => {
@@ -41,25 +56,73 @@ export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
 
   const closeMenu = useCallback(() => {
     setMenuOpen(false);
+    requestAnimationFrame(() => {
+      menuButtonRef.current?.focus();
+    });
   }, []);
 
   useEffect(() => {
     if (!menuOpen) {
       return;
     }
-    const onKey = (e: KeyboardEvent) => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape') {
+        closeMenu();
+      }
+    };
+    const mq = window.matchMedia(MD_MIN_WIDTH);
+    const onViewport = () => {
+      if (mq.matches) {
         setMenuOpen(false);
       }
     };
     document.addEventListener('keydown', onKey);
+    mq.addEventListener('change', onViewport);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', onKey);
+      mq.removeEventListener('change', onViewport);
       document.body.style.overflow = prev;
     };
+  }, [menuOpen, closeMenu]);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+    const id = requestAnimationFrame(() => {
+      mobileMenuCloseButtonRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(id);
   }, [menuOpen]);
+
+  const handleMobileMenuKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Tab' || !mobileDialogRef.current) {
+      return;
+    }
+    const focusables = getFocusableElements(mobileDialogRef.current);
+    if (focusables.length === 0) {
+      return;
+    }
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement;
+    if (!active || !focusables.includes(active as HTMLElement)) {
+      e.preventDefault();
+      first.focus();
+      return;
+    }
+    if (e.shiftKey) {
+      if (active === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (active === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
 
   const trialHref = appBaseUrl
     ? `${String(appBaseUrl).replace(/\/$/, '')}/${locale}/signup`
@@ -148,6 +211,7 @@ export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
           )}
           <div className='shrink-0 md:hidden'>
             <button
+              ref={menuButtonRef}
               type='button'
               className='focus-ring flex h-10 w-10 items-center justify-center rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)]/80 text-[color:var(--color-text)] shadow-sm'
               aria-expanded={menuOpen}
@@ -170,15 +234,17 @@ export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
 
       {menuOpen ? (
         <div
+          ref={mobileDialogRef}
           className='fixed inset-0 z-[60] md:hidden'
           id={mobilePanelId}
           role='dialog'
           aria-modal
+          tabIndex={-1}
+          onKeyDown={handleMobileMenuKeyDown}
         >
-          <button
-            type='button'
-            className='absolute inset-0 bg-[color:var(--color-text)]/40 backdrop-blur-sm'
-            aria-label={copy.topNav.closeMenu}
+          <div
+            className='absolute inset-0 cursor-default bg-[color:var(--color-text)]/40 backdrop-blur-sm'
+            role='presentation'
             onClick={closeMenu}
           />
           <div className='absolute top-0 right-0 left-0 max-h-[min(90dvh,28rem)] overflow-y-auto border-b border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3 shadow-2xl dark:bg-[color:var(--color-surface-elevated)]'>
@@ -187,6 +253,7 @@ export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
                 {copy.logoAlt}
               </span>
               <button
+                ref={mobileMenuCloseButtonRef}
                 type='button'
                 className='focus-ring rounded-md p-2 text-[color:var(--color-text)]'
                 onClick={closeMenu}
