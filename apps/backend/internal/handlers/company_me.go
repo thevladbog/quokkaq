@@ -14,6 +14,7 @@ import (
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
+	"quokkaq-go-backend/internal/subscriptionfeatures"
 )
 
 // companyPatchSsoAccessSourceOnly is the only JSON shape non-global-admin callers may send to PATCH /companies/me.
@@ -23,12 +24,20 @@ type companyPatchSsoAccessSourceOnly struct {
 	SsoAccessSource *string `json:"ssoAccessSource,omitempty"`
 }
 
+// planCapabilitiesDTO reflects subscription-gated integration features for the active company (tenant UI).
+type planCapabilitiesDTO struct {
+	APIAccess         bool `json:"apiAccess"`
+	OutboundWebhooks  bool `json:"outboundWebhooks"`
+	PublicQueueWidget bool `json:"publicQueueWidget"`
+}
+
 // companyMeResponse is returned by GET /companies/me.
 type companyMeResponse struct {
-	Company      *models.Company `json:"company"`
-	Features     FeaturesFlags   `json:"features"`
-	PublicAPIURL string          `json:"publicApiUrl" example:"https://api.example.com"`
-	PublicAppURL string          `json:"publicAppUrl" example:"https://app.example.com"`
+	Company          *models.Company     `json:"company"`
+	Features         FeaturesFlags       `json:"features"`
+	PlanCapabilities planCapabilitiesDTO `json:"planCapabilities"`
+	PublicAPIURL     string              `json:"publicApiUrl" example:"https://api.example.com"`
+	PublicAppURL     string              `json:"publicAppUrl" example:"https://app.example.com"`
 }
 
 // FeaturesFlags describes DaData-related UI toggles for the deployment.
@@ -104,12 +113,21 @@ func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	apiAccess, _ := subscriptionfeatures.CompanyHasAPIAccess(r.Context(), h.db, companyID)
+	outWebhooks, _ := subscriptionfeatures.CompanyHasOutboundWebhooks(r.Context(), h.db, companyID)
+	pubWidget, _ := subscriptionfeatures.CompanyHasPublicQueueWidget(r.Context(), h.db, companyID)
+
 	w.Header().Set("Content-Type", "application/json")
 	RespondJSON(w, companyMeResponse{
 		Company: company,
 		Features: FeaturesFlags{
 			DaData:        dadataConfigured(),
 			DaDataCleaner: dadataCleanerConfigured(),
+		},
+		PlanCapabilities: planCapabilitiesDTO{
+			APIAccess:         apiAccess,
+			OutboundWebhooks:  outWebhooks,
+			PublicQueueWidget: pubWidget,
 		},
 		PublicAPIURL: services.APIPublicURL(),
 		PublicAppURL: services.PublicAppURL(),

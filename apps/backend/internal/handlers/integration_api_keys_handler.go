@@ -88,6 +88,11 @@ func (h *IntegrationAPIKeysHandler) List(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
+	okPlan, err := subscriptionfeatures.CompanyHasAPIAccess(r.Context(), h.db, companyID)
+	if err != nil || !okPlan {
+		http.Error(w, "API access is not enabled for this subscription plan", http.StatusForbidden)
+		return
+	}
 	rows, err := h.keys.ListByCompany(r.Context(), companyID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -118,6 +123,25 @@ func (h *IntegrationAPIKeysHandler) Create(w http.ResponseWriter, r *http.Reques
 	if err != nil || !okPlan {
 		http.Error(w, "API access is not enabled for this subscription plan", http.StatusForbidden)
 		return
+	}
+	lim, err := subscriptionfeatures.CompanyPlanLimitInt(r.Context(), h.db, companyID, "integration_api_keys_max")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if lim == 0 {
+		lim = 20
+	}
+	if lim >= 0 {
+		n, err := h.keys.CountActiveByCompany(r.Context(), companyID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if n >= int64(lim) {
+			http.Error(w, "integration API key limit reached for this subscription plan", http.StatusForbidden)
+			return
+		}
 	}
 	userID, _ := middleware.GetUserIDFromContext(r.Context())
 	var req createIntegrationAPIKeyRequest
@@ -185,6 +209,11 @@ func (h *IntegrationAPIKeysHandler) Create(w http.ResponseWriter, r *http.Reques
 func (h *IntegrationAPIKeysHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	companyID, ok := h.resolveCompany(w, r)
 	if !ok {
+		return
+	}
+	okPlan, err := subscriptionfeatures.CompanyHasAPIAccess(r.Context(), h.db, companyID)
+	if err != nil || !okPlan {
+		http.Error(w, "API access is not enabled for this subscription plan", http.StatusForbidden)
 		return
 	}
 	id := strings.TrimSpace(chi.URLParam(r, "id"))

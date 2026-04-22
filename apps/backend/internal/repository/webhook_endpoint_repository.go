@@ -13,6 +13,7 @@ import (
 type WebhookEndpointRepository interface {
 	Create(ctx context.Context, row *models.WebhookEndpoint) error
 	Update(ctx context.Context, row *models.WebhookEndpoint) error
+	CountByCompany(ctx context.Context, companyID string) (int64, error)
 	ListByCompany(ctx context.Context, companyID string) ([]models.WebhookEndpoint, error)
 	GetByIDAndCompany(ctx context.Context, id, companyID string) (*models.WebhookEndpoint, error)
 	Delete(ctx context.Context, id, companyID string) error
@@ -35,6 +36,12 @@ func (r *webhookEndpointRepository) Create(ctx context.Context, row *models.Webh
 
 func (r *webhookEndpointRepository) Update(ctx context.Context, row *models.WebhookEndpoint) error {
 	return r.db.WithContext(ctx).Save(row).Error
+}
+
+func (r *webhookEndpointRepository) CountByCompany(ctx context.Context, companyID string) (int64, error) {
+	var n int64
+	err := r.db.WithContext(ctx).Model(&models.WebhookEndpoint{}).Where("company_id = ?", companyID).Count(&n).Error
+	return n, err
 }
 
 func (r *webhookEndpointRepository) ListByCompany(ctx context.Context, companyID string) ([]models.WebhookEndpoint, error) {

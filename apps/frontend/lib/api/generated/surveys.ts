@@ -1436,9 +1436,16 @@ export interface ModelsCompany {
   usageRecords?: ModelsUsageRecord[];
 }
 
+export interface HandlersPlanCapabilitiesDTO {
+  apiAccess?: boolean;
+  outboundWebhooks?: boolean;
+  publicQueueWidget?: boolean;
+}
+
 export interface HandlersCompanyMeResponse {
   company?: ModelsCompany;
   features?: HandlersFeaturesFlags;
+  planCapabilities?: HandlersPlanCapabilitiesDTO;
   publicApiUrl?: string;
   publicAppUrl?: string;
 }
@@ -1542,6 +1549,16 @@ export interface HandlersGuestSurveySubmitRequest {
   ticketId: string;
 }
 
+export interface HandlersIssuePublicWidgetTokenRequest {
+  ttlSeconds?: number;
+  unitId?: string;
+}
+
+export interface HandlersIssuePublicWidgetTokenResponse {
+  expiresInSeconds?: number;
+  token?: string;
+}
+
 export interface HandlersPatchCompanySlugRequest {
   slug: string;
 }
@@ -1567,6 +1584,12 @@ export interface HandlersPatchVisitorTagDefinitionRequest {
   color?: string;
   label?: string;
   sortOrder?: number;
+}
+
+export interface HandlersPatchWebhookEndpointRequest {
+  enabled?: boolean;
+  eventTypes?: string[];
+  url?: string;
 }
 
 export interface HandlersPlatformListResponseModelsCatalogItem {
@@ -1601,9 +1624,18 @@ export interface HandlersPostSupportReportCommentRequest {
   text?: string;
 }
 
+export interface HandlersPublicQueueWidgetSettingsDTO {
+  allowedOrigins?: string[];
+}
+
 export interface HandlersPutVisitorTagsRequest {
   operatorComment: string;
   tagDefinitionIds: string[];
+}
+
+export interface HandlersRotateWebhookSecretResponse {
+  endpoint?: HandlersWebhookEndpointDTO;
+  signingSecret?: string;
 }
 
 export interface HandlersSetupFirstAdminRequest {
@@ -1621,6 +1653,24 @@ export interface HandlersSsoExchangeRequest {
 
 export interface HandlersTenantHintRequest {
   email: string;
+}
+
+export interface HandlersWebhookDeliveryLogDTO {
+  attempt?: number;
+  createdAt?: string;
+  durationMs?: number;
+  errorMessage?: string;
+  httpStatus?: number;
+  id?: string;
+  ticketHistoryId?: string;
+  webhookEndpointId?: string;
+}
+
+export interface HandlersWebhookTestPingResponse {
+  durationMs?: number;
+  error?: string;
+  httpStatus?: number;
+  responseSnippet?: string;
 }
 
 export interface ModelsCatalogItemCreateRequest {

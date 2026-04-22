@@ -125,3 +125,8 @@ func KeyGoogleCalendarOAuthState(state string) string {
 func KeyGoogleCalendarPickSession(token string) string {
 	return KeyPrefix + "gcal-pick:" + token
 }
+
+// KeyMicrosoftCalendarOAuthState stores PKCE + unit scope for Microsoft Calendar OAuth (admin flow).
+func KeyMicrosoftCalendarOAuthState(state string) string {
+	return KeyPrefix + "mscal-oauth:" + state
+}

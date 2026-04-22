@@ -535,3 +535,56 @@ func TestCalendarIntegrationService_UpdateIntegration_GoogleRejectsImmutableCalD
 		t.Fatalf("timezone: %s", up.Timezone)
 	}
 }
+
+func TestCalendarIntegrationService_UpdateIntegration_MicrosoftRejectsImmutableCalDAVFields(t *testing.T) {
+	defer setupCalendarIntegrationServiceTestDB(t)()
+	svc := newTestCalendarService()
+	if err := database.DB.Create(&models.Unit{
+		ID:        "unit-ms2",
+		CompanyID: "co-ms2",
+		Code:      "ms2",
+		Kind:      models.UnitKindSubdivision,
+		Name:      "MS2",
+		Timezone:  "UTC",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	pub, err := svc.CreateMicrosoftGraphIntegration(
+		"co-ms2",
+		"unit-ms2",
+		"refresh-token-ms",
+		"primary",
+		"user@outlook.com",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = svc.UpdateIntegration("co-ms2", pub.ID, &UpdateCalendarIntegrationRequest{
+		DisplayName:   "Renamed",
+		Enabled:       boolPtr(true),
+		CaldavBaseURL: "https://evil.example",
+		CalendarPath:  "other-cal",
+		Username:      "hacker@evil.com",
+		Timezone:      "Europe/London",
+	})
+	if !errors.Is(err, ErrCalendarGoogleCalDAVIdentityImmutable) {
+		t.Fatalf("update: want ErrCalendarGoogleCalDAVIdentityImmutable, got %v", err)
+	}
+	up, err := svc.UpdateIntegration("co-ms2", pub.ID, &UpdateCalendarIntegrationRequest{
+		DisplayName:   "Renamed OK",
+		Enabled:       boolPtr(true),
+		CaldavBaseURL: pub.CaldavBaseURL,
+		CalendarPath:  pub.CalendarPath,
+		Username:      pub.Username,
+		Timezone:      "Europe/London",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if up.DisplayName != "Renamed OK" {
+		t.Fatalf("display name: %s", up.DisplayName)
+	}
+	if up.Timezone != "Europe/London" {
+		t.Fatalf("timezone: %s", up.Timezone)
+	}
+}

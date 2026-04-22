@@ -30,6 +30,12 @@ func GetIntegrationKeyCompanyID(ctx context.Context) (string, bool) {
 	return v, ok && strings.TrimSpace(v) != ""
 }
 
+// GetIntegrationKeyID returns the integration API key id from context (set by IntegrationAPIKeyAuth).
+func GetIntegrationKeyID(ctx context.Context) (string, bool) {
+	v, ok := ctx.Value(IntegrationKeyIDKey).(string)
+	return v, ok && strings.TrimSpace(v) != ""
+}
+
 // GetIntegrationKeyScopes returns scope strings from the active integration key.
 func GetIntegrationKeyScopes(ctx context.Context) []string {
 	v, _ := ctx.Value(IntegrationKeyScopesKey).([]string)

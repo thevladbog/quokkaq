@@ -78,6 +78,28 @@ export function IntegrationsSettingsContent() {
   });
 
   const company = companyMe.data?.company;
+  const planCaps = companyMe.data?.planCapabilities;
+  const apiAccess = planCaps?.apiAccess ?? false;
+  const outboundWebhooks = planCaps?.outboundWebhooks ?? false;
+  const publicQueueWidget = planCaps?.publicQueueWidget ?? false;
+  const showApiTab = apiAccess || outboundWebhooks || publicQueueWidget;
+
+  useEffect(() => {
+    if (tabParam === 'api' && companyMe.isSuccess && company && !showApiTab) {
+      const q = new URLSearchParams(searchParams.toString());
+      q.delete('tab');
+      const suffix = q.toString();
+      router.replace(suffix ? `${pathname}?${suffix}` : pathname);
+    }
+  }, [
+    tabParam,
+    companyMe.isSuccess,
+    company,
+    showApiTab,
+    pathname,
+    router,
+    searchParams
+  ]);
 
   const unitOptions = useMemo(() => {
     const list = unitsQuery.data ?? [];
@@ -109,6 +131,7 @@ export function IntegrationsSettingsContent() {
   }, [searchParams, unitOptions]);
 
   const googleOAuthToastHandled = useRef(false);
+  const microsoftOAuthToastHandled = useRef(false);
   const googlePickUrlHandled = useRef(false);
   const [googlePickToken, setGooglePickToken] = useState<string | null>(null);
 
@@ -186,6 +209,52 @@ export function IntegrationsSettingsContent() {
     }
   }, [searchParams, pathname, router, tCal]);
 
+  useEffect(() => {
+    const m = searchParams.get('microsoft_calendar');
+    if (!m) {
+      microsoftOAuthToastHandled.current = false;
+      return;
+    }
+    if (microsoftOAuthToastHandled.current) return;
+    microsoftOAuthToastHandled.current = true;
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete('microsoft_calendar');
+    next.delete('reason');
+    const suffix = next.toString();
+    router.replace(suffix ? `${pathname}?${suffix}` : pathname);
+    if (m === 'connected') {
+      toast.success(tCal('microsoft_oauth_success_toast'));
+      return;
+    }
+    if (m === 'error') {
+      const reason = searchParams.get('reason') ?? '';
+      let msg = tCal('microsoft_oauth_error_toast');
+      switch (reason) {
+        case 'no_refresh_token':
+          msg = tCal('microsoft_oauth_err_no_refresh');
+          break;
+        case 'not_configured':
+          msg = tCal('microsoft_oauth_err_not_configured');
+          break;
+        case 'userinfo':
+          msg = tCal('microsoft_oauth_err_userinfo');
+          break;
+        case 'limit':
+          msg = tCal('microsoft_oauth_err_limit');
+          break;
+        case 'forbidden':
+          msg = tCal('microsoft_oauth_err_forbidden');
+          break;
+        case 'session':
+          msg = tCal('microsoft_oauth_err_session');
+          break;
+        default:
+          break;
+      }
+      toast.error(msg);
+    }
+  }, [searchParams, pathname, router, tCal]);
+
   if (companyMe.isLoading) {
     return (
       <div className='flex justify-center py-12'>
@@ -218,7 +287,9 @@ export function IntegrationsSettingsContent() {
         <TabsList className='mb-6'>
           <TabsTrigger value='calendars'>{t('tab_calendars')}</TabsTrigger>
           <TabsTrigger value='auth'>{t('tab_authentication')}</TabsTrigger>
-          <TabsTrigger value='api'>{t('tab_api')}</TabsTrigger>
+          {showApiTab ? (
+            <TabsTrigger value='api'>{t('tab_api')}</TabsTrigger>
+          ) : null}
         </TabsList>
 
         <TabsContent value='calendars' className='space-y-6'>
@@ -275,12 +346,20 @@ export function IntegrationsSettingsContent() {
           </Card>
         </TabsContent>
 
-        <TabsContent value='api' className='space-y-6'>
-          <DeveloperApiIntegrations
-            locale={locale}
-            unitOptions={unitOptionsForProps}
-          />
-        </TabsContent>
+        {showApiTab ? (
+          <TabsContent value='api' className='space-y-6'>
+            <DeveloperApiIntegrations
+              locale={locale}
+              unitOptions={unitOptionsForProps}
+              planCapabilities={{
+                apiAccess,
+                outboundWebhooks,
+                publicQueueWidget
+              }}
+              publicApiUrl={companyMe.data?.publicApiUrl}
+            />
+          </TabsContent>
+        ) : null}
 
         <TabsContent value='auth' className='space-y-6'>
           {ssoQ.isLoading && (

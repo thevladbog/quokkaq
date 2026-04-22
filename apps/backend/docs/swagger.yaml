@@ -1233,6 +1233,8 @@ components:
                     $ref: '#/components/schemas/models.Company'
                 features:
                     $ref: '#/components/schemas/handlers.FeaturesFlags'
+                planCapabilities:
+                    $ref: '#/components/schemas/handlers.planCapabilitiesDTO'
                 publicApiUrl:
                     example: https://api.example.com
                     type: string
@@ -1366,6 +1368,20 @@ components:
                 unitId:
                     type: string
             type: object
+        handlers.issuePublicWidgetTokenRequest:
+            properties:
+                ttlSeconds:
+                    type: integer
+                unitId:
+                    type: string
+            type: object
+        handlers.issuePublicWidgetTokenResponse:
+            properties:
+                expiresInSeconds:
+                    type: integer
+                token:
+                    type: string
+            type: object
         handlers.operatorSkillInput:
             properties:
                 priority:
@@ -1413,6 +1429,26 @@ components:
                     type: string
                 sortOrder:
                     type: integer
+            type: object
+        handlers.patchWebhookEndpointRequest:
+            properties:
+                enabled:
+                    type: boolean
+                eventTypes:
+                    items:
+                        type: string
+                    type: array
+                url:
+                    type: string
+            type: object
+        handlers.planCapabilitiesDTO:
+            properties:
+                apiAccess:
+                    type: boolean
+                outboundWebhooks:
+                    type: boolean
+                publicQueueWidget:
+                    type: boolean
             type: object
         handlers.platformListResponse-models_CatalogItem:
             properties:
@@ -1471,6 +1507,13 @@ components:
                 text:
                     type: string
             type: object
+        handlers.publicQueueWidgetSettingsDTO:
+            properties:
+                allowedOrigins:
+                    items:
+                        type: string
+                    type: array
+            type: object
         handlers.putVisitorTagsRequest:
             properties:
                 operatorComment:
@@ -1482,6 +1525,13 @@ components:
             required:
                 - operatorComment
                 - tagDefinitionIds
+            type: object
+        handlers.rotateWebhookSecretResponse:
+            properties:
+                endpoint:
+                    $ref: '#/components/schemas/handlers.webhookEndpointDTO'
+                signingSecret:
+                    type: string
             type: object
         handlers.setupFirstAdminRequest:
             properties:
@@ -1517,6 +1567,25 @@ components:
             required:
                 - email
             type: object
+        handlers.webhookDeliveryLogDTO:
+            properties:
+                attempt:
+                    type: integer
+                createdAt:
+                    type: string
+                durationMs:
+                    type: integer
+                errorMessage:
+                    type: string
+                httpStatus:
+                    type: integer
+                id:
+                    type: string
+                ticketHistoryId:
+                    type: string
+                webhookEndpointId:
+                    type: string
+            type: object
         handlers.webhookEndpointDTO:
             properties:
                 companyId:
@@ -1538,6 +1607,17 @@ components:
                 unitId:
                     type: string
                 url:
+                    type: string
+            type: object
+        handlers.webhookTestPingResponse:
+            properties:
+                durationMs:
+                    type: integer
+                error:
+                    type: string
+                httpStatus:
+                    type: integer
+                responseSnippet:
                     type: string
             type: object
         models.Booking:
@@ -4562,6 +4642,28 @@ paths:
             summary: Google Calendar OAuth callback (browser redirect)
             tags:
                 - calendar-integration
+    /calendar-integrations/microsoft/oauth/callback:
+        get:
+            operationId: calendarIntegrationMicrosoftOAuthCallback
+            parameters:
+                - description: Authorization code from Microsoft
+                  in: query
+                  name: code
+                  required: true
+                  schema:
+                    type: string
+                - description: OAuth state (PKCE session key)
+                  in: query
+                  name: state
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "302":
+                    description: Redirect to returnPath with microsoft_calendar=connected or error query params
+            summary: Microsoft Calendar OAuth callback (browser redirect)
+            tags:
+                - calendar-integration
     /commerceml/exchange:
         get:
             description: 'Bitrix-style protocol: type=sale with mode=checkauth|query|import|file; session from checkauth via sessid or session query param. Import body is CommerceML XML (up to 8 MiB).'
@@ -5596,6 +5698,35 @@ paths:
             summary: Start Google Calendar OAuth (returns authorize URL)
             tags:
                 - calendar-integration
+    /companies/me/calendar-integrations/microsoft/oauth/start:
+        post:
+            operationId: calendarIntegrationMicrosoftOAuthStart
+            parameters:
+                - description: Optional company selector for admins with multiple companies
+                  in: header
+                  name: X-Company-Id
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/handlers.GoogleCalendarOAuthStartRequest'
+                description: 'Payload (same shape as Google: unitId, returnPath)'
+                required: true
+                x-originalParamName: body
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.GoogleCalendarOAuthStartResponse'
+                    description: OK
+            security:
+                - BearerAuth: []
+            summary: Start Microsoft 365 / Outlook Calendar OAuth (returns authorize URL)
+            tags:
+                - calendar-integration
     /companies/me/complete-onboarding:
         post:
             description: Marks onboarding as complete for the user's company
@@ -5707,6 +5838,63 @@ paths:
             summary: Create opaque login link
             tags:
                 - companies
+    /companies/me/public-queue-widget-settings:
+        get:
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.publicQueueWidgetSettingsDTO'
+                    description: OK
+            security:
+                - BearerAuth: []
+            summary: Get CORS allowlist origins for the public queue widget
+            tags:
+                - integrations
+        patch:
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/handlers.publicQueueWidgetSettingsDTO'
+                description: Allowlist (empty clears CORS restriction)
+                required: true
+                x-originalParamName: body
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.publicQueueWidgetSettingsDTO'
+                    description: OK
+            security:
+                - BearerAuth: []
+            summary: Set CORS allowlist origins for the public queue widget
+            tags:
+                - integrations
+    /companies/me/public-widget-token:
+        post:
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/handlers.issuePublicWidgetTokenRequest'
+                description: Payload
+                required: true
+                x-originalParamName: body
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.issuePublicWidgetTokenResponse'
+                    description: OK
+            security:
+                - BearerAuth: []
+            summary: Mint a short-lived JWT for the public queue status widget
+            tags:
+                - integrations
     /companies/me/rbac/permissions:
         get:
             description: Returns the canonical permission strings shared by all tenants; used when defining tenant roles.
@@ -6492,6 +6680,33 @@ paths:
             summary: Replace tenant role assignments for a user
             tags:
                 - companies
+    /companies/me/webhook-delivery-logs:
+        get:
+            parameters:
+                - description: Filter by webhook endpoint id
+                  in: query
+                  name: endpointId
+                  schema:
+                    type: string
+                - description: Max rows (default 50, max 200)
+                  in: query
+                  name: limit
+                  schema:
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                items:
+                                    $ref: '#/components/schemas/handlers.webhookDeliveryLogDTO'
+                                type: array
+                    description: OK
+            security:
+                - BearerAuth: []
+            summary: List webhook delivery logs
+            tags:
+                - integrations
     /companies/me/webhook-endpoints:
         get:
             responses:
@@ -6544,6 +6759,76 @@ paths:
             security:
                 - BearerAuth: []
             summary: Delete webhook endpoint
+            tags:
+                - integrations
+        patch:
+            parameters:
+                - description: Endpoint ID
+                  in: path
+                  name: id
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/handlers.patchWebhookEndpointRequest'
+                description: Fields to update
+                required: true
+                x-originalParamName: body
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.webhookEndpointDTO'
+                    description: OK
+            security:
+                - BearerAuth: []
+            summary: Update webhook endpoint (partial)
+            tags:
+                - integrations
+    /companies/me/webhook-endpoints/{id}/rotate-secret:
+        post:
+            parameters:
+                - description: Endpoint ID
+                  in: path
+                  name: id
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.rotateWebhookSecretResponse'
+                    description: OK
+            security:
+                - BearerAuth: []
+            summary: Rotate webhook signing secret
+            tags:
+                - integrations
+    /companies/me/webhook-endpoints/{id}/test:
+        post:
+            parameters:
+                - description: Endpoint ID
+                  in: path
+                  name: id
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.webhookTestPingResponse'
+                    description: OK
+            security:
+                - BearerAuth: []
+            summary: Send a signed test ping to a webhook endpoint
             tags:
                 - integrations
     /counters/{id}:
@@ -7249,6 +7534,25 @@ paths:
             summary: Readiness probe (HEAD)
             tags:
                 - health
+    /integrations/v1/units/{unitId}/queue-summary:
+        get:
+            parameters:
+                - description: Unit ID
+                  in: path
+                  name: unitId
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/services.UnitQueueSummary'
+                    description: OK
+            summary: Queue summary for integration API (same payload as public queue-status, authenticated by integration key)
+            tags:
+                - integrations
     /invitations:
         get:
             description: Lists invitations for the resolved tenant company only.
@@ -13399,13 +13703,18 @@ paths:
                 - pre-registrations
     /units/{unitId}/queue-status:
         get:
-            description: Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required.
+            description: Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required. Requires subscription plan feature public_queue_widget.
             operationId: getUnitQueueStatus
             parameters:
                 - description: Unit ID
                   in: path
                   name: unitId
                   required: true
+                  schema:
+                    type: string
+                - description: Optional embed JWT from POST /companies/me/public-widget-token
+                  in: query
+                  name: token
                   schema:
                     type: string
             responses:

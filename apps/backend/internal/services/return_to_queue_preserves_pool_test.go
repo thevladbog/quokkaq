@@ -59,6 +59,25 @@ CREATE TABLE ticket_histories (
 	payload blob,
 	created_at datetime
 );
+CREATE TABLE companies (
+	id text PRIMARY KEY,
+	subscription_id text,
+	is_saas_operator integer NOT NULL DEFAULT 0
+);
+CREATE TABLE units (
+	id text PRIMARY KEY,
+	company_id text NOT NULL
+);
+CREATE TABLE subscription_plans (
+	id text PRIMARY KEY,
+	features text
+);
+CREATE TABLE subscriptions (
+	id text PRIMARY KEY,
+	plan_id text
+);
+INSERT INTO companies (id, is_saas_operator) VALUES ('c-rtq', 0);
+INSERT INTO units (id, company_id) VALUES ('u-rtq', 'c-rtq');
 `).Error; err != nil {
 		t.Fatal(err)
 	}

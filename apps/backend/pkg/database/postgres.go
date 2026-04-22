@@ -2378,15 +2378,16 @@ END $$;
 	}
 
 	err = manager.RunMigration("v1.8.0_integrations_api_keys_webhooks_outbox", func(db *gorm.DB) error {
+		// company_id / unit_id / user ids / ticket_history ids are TEXT (GORM string PKs), same as companies.id — not PostgreSQL uuid.
 		if err := db.Exec(`
 CREATE TABLE IF NOT EXISTS integration_api_keys (
-	id uuid PRIMARY KEY,
-	company_id uuid NOT NULL REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE,
-	unit_id uuid REFERENCES units(id) ON UPDATE CASCADE ON DELETE SET NULL,
+	id TEXT PRIMARY KEY,
+	company_id TEXT NOT NULL REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE,
+	unit_id TEXT REFERENCES units(id) ON UPDATE CASCADE ON DELETE SET NULL,
 	name text NOT NULL,
 	secret_hash text NOT NULL,
 	scopes jsonb NOT NULL DEFAULT '[]'::jsonb,
-	created_by_user_id uuid REFERENCES users(id) ON UPDATE CASCADE ON DELETE SET NULL,
+	created_by_user_id TEXT REFERENCES users(id) ON UPDATE CASCADE ON DELETE SET NULL,
 	revoked_at timestamptz,
 	last_used_at timestamptz,
 	created_at timestamptz NOT NULL DEFAULT now(),
@@ -2396,9 +2397,9 @@ CREATE INDEX IF NOT EXISTS idx_integration_api_keys_company_id ON integration_ap
 CREATE INDEX IF NOT EXISTS idx_integration_api_keys_unit_id ON integration_api_keys(unit_id);
 
 CREATE TABLE IF NOT EXISTS webhook_endpoints (
-	id uuid PRIMARY KEY,
-	company_id uuid NOT NULL REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE,
-	unit_id uuid REFERENCES units(id) ON UPDATE CASCADE ON DELETE SET NULL,
+	id TEXT PRIMARY KEY,
+	company_id TEXT NOT NULL REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE,
+	unit_id TEXT REFERENCES units(id) ON UPDATE CASCADE ON DELETE SET NULL,
 	url text NOT NULL,
 	signing_secret text NOT NULL,
 	event_types jsonb NOT NULL DEFAULT '[]'::jsonb,
@@ -2410,9 +2411,9 @@ CREATE TABLE IF NOT EXISTS webhook_endpoints (
 CREATE INDEX IF NOT EXISTS idx_webhook_endpoints_company_id ON webhook_endpoints(company_id);
 
 CREATE TABLE IF NOT EXISTS webhook_delivery_logs (
-	id uuid PRIMARY KEY,
-	webhook_endpoint_id uuid NOT NULL REFERENCES webhook_endpoints(id) ON UPDATE CASCADE ON DELETE CASCADE,
-	ticket_history_id uuid REFERENCES ticket_histories(id) ON UPDATE CASCADE ON DELETE SET NULL,
+	id TEXT PRIMARY KEY,
+	webhook_endpoint_id TEXT NOT NULL REFERENCES webhook_endpoints(id) ON UPDATE CASCADE ON DELETE CASCADE,
+	ticket_history_id TEXT REFERENCES ticket_histories(id) ON UPDATE CASCADE ON DELETE SET NULL,
 	http_status integer,
 	response_snippet text,
 	duration_ms integer NOT NULL DEFAULT 0,
@@ -2423,9 +2424,9 @@ CREATE TABLE IF NOT EXISTS webhook_delivery_logs (
 CREATE INDEX IF NOT EXISTS idx_webhook_delivery_logs_endpoint ON webhook_delivery_logs(webhook_endpoint_id);
 
 CREATE TABLE IF NOT EXISTS webhook_outbox (
-	id uuid PRIMARY KEY,
-	company_id uuid NOT NULL REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE,
-	ticket_history_id uuid NOT NULL REFERENCES ticket_histories(id) ON UPDATE CASCADE ON DELETE CASCADE,
+	id TEXT PRIMARY KEY,
+	company_id TEXT NOT NULL REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE,
+	ticket_history_id TEXT NOT NULL REFERENCES ticket_histories(id) ON UPDATE CASCADE ON DELETE CASCADE,
 	created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_webhook_outbox_created_at ON webhook_outbox(created_at);
@@ -2466,6 +2467,51 @@ WHERE code = 'starter';
 	})
 	if err != nil {
 		return fmt.Errorf("failed to run v1.8.1_subscription_plan_integration_features migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.8.2_webhook_outbox_retry", func(db *gorm.DB) error {
+		if err := db.Exec(`
+ALTER TABLE webhook_outbox
+	ADD COLUMN IF NOT EXISTS attempt_count integer NOT NULL DEFAULT 0,
+	ADD COLUMN IF NOT EXISTS next_attempt_at timestamptz NOT NULL DEFAULT now(),
+	ADD COLUMN IF NOT EXISTS locked_until timestamptz;
+CREATE INDEX IF NOT EXISTS idx_webhook_outbox_next_attempt ON webhook_outbox(next_attempt_at ASC, created_at ASC);
+`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.2_webhook_outbox_retry migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.8.3_subscription_plan_integration_limits", func(db *gorm.DB) error {
+		if err := db.Exec(`
+UPDATE subscription_plans
+SET limits = COALESCE(limits, '{}'::jsonb) || '{"integration_api_keys_max": 2}'::jsonb
+WHERE code = 'starter' AND limits->'integration_api_keys_max' IS NULL;
+UPDATE subscription_plans
+SET limits = COALESCE(limits, '{}'::jsonb) || '{"webhook_endpoints_max": 2}'::jsonb
+WHERE code = 'starter' AND limits->'webhook_endpoints_max' IS NULL;
+UPDATE subscription_plans
+SET limits = COALESCE(limits, '{}'::jsonb) || '{"integration_api_keys_max": 20}'::jsonb
+WHERE code = 'professional' AND limits->'integration_api_keys_max' IS NULL;
+UPDATE subscription_plans
+SET limits = COALESCE(limits, '{}'::jsonb) || '{"webhook_endpoints_max": 20}'::jsonb
+WHERE code = 'professional' AND limits->'webhook_endpoints_max' IS NULL;
+UPDATE subscription_plans
+SET limits = COALESCE(limits, '{}'::jsonb) || '{"integration_api_keys_max": -1}'::jsonb
+WHERE code IN ('enterprise', 'grandfathered') AND limits->'integration_api_keys_max' IS NULL;
+UPDATE subscription_plans
+SET limits = COALESCE(limits, '{}'::jsonb) || '{"webhook_endpoints_max": -1}'::jsonb
+WHERE code IN ('enterprise', 'grandfathered') AND limits->'webhook_endpoints_max' IS NULL;
+`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.3_subscription_plan_integration_limits migration: %w", err)
 	}
 
 	fmt.Println("✅ All migrations completed successfully")

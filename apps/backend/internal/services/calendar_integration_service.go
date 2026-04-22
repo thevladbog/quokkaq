@@ -408,6 +408,59 @@ func (s *CalendarIntegrationService) CreateGoogleIntegration(companyID, unitID, 
 	return s.GetPublicByID(row.ID)
 }
 
+// CreateMicrosoftGraphIntegration persists a microsoft_graph row after OAuth (refresh token encrypted).
+func (s *CalendarIntegrationService) CreateMicrosoftGraphIntegration(companyID, unitID, refreshToken, calendarID, upn string) (*CalendarIntegrationPublic, error) {
+	if err := s.VerifyUnitBelongsToCompany(unitID, companyID); err != nil {
+		return nil, err
+	}
+	n, err := s.repo.CountByUnitID(unitID)
+	if err != nil {
+		return nil, err
+	}
+	if n >= MaxCalendarIntegrationsPerUnit {
+		return nil, ErrCalendarIntegrationLimit
+	}
+	rt := strings.TrimSpace(refreshToken)
+	if rt == "" {
+		return nil, ErrMicrosoftCalendarOAuthNoRefreshToken
+	}
+	upn = strings.TrimSpace(upn)
+	if upn == "" {
+		return nil, ErrMicrosoftCalendarOAuthUserinfo
+	}
+	calID := strings.TrimSpace(calendarID)
+	if calID == "" {
+		calID = "primary"
+	}
+	u, err := s.unitRepo.FindByIDLight(unitID)
+	if err != nil {
+		return nil, err
+	}
+	tz := strings.TrimSpace(u.Timezone)
+	if tz == "" {
+		tz = "Europe/Moscow"
+	}
+	encStr, encErr := ssocrypto.EncryptAES256GCM([]byte(rt))
+	if encErr != nil {
+		return nil, encErr
+	}
+	row := models.UnitCalendarIntegration{
+		UnitID:               unitID,
+		Kind:                 models.CalendarIntegrationKindMicrosoftGraph,
+		DisplayName:          fmt.Sprintf("Microsoft 365 (%s)", upn),
+		Enabled:              true,
+		CaldavBaseURL:        "https://graph.microsoft.com",
+		CalendarPath:         calID,
+		Username:             upn,
+		AppPasswordEncrypted: encStr,
+		Timezone:             tz,
+	}
+	if err := s.repo.CreateIntegration(&row); err != nil {
+		return nil, err
+	}
+	return s.GetPublicByID(row.ID)
+}
+
 // UpdateCalendarIntegrationRequest is PUT body (unitId changes not allowed in MVP).
 type UpdateCalendarIntegrationRequest struct {
 	DisplayName       string `json:"displayName,omitempty"`
@@ -445,7 +498,8 @@ func (s *CalendarIntegrationService) UpdateIntegration(companyID, integrationID 
 	if kind == "" {
 		kind = models.CalendarIntegrationKindYandexCalDAV
 	}
-	if kind == models.CalendarIntegrationKindGoogleCalDAV {
+	if kind == models.CalendarIntegrationKindGoogleCalDAV ||
+		kind == models.CalendarIntegrationKindMicrosoftGraph {
 		reqBase := strings.TrimSpace(req.CaldavBaseURL)
 		if reqBase != "" && reqBase != row.CaldavBaseURL {
 			return nil, ErrCalendarGoogleCalDAVIdentityImmutable
@@ -462,7 +516,9 @@ func (s *CalendarIntegrationService) UpdateIntegration(companyID, integrationID 
 		row.Enabled = *req.Enabled
 		row.Timezone = req.Timezone
 		row.AdminNotifyEmails = req.AdminNotifyEmails
-		row.CaldavBaseURL = models.GoogleCalDAVBaseURL
+		if kind == models.CalendarIntegrationKindGoogleCalDAV {
+			row.CaldavBaseURL = models.GoogleCalDAVBaseURL
+		}
 		if row.Timezone == "" {
 			row.Timezone = "Europe/Moscow"
 		}
@@ -591,7 +647,7 @@ func (s *CalendarIntegrationService) UpsertIntegration(unitID, companyID string,
 	return s.GetPublic(unitID, companyID)
 }
 
-// SyncIntegration pulls CalDAV events for one integration id.
+// SyncIntegration pulls external calendar events for one integration id.
 func (s *CalendarIntegrationService) SyncIntegration(ctx context.Context, integrationID string) error {
 	integ, err := s.repo.GetByID(integrationID)
 	if err != nil {
@@ -603,11 +659,11 @@ func (s *CalendarIntegrationService) SyncIntegration(ctx context.Context, integr
 	if !integ.Enabled {
 		return nil
 	}
-	if strings.TrimSpace(integ.Kind) == models.CalendarIntegrationKindMicrosoftGraph {
-		// OAuth + Graph sync path is not shipped yet; keep row enabled for forward compatibility.
-		_ = s.repo.UpdateSyncMeta(integ.ID, time.Now().UTC(), "")
-		return nil
-	}
+	d := calendarSyncDriverFor(integ.Kind)
+	return d.Sync(ctx, s, integ)
+}
+
+func (s *CalendarIntegrationService) syncCalDAVStyle(ctx context.Context, integ *models.UnitCalendarIntegration) error {
 	unitID := integ.UnitID
 	client, err := s.clientForIntegration(ctx, integ)
 	if err != nil {

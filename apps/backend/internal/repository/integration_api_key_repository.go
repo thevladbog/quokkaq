@@ -13,6 +13,7 @@ import (
 type IntegrationAPIKeyRepository interface {
 	Create(ctx context.Context, key *models.IntegrationAPIKey) error
 	ListByCompany(ctx context.Context, companyID string) ([]models.IntegrationAPIKey, error)
+	CountActiveByCompany(ctx context.Context, companyID string) (int64, error)
 	FindActiveByIDAndCompany(ctx context.Context, id, companyID string) (*models.IntegrationAPIKey, error)
 	Revoke(ctx context.Context, id, companyID string) error
 	TouchLastUsed(ctx context.Context, id string) error
@@ -34,6 +35,13 @@ func (r *integrationAPIKeyRepository) ListByCompany(ctx context.Context, company
 	var rows []models.IntegrationAPIKey
 	err := r.db.WithContext(ctx).Where("company_id = ?", companyID).Order("created_at DESC").Find(&rows).Error
 	return rows, err
+}
+
+func (r *integrationAPIKeyRepository) CountActiveByCompany(ctx context.Context, companyID string) (int64, error) {
+	var n int64
+	err := r.db.WithContext(ctx).Model(&models.IntegrationAPIKey{}).
+		Where("company_id = ? AND revoked_at IS NULL", companyID).Count(&n).Error
+	return n, err
 }
 
 func (r *integrationAPIKeyRepository) FindActiveByIDAndCompany(ctx context.Context, id, companyID string) (*models.IntegrationAPIKey, error) {

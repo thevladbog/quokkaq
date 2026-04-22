@@ -279,6 +279,8 @@ func run() error {
 	webhookEndpointRepo := repository.NewWebhookEndpointRepository(database.DB)
 	integrationAPIKeysHandler := handlers.NewIntegrationAPIKeysHandler(database.DB, integrationAPIKeyRepo, userRepo, unitRepo)
 	webhookEndpointsHandler := handlers.NewWebhookEndpointsHandler(database.DB, webhookEndpointRepo, userRepo, unitRepo)
+	webhookDeliveryLogsHandler := handlers.NewWebhookDeliveryLogsHandler(database.DB, userRepo)
+	publicWidgetTokenHandler := handlers.NewPublicWidgetTokenHandler(database.DB, userRepo, unitRepo)
 	unitClientHandler := handlers.NewUnitClientHandler(unitClientService, ticketService)
 	visitorTagHandler := handlers.NewVisitorTagHandler(visitorTagDefService)
 	uploadHandler := handlers.NewUploadHandler(storageService)
@@ -335,7 +337,7 @@ func run() error {
 		yReturn,
 		pubApp,
 	)
-	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo, tenantRBACRepo)
+	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo, tenantRBACRepo, database.DB)
 	onecSettingsHandler := handlers.NewOneCSettingsHandler(companyRepo, onecSettingsRepo)
 	commerceMLExchangeHandler := handlers.NewCommerceMLExchangeHandler(companyRepo, invoiceRepo, onecSettingsRepo, onecSessionStore)
 	platformHandler := handlers.NewPlatformHandler(companyRepo, subscriptionRepo, invoiceRepo, catalogRepo)
@@ -461,6 +463,7 @@ func run() error {
 
 	// Google Calendar OAuth browser callback (must match GOOGLE_CALENDAR_OAUTH_REDIRECT_URL path on API origin, not under /auth).
 	r.With(authmiddleware.SSOCallbackRateLimit).Get("/calendar-integrations/google/oauth/callback", calendarIntegrationHandler.GoogleOAuthCallback)
+	r.With(authmiddleware.SSOCallbackRateLimit).Get("/calendar-integrations/microsoft/oauth/callback", calendarIntegrationHandler.MicrosoftOAuthCallback)
 
 	r.Route("/system", func(r chi.Router) {
 		r.Get("/status", userHandler.GetSystemStatus)
@@ -666,8 +669,10 @@ func run() error {
 
 	r.Route("/integrations/v1", func(r chi.Router) {
 		r.Use(authmiddleware.IntegrationAPIKeyAuth(database.DB))
+		r.Use(authmiddleware.IntegrationAPIRateLimit)
 		r.Use(authmiddleware.RequireIntegrationUnitBelongsToCompany(unitRepo, "unitId"))
 		r.With(authmiddleware.RequireIntegrationAPIScope("tickets:read"), authmiddleware.RequireIntegrationUnitURLMatch("unitId")).Get("/units/{unitId}/tickets", ticketHandler.GetTicketsByUnit)
+		r.With(authmiddleware.RequireIntegrationAPIScope("tickets:read"), authmiddleware.RequireIntegrationUnitURLMatch("unitId")).Get("/units/{unitId}/queue-summary", ticketHandler.GetIntegrationUnitQueueSummary)
 		r.With(authmiddleware.RequireIntegrationAPIScope("tickets:write"), authmiddleware.RequireIntegrationUnitURLMatch("unitId")).Post("/units/{unitId}/tickets", ticketHandler.CreateTicket)
 	})
 
@@ -765,6 +770,7 @@ func run() error {
 			r.Post("/me/login-links", companySSOHTTP.CreateOpaqueLoginLink)
 			r.Get("/me/calendar-integrations", calendarIntegrationHandler.ListMine)
 			r.Post("/me/calendar-integrations/google/oauth/start", calendarIntegrationHandler.GoogleOAuthStart)
+			r.Post("/me/calendar-integrations/microsoft/oauth/start", calendarIntegrationHandler.MicrosoftOAuthStart)
 			r.Post("/me/calendar-integrations/google/oauth/list-calendars", calendarIntegrationHandler.GooglePickListCalendars)
 			r.Post("/me/calendar-integrations/google/oauth/complete", calendarIntegrationHandler.GooglePickComplete)
 			r.Post("/me/calendar-integrations", calendarIntegrationHandler.CreateMine)
@@ -775,7 +781,14 @@ func run() error {
 			r.Delete("/me/integration-api-keys/{id}", integrationAPIKeysHandler.Revoke)
 			r.Get("/me/webhook-endpoints", webhookEndpointsHandler.List)
 			r.Post("/me/webhook-endpoints", webhookEndpointsHandler.Create)
+			r.Post("/me/webhook-endpoints/{id}/rotate-secret", webhookEndpointsHandler.RotateSecret)
+			r.Post("/me/webhook-endpoints/{id}/test", webhookEndpointsHandler.TestPing)
+			r.Patch("/me/webhook-endpoints/{id}", webhookEndpointsHandler.Patch)
 			r.Delete("/me/webhook-endpoints/{id}", webhookEndpointsHandler.Delete)
+			r.Get("/me/webhook-delivery-logs", webhookDeliveryLogsHandler.List)
+			r.Post("/me/public-widget-token", publicWidgetTokenHandler.Issue)
+			r.Get("/me/public-queue-widget-settings", publicWidgetTokenHandler.GetPublicQueueWidgetSettings)
+			r.Patch("/me/public-queue-widget-settings", publicWidgetTokenHandler.PatchPublicQueueWidgetSettings)
 			r.Post("/dadata/party/find-by-inn", dadataHandler.FindPartyByInn)
 			r.Post("/dadata/party/suggest", dadataHandler.SuggestParty)
 			r.Post("/dadata/address/suggest", dadataHandler.SuggestAddress)

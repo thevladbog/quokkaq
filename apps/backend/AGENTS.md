@@ -48,6 +48,13 @@ auth, users, units, tickets, services, counters, shifts, slots, bookings, pre-re
 - Pull request: корневой CI — `pnpm nx run backend:openapi:check` + `git diff` по `docs/*` при затронутом backend; отдельный workflow в `apps/backend/.github/` — тот же порядок; Gosec — [`.github/workflows/gosec.yml`](../../.github/workflows/gosec.yml) и [`.gosec.json`](.gosec.json).
 - Монорепо **quokkaq**: после обновления `docs/openapi.json`, если эндпоинт попадает под Orval на фронте, из корня выполнить `pnpm nx run frontend:orval` и закоммитить изменения в `apps/frontend/lib/api/generated/` (см. `apps/frontend/orval.config.ts`). Для читаемых имён в клиенте можно задать `@ID` в swag-комментариях к handler.
 
+## Tenant integration API и публичный виджет
+
+- Интеграционный REST — префикс **`/integrations/v1`** (ключи, scope, пути — канон в OpenAPI/Scalar на вашем инстансе, например `GET /docs/openapi.json`).
+- **`INTEGRATION_API_RL_REDIS`:** при `true` и доступном Redis (`REDIS_URL` или `REDIS_HOST`/`REDIS_PORT`) для `/integrations/v1` используется sliding-window лимит в Redis; иначе — in-memory token bucket.
+- **`GET /companies/me`** включает **`planCapabilities`**: флаги тарифа для UI (Developer API, webhooks, публичный виджет и др.) — имена полей и типы только из OpenAPI.
+- **Публичный виджет:** JWT подписывается секретом **`PUBLIC_WIDGET_JWT_SECRET`**; allowlist origin — `company.settings.publicQueueWidgetAllowedOrigins`. Краткая операторская документация: [EN](../../docs/wiki/en/developer-api.md), [RU](../../docs/wiki/ru/developer-api.md).
+
 ## Фронтенд (соседний репозиторий)
 
 - `../quokkaq-frontend` — Next.js; ожидает REST на `NEXT_PUBLIC_API_URL` и WebSocket на `NEXT_PUBLIC_WS_URL`.
