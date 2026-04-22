@@ -1436,11 +1436,41 @@ export interface ModelsCompany {
   usageRecords?: ModelsUsageRecord[];
 }
 
+export interface HandlersPlanCapabilitiesDTO {
+  apiAccess?: boolean;
+  outboundWebhooks?: boolean;
+  publicQueueWidget?: boolean;
+}
+
 export interface HandlersCompanyMeResponse {
   company?: ModelsCompany;
   features?: HandlersFeaturesFlags;
+  planCapabilities?: HandlersPlanCapabilitiesDTO;
   publicApiUrl?: string;
   publicAppUrl?: string;
+}
+
+export interface HandlersCreateIntegrationAPIKeyRequest {
+  name?: string;
+  scopes?: string[];
+  unitId?: string;
+}
+
+export interface HandlersIntegrationAPIKeyRowDTO {
+  companyId?: string;
+  createdAt?: string;
+  createdByUserId?: string;
+  id?: string;
+  lastUsedAt?: string;
+  name?: string;
+  revokedAt?: string;
+  scopes?: string[];
+  unitId?: string;
+}
+
+export interface HandlersCreateIntegrationAPIKeyResponse {
+  key?: HandlersIntegrationAPIKeyRowDTO;
+  token?: string;
 }
 
 export type HandlersCreateSupportReportRequestDiagnostics = { [key: string]: unknown };
@@ -1476,6 +1506,30 @@ export interface HandlersCreateVisitorTagDefinitionRequest {
   sortOrder?: number;
 }
 
+export interface HandlersCreateWebhookEndpointRequest {
+  enabled?: boolean;
+  eventTypes?: string[];
+  unitId?: string;
+  url?: string;
+}
+
+export interface HandlersWebhookEndpointDTO {
+  companyId?: string;
+  consecutiveFailures?: number;
+  createdAt?: string;
+  enabled?: boolean;
+  eventTypes?: string[];
+  id?: string;
+  signingSecretMasked?: string;
+  unitId?: string;
+  url?: string;
+}
+
+export interface HandlersCreateWebhookEndpointResponse {
+  endpoint?: HandlersWebhookEndpointDTO;
+  signingSecret?: string;
+}
+
 export type HandlersEmergencyUnlockBodyConfirm = typeof HandlersEmergencyUnlockBodyConfirm[keyof typeof HandlersEmergencyUnlockBodyConfirm];
 
 
@@ -1493,6 +1547,16 @@ export interface HandlersGuestSurveySubmitRequest {
   answers: HandlersGuestSurveySubmitRequestAnswers;
   surveyId: string;
   ticketId: string;
+}
+
+export interface HandlersIssuePublicWidgetTokenRequest {
+  ttlSeconds?: number;
+  unitId?: string;
+}
+
+export interface HandlersIssuePublicWidgetTokenResponse {
+  expiresInSeconds?: number;
+  token?: string;
 }
 
 export interface HandlersPatchCompanySlugRequest {
@@ -1520,6 +1584,12 @@ export interface HandlersPatchVisitorTagDefinitionRequest {
   color?: string;
   label?: string;
   sortOrder?: number;
+}
+
+export interface HandlersPatchWebhookEndpointRequest {
+  enabled?: boolean;
+  eventTypes?: string[];
+  url?: string;
 }
 
 export interface HandlersPlatformListResponseModelsCatalogItem {
@@ -1554,9 +1624,18 @@ export interface HandlersPostSupportReportCommentRequest {
   text?: string;
 }
 
+export interface HandlersPublicQueueWidgetSettingsDTO {
+  allowedOrigins?: string[];
+}
+
 export interface HandlersPutVisitorTagsRequest {
   operatorComment: string;
   tagDefinitionIds: string[];
+}
+
+export interface HandlersRotateWebhookSecretResponse {
+  endpoint?: HandlersWebhookEndpointDTO;
+  signingSecret?: string;
 }
 
 export interface HandlersSetupFirstAdminRequest {
@@ -1574,6 +1653,24 @@ export interface HandlersSsoExchangeRequest {
 
 export interface HandlersTenantHintRequest {
   email: string;
+}
+
+export interface HandlersWebhookDeliveryLogDTO {
+  attempt?: number;
+  createdAt?: string;
+  durationMs?: number;
+  errorMessage?: string;
+  httpStatus?: number;
+  id?: string;
+  ticketHistoryId?: string;
+  webhookEndpointId?: string;
+}
+
+export interface HandlersWebhookTestPingResponse {
+  durationMs?: number;
+  error?: string;
+  httpStatus?: number;
+  responseSnippet?: string;
 }
 
 export interface ModelsCatalogItemCreateRequest {
@@ -2530,6 +2627,17 @@ code: string;
 state: string;
 };
 
+export type CalendarIntegrationMicrosoftOAuthCallbackParams = {
+/**
+ * Authorization code from Microsoft
+ */
+code: string;
+/**
+ * OAuth state (PKCE session key)
+ */
+state: string;
+};
+
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
@@ -2642,6 +2750,126 @@ export function useCalendarIntegrationGoogleOAuthCallback<TData = Awaited<Return
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getCalendarIntegrationGoogleOAuthCallbackQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary Microsoft Calendar OAuth callback (browser redirect)
+ */
+export type calendarIntegrationMicrosoftOAuthCallbackResponse302 = {
+  data: void
+  status: 302
+}
+
+;
+export type calendarIntegrationMicrosoftOAuthCallbackResponseError = (calendarIntegrationMicrosoftOAuthCallbackResponse302) & {
+  headers: Headers;
+};
+
+export type calendarIntegrationMicrosoftOAuthCallbackResponse = (calendarIntegrationMicrosoftOAuthCallbackResponseError)
+
+export const getCalendarIntegrationMicrosoftOAuthCallbackUrl = (params: CalendarIntegrationMicrosoftOAuthCallbackParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/calendar-integrations/microsoft/oauth/callback?${stringifiedParams}` : `/calendar-integrations/microsoft/oauth/callback`
+}
+
+export const calendarIntegrationMicrosoftOAuthCallback = async (params: CalendarIntegrationMicrosoftOAuthCallbackParams, options?: RequestInit): Promise<calendarIntegrationMicrosoftOAuthCallbackResponse> => {
+
+  return orvalMutator<calendarIntegrationMicrosoftOAuthCallbackResponse>(getCalendarIntegrationMicrosoftOAuthCallbackUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCalendarIntegrationMicrosoftOAuthCallbackQueryKey = (params?: CalendarIntegrationMicrosoftOAuthCallbackParams,) => {
+    return [
+    `/calendar-integrations/microsoft/oauth/callback`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getCalendarIntegrationMicrosoftOAuthCallbackQueryOptions = <TData = Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>, TError = void>(params: CalendarIntegrationMicrosoftOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCalendarIntegrationMicrosoftOAuthCallbackQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>> = ({ signal }) => calendarIntegrationMicrosoftOAuthCallback(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type CalendarIntegrationMicrosoftOAuthCallbackQueryResult = NonNullable<Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>>
+export type CalendarIntegrationMicrosoftOAuthCallbackQueryError = void
+
+
+export function useCalendarIntegrationMicrosoftOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>, TError = void>(
+ params: CalendarIntegrationMicrosoftOAuthCallbackParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>,
+          TError,
+          Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCalendarIntegrationMicrosoftOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>, TError = void>(
+ params: CalendarIntegrationMicrosoftOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>,
+          TError,
+          Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCalendarIntegrationMicrosoftOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>, TError = void>(
+ params: CalendarIntegrationMicrosoftOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Microsoft Calendar OAuth callback (browser redirect)
+ */
+
+export function useCalendarIntegrationMicrosoftOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>, TError = void>(
+ params: CalendarIntegrationMicrosoftOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getCalendarIntegrationMicrosoftOAuthCallbackQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -3252,6 +3480,89 @@ export const useCalendarIntegrationGoogleOAuthStart = <TError = string,
         TContext
       > => {
       return useMutation(getCalendarIntegrationGoogleOAuthStartMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Start Microsoft 365 / Outlook Calendar OAuth (returns authorize URL)
+ */
+export type calendarIntegrationMicrosoftOAuthStartResponse200 = {
+  data: HandlersGoogleCalendarOAuthStartResponse
+  status: 200
+}
+
+export type calendarIntegrationMicrosoftOAuthStartResponseSuccess = (calendarIntegrationMicrosoftOAuthStartResponse200) & {
+  headers: Headers;
+};
+;
+
+export type calendarIntegrationMicrosoftOAuthStartResponse = (calendarIntegrationMicrosoftOAuthStartResponseSuccess)
+
+export const getCalendarIntegrationMicrosoftOAuthStartUrl = () => {
+
+
+
+
+  return `/companies/me/calendar-integrations/microsoft/oauth/start`
+}
+
+export const calendarIntegrationMicrosoftOAuthStart = async (handlersGoogleCalendarOAuthStartRequest: HandlersGoogleCalendarOAuthStartRequest, options?: RequestInit): Promise<calendarIntegrationMicrosoftOAuthStartResponse> => {
+
+  return orvalMutator<calendarIntegrationMicrosoftOAuthStartResponse>(getCalendarIntegrationMicrosoftOAuthStartUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersGoogleCalendarOAuthStartRequest,)
+  }
+);}
+
+
+
+
+export const getCalendarIntegrationMicrosoftOAuthStartMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthStart>>, TError,{data: HandlersGoogleCalendarOAuthStartRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthStart>>, TError,{data: HandlersGoogleCalendarOAuthStartRequest}, TContext> => {
+
+const mutationKey = ['calendarIntegrationMicrosoftOAuthStart'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthStart>>, {data: HandlersGoogleCalendarOAuthStartRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  calendarIntegrationMicrosoftOAuthStart(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CalendarIntegrationMicrosoftOAuthStartMutationResult = NonNullable<Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthStart>>>
+    export type CalendarIntegrationMicrosoftOAuthStartMutationBody = HandlersGoogleCalendarOAuthStartRequest
+    export type CalendarIntegrationMicrosoftOAuthStartMutationError = unknown
+
+    /**
+ * @summary Start Microsoft 365 / Outlook Calendar OAuth (returns authorize URL)
+ */
+export const useCalendarIntegrationMicrosoftOAuthStart = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthStart>>, TError,{data: HandlersGoogleCalendarOAuthStartRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof calendarIntegrationMicrosoftOAuthStart>>,
+        TError,
+        {data: HandlersGoogleCalendarOAuthStartRequest},
+        TContext
+      > => {
+      return useMutation(getCalendarIntegrationMicrosoftOAuthStartMutationOptions(options), queryClient);
     }
 
 /**

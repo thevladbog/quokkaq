@@ -1436,11 +1436,41 @@ export interface ModelsCompany {
   usageRecords?: ModelsUsageRecord[];
 }
 
+export interface HandlersPlanCapabilitiesDTO {
+  apiAccess?: boolean;
+  outboundWebhooks?: boolean;
+  publicQueueWidget?: boolean;
+}
+
 export interface HandlersCompanyMeResponse {
   company?: ModelsCompany;
   features?: HandlersFeaturesFlags;
+  planCapabilities?: HandlersPlanCapabilitiesDTO;
   publicApiUrl?: string;
   publicAppUrl?: string;
+}
+
+export interface HandlersCreateIntegrationAPIKeyRequest {
+  name?: string;
+  scopes?: string[];
+  unitId?: string;
+}
+
+export interface HandlersIntegrationAPIKeyRowDTO {
+  companyId?: string;
+  createdAt?: string;
+  createdByUserId?: string;
+  id?: string;
+  lastUsedAt?: string;
+  name?: string;
+  revokedAt?: string;
+  scopes?: string[];
+  unitId?: string;
+}
+
+export interface HandlersCreateIntegrationAPIKeyResponse {
+  key?: HandlersIntegrationAPIKeyRowDTO;
+  token?: string;
 }
 
 export type HandlersCreateSupportReportRequestDiagnostics = { [key: string]: unknown };
@@ -1476,6 +1506,30 @@ export interface HandlersCreateVisitorTagDefinitionRequest {
   sortOrder?: number;
 }
 
+export interface HandlersCreateWebhookEndpointRequest {
+  enabled?: boolean;
+  eventTypes?: string[];
+  unitId?: string;
+  url?: string;
+}
+
+export interface HandlersWebhookEndpointDTO {
+  companyId?: string;
+  consecutiveFailures?: number;
+  createdAt?: string;
+  enabled?: boolean;
+  eventTypes?: string[];
+  id?: string;
+  signingSecretMasked?: string;
+  unitId?: string;
+  url?: string;
+}
+
+export interface HandlersCreateWebhookEndpointResponse {
+  endpoint?: HandlersWebhookEndpointDTO;
+  signingSecret?: string;
+}
+
 export type HandlersEmergencyUnlockBodyConfirm = typeof HandlersEmergencyUnlockBodyConfirm[keyof typeof HandlersEmergencyUnlockBodyConfirm];
 
 
@@ -1493,6 +1547,16 @@ export interface HandlersGuestSurveySubmitRequest {
   answers: HandlersGuestSurveySubmitRequestAnswers;
   surveyId: string;
   ticketId: string;
+}
+
+export interface HandlersIssuePublicWidgetTokenRequest {
+  ttlSeconds?: number;
+  unitId?: string;
+}
+
+export interface HandlersIssuePublicWidgetTokenResponse {
+  expiresInSeconds?: number;
+  token?: string;
 }
 
 export interface HandlersPatchCompanySlugRequest {
@@ -1520,6 +1584,12 @@ export interface HandlersPatchVisitorTagDefinitionRequest {
   color?: string;
   label?: string;
   sortOrder?: number;
+}
+
+export interface HandlersPatchWebhookEndpointRequest {
+  enabled?: boolean;
+  eventTypes?: string[];
+  url?: string;
 }
 
 export interface HandlersPlatformListResponseModelsCatalogItem {
@@ -1554,9 +1624,18 @@ export interface HandlersPostSupportReportCommentRequest {
   text?: string;
 }
 
+export interface HandlersPublicQueueWidgetSettingsDTO {
+  allowedOrigins?: string[];
+}
+
 export interface HandlersPutVisitorTagsRequest {
   operatorComment: string;
   tagDefinitionIds: string[];
+}
+
+export interface HandlersRotateWebhookSecretResponse {
+  endpoint?: HandlersWebhookEndpointDTO;
+  signingSecret?: string;
 }
 
 export interface HandlersSetupFirstAdminRequest {
@@ -1574,6 +1653,24 @@ export interface HandlersSsoExchangeRequest {
 
 export interface HandlersTenantHintRequest {
   email: string;
+}
+
+export interface HandlersWebhookDeliveryLogDTO {
+  attempt?: number;
+  createdAt?: string;
+  durationMs?: number;
+  errorMessage?: string;
+  httpStatus?: number;
+  id?: string;
+  ticketHistoryId?: string;
+  webhookEndpointId?: string;
+}
+
+export interface HandlersWebhookTestPingResponse {
+  durationMs?: number;
+  error?: string;
+  httpStatus?: number;
+  responseSnippet?: string;
 }
 
 export interface ModelsCatalogItemCreateRequest {
@@ -2522,6 +2619,13 @@ export interface ServicesUtilizationResponse {
 export type PostCountersIdCallNext200 = { [key: string]: unknown };
 
 export type PostCountersIdForceRelease200 = { [key: string]: unknown };
+
+export type GetUnitQueueStatusParams = {
+/**
+ * Optional embed JWT from POST /companies/me/public-widget-token
+ */
+token?: string;
+};
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -4943,7 +5047,7 @@ export const useCreateUnitCounter = <TError = string | HandlersQuotaExceededErro
     }
 
 /**
- * Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required.
+ * Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required. Requires subscription plan feature public_queue_widget.
  * @summary Get public queue status for a unit
  */
 export type getUnitQueueStatusResponse200 = {
@@ -4965,17 +5069,26 @@ export type getUnitQueueStatusResponseError = (getUnitQueueStatusResponse500) & 
 
 export type getUnitQueueStatusResponse = (getUnitQueueStatusResponseSuccess | getUnitQueueStatusResponseError)
 
-export const getGetUnitQueueStatusUrl = (unitId: string,) => {
+export const getGetUnitQueueStatusUrl = (unitId: string,
+    params?: GetUnitQueueStatusParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/units/${unitId}/queue-status`
+  return stringifiedParams.length > 0 ? `/units/${unitId}/queue-status?${stringifiedParams}` : `/units/${unitId}/queue-status`
 }
 
-export const getUnitQueueStatus = async (unitId: string, options?: RequestInit): Promise<getUnitQueueStatusResponse> => {
+export const getUnitQueueStatus = async (unitId: string,
+    params?: GetUnitQueueStatusParams, options?: RequestInit): Promise<getUnitQueueStatusResponse> => {
 
-  return orvalMutator<getUnitQueueStatusResponse>(getGetUnitQueueStatusUrl(unitId),
+  return orvalMutator<getUnitQueueStatusResponse>(getGetUnitQueueStatusUrl(unitId,params),
   {
     ...options,
     method: 'GET'
@@ -4988,23 +5101,25 @@ export const getUnitQueueStatus = async (unitId: string, options?: RequestInit):
 
 
 
-export const getGetUnitQueueStatusQueryKey = (unitId: string,) => {
+export const getGetUnitQueueStatusQueryKey = (unitId: string,
+    params?: GetUnitQueueStatusParams,) => {
     return [
-    `/units/${unitId}/queue-status`
+    `/units/${unitId}/queue-status`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetUnitQueueStatusQueryOptions = <TData = Awaited<ReturnType<typeof getUnitQueueStatus>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetUnitQueueStatusQueryOptions = <TData = Awaited<ReturnType<typeof getUnitQueueStatus>>, TError = string>(unitId: string,
+    params?: GetUnitQueueStatusParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitQueueStatusQueryKey(unitId);
+  const queryKey =  queryOptions?.queryKey ?? getGetUnitQueueStatusQueryKey(unitId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitQueueStatus>>> = ({ signal }) => getUnitQueueStatus(unitId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitQueueStatus>>> = ({ signal }) => getUnitQueueStatus(unitId,params, { signal, ...requestOptions });
 
 
 
@@ -5018,7 +5133,8 @@ export type GetUnitQueueStatusQueryError = string
 
 
 export function useGetUnitQueueStatus<TData = Awaited<ReturnType<typeof getUnitQueueStatus>>, TError = string>(
- unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData>> & Pick<
+ unitId: string,
+    params: undefined |  GetUnitQueueStatusParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getUnitQueueStatus>>,
           TError,
@@ -5028,7 +5144,8 @@ export function useGetUnitQueueStatus<TData = Awaited<ReturnType<typeof getUnitQ
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetUnitQueueStatus<TData = Awaited<ReturnType<typeof getUnitQueueStatus>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData>> & Pick<
+ unitId: string,
+    params?: GetUnitQueueStatusParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getUnitQueueStatus>>,
           TError,
@@ -5038,7 +5155,8 @@ export function useGetUnitQueueStatus<TData = Awaited<ReturnType<typeof getUnitQ
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetUnitQueueStatus<TData = Awaited<ReturnType<typeof getUnitQueueStatus>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ unitId: string,
+    params?: GetUnitQueueStatusParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -5046,11 +5164,12 @@ export function useGetUnitQueueStatus<TData = Awaited<ReturnType<typeof getUnitQ
  */
 
 export function useGetUnitQueueStatus<TData = Awaited<ReturnType<typeof getUnitQueueStatus>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ unitId: string,
+    params?: GetUnitQueueStatusParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetUnitQueueStatusQueryOptions(unitId,options)
+  const queryOptions = getGetUnitQueueStatusQueryOptions(unitId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

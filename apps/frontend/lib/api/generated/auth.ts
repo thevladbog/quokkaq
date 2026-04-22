@@ -1436,11 +1436,41 @@ export interface ModelsCompany {
   usageRecords?: ModelsUsageRecord[];
 }
 
+export interface HandlersPlanCapabilitiesDTO {
+  apiAccess?: boolean;
+  outboundWebhooks?: boolean;
+  publicQueueWidget?: boolean;
+}
+
 export interface HandlersCompanyMeResponse {
   company?: ModelsCompany;
   features?: HandlersFeaturesFlags;
+  planCapabilities?: HandlersPlanCapabilitiesDTO;
   publicApiUrl?: string;
   publicAppUrl?: string;
+}
+
+export interface HandlersCreateIntegrationAPIKeyRequest {
+  name?: string;
+  scopes?: string[];
+  unitId?: string;
+}
+
+export interface HandlersIntegrationAPIKeyRowDTO {
+  companyId?: string;
+  createdAt?: string;
+  createdByUserId?: string;
+  id?: string;
+  lastUsedAt?: string;
+  name?: string;
+  revokedAt?: string;
+  scopes?: string[];
+  unitId?: string;
+}
+
+export interface HandlersCreateIntegrationAPIKeyResponse {
+  key?: HandlersIntegrationAPIKeyRowDTO;
+  token?: string;
 }
 
 export type HandlersCreateSupportReportRequestDiagnostics = { [key: string]: unknown };
@@ -1476,6 +1506,30 @@ export interface HandlersCreateVisitorTagDefinitionRequest {
   sortOrder?: number;
 }
 
+export interface HandlersCreateWebhookEndpointRequest {
+  enabled?: boolean;
+  eventTypes?: string[];
+  unitId?: string;
+  url?: string;
+}
+
+export interface HandlersWebhookEndpointDTO {
+  companyId?: string;
+  consecutiveFailures?: number;
+  createdAt?: string;
+  enabled?: boolean;
+  eventTypes?: string[];
+  id?: string;
+  signingSecretMasked?: string;
+  unitId?: string;
+  url?: string;
+}
+
+export interface HandlersCreateWebhookEndpointResponse {
+  endpoint?: HandlersWebhookEndpointDTO;
+  signingSecret?: string;
+}
+
 export type HandlersEmergencyUnlockBodyConfirm = typeof HandlersEmergencyUnlockBodyConfirm[keyof typeof HandlersEmergencyUnlockBodyConfirm];
 
 
@@ -1493,6 +1547,16 @@ export interface HandlersGuestSurveySubmitRequest {
   answers: HandlersGuestSurveySubmitRequestAnswers;
   surveyId: string;
   ticketId: string;
+}
+
+export interface HandlersIssuePublicWidgetTokenRequest {
+  ttlSeconds?: number;
+  unitId?: string;
+}
+
+export interface HandlersIssuePublicWidgetTokenResponse {
+  expiresInSeconds?: number;
+  token?: string;
 }
 
 export interface HandlersPatchCompanySlugRequest {
@@ -1520,6 +1584,12 @@ export interface HandlersPatchVisitorTagDefinitionRequest {
   color?: string;
   label?: string;
   sortOrder?: number;
+}
+
+export interface HandlersPatchWebhookEndpointRequest {
+  enabled?: boolean;
+  eventTypes?: string[];
+  url?: string;
 }
 
 export interface HandlersPlatformListResponseModelsCatalogItem {
@@ -1554,9 +1624,18 @@ export interface HandlersPostSupportReportCommentRequest {
   text?: string;
 }
 
+export interface HandlersPublicQueueWidgetSettingsDTO {
+  allowedOrigins?: string[];
+}
+
 export interface HandlersPutVisitorTagsRequest {
   operatorComment: string;
   tagDefinitionIds: string[];
+}
+
+export interface HandlersRotateWebhookSecretResponse {
+  endpoint?: HandlersWebhookEndpointDTO;
+  signingSecret?: string;
 }
 
 export interface HandlersSetupFirstAdminRequest {
@@ -1574,6 +1653,24 @@ export interface HandlersSsoExchangeRequest {
 
 export interface HandlersTenantHintRequest {
   email: string;
+}
+
+export interface HandlersWebhookDeliveryLogDTO {
+  attempt?: number;
+  createdAt?: string;
+  durationMs?: number;
+  errorMessage?: string;
+  httpStatus?: number;
+  id?: string;
+  ticketHistoryId?: string;
+  webhookEndpointId?: string;
+}
+
+export interface HandlersWebhookTestPingResponse {
+  durationMs?: number;
+  error?: string;
+  httpStatus?: number;
+  responseSnippet?: string;
 }
 
 export interface ModelsCatalogItemCreateRequest {
@@ -2584,6 +2681,17 @@ export type ListCompanyUsersParams = {
  * Filter by name or email (ILIKE)
  */
 search?: string;
+};
+
+export type GetCompaniesMeWebhookDeliveryLogsParams = {
+/**
+ * Filter by webhook endpoint id
+ */
+endpointId?: string;
+/**
+ * Max rows (default 50, max 200)
+ */
+limit?: number;
 };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -4620,6 +4728,284 @@ export const useCompleteCompanyOnboarding = <TError = string,
     }
 
 /**
+ * @summary List integration API keys
+ */
+export type getCompaniesMeIntegrationApiKeysResponse200 = {
+  data: HandlersIntegrationAPIKeyRowDTO[]
+  status: 200
+}
+
+export type getCompaniesMeIntegrationApiKeysResponseSuccess = (getCompaniesMeIntegrationApiKeysResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getCompaniesMeIntegrationApiKeysResponse = (getCompaniesMeIntegrationApiKeysResponseSuccess)
+
+export const getGetCompaniesMeIntegrationApiKeysUrl = () => {
+
+
+
+
+  return `/companies/me/integration-api-keys`
+}
+
+export const getCompaniesMeIntegrationApiKeys = async ( options?: RequestInit): Promise<getCompaniesMeIntegrationApiKeysResponse> => {
+
+  return orvalMutator<getCompaniesMeIntegrationApiKeysResponse>(getGetCompaniesMeIntegrationApiKeysUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCompaniesMeIntegrationApiKeysQueryKey = () => {
+    return [
+    `/companies/me/integration-api-keys`
+    ] as const;
+    }
+
+
+export const getGetCompaniesMeIntegrationApiKeysQueryOptions = <TData = Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCompaniesMeIntegrationApiKeysQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>> = ({ signal }) => getCompaniesMeIntegrationApiKeys({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCompaniesMeIntegrationApiKeysQueryResult = NonNullable<Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>>
+export type GetCompaniesMeIntegrationApiKeysQueryError = unknown
+
+
+export function useGetCompaniesMeIntegrationApiKeys<TData = Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMeIntegrationApiKeys<TData = Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMeIntegrationApiKeys<TData = Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List integration API keys
+ */
+
+export function useGetCompaniesMeIntegrationApiKeys<TData = Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeIntegrationApiKeys>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCompaniesMeIntegrationApiKeysQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary Create integration API key
+ */
+export type postCompaniesMeIntegrationApiKeysResponse201 = {
+  data: HandlersCreateIntegrationAPIKeyResponse
+  status: 201
+}
+
+export type postCompaniesMeIntegrationApiKeysResponseSuccess = (postCompaniesMeIntegrationApiKeysResponse201) & {
+  headers: Headers;
+};
+;
+
+export type postCompaniesMeIntegrationApiKeysResponse = (postCompaniesMeIntegrationApiKeysResponseSuccess)
+
+export const getPostCompaniesMeIntegrationApiKeysUrl = () => {
+
+
+
+
+  return `/companies/me/integration-api-keys`
+}
+
+export const postCompaniesMeIntegrationApiKeys = async (handlersCreateIntegrationAPIKeyRequest: HandlersCreateIntegrationAPIKeyRequest, options?: RequestInit): Promise<postCompaniesMeIntegrationApiKeysResponse> => {
+
+  return orvalMutator<postCompaniesMeIntegrationApiKeysResponse>(getPostCompaniesMeIntegrationApiKeysUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersCreateIntegrationAPIKeyRequest,)
+  }
+);}
+
+
+
+
+export const getPostCompaniesMeIntegrationApiKeysMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeIntegrationApiKeys>>, TError,{data: HandlersCreateIntegrationAPIKeyRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeIntegrationApiKeys>>, TError,{data: HandlersCreateIntegrationAPIKeyRequest}, TContext> => {
+
+const mutationKey = ['postCompaniesMeIntegrationApiKeys'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postCompaniesMeIntegrationApiKeys>>, {data: HandlersCreateIntegrationAPIKeyRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postCompaniesMeIntegrationApiKeys(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostCompaniesMeIntegrationApiKeysMutationResult = NonNullable<Awaited<ReturnType<typeof postCompaniesMeIntegrationApiKeys>>>
+    export type PostCompaniesMeIntegrationApiKeysMutationBody = HandlersCreateIntegrationAPIKeyRequest
+    export type PostCompaniesMeIntegrationApiKeysMutationError = unknown
+
+    /**
+ * @summary Create integration API key
+ */
+export const usePostCompaniesMeIntegrationApiKeys = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeIntegrationApiKeys>>, TError,{data: HandlersCreateIntegrationAPIKeyRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postCompaniesMeIntegrationApiKeys>>,
+        TError,
+        {data: HandlersCreateIntegrationAPIKeyRequest},
+        TContext
+      > => {
+      return useMutation(getPostCompaniesMeIntegrationApiKeysMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Revoke integration API key
+ */
+export type deleteCompaniesMeIntegrationApiKeysIdResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteCompaniesMeIntegrationApiKeysIdResponseSuccess = (deleteCompaniesMeIntegrationApiKeysIdResponse204) & {
+  headers: Headers;
+};
+;
+
+export type deleteCompaniesMeIntegrationApiKeysIdResponse = (deleteCompaniesMeIntegrationApiKeysIdResponseSuccess)
+
+export const getDeleteCompaniesMeIntegrationApiKeysIdUrl = (id: string,) => {
+
+
+
+
+  return `/companies/me/integration-api-keys/${id}`
+}
+
+export const deleteCompaniesMeIntegrationApiKeysId = async (id: string, options?: RequestInit): Promise<deleteCompaniesMeIntegrationApiKeysIdResponse> => {
+
+  return orvalMutator<deleteCompaniesMeIntegrationApiKeysIdResponse>(getDeleteCompaniesMeIntegrationApiKeysIdUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteCompaniesMeIntegrationApiKeysIdMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeIntegrationApiKeysId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeIntegrationApiKeysId>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deleteCompaniesMeIntegrationApiKeysId'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCompaniesMeIntegrationApiKeysId>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteCompaniesMeIntegrationApiKeysId(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCompaniesMeIntegrationApiKeysIdMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCompaniesMeIntegrationApiKeysId>>>
+
+    export type DeleteCompaniesMeIntegrationApiKeysIdMutationError = unknown
+
+    /**
+ * @summary Revoke integration API key
+ */
+export const useDeleteCompaniesMeIntegrationApiKeysId = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeIntegrationApiKeysId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCompaniesMeIntegrationApiKeysId>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeleteCompaniesMeIntegrationApiKeysIdMutationOptions(options), queryClient);
+    }
+
+/**
  * @summary Create opaque login link
  */
 export type companiesMeLoginLinkPostResponse200 = {
@@ -4699,6 +5085,285 @@ export const useCompaniesMeLoginLinkPost = <TError = unknown,
         TContext
       > => {
       return useMutation(getCompaniesMeLoginLinkPostMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Get CORS allowlist origins for the public queue widget
+ */
+export type getCompaniesMePublicQueueWidgetSettingsResponse200 = {
+  data: HandlersPublicQueueWidgetSettingsDTO
+  status: 200
+}
+
+export type getCompaniesMePublicQueueWidgetSettingsResponseSuccess = (getCompaniesMePublicQueueWidgetSettingsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getCompaniesMePublicQueueWidgetSettingsResponse = (getCompaniesMePublicQueueWidgetSettingsResponseSuccess)
+
+export const getGetCompaniesMePublicQueueWidgetSettingsUrl = () => {
+
+
+
+
+  return `/companies/me/public-queue-widget-settings`
+}
+
+export const getCompaniesMePublicQueueWidgetSettings = async ( options?: RequestInit): Promise<getCompaniesMePublicQueueWidgetSettingsResponse> => {
+
+  return orvalMutator<getCompaniesMePublicQueueWidgetSettingsResponse>(getGetCompaniesMePublicQueueWidgetSettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCompaniesMePublicQueueWidgetSettingsQueryKey = () => {
+    return [
+    `/companies/me/public-queue-widget-settings`
+    ] as const;
+    }
+
+
+export const getGetCompaniesMePublicQueueWidgetSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCompaniesMePublicQueueWidgetSettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>> = ({ signal }) => getCompaniesMePublicQueueWidgetSettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCompaniesMePublicQueueWidgetSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>>
+export type GetCompaniesMePublicQueueWidgetSettingsQueryError = unknown
+
+
+export function useGetCompaniesMePublicQueueWidgetSettings<TData = Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMePublicQueueWidgetSettings<TData = Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMePublicQueueWidgetSettings<TData = Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get CORS allowlist origins for the public queue widget
+ */
+
+export function useGetCompaniesMePublicQueueWidgetSettings<TData = Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMePublicQueueWidgetSettings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCompaniesMePublicQueueWidgetSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary Set CORS allowlist origins for the public queue widget
+ */
+export type patchCompaniesMePublicQueueWidgetSettingsResponse200 = {
+  data: HandlersPublicQueueWidgetSettingsDTO
+  status: 200
+}
+
+export type patchCompaniesMePublicQueueWidgetSettingsResponseSuccess = (patchCompaniesMePublicQueueWidgetSettingsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type patchCompaniesMePublicQueueWidgetSettingsResponse = (patchCompaniesMePublicQueueWidgetSettingsResponseSuccess)
+
+export const getPatchCompaniesMePublicQueueWidgetSettingsUrl = () => {
+
+
+
+
+  return `/companies/me/public-queue-widget-settings`
+}
+
+export const patchCompaniesMePublicQueueWidgetSettings = async (handlersPublicQueueWidgetSettingsDTO: HandlersPublicQueueWidgetSettingsDTO, options?: RequestInit): Promise<patchCompaniesMePublicQueueWidgetSettingsResponse> => {
+
+  return orvalMutator<patchCompaniesMePublicQueueWidgetSettingsResponse>(getPatchCompaniesMePublicQueueWidgetSettingsUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersPublicQueueWidgetSettingsDTO,)
+  }
+);}
+
+
+
+
+export const getPatchCompaniesMePublicQueueWidgetSettingsMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMePublicQueueWidgetSettings>>, TError,{data: HandlersPublicQueueWidgetSettingsDTO}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMePublicQueueWidgetSettings>>, TError,{data: HandlersPublicQueueWidgetSettingsDTO}, TContext> => {
+
+const mutationKey = ['patchCompaniesMePublicQueueWidgetSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchCompaniesMePublicQueueWidgetSettings>>, {data: HandlersPublicQueueWidgetSettingsDTO}> = (props) => {
+          const {data} = props ?? {};
+
+          return  patchCompaniesMePublicQueueWidgetSettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PatchCompaniesMePublicQueueWidgetSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof patchCompaniesMePublicQueueWidgetSettings>>>
+    export type PatchCompaniesMePublicQueueWidgetSettingsMutationBody = HandlersPublicQueueWidgetSettingsDTO
+    export type PatchCompaniesMePublicQueueWidgetSettingsMutationError = unknown
+
+    /**
+ * @summary Set CORS allowlist origins for the public queue widget
+ */
+export const usePatchCompaniesMePublicQueueWidgetSettings = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMePublicQueueWidgetSettings>>, TError,{data: HandlersPublicQueueWidgetSettingsDTO}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof patchCompaniesMePublicQueueWidgetSettings>>,
+        TError,
+        {data: HandlersPublicQueueWidgetSettingsDTO},
+        TContext
+      > => {
+      return useMutation(getPatchCompaniesMePublicQueueWidgetSettingsMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Mint a short-lived JWT for the public queue status widget
+ */
+export type postCompaniesMePublicWidgetTokenResponse200 = {
+  data: HandlersIssuePublicWidgetTokenResponse
+  status: 200
+}
+
+export type postCompaniesMePublicWidgetTokenResponseSuccess = (postCompaniesMePublicWidgetTokenResponse200) & {
+  headers: Headers;
+};
+;
+
+export type postCompaniesMePublicWidgetTokenResponse = (postCompaniesMePublicWidgetTokenResponseSuccess)
+
+export const getPostCompaniesMePublicWidgetTokenUrl = () => {
+
+
+
+
+  return `/companies/me/public-widget-token`
+}
+
+export const postCompaniesMePublicWidgetToken = async (handlersIssuePublicWidgetTokenRequest: HandlersIssuePublicWidgetTokenRequest, options?: RequestInit): Promise<postCompaniesMePublicWidgetTokenResponse> => {
+
+  return orvalMutator<postCompaniesMePublicWidgetTokenResponse>(getPostCompaniesMePublicWidgetTokenUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersIssuePublicWidgetTokenRequest,)
+  }
+);}
+
+
+
+
+export const getPostCompaniesMePublicWidgetTokenMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMePublicWidgetToken>>, TError,{data: HandlersIssuePublicWidgetTokenRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMePublicWidgetToken>>, TError,{data: HandlersIssuePublicWidgetTokenRequest}, TContext> => {
+
+const mutationKey = ['postCompaniesMePublicWidgetToken'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postCompaniesMePublicWidgetToken>>, {data: HandlersIssuePublicWidgetTokenRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postCompaniesMePublicWidgetToken(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostCompaniesMePublicWidgetTokenMutationResult = NonNullable<Awaited<ReturnType<typeof postCompaniesMePublicWidgetToken>>>
+    export type PostCompaniesMePublicWidgetTokenMutationBody = HandlersIssuePublicWidgetTokenRequest
+    export type PostCompaniesMePublicWidgetTokenMutationError = unknown
+
+    /**
+ * @summary Mint a short-lived JWT for the public queue status widget
+ */
+export const usePostCompaniesMePublicWidgetToken = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMePublicWidgetToken>>, TError,{data: HandlersIssuePublicWidgetTokenRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postCompaniesMePublicWidgetToken>>,
+        TError,
+        {data: HandlersIssuePublicWidgetTokenRequest},
+        TContext
+      > => {
+      return useMutation(getPostCompaniesMePublicWidgetTokenMutationOptions(options), queryClient);
     }
 
 /**
@@ -6552,6 +7217,765 @@ export const usePatchUserTenantRoles = <TError = string,
       > => {
       return useMutation(getPatchUserTenantRolesMutationOptions(options), queryClient);
     }
+
+/**
+ * @summary List webhook delivery logs
+ */
+export type getCompaniesMeWebhookDeliveryLogsResponse200 = {
+  data: HandlersWebhookDeliveryLogDTO[]
+  status: 200
+}
+
+export type getCompaniesMeWebhookDeliveryLogsResponseSuccess = (getCompaniesMeWebhookDeliveryLogsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getCompaniesMeWebhookDeliveryLogsResponse = (getCompaniesMeWebhookDeliveryLogsResponseSuccess)
+
+export const getGetCompaniesMeWebhookDeliveryLogsUrl = (params?: GetCompaniesMeWebhookDeliveryLogsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/companies/me/webhook-delivery-logs?${stringifiedParams}` : `/companies/me/webhook-delivery-logs`
+}
+
+export const getCompaniesMeWebhookDeliveryLogs = async (params?: GetCompaniesMeWebhookDeliveryLogsParams, options?: RequestInit): Promise<getCompaniesMeWebhookDeliveryLogsResponse> => {
+
+  return orvalMutator<getCompaniesMeWebhookDeliveryLogsResponse>(getGetCompaniesMeWebhookDeliveryLogsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCompaniesMeWebhookDeliveryLogsQueryKey = (params?: GetCompaniesMeWebhookDeliveryLogsParams,) => {
+    return [
+    `/companies/me/webhook-delivery-logs`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetCompaniesMeWebhookDeliveryLogsQueryOptions = <TData = Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>, TError = unknown>(params?: GetCompaniesMeWebhookDeliveryLogsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCompaniesMeWebhookDeliveryLogsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>> = ({ signal }) => getCompaniesMeWebhookDeliveryLogs(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCompaniesMeWebhookDeliveryLogsQueryResult = NonNullable<Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>>
+export type GetCompaniesMeWebhookDeliveryLogsQueryError = unknown
+
+
+export function useGetCompaniesMeWebhookDeliveryLogs<TData = Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>, TError = unknown>(
+ params: undefined |  GetCompaniesMeWebhookDeliveryLogsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMeWebhookDeliveryLogs<TData = Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>, TError = unknown>(
+ params?: GetCompaniesMeWebhookDeliveryLogsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMeWebhookDeliveryLogs<TData = Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>, TError = unknown>(
+ params?: GetCompaniesMeWebhookDeliveryLogsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List webhook delivery logs
+ */
+
+export function useGetCompaniesMeWebhookDeliveryLogs<TData = Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>, TError = unknown>(
+ params?: GetCompaniesMeWebhookDeliveryLogsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeWebhookDeliveryLogs>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCompaniesMeWebhookDeliveryLogsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary List webhook endpoints
+ */
+export type getCompaniesMeWebhookEndpointsResponse200 = {
+  data: HandlersWebhookEndpointDTO[]
+  status: 200
+}
+
+export type getCompaniesMeWebhookEndpointsResponseSuccess = (getCompaniesMeWebhookEndpointsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getCompaniesMeWebhookEndpointsResponse = (getCompaniesMeWebhookEndpointsResponseSuccess)
+
+export const getGetCompaniesMeWebhookEndpointsUrl = () => {
+
+
+
+
+  return `/companies/me/webhook-endpoints`
+}
+
+export const getCompaniesMeWebhookEndpoints = async ( options?: RequestInit): Promise<getCompaniesMeWebhookEndpointsResponse> => {
+
+  return orvalMutator<getCompaniesMeWebhookEndpointsResponse>(getGetCompaniesMeWebhookEndpointsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCompaniesMeWebhookEndpointsQueryKey = () => {
+    return [
+    `/companies/me/webhook-endpoints`
+    ] as const;
+    }
+
+
+export const getGetCompaniesMeWebhookEndpointsQueryOptions = <TData = Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCompaniesMeWebhookEndpointsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>> = ({ signal }) => getCompaniesMeWebhookEndpoints({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCompaniesMeWebhookEndpointsQueryResult = NonNullable<Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>>
+export type GetCompaniesMeWebhookEndpointsQueryError = unknown
+
+
+export function useGetCompaniesMeWebhookEndpoints<TData = Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMeWebhookEndpoints<TData = Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMeWebhookEndpoints<TData = Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List webhook endpoints
+ */
+
+export function useGetCompaniesMeWebhookEndpoints<TData = Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeWebhookEndpoints>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCompaniesMeWebhookEndpointsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary Create webhook endpoint
+ */
+export type postCompaniesMeWebhookEndpointsResponse201 = {
+  data: HandlersCreateWebhookEndpointResponse
+  status: 201
+}
+
+export type postCompaniesMeWebhookEndpointsResponseSuccess = (postCompaniesMeWebhookEndpointsResponse201) & {
+  headers: Headers;
+};
+;
+
+export type postCompaniesMeWebhookEndpointsResponse = (postCompaniesMeWebhookEndpointsResponseSuccess)
+
+export const getPostCompaniesMeWebhookEndpointsUrl = () => {
+
+
+
+
+  return `/companies/me/webhook-endpoints`
+}
+
+export const postCompaniesMeWebhookEndpoints = async (handlersCreateWebhookEndpointRequest: HandlersCreateWebhookEndpointRequest, options?: RequestInit): Promise<postCompaniesMeWebhookEndpointsResponse> => {
+
+  return orvalMutator<postCompaniesMeWebhookEndpointsResponse>(getPostCompaniesMeWebhookEndpointsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersCreateWebhookEndpointRequest,)
+  }
+);}
+
+
+
+
+export const getPostCompaniesMeWebhookEndpointsMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeWebhookEndpoints>>, TError,{data: HandlersCreateWebhookEndpointRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeWebhookEndpoints>>, TError,{data: HandlersCreateWebhookEndpointRequest}, TContext> => {
+
+const mutationKey = ['postCompaniesMeWebhookEndpoints'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postCompaniesMeWebhookEndpoints>>, {data: HandlersCreateWebhookEndpointRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postCompaniesMeWebhookEndpoints(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostCompaniesMeWebhookEndpointsMutationResult = NonNullable<Awaited<ReturnType<typeof postCompaniesMeWebhookEndpoints>>>
+    export type PostCompaniesMeWebhookEndpointsMutationBody = HandlersCreateWebhookEndpointRequest
+    export type PostCompaniesMeWebhookEndpointsMutationError = unknown
+
+    /**
+ * @summary Create webhook endpoint
+ */
+export const usePostCompaniesMeWebhookEndpoints = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeWebhookEndpoints>>, TError,{data: HandlersCreateWebhookEndpointRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postCompaniesMeWebhookEndpoints>>,
+        TError,
+        {data: HandlersCreateWebhookEndpointRequest},
+        TContext
+      > => {
+      return useMutation(getPostCompaniesMeWebhookEndpointsMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Delete webhook endpoint
+ */
+export type deleteCompaniesMeWebhookEndpointsIdResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteCompaniesMeWebhookEndpointsIdResponseSuccess = (deleteCompaniesMeWebhookEndpointsIdResponse204) & {
+  headers: Headers;
+};
+;
+
+export type deleteCompaniesMeWebhookEndpointsIdResponse = (deleteCompaniesMeWebhookEndpointsIdResponseSuccess)
+
+export const getDeleteCompaniesMeWebhookEndpointsIdUrl = (id: string,) => {
+
+
+
+
+  return `/companies/me/webhook-endpoints/${id}`
+}
+
+export const deleteCompaniesMeWebhookEndpointsId = async (id: string, options?: RequestInit): Promise<deleteCompaniesMeWebhookEndpointsIdResponse> => {
+
+  return orvalMutator<deleteCompaniesMeWebhookEndpointsIdResponse>(getDeleteCompaniesMeWebhookEndpointsIdUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteCompaniesMeWebhookEndpointsIdMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeWebhookEndpointsId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeWebhookEndpointsId>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deleteCompaniesMeWebhookEndpointsId'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCompaniesMeWebhookEndpointsId>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteCompaniesMeWebhookEndpointsId(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCompaniesMeWebhookEndpointsIdMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCompaniesMeWebhookEndpointsId>>>
+
+    export type DeleteCompaniesMeWebhookEndpointsIdMutationError = unknown
+
+    /**
+ * @summary Delete webhook endpoint
+ */
+export const useDeleteCompaniesMeWebhookEndpointsId = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeWebhookEndpointsId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCompaniesMeWebhookEndpointsId>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeleteCompaniesMeWebhookEndpointsIdMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Update webhook endpoint (partial)
+ */
+export type patchCompaniesMeWebhookEndpointsIdResponse200 = {
+  data: HandlersWebhookEndpointDTO
+  status: 200
+}
+
+export type patchCompaniesMeWebhookEndpointsIdResponseSuccess = (patchCompaniesMeWebhookEndpointsIdResponse200) & {
+  headers: Headers;
+};
+;
+
+export type patchCompaniesMeWebhookEndpointsIdResponse = (patchCompaniesMeWebhookEndpointsIdResponseSuccess)
+
+export const getPatchCompaniesMeWebhookEndpointsIdUrl = (id: string,) => {
+
+
+
+
+  return `/companies/me/webhook-endpoints/${id}`
+}
+
+export const patchCompaniesMeWebhookEndpointsId = async (id: string,
+    handlersPatchWebhookEndpointRequest: HandlersPatchWebhookEndpointRequest, options?: RequestInit): Promise<patchCompaniesMeWebhookEndpointsIdResponse> => {
+
+  return orvalMutator<patchCompaniesMeWebhookEndpointsIdResponse>(getPatchCompaniesMeWebhookEndpointsIdUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersPatchWebhookEndpointRequest,)
+  }
+);}
+
+
+
+
+export const getPatchCompaniesMeWebhookEndpointsIdMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMeWebhookEndpointsId>>, TError,{id: string;data: HandlersPatchWebhookEndpointRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMeWebhookEndpointsId>>, TError,{id: string;data: HandlersPatchWebhookEndpointRequest}, TContext> => {
+
+const mutationKey = ['patchCompaniesMeWebhookEndpointsId'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchCompaniesMeWebhookEndpointsId>>, {id: string;data: HandlersPatchWebhookEndpointRequest}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  patchCompaniesMeWebhookEndpointsId(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PatchCompaniesMeWebhookEndpointsIdMutationResult = NonNullable<Awaited<ReturnType<typeof patchCompaniesMeWebhookEndpointsId>>>
+    export type PatchCompaniesMeWebhookEndpointsIdMutationBody = HandlersPatchWebhookEndpointRequest
+    export type PatchCompaniesMeWebhookEndpointsIdMutationError = unknown
+
+    /**
+ * @summary Update webhook endpoint (partial)
+ */
+export const usePatchCompaniesMeWebhookEndpointsId = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMeWebhookEndpointsId>>, TError,{id: string;data: HandlersPatchWebhookEndpointRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof patchCompaniesMeWebhookEndpointsId>>,
+        TError,
+        {id: string;data: HandlersPatchWebhookEndpointRequest},
+        TContext
+      > => {
+      return useMutation(getPatchCompaniesMeWebhookEndpointsIdMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Rotate webhook signing secret
+ */
+export type postCompaniesMeWebhookEndpointsIdRotateSecretResponse200 = {
+  data: HandlersRotateWebhookSecretResponse
+  status: 200
+}
+
+export type postCompaniesMeWebhookEndpointsIdRotateSecretResponseSuccess = (postCompaniesMeWebhookEndpointsIdRotateSecretResponse200) & {
+  headers: Headers;
+};
+;
+
+export type postCompaniesMeWebhookEndpointsIdRotateSecretResponse = (postCompaniesMeWebhookEndpointsIdRotateSecretResponseSuccess)
+
+export const getPostCompaniesMeWebhookEndpointsIdRotateSecretUrl = (id: string,) => {
+
+
+
+
+  return `/companies/me/webhook-endpoints/${id}/rotate-secret`
+}
+
+export const postCompaniesMeWebhookEndpointsIdRotateSecret = async (id: string, options?: RequestInit): Promise<postCompaniesMeWebhookEndpointsIdRotateSecretResponse> => {
+
+  return orvalMutator<postCompaniesMeWebhookEndpointsIdRotateSecretResponse>(getPostCompaniesMeWebhookEndpointsIdRotateSecretUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostCompaniesMeWebhookEndpointsIdRotateSecretMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeWebhookEndpointsIdRotateSecret>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeWebhookEndpointsIdRotateSecret>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['postCompaniesMeWebhookEndpointsIdRotateSecret'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postCompaniesMeWebhookEndpointsIdRotateSecret>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  postCompaniesMeWebhookEndpointsIdRotateSecret(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostCompaniesMeWebhookEndpointsIdRotateSecretMutationResult = NonNullable<Awaited<ReturnType<typeof postCompaniesMeWebhookEndpointsIdRotateSecret>>>
+
+    export type PostCompaniesMeWebhookEndpointsIdRotateSecretMutationError = unknown
+
+    /**
+ * @summary Rotate webhook signing secret
+ */
+export const usePostCompaniesMeWebhookEndpointsIdRotateSecret = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeWebhookEndpointsIdRotateSecret>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postCompaniesMeWebhookEndpointsIdRotateSecret>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getPostCompaniesMeWebhookEndpointsIdRotateSecretMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Send a signed test ping to a webhook endpoint
+ */
+export type postCompaniesMeWebhookEndpointsIdTestResponse200 = {
+  data: HandlersWebhookTestPingResponse
+  status: 200
+}
+
+export type postCompaniesMeWebhookEndpointsIdTestResponseSuccess = (postCompaniesMeWebhookEndpointsIdTestResponse200) & {
+  headers: Headers;
+};
+;
+
+export type postCompaniesMeWebhookEndpointsIdTestResponse = (postCompaniesMeWebhookEndpointsIdTestResponseSuccess)
+
+export const getPostCompaniesMeWebhookEndpointsIdTestUrl = (id: string,) => {
+
+
+
+
+  return `/companies/me/webhook-endpoints/${id}/test`
+}
+
+export const postCompaniesMeWebhookEndpointsIdTest = async (id: string, options?: RequestInit): Promise<postCompaniesMeWebhookEndpointsIdTestResponse> => {
+
+  return orvalMutator<postCompaniesMeWebhookEndpointsIdTestResponse>(getPostCompaniesMeWebhookEndpointsIdTestUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostCompaniesMeWebhookEndpointsIdTestMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeWebhookEndpointsIdTest>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeWebhookEndpointsIdTest>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['postCompaniesMeWebhookEndpointsIdTest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postCompaniesMeWebhookEndpointsIdTest>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  postCompaniesMeWebhookEndpointsIdTest(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostCompaniesMeWebhookEndpointsIdTestMutationResult = NonNullable<Awaited<ReturnType<typeof postCompaniesMeWebhookEndpointsIdTest>>>
+
+    export type PostCompaniesMeWebhookEndpointsIdTestMutationError = unknown
+
+    /**
+ * @summary Send a signed test ping to a webhook endpoint
+ */
+export const usePostCompaniesMeWebhookEndpointsIdTest = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeWebhookEndpointsIdTest>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postCompaniesMeWebhookEndpointsIdTest>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getPostCompaniesMeWebhookEndpointsIdTestMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Queue summary for integration API (same payload as public queue-status, authenticated by integration key)
+ */
+export type getIntegrationUnitQueueSummaryResponse200 = {
+  data: ServicesUnitQueueSummary
+  status: 200
+}
+
+export type getIntegrationUnitQueueSummaryResponseSuccess = (getIntegrationUnitQueueSummaryResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getIntegrationUnitQueueSummaryResponse = (getIntegrationUnitQueueSummaryResponseSuccess)
+
+export const getGetIntegrationUnitQueueSummaryUrl = (unitId: string,) => {
+
+
+
+
+  return `/integrations/v1/units/${unitId}/queue-summary`
+}
+
+export const getIntegrationUnitQueueSummary = async (unitId: string, options?: RequestInit): Promise<getIntegrationUnitQueueSummaryResponse> => {
+
+  return orvalMutator<getIntegrationUnitQueueSummaryResponse>(getGetIntegrationUnitQueueSummaryUrl(unitId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetIntegrationUnitQueueSummaryQueryKey = (unitId: string,) => {
+    return [
+    `/integrations/v1/units/${unitId}/queue-summary`
+    ] as const;
+    }
+
+
+export const getGetIntegrationUnitQueueSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError = unknown>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetIntegrationUnitQueueSummaryQueryKey(unitId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>> = ({ signal }) => getIntegrationUnitQueueSummary(unitId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetIntegrationUnitQueueSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>>
+export type GetIntegrationUnitQueueSummaryQueryError = unknown
+
+
+export function useGetIntegrationUnitQueueSummary<TData = Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError = unknown>(
+ unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>,
+          TError,
+          Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetIntegrationUnitQueueSummary<TData = Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>,
+          TError,
+          Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetIntegrationUnitQueueSummary<TData = Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Queue summary for integration API (same payload as public queue-status, authenticated by integration key)
+ */
+
+export function useGetIntegrationUnitQueueSummary<TData = Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetIntegrationUnitQueueSummaryQueryOptions(unitId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 /**
  * @summary Public tenant metadata by slug

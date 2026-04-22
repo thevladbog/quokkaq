@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -260,6 +261,9 @@ func (r *ticketRepository) CreateTicketHistory(history *models.TicketHistory) er
 	return r.CreateTicketHistoryTx(r.db, history)
 }
 
+// CreateTicketHistoryTx inserts one history row. Callers that should emit outbound webhooks must also
+// invoke InsertWebhookOutboxIfEligibleTx in the same transaction (see ticket_service.writeTicketHistoryTx,
+// counter_service, and AppendEODFlaggedHistoryForUnitTx).
 func (r *ticketRepository) CreateTicketHistoryTx(tx *gorm.DB, history *models.TicketHistory) error {
 	return tx.Create(history).Error
 }
@@ -275,21 +279,18 @@ func (r *ticketRepository) AppendEODFlaggedHistoryForUnitTx(tx *gorm.DB, unitID 
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	payload, err := json.Marshal(map[string]string{"unit_id": unitID})
-	if err != nil {
-		return nil, err
-	}
-	histories := make([]models.TicketHistory, 0, len(ids))
+	payload := map[string]interface{}{"unit_id": unitID}
 	for _, id := range ids {
-		histories = append(histories, models.TicketHistory{
-			TicketID: id,
-			Action:   ticketaudit.ActionTicketEODFlagged,
-			UserID:   actorUserID,
-			Payload:  payload,
-		})
-	}
-	if err := tx.Create(&histories).Error; err != nil {
-		return nil, err
+		h, err := ticketaudit.NewHistory(id, ticketaudit.ActionTicketEODFlagged, actorUserID, payload)
+		if err != nil {
+			return nil, err
+		}
+		if err := tx.Create(h).Error; err != nil {
+			return nil, err
+		}
+		if err := InsertWebhookOutboxIfEligibleTx(context.Background(), tx, h); err != nil {
+			return nil, err
+		}
 	}
 	return ids, nil
 }

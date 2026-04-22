@@ -26,18 +26,22 @@ var Plans = map[string]PlanDefinition{
 		Currency: "RUB",
 		Interval: "month",
 		Limits: map[string]int{
-			"units":             3, // max 3 subdivisions on this plan
-			"users":             5,
-			"tickets_per_month": 1000,
-			"services":          10,
-			"counters":          5,
-			"zones_per_unit":    2, // max service zones per subdivision
+			"units":                    3, // max 3 subdivisions on this plan
+			"users":                    5,
+			"tickets_per_month":        1000,
+			"services":                 10,
+			"counters":                 5,
+			"zones_per_unit":           2, // max service zones per subdivision
+			"integration_api_keys_max": 2,
+			"webhook_endpoints_max":    2,
 		},
 		Features: map[string]bool{
 			"websocket_updates":     true,
 			"basic_reports":         true,
 			"email_support":         true,
 			"api_access":            false,
+			"outbound_webhooks":     false,
+			"public_queue_widget":   false,
 			"white_label":           false,
 			"custom_branding":       false,
 			"priority_support":      false,
@@ -54,12 +58,14 @@ var Plans = map[string]PlanDefinition{
 		Currency: "RUB",
 		Interval: "month",
 		Limits: map[string]int{
-			"units":             10, // max 10 subdivisions on this plan
-			"users":             20,
-			"tickets_per_month": 10000,
-			"services":          50,
-			"counters":          25,
-			"zones_per_unit":    5, // max service zones per subdivision
+			"units":                    10, // max 10 subdivisions on this plan
+			"users":                    20,
+			"tickets_per_month":        10000,
+			"services":                 50,
+			"counters":                 25,
+			"zones_per_unit":           5, // max service zones per subdivision
+			"integration_api_keys_max": 20,
+			"webhook_endpoints_max":    20,
 		},
 		Features: map[string]bool{
 			"websocket_updates":     true,
@@ -68,6 +74,8 @@ var Plans = map[string]PlanDefinition{
 			"email_support":         true,
 			"phone_support":         true,
 			"api_access":            true,
+			"outbound_webhooks":     true,
+			"public_queue_widget":   true,
 			"white_label":           false,
 			"custom_branding":       true,
 			"priority_support":      true,
@@ -84,12 +92,14 @@ var Plans = map[string]PlanDefinition{
 		Currency: "RUB",
 		Interval: "month",
 		Limits: map[string]int{
-			"units":             -1, // unlimited
-			"users":             -1,
-			"tickets_per_month": -1,
-			"services":          -1,
-			"counters":          -1,
-			"zones_per_unit":    -1, // unlimited zones
+			"units":                    -1, // unlimited
+			"users":                    -1,
+			"tickets_per_month":        -1,
+			"services":                 -1,
+			"counters":                 -1,
+			"zones_per_unit":           -1, // unlimited zones
+			"integration_api_keys_max": -1,
+			"webhook_endpoints_max":    -1,
 		},
 		Features: map[string]bool{
 			"websocket_updates":     true,
@@ -98,6 +108,8 @@ var Plans = map[string]PlanDefinition{
 			"email_support":         true,
 			"phone_support":         true,
 			"api_access":            true,
+			"outbound_webhooks":     true,
+			"public_queue_widget":   true,
 			"white_label":           true,
 			"custom_branding":       true,
 			"priority_support":      true,
@@ -117,12 +129,14 @@ var Plans = map[string]PlanDefinition{
 		Currency: "RUB",
 		Interval: "month",
 		Limits: map[string]int{
-			"units":             -1, // unlimited
-			"users":             -1,
-			"tickets_per_month": -1,
-			"services":          -1,
-			"counters":          -1,
-			"zones_per_unit":    -1, // unlimited zones
+			"units":                    -1, // unlimited
+			"users":                    -1,
+			"tickets_per_month":        -1,
+			"services":                 -1,
+			"counters":                 -1,
+			"zones_per_unit":           -1, // unlimited zones
+			"integration_api_keys_max": -1,
+			"webhook_endpoints_max":    -1,
 		},
 		Features: map[string]bool{
 			"websocket_updates":     true,
@@ -130,6 +144,8 @@ var Plans = map[string]PlanDefinition{
 			"advanced_reports":      true,
 			"email_support":         true,
 			"api_access":            true,
+			"outbound_webhooks":     true,
+			"public_queue_widget":   true,
 			"white_label":           false,
 			"counter_guest_survey":  true,
 			"counter_board":         true,

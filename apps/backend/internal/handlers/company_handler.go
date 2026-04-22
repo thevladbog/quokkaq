@@ -7,19 +7,23 @@ import (
 	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
+
+	"gorm.io/gorm"
 )
 
 type CompanyHandler struct {
 	companyRepo repository.CompanyRepository
 	userRepo    repository.UserRepository
 	tenantRBAC  repository.TenantRBACRepository
+	db          *gorm.DB
 }
 
-func NewCompanyHandler(companyRepo repository.CompanyRepository, userRepo repository.UserRepository, tenantRBAC repository.TenantRBACRepository) *CompanyHandler {
+func NewCompanyHandler(companyRepo repository.CompanyRepository, userRepo repository.UserRepository, tenantRBAC repository.TenantRBACRepository, db *gorm.DB) *CompanyHandler {
 	return &CompanyHandler{
 		companyRepo: companyRepo,
 		userRepo:    userRepo,
 		tenantRBAC:  tenantRBAC,
+		db:          db,
 	}
 }
 

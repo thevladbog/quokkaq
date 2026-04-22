@@ -71,7 +71,7 @@ func TestCalendarIntegrationRepository_ListByUnitID_CountByUnitID_MultipleRows(t
 			CaldavBaseURL:        "https://caldav.yandex.ru",
 			CalendarPath:         "/p/",
 			Username:             "u@yandex.ru",
-			AppPasswordEncrypted: "enc",
+			CredentialCiphertext: "enc",
 			Timezone:             "Europe/Moscow",
 		}
 		row.CalendarPath = "/p/x" + string(rune('0'+i))
@@ -124,7 +124,7 @@ func TestCalendarIntegrationRepository_ListByCompanyID_JoinsUnits(t *testing.T) 
 			CaldavBaseURL:        "https://caldav.yandex.ru",
 			CalendarPath:         "/z/" + u,
 			Username:             "x@yandex.ru",
-			AppPasswordEncrypted: "enc",
+			CredentialCiphertext: "enc",
 			Timezone:             "UTC",
 		}
 		if err := repo.CreateIntegration(&row); err != nil {

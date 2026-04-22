@@ -344,6 +344,9 @@ func (s *counterService) ForceRelease(counterID string, actorUserID *string) (*m
 			if err := s.ticketRepo.CreateTicketHistoryTx(tx, h); err != nil {
 				return err
 			}
+			if err := repository.InsertWebhookOutboxIfEligibleTx(context.Background(), tx, h); err != nil {
+				return err
+			}
 		}
 
 		now := time.Now()
@@ -523,7 +526,10 @@ func (s *counterService) CallNext(counterID string, serviceIDs []string, actorUs
 		if herr != nil {
 			return herr
 		}
-		return s.ticketRepo.CreateTicketHistoryTx(tx, h)
+		if err := s.ticketRepo.CreateTicketHistoryTx(tx, h); err != nil {
+			return err
+		}
+		return repository.InsertWebhookOutboxIfEligibleTx(context.Background(), tx, h)
 	})
 	if err != nil {
 		return nil, err

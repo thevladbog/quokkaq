@@ -12,8 +12,9 @@ import (
 
 // CalendarIntegrationKind identifies the provider implementation (extensible).
 const (
-	CalendarIntegrationKindYandexCalDAV = "yandex_caldav"
-	CalendarIntegrationKindGoogleCalDAV = "google_caldav"
+	CalendarIntegrationKindYandexCalDAV   = "yandex_caldav"
+	CalendarIntegrationKindGoogleCalDAV   = "google_caldav"
+	CalendarIntegrationKindMicrosoftGraph = "microsoft_graph"
 )
 
 // GoogleCalDAVAPIHost is the HTTPS host for Google Calendar CalDAV v2.
@@ -35,8 +36,8 @@ func GoogleCalDAVEventsCollectionPath(calendarID string) (string, error) {
 
 // UnitCalendarIntegration stores CalDAV credentials and calendar path per unit.
 // Multiple rows per unit_id are allowed (max enforced in service).
-// AppPasswordEncrypted stores the AES-GCM ciphertext of either a Yandex CalDAV app password
-// or, for CalendarIntegrationKindGoogleCalDAV, an OAuth refresh token used for Bearer CalDAV.
+// CredentialCiphertext stores AES-GCM ciphertext for the integration secret (Yandex CalDAV
+// application token, Google/Microsoft OAuth refresh token, etc.). DB column remains app_password_encrypted.
 type UnitCalendarIntegration struct {
 	ID                   string     `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
 	UnitID               string     `gorm:"not null;index:idx_unit_calendar_integrations_unit_id" json:"unitId"`
@@ -46,7 +47,7 @@ type UnitCalendarIntegration struct {
 	CaldavBaseURL        string     `gorm:"not null;default:'https://caldav.yandex.ru'" json:"caldavBaseUrl"`
 	CalendarPath         string     `gorm:"not null" json:"calendarPath"` // e.g. /calendars/xxx@yandex.ru/events-xxx/
 	Username             string     `gorm:"not null" json:"username"`     // full Yandex login email
-	AppPasswordEncrypted string     `gorm:"type:text;not null" json:"-"`
+	CredentialCiphertext string     `gorm:"column:app_password_encrypted;type:text;not null" json:"-"`
 	Timezone             string     `gorm:"not null;default:'Europe/Moscow'" json:"timezone"`
 	AdminNotifyEmails    string     `gorm:"type:text" json:"adminNotifyEmails,omitempty"` // comma-separated
 	LastSyncAt           *time.Time `json:"lastSyncAt,omitempty"`

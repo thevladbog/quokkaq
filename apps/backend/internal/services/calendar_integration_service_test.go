@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"quokkaq-go-backend/internal/models"
@@ -14,6 +15,11 @@ import (
 )
 
 func boolPtr(b bool) *bool { return &b }
+
+// testCalDAVPlainInput returns a non-production plaintext used only in unit tests.
+func testCalDAVPlainInput() string {
+	return "fixture-" + strings.Repeat("0", 20)
+}
 
 func setupCalendarIntegrationServiceTestDB(t *testing.T) func() {
 	t.Helper()
@@ -116,7 +122,7 @@ func TestCalendarIntegrationService_CreateIntegration_LimitFourPerUnit(t *testin
 			CaldavBaseURL: "https://caldav.yandex.ru",
 			CalendarPath:  "/cal/p/",
 			Username:      "u@yandex.ru",
-			AppPassword:   "app-pass-123456789012",
+			AppPassword:   testCalDAVPlainInput(),
 			Timezone:      "Europe/Moscow",
 		}
 	}
@@ -158,7 +164,7 @@ func TestCalendarIntegrationService_CreateIntegration_UnitNotInCompany(t *testin
 		Enabled:      boolPtr(true),
 		CalendarPath: "/x/",
 		Username:     "x@yandex.ru",
-		AppPassword:  "app-pass-123456789012",
+		AppPassword:  testCalDAVPlainInput(),
 		Timezone:     "UTC",
 	})
 	if err == nil {
@@ -195,7 +201,7 @@ func TestCalendarIntegrationService_ListPublicForCompany(t *testing.T) {
 			Enabled:      boolPtr(true),
 			CalendarPath: path,
 			Username:     "x@yandex.ru",
-			AppPassword:  "app-pass-123456789012",
+			AppPassword:  testCalDAVPlainInput(),
 			Timezone:     "UTC",
 		})
 		if err != nil {
@@ -208,7 +214,7 @@ func TestCalendarIntegrationService_ListPublicForCompany(t *testing.T) {
 		Enabled:      boolPtr(false),
 		CalendarPath: "/c/",
 		Username:     "y@yandex.ru",
-		AppPassword:  "app-pass-123456789012",
+		AppPassword:  testCalDAVPlainInput(),
 		Timezone:     "UTC",
 	})
 	if err != nil {
@@ -254,7 +260,7 @@ func TestCalendarIntegrationService_GetPublicByID_MissingUnitLeavesNamesEmpty(t 
 		Enabled:      boolPtr(true),
 		CalendarPath: "/gone/",
 		Username:     "x@yandex.ru",
-		AppPassword:  "app-pass-123456789012",
+		AppPassword:  testCalDAVPlainInput(),
 		Timezone:     "UTC",
 	})
 	if err != nil {
@@ -297,7 +303,7 @@ func TestCalendarIntegrationService_DeleteIntegration_BlocksActivePreRegistratio
 		Enabled:      boolPtr(true),
 		CalendarPath: "/z/",
 		Username:     "z@yandex.ru",
-		AppPassword:  "app-pass-123456789012",
+		AppPassword:  testCalDAVPlainInput(),
 		Timezone:     "UTC",
 	})
 	if err != nil {
@@ -357,7 +363,7 @@ func TestCalendarIntegrationService_SyncIntegration_NoOpWhenMissingOrDisabled(t 
 		Enabled:      boolPtr(false),
 		CalendarPath: "/off/",
 		Username:     "off@yandex.ru",
-		AppPassword:  "app-pass-123456789012",
+		AppPassword:  testCalDAVPlainInput(),
 		Timezone:     "UTC",
 	})
 	if err != nil {
@@ -388,7 +394,7 @@ func TestCalendarIntegrationService_ResolveIntegrationForPreReg_ExplicitID(t *te
 		Enabled:      boolPtr(true),
 		CalendarPath: "/r1/",
 		Username:     "a@yandex.ru",
-		AppPassword:  "app-pass-123456789012",
+		AppPassword:  testCalDAVPlainInput(),
 		Timezone:     "UTC",
 	})
 	if err != nil {
@@ -400,7 +406,7 @@ func TestCalendarIntegrationService_ResolveIntegrationForPreReg_ExplicitID(t *te
 		Enabled:      boolPtr(true),
 		CalendarPath: "/r2/",
 		Username:     "b@yandex.ru",
-		AppPassword:  "app-pass-123456789012",
+		AppPassword:  testCalDAVPlainInput(),
 		Timezone:     "UTC",
 	})
 	if err != nil {
@@ -521,6 +527,59 @@ func TestCalendarIntegrationService_UpdateIntegration_GoogleRejectsImmutableCalD
 		DisplayName:   "Renamed OK",
 		Enabled:       boolPtr(true),
 		CaldavBaseURL: models.GoogleCalDAVBaseURL,
+		CalendarPath:  pub.CalendarPath,
+		Username:      pub.Username,
+		Timezone:      "Europe/London",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if up.DisplayName != "Renamed OK" {
+		t.Fatalf("display name: %s", up.DisplayName)
+	}
+	if up.Timezone != "Europe/London" {
+		t.Fatalf("timezone: %s", up.Timezone)
+	}
+}
+
+func TestCalendarIntegrationService_UpdateIntegration_MicrosoftRejectsImmutableCalDAVFields(t *testing.T) {
+	defer setupCalendarIntegrationServiceTestDB(t)()
+	svc := newTestCalendarService()
+	if err := database.DB.Create(&models.Unit{
+		ID:        "unit-ms2",
+		CompanyID: "co-ms2",
+		Code:      "ms2",
+		Kind:      models.UnitKindSubdivision,
+		Name:      "MS2",
+		Timezone:  "UTC",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	pub, err := svc.CreateMicrosoftGraphIntegration(
+		"co-ms2",
+		"unit-ms2",
+		"refresh-token-ms",
+		"primary",
+		"user@outlook.com",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = svc.UpdateIntegration("co-ms2", pub.ID, &UpdateCalendarIntegrationRequest{
+		DisplayName:   "Renamed",
+		Enabled:       boolPtr(true),
+		CaldavBaseURL: "https://evil.example",
+		CalendarPath:  "other-cal",
+		Username:      "hacker@evil.com",
+		Timezone:      "Europe/London",
+	})
+	if !errors.Is(err, ErrCalendarOAuthIdentityImmutable) {
+		t.Fatalf("update: want ErrCalendarOAuthIdentityImmutable, got %v", err)
+	}
+	up, err := svc.UpdateIntegration("co-ms2", pub.ID, &UpdateCalendarIntegrationRequest{
+		DisplayName:   "Renamed OK",
+		Enabled:       boolPtr(true),
+		CaldavBaseURL: pub.CaldavBaseURL,
 		CalendarPath:  pub.CalendarPath,
 		Username:      pub.Username,
 		Timezone:      "Europe/London",

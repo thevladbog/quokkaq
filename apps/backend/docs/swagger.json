@@ -1825,12 +1825,43 @@
                     "features": {
                         "$ref": "#/components/schemas/handlers.FeaturesFlags"
                     },
+                    "planCapabilities": {
+                        "$ref": "#/components/schemas/handlers.planCapabilitiesDTO"
+                    },
                     "publicApiUrl": {
                         "example": "https://api.example.com",
                         "type": "string"
                     },
                     "publicAppUrl": {
                         "example": "https://app.example.com",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.createIntegrationAPIKeyRequest": {
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "scopes": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.createIntegrationAPIKeyResponse": {
+                "properties": {
+                    "key": {
+                        "$ref": "#/components/schemas/handlers.integrationAPIKeyRowDTO"
+                    },
+                    "token": {
                         "type": "string"
                     }
                 },
@@ -1899,6 +1930,37 @@
                 ],
                 "type": "object"
             },
+            "handlers.createWebhookEndpointRequest": {
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "eventTypes": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.createWebhookEndpointResponse": {
+                "properties": {
+                    "endpoint": {
+                        "$ref": "#/components/schemas/handlers.webhookEndpointDTO"
+                    },
+                    "signingSecret": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.emergencyUnlockBody": {
                 "properties": {
                     "confirm": {
@@ -1931,6 +1993,63 @@
                     "surveyId",
                     "answers"
                 ],
+                "type": "object"
+            },
+            "handlers.integrationAPIKeyRowDTO": {
+                "properties": {
+                    "companyId": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "createdByUserId": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "lastUsedAt": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "revokedAt": {
+                        "type": "string"
+                    },
+                    "scopes": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.issuePublicWidgetTokenRequest": {
+                "properties": {
+                    "ttlSeconds": {
+                        "type": "integer"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.issuePublicWidgetTokenResponse": {
+                "properties": {
+                    "expiresInSeconds": {
+                        "type": "integer"
+                    },
+                    "token": {
+                        "type": "string"
+                    }
+                },
                 "type": "object"
             },
             "handlers.operatorSkillInput": {
@@ -1999,6 +2118,37 @@
                     },
                     "sortOrder": {
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.patchWebhookEndpointRequest": {
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "eventTypes": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "url": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.planCapabilitiesDTO": {
+                "properties": {
+                    "apiAccess": {
+                        "type": "boolean"
+                    },
+                    "outboundWebhooks": {
+                        "type": "boolean"
+                    },
+                    "publicQueueWidget": {
+                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -2091,6 +2241,17 @@
                 },
                 "type": "object"
             },
+            "handlers.publicQueueWidgetSettingsDTO": {
+                "properties": {
+                    "allowedOrigins": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.putVisitorTagsRequest": {
                 "properties": {
                     "operatorComment": {
@@ -2107,6 +2268,17 @@
                     "operatorComment",
                     "tagDefinitionIds"
                 ],
+                "type": "object"
+            },
+            "handlers.rotateWebhookSecretResponse": {
+                "properties": {
+                    "endpoint": {
+                        "$ref": "#/components/schemas/handlers.webhookEndpointDTO"
+                    },
+                    "signingSecret": {
+                        "type": "string"
+                    }
+                },
                 "type": "object"
             },
             "handlers.setupFirstAdminRequest": {
@@ -2158,6 +2330,87 @@
                 "required": [
                     "email"
                 ],
+                "type": "object"
+            },
+            "handlers.webhookDeliveryLogDTO": {
+                "properties": {
+                    "attempt": {
+                        "type": "integer"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "durationMs": {
+                        "type": "integer"
+                    },
+                    "errorMessage": {
+                        "type": "string"
+                    },
+                    "httpStatus": {
+                        "type": "integer"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "ticketHistoryId": {
+                        "type": "string"
+                    },
+                    "webhookEndpointId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.webhookEndpointDTO": {
+                "properties": {
+                    "companyId": {
+                        "type": "string"
+                    },
+                    "consecutiveFailures": {
+                        "type": "integer"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "eventTypes": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "signingSecretMasked": {
+                        "type": "string"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.webhookTestPingResponse": {
+                "properties": {
+                    "durationMs": {
+                        "type": "integer"
+                    },
+                    "error": {
+                        "type": "string"
+                    },
+                    "httpStatus": {
+                        "type": "integer"
+                    },
+                    "responseSnippet": {
+                        "type": "string"
+                    }
+                },
                 "type": "object"
             },
             "models.Booking": {
@@ -6700,6 +6953,40 @@
                 ]
             }
         },
+        "/calendar-integrations/microsoft/oauth/callback": {
+            "get": {
+                "operationId": "calendarIntegrationMicrosoftOAuthCallback",
+                "parameters": [
+                    {
+                        "description": "Authorization code from Microsoft",
+                        "in": "query",
+                        "name": "code",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "OAuth state (PKCE session key)",
+                        "in": "query",
+                        "name": "state",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirect to returnPath with microsoft_calendar=connected or error query params"
+                    }
+                },
+                "summary": "Microsoft Calendar OAuth callback (browser redirect)",
+                "tags": [
+                    "calendar-integration"
+                ]
+            }
+        },
         "/commerceml/exchange": {
             "get": {
                 "description": "Bitrix-style protocol: type=sale with mode=checkauth|query|import|file; session from checkauth via sessid or session query param. Import body is CommerceML XML (up to 8 MiB).",
@@ -8121,6 +8408,54 @@
                 ]
             }
         },
+        "/companies/me/calendar-integrations/microsoft/oauth/start": {
+            "post": {
+                "operationId": "calendarIntegrationMicrosoftOAuthStart",
+                "parameters": [
+                    {
+                        "description": "Optional company selector for admins with multiple companies",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.GoogleCalendarOAuthStartRequest"
+                            }
+                        }
+                    },
+                    "description": "Payload (same shape as Google: unitId, returnPath)",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.GoogleCalendarOAuthStartResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Start Microsoft 365 / Outlook Calendar OAuth (returns authorize URL)",
+                "tags": [
+                    "calendar-integration"
+                ]
+            }
+        },
         "/companies/me/calendar-integrations/{integrationId}": {
             "delete": {
                 "operationId": "calendarIntegrationDeleteMine",
@@ -8404,6 +8739,98 @@
                 ]
             }
         },
+        "/companies/me/integration-api-keys": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/handlers.integrationAPIKeyRowDTO"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List integration API keys",
+                "tags": [
+                    "integrations"
+                ]
+            },
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.createIntegrationAPIKeyRequest"
+                            }
+                        }
+                    },
+                    "description": "request",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.createIntegrationAPIKeyResponse"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create integration API key",
+                "tags": [
+                    "integrations"
+                ]
+            }
+        },
+        "/companies/me/integration-api-keys/{id}": {
+            "delete": {
+                "parameters": [
+                    {
+                        "description": "Key ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Revoke integration API key",
+                "tags": [
+                    "integrations"
+                ]
+            }
+        },
         "/companies/me/login-links": {
             "post": {
                 "operationId": "companiesMeLoginLinkPost",
@@ -8427,6 +8854,103 @@
                 "summary": "Create opaque login link",
                 "tags": [
                     "companies"
+                ]
+            }
+        },
+        "/companies/me/public-queue-widget-settings": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.publicQueueWidgetSettingsDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get CORS allowlist origins for the public queue widget",
+                "tags": [
+                    "integrations"
+                ]
+            },
+            "patch": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.publicQueueWidgetSettingsDTO"
+                            }
+                        }
+                    },
+                    "description": "Allowlist (empty clears CORS restriction)",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.publicQueueWidgetSettingsDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Set CORS allowlist origins for the public queue widget",
+                "tags": [
+                    "integrations"
+                ]
+            }
+        },
+        "/companies/me/public-widget-token": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.issuePublicWidgetTokenRequest"
+                            }
+                        }
+                    },
+                    "description": "Payload",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.issuePublicWidgetTokenResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Mint a short-lived JWT for the public queue status widget",
+                "tags": [
+                    "integrations"
                 ]
             }
         },
@@ -9726,6 +10250,262 @@
                 ]
             }
         },
+        "/companies/me/webhook-delivery-logs": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Filter by webhook endpoint id",
+                        "in": "query",
+                        "name": "endpointId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Max rows (default 50, max 200)",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/handlers.webhookDeliveryLogDTO"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List webhook delivery logs",
+                "tags": [
+                    "integrations"
+                ]
+            }
+        },
+        "/companies/me/webhook-endpoints": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/handlers.webhookEndpointDTO"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List webhook endpoints",
+                "tags": [
+                    "integrations"
+                ]
+            },
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.createWebhookEndpointRequest"
+                            }
+                        }
+                    },
+                    "description": "Webhook endpoint",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.createWebhookEndpointResponse"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create webhook endpoint",
+                "tags": [
+                    "integrations"
+                ]
+            }
+        },
+        "/companies/me/webhook-endpoints/{id}": {
+            "delete": {
+                "parameters": [
+                    {
+                        "description": "Endpoint ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete webhook endpoint",
+                "tags": [
+                    "integrations"
+                ]
+            },
+            "patch": {
+                "parameters": [
+                    {
+                        "description": "Endpoint ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.patchWebhookEndpointRequest"
+                            }
+                        }
+                    },
+                    "description": "Fields to update",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.webhookEndpointDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update webhook endpoint (partial)",
+                "tags": [
+                    "integrations"
+                ]
+            }
+        },
+        "/companies/me/webhook-endpoints/{id}/rotate-secret": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Endpoint ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.rotateWebhookSecretResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Rotate webhook signing secret",
+                "tags": [
+                    "integrations"
+                ]
+            }
+        },
+        "/companies/me/webhook-endpoints/{id}/test": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Endpoint ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.webhookTestPingResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Send a signed test ping to a webhook endpoint",
+                "tags": [
+                    "integrations"
+                ]
+            }
+        },
         "/companies/{companyId}/usage-metrics": {
             "get": {
                 "description": "Returns current resource usage and limits for the company",
@@ -10955,6 +11735,38 @@
                 "summary": "Readiness probe (HEAD)",
                 "tags": [
                     "health"
+                ]
+            }
+        },
+        "/integrations/v1/units/{unitId}/queue-summary": {
+            "get": {
+                "operationId": "getIntegrationUnitQueueSummary",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.UnitQueueSummary"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Queue summary for integration API (same payload as public queue-status, authenticated by integration key)",
+                "tags": [
+                    "integrations"
                 ]
             }
         },
@@ -21051,7 +21863,7 @@
         },
         "/units/{unitId}/queue-status": {
             "get": {
-                "description": "Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required.",
+                "description": "Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required. Requires subscription plan feature public_queue_widget.",
                 "operationId": "getUnitQueueStatus",
                 "parameters": [
                     {
@@ -21059,6 +21871,14 @@
                         "in": "path",
                         "name": "unitId",
                         "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Optional embed JWT from POST /companies/me/public-widget-token",
+                        "in": "query",
+                        "name": "token",
                         "schema": {
                             "type": "string"
                         }

@@ -10,12 +10,17 @@ import (
 	"os"
 	"quokkaq-go-backend/internal/logger"
 	"strings"
+	"sync"
+	"time"
 
 	"quokkaq-go-backend/internal/localeutil"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/phoneutil"
+	"quokkaq-go-backend/internal/publicqueuewidget"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
+	"quokkaq-go-backend/internal/subscriptionfeatures"
+	"quokkaq-go-backend/pkg/database"
 
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
@@ -27,6 +32,72 @@ type TicketHandler struct {
 	eta         *services.ETAService
 	unitService services.UnitService
 	settingsSvc *services.DeploymentSaaSSettingsService
+	db          *gorm.DB
+}
+
+var (
+	unitQueueStatusCacheMu   sync.Mutex
+	unitQueueStatusCacheData = make(map[string]queueStatusCacheEntry)
+)
+
+type queueStatusCacheEntry struct {
+	at   time.Time
+	body []byte
+}
+
+const (
+	unitQueueStatusCacheTTL        = 10 * time.Second
+	unitQueueStatusCacheMaxEntries = 2000
+)
+
+func loadQueueStatusFromCache(unitID string) ([]byte, bool) {
+	unitQueueStatusCacheMu.Lock()
+	defer unitQueueStatusCacheMu.Unlock()
+	e, ok := unitQueueStatusCacheData[unitID]
+	if !ok {
+		return nil, false
+	}
+	if time.Since(e.at) > unitQueueStatusCacheTTL {
+		delete(unitQueueStatusCacheData, unitID)
+		return nil, false
+	}
+	return e.body, true
+}
+
+func storeQueueStatusCache(unitID string, body []byte) {
+	b := make([]byte, len(body))
+	copy(b, body)
+	now := time.Now()
+	unitQueueStatusCacheMu.Lock()
+	defer unitQueueStatusCacheMu.Unlock()
+	for id, ent := range unitQueueStatusCacheData {
+		if now.Sub(ent.at) > unitQueueStatusCacheTTL {
+			delete(unitQueueStatusCacheData, id)
+		}
+	}
+	unitQueueStatusCacheData[unitID] = queueStatusCacheEntry{at: now, body: b}
+	if len(unitQueueStatusCacheData) > unitQueueStatusCacheMaxEntries {
+		var oldestID string
+		var oldestAt time.Time
+		first := true
+		for id, ent := range unitQueueStatusCacheData {
+			if first || ent.at.Before(oldestAt) {
+				first = false
+				oldestAt = ent.at
+				oldestID = id
+			}
+		}
+		if oldestID != "" {
+			delete(unitQueueStatusCacheData, oldestID)
+		}
+	}
+}
+
+func (h *TicketHandler) orm() *gorm.DB {
+	if h.db != nil {
+		return h.db
+	}
+	return database.DB
 }
 
 func NewTicketHandler(service services.TicketService, operational *services.OperationalService) *TicketHandler {
@@ -39,8 +110,9 @@ func NewTicketHandlerWithETA(service services.TicketService, operational *servic
 }
 
 // NewTicketHandlerFull creates a TicketHandler with all optional services wired.
-func NewTicketHandlerFull(service services.TicketService, operational *services.OperationalService, eta *services.ETAService, unitService services.UnitService) *TicketHandler {
-	return &TicketHandler{service: service, operational: operational, eta: eta, unitService: unitService}
+// db is used for subscription/plan checks on public routes (e.g. queue-status); when nil, database.DB is used.
+func NewTicketHandlerFull(service services.TicketService, operational *services.OperationalService, eta *services.ETAService, unitService services.UnitService, db *gorm.DB) *TicketHandler {
+	return &TicketHandler{service: service, operational: operational, eta: eta, unitService: unitService, db: db}
 }
 
 // WithSettingsService attaches the deployment SaaS settings service (needed for smsOptInAvailable check).
@@ -892,15 +964,103 @@ func (h *TicketHandler) AttachPhone(w http.ResponseWriter, r *http.Request) {
 // GetUnitQueueStatus godoc
 // @ID           getUnitQueueStatus
 // @Summary      Get public queue status for a unit
-// @Description  Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required.
+// @Description  Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required. Requires subscription plan feature public_queue_widget.
 // @Tags         tickets
 // @Produce      json
 // @Param        unitId  path      string  true  "Unit ID"
+// @Param        token   query     string  false "Optional embed JWT from POST /companies/me/public-widget-token"
 // @Success      200     {object}  services.UnitQueueSummary
 // @Failure      500     {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/queue-status [get]
 func (h *TicketHandler) GetUnitQueueStatus(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
+	if h.unitService == nil {
+		http.Error(w, "widget authorization not configured", http.StatusInternalServerError)
+		return
+	}
+	unit, uerr := h.unitService.GetUnitByID(unitID)
+	if uerr != nil || unit == nil {
+		http.Error(w, "unit not found", http.StatusNotFound)
+		return
+	}
+	ok, ferr := subscriptionfeatures.CompanyHasPublicQueueWidget(r.Context(), h.orm(), unit.CompanyID)
+	if ferr != nil || !ok {
+		http.Error(w, "public queue widget is not enabled for this subscription plan", http.StatusForbidden)
+		return
+	}
+	if qtok := strings.TrimSpace(r.URL.Query().Get("token")); qtok != "" && publicqueuewidget.SecretConfigured() {
+		wid, cid, verr := publicqueuewidget.Verify(qtok)
+		if verr != nil || !strings.EqualFold(wid, unitID) || cid != unit.CompanyID {
+			http.Error(w, "invalid widget token", http.StatusUnauthorized)
+			return
+		}
+	}
+	var co models.Company
+	if err := h.orm().WithContext(r.Context()).Where("id = ?", unit.CompanyID).First(&co).Error; err == nil {
+		origins := publicqueuewidget.AllowedOriginsFromCompanySettings(co.Settings)
+		if o := strings.TrimSpace(r.Header.Get("Origin")); len(origins) > 0 && o != "" {
+			allowed := false
+			for _, a := range origins {
+				if a == o {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				http.Error(w, "origin not allowed", http.StatusForbidden)
+				return
+			}
+			w.Header().Set("Access-Control-Allow-Origin", o)
+			w.Header().Add("Vary", "Origin")
+		}
+	}
+	if h.eta == nil {
+		RespondJSON(w, map[string]interface{}{
+			"queueLength":          0,
+			"estimatedWaitMinutes": 0.0,
+			"activeCounters":       0,
+		})
+		return
+	}
+	if cached, ok := loadQueueStatusFromCache(unitID); ok {
+		var summary services.UnitQueueSummary
+		if err := json.Unmarshal(cached, &summary); err == nil {
+			RespondJSON(w, summary)
+			return
+		}
+		unitQueueStatusCacheMu.Lock()
+		delete(unitQueueStatusCacheData, unitID)
+		unitQueueStatusCacheMu.Unlock()
+	}
+	summary, err := h.eta.GetUnitQueueSummary(unitID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	body, err := json.Marshal(summary)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	storeQueueStatusCache(unitID, body)
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(body)
+}
+
+// GetIntegrationUnitQueueSummary godoc
+// @ID           getIntegrationUnitQueueSummary
+// @Summary      Queue summary for integration API (same payload as public queue-status, authenticated by integration key)
+// @Tags         integrations
+// @Produce      json
+// @Param        unitId path string true "Unit ID"
+// @Success      200 {object} services.UnitQueueSummary
+// @Router       /integrations/v1/units/{unitId}/queue-summary [get]
+func (h *TicketHandler) GetIntegrationUnitQueueSummary(w http.ResponseWriter, r *http.Request) {
+	unitID := strings.TrimSpace(chi.URLParam(r, "unitId"))
+	if unitID == "" {
+		http.Error(w, "unitId required", http.StatusBadRequest)
+		return
+	}
 	if h.eta == nil {
 		RespondJSON(w, map[string]interface{}{
 			"queueLength":          0,

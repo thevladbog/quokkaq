@@ -42,7 +42,7 @@ The product does not ship a dedicated webhook for ticket history. Typical option
 
 1. **Logical replication / CDC** from PostgreSQL to ClickHouse, BigQuery, or another warehouse (Debezium, native replication, managed CDC).
 2. **Periodic batch export**: `COPY` or incremental `SELECT … WHERE created_at > :cursor` on `ticket_histories` (and optionally `tickets`).
-3. **Application webhook** (future): subscribe to the same transitions the API already performs and push normalized events; not implemented in this repo.
+3. **Application webhook**: tenants with `outbound_webhooks` on their plan can register HTTPS endpoints; the API enqueues deliveries from `ticket_histories` via `webhook_outbox` and Asynq (`webhook:flush_outbox`). See `internal/jobs/webhook_flush.go` and `/companies/me/webhook-endpoints`.
 
 ## Derived metrics (for analysts)
 

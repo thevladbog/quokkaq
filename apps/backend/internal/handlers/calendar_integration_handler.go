@@ -78,6 +78,8 @@ func respondCalendarIntegrationError(ctx context.Context, w http.ResponseWriter,
 		http.Error(w, calendarIntMsgBadRequest, http.StatusBadRequest)
 	case errors.Is(err, services.ErrCalendarGoogleCalDAVIdentityImmutable):
 		http.Error(w, services.ErrCalendarGoogleCalDAVIdentityImmutable.Error(), http.StatusBadRequest)
+	case errors.Is(err, services.ErrCalendarOAuthIdentityImmutable):
+		http.Error(w, services.ErrCalendarOAuthIdentityImmutable.Error(), http.StatusBadRequest)
 	case errors.Is(err, services.ErrCalendarEnabledRequired):
 		http.Error(w, services.ErrCalendarEnabledRequired.Error(), http.StatusBadRequest)
 	case errors.Is(err, services.ErrCalendarIntegrationBlockedByActivePreRegistrations):
@@ -321,6 +323,8 @@ func respondGoogleOAuthStartError(ctx context.Context, w http.ResponseWriter, op
 	switch {
 	case errors.Is(err, services.ErrGoogleCalendarOAuthNotConfigured):
 		http.Error(w, services.ErrGoogleCalendarOAuthNotConfigured.Error(), http.StatusServiceUnavailable)
+	case errors.Is(err, services.ErrMicrosoftCalendarOAuthNotConfigured):
+		http.Error(w, services.ErrMicrosoftCalendarOAuthNotConfigured.Error(), http.StatusServiceUnavailable)
 	case errors.Is(err, services.ErrGoogleCalendarOAuthUnitIDRequired):
 		http.Error(w, services.ErrGoogleCalendarOAuthUnitIDRequired.Error(), http.StatusBadRequest)
 	case errors.Is(err, services.ErrGoogleCalendarOAuthInvalidReturnPath):
@@ -406,6 +410,72 @@ func (h *CalendarIntegrationHandler) GoogleOAuthCallback(w http.ResponseWriter, 
 	okURL, failPath, err := h.svc.CompleteGoogleCalendarOAuth(r.Context(), r.URL.Query().Get("code"), r.URL.Query().Get("state"))
 	if err != nil {
 		loc := services.GoogleCalendarOAuthFailureRedirect(failPath, googleOAuthCallbackFailureReason(err))
+		http.Redirect(w, r, loc, http.StatusFound)
+		return
+	}
+	http.Redirect(w, r, okURL, http.StatusFound)
+}
+
+func microsoftOAuthCallbackFailureReason(err error) string {
+	switch {
+	case errors.Is(err, services.ErrMicrosoftCalendarOAuthNotConfigured):
+		return "not_configured"
+	case errors.Is(err, services.ErrMicrosoftCalendarOAuthNoRefreshToken):
+		return "no_refresh_token"
+	case errors.Is(err, services.ErrMicrosoftCalendarOAuthUserinfo):
+		return "userinfo"
+	case errors.Is(err, services.ErrCalendarIntegrationLimit):
+		return "limit"
+	case errors.Is(err, services.ErrCalendarUnitCompanyMismatch):
+		return "forbidden"
+	case errors.Is(err, services.ErrGoogleCalendarOAuthSessionSaveFailed):
+		return "session"
+	default:
+		return "oauth_failed"
+	}
+}
+
+// MicrosoftOAuthStart godoc
+// @ID           calendarIntegrationMicrosoftOAuthStart
+// @Summary      Start Microsoft 365 / Outlook Calendar OAuth (returns authorize URL)
+// @Tags         calendar-integration
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        X-Company-Id header string false "Optional company selector for admins with multiple companies"
+// @Param        body body GoogleCalendarOAuthStartRequest true "Payload (same shape as Google: unitId, returnPath)"
+// @Success      200 {object} GoogleCalendarOAuthStartResponse
+// @Router       /companies/me/calendar-integrations/microsoft/oauth/start [post]
+func (h *CalendarIntegrationHandler) MicrosoftOAuthStart(w http.ResponseWriter, r *http.Request) {
+	companyID, ok := h.resolveCompanyID(w, r)
+	if !ok {
+		return
+	}
+	var req GoogleCalendarOAuthStartRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONDecodeError(r.Context(), w, "MicrosoftOAuthStart", err)
+		return
+	}
+	authURL, err := h.svc.StartMicrosoftCalendarOAuth(r.Context(), companyID, req.UnitID, req.ReturnPath)
+	if err != nil {
+		respondGoogleOAuthStartError(r.Context(), w, "MicrosoftOAuthStart", err)
+		return
+	}
+	RespondJSON(w, GoogleCalendarOAuthStartResponse{URL: authURL})
+}
+
+// MicrosoftOAuthCallback godoc
+// @ID           calendarIntegrationMicrosoftOAuthCallback
+// @Summary      Microsoft Calendar OAuth callback (browser redirect)
+// @Tags         calendar-integration
+// @Param        code   query string true "Authorization code from Microsoft"
+// @Param        state  query string true "OAuth state (PKCE session key)"
+// @Success      302 "Redirect to returnPath with microsoft_calendar=connected or error query params"
+// @Router       /calendar-integrations/microsoft/oauth/callback [get]
+func (h *CalendarIntegrationHandler) MicrosoftOAuthCallback(w http.ResponseWriter, r *http.Request) {
+	okURL, failPath, err := h.svc.CompleteMicrosoftCalendarOAuth(r.Context(), r.URL.Query().Get("code"), r.URL.Query().Get("state"))
+	if err != nil {
+		loc := services.MicrosoftCalendarOAuthFailureRedirect(failPath, microsoftOAuthCallbackFailureReason(err))
 		http.Redirect(w, r, loc, http.StatusFound)
 		return
 	}

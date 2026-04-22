@@ -4,7 +4,15 @@ import { useMemo, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Globe, Loader2, Plus, Save, Trash2 } from 'lucide-react';
+import {
+  CalendarDays,
+  Globe,
+  Loader2,
+  Monitor,
+  Plus,
+  Save,
+  Trash2
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
@@ -70,6 +78,7 @@ import { authenticatedApiFetch } from '@/lib/authenticated-api-fetch';
 
 export const CALENDAR_KIND_YANDEX_CALDAV = 'yandex_caldav';
 export const CALENDAR_KIND_GOOGLE_CALDAV = 'google_caldav';
+export const CALENDAR_KIND_MICROSOFT_GRAPH = 'microsoft_graph';
 
 const DEFAULT_CALDAV = 'https://caldav.yandex.ru';
 
@@ -98,7 +107,9 @@ function CalendarIntegrationCardForm({
   const locale = useLocale();
   const queryClient = useQueryClient();
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const isGoogle = pub.kind === CALENDAR_KIND_GOOGLE_CALDAV;
+  const isOAuthManaged =
+    pub.kind === CALENDAR_KIND_GOOGLE_CALDAV ||
+    pub.kind === CALENDAR_KIND_MICROSOFT_GRAPH;
 
   const [enabled, setEnabled] = useState(pub.enabled ?? false);
   const [displayName, setDisplayName] = useState(() => pub.displayName ?? '');
@@ -143,7 +154,7 @@ function CalendarIntegrationCardForm({
   });
 
   const payload = useMemo((): ServicesUpdateCalendarIntegrationRequest => {
-    if (isGoogle) {
+    if (isOAuthManaged) {
       const body: ServicesUpdateCalendarIntegrationRequest = {
         enabled,
         displayName: displayName.trim() || undefined,
@@ -169,7 +180,7 @@ function CalendarIntegrationCardForm({
     }
     return body;
   }, [
-    isGoogle,
+    isOAuthManaged,
     pub.caldavBaseUrl,
     pub.calendarPath,
     pub.username,
@@ -184,7 +195,7 @@ function CalendarIntegrationCardForm({
   ]);
 
   const handleSave = () => {
-    if (!isGoogle && enabled) {
+    if (!isOAuthManaged && enabled) {
       if (!calendarPath.trim() || !username.trim()) {
         toast.error(t('required_fields'));
         return;
@@ -204,7 +215,9 @@ function CalendarIntegrationCardForm({
       ? t('kind_yandex')
       : pub.kind === CALENDAR_KIND_GOOGLE_CALDAV
         ? t('kind_google')
-        : (pub.kind ?? '');
+        : pub.kind === CALENDAR_KIND_MICROSOFT_GRAPH
+          ? t('kind_microsoft')
+          : (pub.kind ?? '');
 
   return (
     <div className='space-y-4'>
@@ -223,9 +236,11 @@ function CalendarIntegrationCardForm({
 
       <p className='text-muted-foreground text-xs'>{t('unit_readonly_hint')}</p>
 
-      {isGoogle ? (
+      {isOAuthManaged ? (
         <p className='text-muted-foreground text-xs'>
-          {t('google_readonly_hint')}
+          {pub.kind === CALENDAR_KIND_GOOGLE_CALDAV
+            ? t('google_readonly_hint')
+            : t('microsoft_readonly_hint')}
         </p>
       ) : null}
 
@@ -249,7 +264,7 @@ function CalendarIntegrationCardForm({
       </div>
 
       <div className='grid gap-4 sm:grid-cols-2'>
-        {!isGoogle ? (
+        {!isOAuthManaged ? (
           <>
             <div className='space-y-2 sm:col-span-2'>
               <Label htmlFor={`caldav-url-${pub.id}`}>
@@ -296,7 +311,9 @@ function CalendarIntegrationCardForm({
           <div className='text-muted-foreground space-y-1 text-sm sm:col-span-2'>
             <p>
               <span className='text-foreground font-medium'>
-                {t('google_account_label')}
+                {pub.kind === CALENDAR_KIND_GOOGLE_CALDAV
+                  ? t('google_account_label')
+                  : t('microsoft_account_label')}
               </span>{' '}
               {pub.username || '—'}
             </p>
@@ -743,6 +760,124 @@ function GoogleConnectCalendarDialog({
   );
 }
 
+function MicrosoftConnectCalendarDialog({
+  open,
+  onOpenChange,
+  units,
+  integrations,
+  defaultUnitId,
+  returnPath
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  units: UnitOption[];
+  integrations: ServicesCalendarIntegrationPublic[];
+  defaultUnitId?: string;
+  returnPath: string;
+}) {
+  const t = useTranslations('admin.calendar_integration');
+  const tInt = useTranslations('admin.integrations');
+  const locale = useLocale();
+  const [unitId, setUnitId] = useState(
+    () => defaultUnitId ?? units[0]?.id ?? ''
+  );
+  const [busy, setBusy] = useState(false);
+
+  const countForUnit = useMemo(() => {
+    if (!unitId) return 0;
+    return integrations.filter(
+      (i: ServicesCalendarIntegrationPublic) => i.unitId === unitId
+    ).length;
+  }, [integrations, unitId]);
+
+  const atLimit = countForUnit >= 4;
+
+  const startMicrosoft = async () => {
+    if (!unitId) {
+      toast.error(tInt('select_unit_error'));
+      return;
+    }
+    if (atLimit) {
+      toast.error(t('limit_error'));
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await authenticatedApiFetch(
+        '/companies/me/calendar-integrations/microsoft/oauth/start',
+        {
+          method: 'POST',
+          body: JSON.stringify({ unitId, returnPath })
+        }
+      );
+      if (res.status === 503) {
+        toast.error(t('microsoft_connect_unavailable'));
+        return;
+      }
+      if (!res.ok) {
+        toast.error(t('microsoft_connect_error'));
+        return;
+      }
+      const data = (await res.json()) as { url?: string };
+      if (!data.url) {
+        toast.error(t('microsoft_connect_error'));
+        return;
+      }
+      window.location.href = data.url;
+    } catch (e) {
+      console.error('startMicrosoft', e);
+      toast.error(t('microsoft_connect_error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className='sm:max-w-md'>
+        <DialogHeader>
+          <DialogTitle>{t('microsoft_connect_dialog_title')}</DialogTitle>
+          <DialogDescription className='space-y-2'>
+            <span className='block'>{t('microsoft_connect_dialog_desc')}</span>
+          </DialogDescription>
+        </DialogHeader>
+        <div className='space-y-4 py-2'>
+          <div className='space-y-2'>
+            <Label>{t('google_select_unit')}</Label>
+            <Select value={unitId} onValueChange={setUnitId}>
+              <SelectTrigger>
+                <SelectValue placeholder={tInt('unit_placeholder')} />
+              </SelectTrigger>
+              <SelectContent>
+                {units.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {getUnitDisplayName(u, locale)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {atLimit ? (
+              <p className='text-destructive text-sm'>{t('limit_error')}</p>
+            ) : null}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant='outline' onClick={() => onOpenChange(false)}>
+            {t('cancel')}
+          </Button>
+          <Button
+            onClick={() => void startMicrosoft()}
+            disabled={busy || atLimit || units.length === 0}
+          >
+            {busy && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+            {t('microsoft_connect_submit')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export interface CalendarIntegrationsPanelProps {
   /** When set, only show integrations for this unit (e.g. URL filter). */
   filterUnitId?: string | null;
@@ -765,6 +900,8 @@ export function CalendarIntegrationsPanel({
   const [createDialogKey, setCreateDialogKey] = useState(0);
   const [googleOpen, setGoogleOpen] = useState(false);
   const [googleDialogKey, setGoogleDialogKey] = useState(0);
+  const [microsoftOpen, setMicrosoftOpen] = useState(false);
+  const [microsoftDialogKey, setMicrosoftDialogKey] = useState(0);
 
   const oauthReturnPath = useMemo(() => {
     const s = searchParams.toString();
@@ -809,7 +946,9 @@ export function CalendarIntegrationsPanel({
     const kindFallback =
       row.kind === CALENDAR_KIND_GOOGLE_CALDAV
         ? tCal('kind_google')
-        : tCal('kind_yandex');
+        : row.kind === CALENDAR_KIND_MICROSOFT_GRAPH
+          ? tCal('kind_microsoft')
+          : tCal('kind_yandex');
     const label = row.displayName?.trim() || kindFallback;
     return `${unit} — ${label}`;
   };
@@ -863,6 +1002,24 @@ export function CalendarIntegrationsPanel({
                 <span>{tCal('add_menu_google')}</span>
                 <span className='text-muted-foreground text-xs font-normal'>
                   {tCal('add_menu_google_hint')}
+                </span>
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className='cursor-pointer gap-2'
+              onSelect={() => {
+                setMicrosoftDialogKey((k) => k + 1);
+                setMicrosoftOpen(true);
+              }}
+            >
+              <Monitor
+                className='text-muted-foreground size-4 shrink-0'
+                aria-hidden
+              />
+              <span className='flex flex-col gap-0.5'>
+                <span>{tCal('add_menu_microsoft')}</span>
+                <span className='text-muted-foreground text-xs font-normal'>
+                  {tCal('add_menu_microsoft_hint')}
                 </span>
               </span>
             </DropdownMenuItem>
@@ -936,6 +1093,16 @@ export function CalendarIntegrationsPanel({
         key={`cal-google-${googleDialogKey}`}
         open={googleOpen}
         onOpenChange={setGoogleOpen}
+        units={unitOptions}
+        integrations={rawList}
+        defaultUnitId={filterUnitId ?? undefined}
+        returnPath={oauthReturnPath}
+      />
+
+      <MicrosoftConnectCalendarDialog
+        key={`cal-ms-${microsoftDialogKey}`}
+        open={microsoftOpen}
+        onOpenChange={setMicrosoftOpen}
         units={unitOptions}
         integrations={rawList}
         defaultUnitId={filterUnitId ?? undefined}

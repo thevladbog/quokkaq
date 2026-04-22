@@ -1322,9 +1322,17 @@ export const CompanyMeFeaturesSchema = z.object({
   dadataCleaner: z.boolean()
 });
 
+export const CompanyMePlanCapabilitiesSchema = z.object({
+  apiAccess: z.boolean(),
+  outboundWebhooks: z.boolean(),
+  publicQueueWidget: z.boolean()
+});
+
 export const CompanyMeResponseSchema = z.object({
   company: CompanySchema,
   features: CompanyMeFeaturesSchema,
+  /** Subscription-gated integration surfaces (GET /companies/me). */
+  planCapabilities: CompanyMePlanCapabilitiesSchema.optional(),
   /** Canonical API origin (matches backend API_PUBLIC_URL). */
   publicApiUrl: z.string().optional(),
   /** Canonical app origin (matches backend PUBLIC_APP_URL / APP_BASE_URL). */
