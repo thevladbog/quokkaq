@@ -327,9 +327,20 @@ export interface HandlersCounterCallNextRequest {
   serviceIds?: string[];
 }
 
+/**
+ * BillingPeriod is "month" (default) or "annual" (12-month prepay when configured on the plan).
+ */
+export type HandlersCreateCheckoutRequestBillingPeriod = typeof HandlersCreateCheckoutRequestBillingPeriod[keyof typeof HandlersCreateCheckoutRequestBillingPeriod];
+
+
+export const HandlersCreateCheckoutRequestBillingPeriod = {
+  month: 'month',
+  annual: 'annual',
+} as const;
+
 export interface HandlersCreateCheckoutRequest {
   /** BillingPeriod is "month" (default) or "annual" (12-month prepay when configured on the plan). */
-  billingPeriod?: string;
+  billingPeriod?: HandlersCreateCheckoutRequestBillingPeriod;
   planCode?: string;
 }
 
@@ -436,9 +447,20 @@ export interface HandlersCreateTicketRequestKiosk {
 
 export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
 
+/**
+ * BillingPeriod optional context for sales: "month" or "annual".
+ */
+export type HandlersCustomTermsLeadRequestBodyBillingPeriod = typeof HandlersCustomTermsLeadRequestBodyBillingPeriod[keyof typeof HandlersCustomTermsLeadRequestBodyBillingPeriod];
+
+
+export const HandlersCustomTermsLeadRequestBodyBillingPeriod = {
+  month: 'month',
+  annual: 'annual',
+} as const;
+
 export interface HandlersCustomTermsLeadRequestBody {
   /** BillingPeriod optional context for sales: "month" or "annual". */
-  billingPeriod?: string;
+  billingPeriod?: HandlersCustomTermsLeadRequestBodyBillingPeriod;
   /** @minLength 1 */
   comment: string;
 }
@@ -681,9 +703,20 @@ export interface HandlersPickRequest {
   counterId?: string;
 }
 
+/**
+ * BillingPeriod is optional: "month" (default) or "annual" when the target plan supports annual prepay.
+ */
+export type HandlersPlanChangeRequestBodyBillingPeriod = typeof HandlersPlanChangeRequestBodyBillingPeriod[keyof typeof HandlersPlanChangeRequestBodyBillingPeriod];
+
+
+export const HandlersPlanChangeRequestBodyBillingPeriod = {
+  month: 'month',
+  annual: 'annual',
+} as const;
+
 export interface HandlersPlanChangeRequestBody {
   /** BillingPeriod is optional: "month" (default) or "annual" when the target plan supports annual prepay. */
-  billingPeriod?: string;
+  billingPeriod?: HandlersPlanChangeRequestBodyBillingPeriod;
   /** @minLength 1 */
   requestedPlanCode: string;
 }
@@ -715,11 +748,16 @@ export const HandlersPlatformCreateSubscriptionPlanBodyPricingModel = {
   per_unit: 'per_unit',
 } as const;
 
-export interface HandlersPlatformCreateSubscriptionPlanBody {
+export type HandlersPlatformCreateSubscriptionPlanBody = unknown & {
   /** AllowInstantPurchase omitted or null defaults to true. */
   allowInstantPurchase?: boolean;
-  /** Annual prepay (monthly plans only): set at most one of discount percent (1–100) or fixed effective monthly price (minor units). */
+  /**
+     * Annual prepay (monthly plans only): set at most one of discount percent (1–100) or fixed effective monthly price (minor units).
+     * @minimum 1
+     * @maximum 100
+     */
   annualPrepayDiscountPercent?: number;
+  /** @minimum 1 */
   annualPrepayPricePerMonth?: number;
   code?: string;
   currency?: string;
@@ -742,7 +780,7 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
   /** PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".
   enums: flat,per_unit */
   pricingModel?: HandlersPlatformCreateSubscriptionPlanBodyPricingModel;
-}
+};
 
 export interface HandlersPlatformIntegrationsResponse {
   leadsTrackerQueue?: string;
@@ -777,9 +815,14 @@ export const HandlersPlatformUpdateSubscriptionPlanBodyPricingModel = {
   per_unit: 'per_unit',
 } as const;
 
-export interface HandlersPlatformUpdateSubscriptionPlanBody {
+export type HandlersPlatformUpdateSubscriptionPlanBody = unknown & {
   allowInstantPurchase?: boolean;
+  /**
+     * @minimum 1
+     * @maximum 100
+     */
   annualPrepayDiscountPercent?: number;
+  /** @minimum 1 */
   annualPrepayPricePerMonth?: number;
   code?: string;
   currency?: string;
@@ -800,10 +843,18 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
   /** PricingModel: "flat" or "per_unit". Omit to leave unchanged.
   enums: flat,per_unit */
   pricingModel?: HandlersPlatformUpdateSubscriptionPlanBodyPricingModel;
-}
+};
+
+export type HandlersPublicLeadRequestBodyBillingPeriod = typeof HandlersPublicLeadRequestBodyBillingPeriod[keyof typeof HandlersPublicLeadRequestBodyBillingPeriod];
+
+
+export const HandlersPublicLeadRequestBodyBillingPeriod = {
+  month: 'month',
+  annual: 'annual',
+} as const;
 
 export interface HandlersPublicLeadRequestBody {
-  billingPeriod?: string;
+  billingPeriod?: HandlersPublicLeadRequestBodyBillingPeriod;
   company?: string;
   email: string;
   locale?: string;
@@ -874,9 +925,20 @@ export interface HandlersSaasVendorResponse {
   paymentAccounts?: HandlersSaasVendorResponsePaymentAccountsItem[];
 }
 
+/**
+ * BillingPeriod: "month" (default) or "annual" when the selected plan supports annual prepay.
+ */
+export type HandlersSignupRequestBillingPeriod = typeof HandlersSignupRequestBillingPeriod[keyof typeof HandlersSignupRequestBillingPeriod];
+
+
+export const HandlersSignupRequestBillingPeriod = {
+  month: 'month',
+  annual: 'annual',
+} as const;
+
 export interface HandlersSignupRequest {
   /** BillingPeriod: "month" (default) or "annual" when the selected plan supports annual prepay. */
-  billingPeriod?: string;
+  billingPeriod?: HandlersSignupRequestBillingPeriod;
   companyName: string;
   /** optional; if empty, generated from company name */
   companySlug?: string;
@@ -1081,12 +1143,19 @@ export type ModelsSubscriptionPlanLimits = {[key: string]: number};
  */
 export type ModelsSubscriptionPlanLimitsNegotiable = {[key: string]: boolean};
 
-export interface ModelsSubscriptionPlan {
+export type ModelsSubscriptionPlan = unknown & {
   /** AllowInstantPurchase when false: plan may still be public, but checkout is disabled until a sales-led flow exists. */
   allowInstantPurchase?: boolean;
-  /** AnnualPrepayDiscountPercent when set (1–100, interval must be month): yearly checkout uses price*12*(100-pct)/100. */
+  /**
+     * AnnualPrepayDiscountPercent when set (1–100, interval must be month): yearly checkout uses price*12*(100-pct)/100.
+     * @minimum 1
+     * @maximum 100
+     */
   annualPrepayDiscountPercent?: number;
-  /** AnnualPrepayPricePerMonth when set (minor units, interval month): yearly checkout uses this * 12 per year. */
+  /**
+     * AnnualPrepayPricePerMonth when set (minor units, interval month): yearly checkout uses this * 12 per year.
+     * @minimum 1
+     */
   annualPrepayPricePerMonth?: number;
   /** unique plan code like "starter", "professional" */
   code?: string;
@@ -1123,7 +1192,7 @@ export interface ModelsSubscriptionPlan {
   enums: flat,per_unit */
   pricingModel?: ModelsSubscriptionPlanPricingModel;
   updatedAt?: string;
-}
+};
 
 export interface ModelsCatalogItem {
   article?: string;
