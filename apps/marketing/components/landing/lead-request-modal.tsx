@@ -140,11 +140,11 @@ export function LeadRequestModal({
     setSubmitting(true);
     try {
       const trimmedBillingPeriod = billingPeriod?.trim();
-      const validBillingPeriod = 
+      const validBillingPeriod =
         trimmedBillingPeriod === 'month' || trimmedBillingPeriod === 'annual'
           ? (trimmedBillingPeriod as HandlersPublicLeadRequestBodyBillingPeriod)
           : undefined;
-      
+
       const body: HandlersPublicLeadRequestBody = {
         name: n,
         email: em,
