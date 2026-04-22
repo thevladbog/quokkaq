@@ -24,6 +24,8 @@ type etaTicketRepo struct {
 	waitingByUnitErr    error
 	waitingByService    []repository.ServiceWaitingCount
 	waitingByServiceErr error
+	// For CountServedInUnitInRange (served-today in snapshot / summary when unitRepo is set).
+	servedInRange int64
 }
 
 func (s *etaTicketRepo) GetRecentCompletedServiceTimes(unitID, serviceID string, _ int) ([]int, error) {
@@ -64,6 +66,10 @@ func (s *etaTicketRepo) GetWaitingTicketsWithSLA(_ string) ([]models.Ticket, err
 
 func (s *etaTicketRepo) CountTicketsCreatedSince(_ string, _ time.Time) (int64, error) {
 	return 0, nil
+}
+
+func (s *etaTicketRepo) CountServedInUnitInRange(_ string, _, _ time.Time) (int64, error) {
+	return s.servedInRange, nil
 }
 
 // etaStatsRepoStub implements StatisticsRepository for ETA bucket fallback tests.
@@ -109,6 +115,23 @@ func (s *etaServiceRepo) FindMapByIDs(_ []string) (map[string]*models.Service, e
 		return s.serviceMap, nil
 	}
 	return map[string]*models.Service{}, nil
+}
+
+// etaUnitRepo implements only [repository.UnitRepository.FindByIDLight] for ETA tests.
+type etaUnitRepo struct {
+	repository.UnitRepository
+	unit *models.Unit
+	err  error
+}
+
+func (e *etaUnitRepo) FindByIDLight(id string) (*models.Unit, error) {
+	if e.err != nil {
+		return nil, e.err
+	}
+	if e.unit != nil {
+		return e.unit, nil
+	}
+	return &models.Unit{ID: id, Timezone: "UTC"}, nil
 }
 
 // helper for creating a gorm.DB-satisfying counter repo (unused but avoids
@@ -318,6 +341,31 @@ func (r *countingTicketRepo) GetWaitingTickets(unitID string) ([]models.Ticket, 
 func (r *countingTicketRepo) GetAvgServiceSecPerOccupiedCounter(unitID string, n int) (map[string]float64, error) {
 	r.getAvgCalls++
 	return r.etaTicketRepo.GetAvgServiceSecPerOccupiedCounter(unitID, n)
+}
+
+func TestComputeUnitETASnapshot_ServedToday_matchesGetUnitQueueSummary(t *testing.T) {
+	t.Parallel()
+	unitID := "u1"
+	ticketRepo := &etaTicketRepo{
+		waitingByUnit: 0,
+		servedInRange: 42,
+	}
+	unitRepo := &etaUnitRepo{unit: &models.Unit{ID: unitID, Timezone: "UTC"}}
+	eta := NewETAServiceFull(ticketRepo, &etaCounterRepo{activeCount: 1}, nil, unitRepo, nil)
+	snap, err := eta.ComputeUnitETASnapshot(unitID)
+	if err != nil {
+		t.Fatalf("ComputeUnitETASnapshot: %v", err)
+	}
+	if snap.ServedToday != 42 {
+		t.Errorf("snapshot ServedToday: want 42, got %d", snap.ServedToday)
+	}
+	summary, err := eta.GetUnitQueueSummary(unitID)
+	if err != nil {
+		t.Fatalf("GetUnitQueueSummary: %v", err)
+	}
+	if summary.ServedToday != 42 {
+		t.Errorf("summary ServedToday: want 42, got %d", summary.ServedToday)
+	}
 }
 
 func TestComputeUnitETASnapshot_fetchesOccupiedCounterSamplesOnce(t *testing.T) {

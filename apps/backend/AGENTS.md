@@ -32,6 +32,14 @@ handlers → services → repository → models (GORM)
 
 auth, users, units, tickets, services, counters, shifts, slots, bookings, pre-registrations, invitations, templates, mail, storage, TTS, job enqueue.
 
+## Digital Signage (табло, внешние фиды, плейлисты)
+
+- **Модели/таблицы:** [`internal/models/signage.go`](internal/models/signage.go) — плейлисты, расписания, `ExternalFeed` (в т.ч. `last_error`, `last_fetch_at`, `consecutive_failures` после миграции), объявления на экран.
+- **Сервис/поллинг:** [`internal/services/signage_service.go`](internal/services/signage_service.go) — `PollDueFeeds` / `PollFeedByID`. Тип `weather` использует **Open-Meteo** (параметры `lat`/`lon` в `config` JSON, см. `pollWeather`); `rss` — парсер `gofeed`, `custom_url` — JSON по HTTP. Для сетевых вызовов встроены **повторные попытки** (см. `httpGetJSON` / `pollCustomURL`).
+- **Периодика Asynq:** `internal/jobs/feed_poller.go`, постановка `EnqueueSignageFeedPoll` из `cmd/api/main.go` (интервальные enqueue в общем цикле, как у других periodic jobs).
+- **Публичные пути (без сессии, для экрана):** объявления и данные фидов — теги и маршруты в [`internal/handlers/signage_handler.go`](internal/handlers/signage_handler.go) (имена путей и префиксы `public-` / `public-screen-` в OpenAPI).
+- **Очередь `servedToday`:** в обход HTTP и WebSocket `UnitETASnapshot` заполняется в [`internal/services/eta_service.go`](internal/services/eta_service.go) той же логикой дня, что `GetUnitQueueSummary` (функция `servedTodayForUnit` + timezone юнита).
+
 ## Статистика: аномалии и staffing
 
 - **Asynq:** периодическая задача `anomaly:check` ставится из `cmd/api/main.go`, тип и постановка — `internal/jobs/types.go`, `internal/jobs/client.go`, обработчик — `internal/jobs/worker.go` (`handleAnomalyCheck`). Нужен **Redis** (`REDIS_URL` и т.п.), иначе очередь недоступна.

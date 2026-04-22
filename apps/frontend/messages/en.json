@@ -1028,7 +1028,22 @@
       "cleared": "Cleared",
       "rssWidgetFeed": "Bottom row — RSS feed",
       "noFeed": "—",
-      "layoutInfoHeavy": "This template has no RSS row. Use “split-3” to show an RSS or weather feed."
+      "layoutInfoHeavy": "This template has no RSS row. Use “split-3” to show an RSS or weather feed.",
+      "weatherWidgetFeed": "Weather — feed",
+      "customHtml": "Custom HTML",
+      "noWidgetConfig": "This preset has no feed/HTML widgets to configure.",
+      "screenPreview": "Screen preview",
+      "refreshPreview": "Refresh",
+      "scheduleTimeline": "Weekly view",
+      "dayM": "Mon",
+      "dayT": "Tue",
+      "dayW": "Wed",
+      "dayTh": "Thu",
+      "dayF": "Fri",
+      "dayS": "Sat",
+      "daySn": "Sun",
+      "feedStatusOk": "OK",
+      "feedStatusFail": "Failing"
     },
     "kiosk_settings": {
       "title": "Kiosk Settings",
@@ -2012,7 +2027,8 @@
       "inQueue": "In queue",
       "openWindows": "Open windows",
       "estWait": "Est. wait",
-      "servedToday": "Served today"
+      "servedToday": "Served today",
+      "aria": "Queue summary"
     }
   },
   "common": {

@@ -7,8 +7,13 @@ export const SCREEN_TEMPLATE_PRESETS: Record<string, ScreenTemplate> = {
     layout: {
       type: 'grid',
       regions: [
-        { id: 'main', area: 'main', size: '1fr' },
-        { id: 'side', area: 'side', size: '420px' }
+        { id: 'main', area: 'main', size: '1fr', panelStyle: 'default' },
+        {
+          id: 'side',
+          area: 'side',
+          size: '420px',
+          panelStyle: 'scrollPadded'
+        }
       ]
     },
     widgets: [
@@ -39,9 +44,14 @@ export const SCREEN_TEMPLATE_PRESETS: Record<string, ScreenTemplate> = {
     layout: {
       type: 'grid',
       regions: [
-        { id: 'top', area: 'top', size: '40%' },
-        { id: 'mid', area: 'mid', size: '35%' },
-        { id: 'bottom', area: 'bottom', size: '25%' }
+        { id: 'top', area: 'top', size: '40%', panelStyle: 'splitSection' },
+        { id: 'mid', area: 'mid', size: '35%', panelStyle: 'card' },
+        {
+          id: 'bottom',
+          area: 'bottom',
+          size: '25%',
+          panelStyle: 'splitSection'
+        }
       ]
     },
     widgets: [

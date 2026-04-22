@@ -51,19 +51,20 @@ type PlaylistSchedule struct {
 
 // ExternalFeed is RSS, weather, or a generic URL polled into CachedData.
 type ExternalFeed struct {
-	ID           string          `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	UnitID       string          `gorm:"not null;index" json:"unitId"`
-	Name         string          `gorm:"not null" json:"name"`
-	Type         string          `gorm:"not null" json:"type"` // rss | weather | custom_url
-	URL          string          `gorm:"not null" json:"url"`
-	PollInterval int             `gorm:"not null;default:300" json:"pollInterval"`
-	Config       json.RawMessage `gorm:"type:jsonb" json:"config,omitempty" swaggertype:"object"`
-	CachedData   json.RawMessage `gorm:"type:jsonb" json:"cachedData,omitempty" swaggertype:"object"`
-	LastError    string          `gorm:"not null;default:''" json:"lastError,omitempty"`
-	LastFetchAt  *time.Time      `json:"lastFetchAt,omitempty"`
-	IsActive     bool            `gorm:"not null;default:true" json:"isActive"`
-	CreatedAt    time.Time       `gorm:"default:now()" json:"createdAt"`
-	UpdatedAt    time.Time       `gorm:"default:now()" json:"updatedAt"`
+	ID                  string          `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	UnitID              string          `gorm:"not null;index" json:"unitId"`
+	Name                string          `gorm:"not null" json:"name"`
+	Type                string          `gorm:"not null" json:"type"` // rss | weather | custom_url
+	URL                 string          `gorm:"not null" json:"url"`
+	PollInterval        int             `gorm:"not null;default:300" json:"pollInterval"`
+	Config              json.RawMessage `gorm:"type:jsonb" json:"config,omitempty" swaggertype:"object"`
+	CachedData          json.RawMessage `gorm:"type:jsonb" json:"cachedData,omitempty" swaggertype:"object"`
+	LastError           string          `gorm:"not null;default:''" json:"lastError,omitempty"`
+	ConsecutiveFailures int             `gorm:"not null;default:0" json:"consecutiveFailures"`
+	LastFetchAt         *time.Time      `json:"lastFetchAt,omitempty"`
+	IsActive            bool            `gorm:"not null;default:true" json:"isActive"`
+	CreatedAt           time.Time       `gorm:"default:now()" json:"createdAt"`
+	UpdatedAt           time.Time       `gorm:"default:now()" json:"updatedAt"`
 
 	Unit Unit `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
 }

@@ -1028,7 +1028,22 @@
       "cleared": "Готово",
       "rssWidgetFeed": "Нижняя зона — RSS-фид",
       "noFeed": "—",
-      "layoutInfoHeavy": "В этом шаблоне нет полосы RSS. Используйте «split-3» для ленты или погоды."
+      "layoutInfoHeavy": "В этом шаблоне нет полосы RSS. Используйте «split-3» для ленты или погоды.",
+      "weatherWidgetFeed": "Погода — фид",
+      "customHtml": "Произвольный HTML",
+      "noWidgetConfig": "В этом пресете нет виджетов фида или HTML для настройки.",
+      "screenPreview": "Превью экрана",
+      "refreshPreview": "Обновить",
+      "scheduleTimeline": "Недельный обзор",
+      "dayM": "пн",
+      "dayT": "вт",
+      "dayW": "ср",
+      "dayTh": "чт",
+      "dayF": "пт",
+      "dayS": "сб",
+      "daySn": "вс",
+      "feedStatusOk": "ОК",
+      "feedStatusFail": "Ошибка"
     },
     "kiosk_settings": {
       "title": "Киоск",
@@ -2012,7 +2027,8 @@
       "inQueue": "В очереди",
       "openWindows": "Открыто окон",
       "estWait": "Прим. ожид.",
-      "servedToday": "Обслужено сегодня"
+      "servedToday": "Обслужено сегодня",
+      "aria": "Сводка по очереди"
     }
   },
   "common": {

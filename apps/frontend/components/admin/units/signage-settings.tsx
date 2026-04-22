@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { safeParseSignageWithToast, signageZod } from '@/lib/signage-zod';
 import { PlaylistManager } from './signage/playlist-manager';
 import { ScheduleEditor } from './signage/schedule-editor';
 import { FeedConfig } from './signage/feed-config';
@@ -27,15 +28,23 @@ export function SignageSettings({
   const createAnn = orval.useCreateSignageAnnouncement();
   const deleteAnn = orval.useDeleteSignageAnnouncement();
   const onCreateAnn = async () => {
-    if (!annText.trim()) return;
+    if (!annText.trim()) {
+      return;
+    }
+    const data = { text: annText.trim(), style: 'info', isActive: true };
+    if (
+      !safeParseSignageWithToast(
+        'Announcement',
+        signageZod.createAnnouncement,
+        data
+      ).success
+    ) {
+      return;
+    }
     try {
       await createAnn.mutateAsync({
         unitId,
-        data: {
-          text: annText,
-          style: 'info',
-          isActive: true
-        } as orval.HandlersAnnouncementRequest
+        data: data as orval.HandlersAnnouncementRequest
       });
       setAnnText('');
       void refetchAnn();

@@ -554,8 +554,10 @@ func (s *signageService) PollFeedByID(ctx context.Context, feedID string) error 
 	now := time.Now()
 	f.LastFetchAt = &now
 	if errFetch != nil {
+		f.ConsecutiveFailures++
 		f.LastError = errFetch.Error()
 	} else {
+		f.ConsecutiveFailures = 0
 		f.LastError = ""
 		f.CachedData = raw
 	}
@@ -610,6 +612,8 @@ func (s *signageService) pollRSS(_ context.Context, u string) (json.RawMessage, 
 	return b, nil
 }
 
+// pollWeather fetches current conditions from Open-Meteo (no API key; rate limits apply). Prefer config.lat/lon;
+// when missing, a full URL in fallbackURL is fetched like custom_url.
 func (s *signageService) pollWeather(config json.RawMessage, fallbackURL string) (json.RawMessage, error) {
 	type cfg struct {
 		Lat *float64 `json:"lat"`

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import type { Unit } from '@quokkaq/shared-types';
 import {
   ScreenTemplateSchema,
@@ -12,12 +12,165 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useUpdateUnit } from '@/lib/hooks';
 import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
 import { SCREEN_TEMPLATE_PRESETS } from '@/lib/screen-template-presets';
+import { safeParseSignageWithToast, signageZod } from '@/lib/signage-zod';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { ScreenLayoutPreview } from './screen-layout-preview';
 
 function cloneTemplate(t: ScreenTemplate): ScreenTemplate {
   return JSON.parse(JSON.stringify(t)) as ScreenTemplate;
+}
+
+type WidgetOverlay = { feedId?: string; html?: string };
+
+function overlaysFromTemplate(
+  tpl: ScreenTemplate
+): Record<string, WidgetOverlay> {
+  const o: Record<string, WidgetOverlay> = {};
+  for (const w of tpl.widgets) {
+    if (w.type === 'rss-feed' || w.type === 'weather') {
+      o[w.id] = {
+        feedId: String(
+          (w.config as { feedId?: string } | undefined)?.feedId ?? ''
+        )
+      };
+    } else if (w.type === 'custom-html') {
+      o[w.id] = {
+        html: String((w.config as { html?: string } | undefined)?.html ?? '')
+      };
+    }
+  }
+  return o;
+}
+
+function WidgetOverlaysForm({
+  initialOverlays,
+  configurableWidgets,
+  feedList,
+  t,
+  isPending,
+  onApply
+}: {
+  initialOverlays: Record<string, WidgetOverlay>;
+  configurableWidgets: ScreenTemplate['widgets'];
+  feedList: orval.ModelsExternalFeed[];
+  t: (key: string, values?: { default: string }) => string;
+  isPending: boolean;
+  onApply: (overlays: Record<string, WidgetOverlay>) => void;
+}) {
+  const [overlays, setOverlays] = useState(initialOverlays);
+  return (
+    <>
+      {configurableWidgets.length > 0 ? (
+        <div className='space-y-3'>
+          {configurableWidgets.map((w) => (
+            <div
+              key={w.id}
+              className='bg-muted/30 space-y-2 rounded-lg border p-3'
+            >
+              <p className='text-muted-foreground text-xs font-medium tracking-wide'>
+                {w.type} <span className='font-mono'>({w.id})</span>
+              </p>
+              {w.type === 'rss-feed' && (
+                <div>
+                  <Label htmlFor={`feed-${w.id}`}>
+                    {t('rssWidgetFeed', { default: 'RSS — feed' })}
+                  </Label>
+                  <select
+                    id={`feed-${w.id}`}
+                    className='border-input mt-1 w-full max-w-md rounded-md border p-2'
+                    value={overlays[w.id]?.feedId ?? ''}
+                    onChange={(e) =>
+                      setOverlays((prev) => ({
+                        ...prev,
+                        [w.id]: { ...prev[w.id], feedId: e.target.value }
+                      }))
+                    }
+                  >
+                    <option value=''>{t('noFeed', { default: '—' })}</option>
+                    {feedList
+                      .filter((f) => f.type === 'rss')
+                      .map((f) => (
+                        <option key={f.id} value={f.id!}>
+                          {f.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+              {w.type === 'weather' && (
+                <div>
+                  <Label htmlFor={`w-${w.id}`}>
+                    {t('weatherWidgetFeed', { default: 'Weather — feed' })}
+                  </Label>
+                  <select
+                    id={`w-${w.id}`}
+                    className='border-input mt-1 w-full max-w-md rounded-md border p-2'
+                    value={overlays[w.id]?.feedId ?? ''}
+                    onChange={(e) =>
+                      setOverlays((prev) => ({
+                        ...prev,
+                        [w.id]: { ...prev[w.id], feedId: e.target.value }
+                      }))
+                    }
+                  >
+                    <option value=''>{t('noFeed', { default: '—' })}</option>
+                    {feedList
+                      .filter((f) => f.type === 'weather')
+                      .map((f) => (
+                        <option key={f.id} value={f.id!}>
+                          {f.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+              {w.type === 'custom-html' && (
+                <div>
+                  <Label htmlFor={`html-${w.id}`}>
+                    {t('customHtml', { default: 'Custom HTML' })}
+                  </Label>
+                  <Textarea
+                    id={`html-${w.id}`}
+                    className='mt-1 font-mono text-sm'
+                    rows={4}
+                    value={overlays[w.id]?.html ?? ''}
+                    onChange={(e) =>
+                      setOverlays((prev) => ({
+                        ...prev,
+                        [w.id]: { ...prev[w.id], html: e.target.value }
+                      }))
+                    }
+                    placeholder='HTML'
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className='text-muted-foreground text-sm'>
+          {t('noWidgetConfig', {
+            default: 'This preset has no feed/HTML widgets to configure.'
+          })}
+        </p>
+      )}
+
+      <div className='pt-1'>
+        <Button
+          type='button'
+          onClick={() => {
+            onApply(overlays);
+          }}
+          disabled={isPending}
+        >
+          {t('applyLayout', { default: 'Apply' })}
+        </Button>
+      </div>
+    </>
+  );
 }
 
 export function ScreenTemplateBuilder({
@@ -28,6 +181,7 @@ export function ScreenTemplateBuilder({
   unitId: string;
 }) {
   const t = useTranslations('admin.signage');
+  const locale = useLocale();
   const qc = useQueryClient();
   const updateUnit = useUpdateUnit();
   const { data: feeds } = orval.useListSignageFeeds(unitId);
@@ -35,7 +189,7 @@ export function ScreenTemplateBuilder({
 
   const raw = (unit.config as { screenTemplate?: unknown } | null)
     ?.screenTemplate;
-  const initial = useMemo(() => {
+  const initialLayoutId = useMemo(() => {
     if (raw) {
       const p = ScreenTemplateSchema.safeParse(raw);
       if (p.success) {
@@ -44,24 +198,60 @@ export function ScreenTemplateBuilder({
     }
     return Object.keys(SCREEN_TEMPLATE_PRESETS)[0] ?? 'info-heavy';
   }, [raw]);
-  const [layoutId, setLayoutId] = useState(initial);
+  const [layoutId, setLayoutId] = useState(initialLayoutId);
 
-  const [feedRss, setFeedRss] = useState('');
+  const rawParsed = useMemo(
+    () => (raw ? ScreenTemplateSchema.safeParse(raw) : null),
+    [raw]
+  );
 
-  const onSaveLayout = () => {
-    const preset = SCREEN_TEMPLATE_PRESETS[layoutId];
+  const serverOverlays = useMemo(() => {
+    if (rawParsed?.success && rawParsed.data.id === layoutId) {
+      return overlaysFromTemplate(rawParsed.data);
+    }
+    return {};
+  }, [rawParsed, layoutId]);
+
+  const preset = SCREEN_TEMPLATE_PRESETS[layoutId];
+  const configurableWidgets = useMemo(
+    () =>
+      preset
+        ? preset.widgets.filter(
+            (w) =>
+              w.type === 'rss-feed' ||
+              w.type === 'weather' ||
+              w.type === 'custom-html'
+          )
+        : [],
+    [preset]
+  );
+
+  const formKey = `${layoutId}|${(unit as { updatedAt?: string }).updatedAt ?? unit.id}`;
+
+  const applyLayout = (overlays: Record<string, WidgetOverlay>) => {
     if (!preset) {
       return;
     }
     const v0 = cloneTemplate(preset);
     for (const w of v0.widgets) {
-      if (w.type === 'rss-feed' && feedRss) {
-        w.config = { ...(w.config ?? {}), feedId: feedRss };
+      const o = overlays[w.id];
+      if (!o) {
+        continue;
+      }
+      if (w.type === 'rss-feed' || w.type === 'weather') {
+        if (o.feedId) {
+          w.config = { ...(w.config ?? {}), feedId: o.feedId };
+        }
+      } else if (w.type === 'custom-html' && o.html != null) {
+        w.config = { ...(w.config ?? {}), html: o.html };
       }
     }
-    const v = ScreenTemplateSchema.safeParse(v0);
+    const v = safeParseSignageWithToast(
+      'Screen template',
+      signageZod.screenTemplate,
+      v0
+    );
     if (!v.success) {
-      toast.error('Invalid');
       return;
     }
     const current = (
@@ -109,57 +299,57 @@ export function ScreenTemplateBuilder({
     );
   };
 
+  if (!preset) {
+    return null;
+  }
+
   return (
-    <div className='space-y-3'>
-      <Label>{t('presets', { default: 'Screen template' })}</Label>
-      <select
-        className='border-input w-full max-w-sm rounded-md border p-2'
-        value={layoutId}
-        onChange={(e) => setLayoutId(e.target.value)}
-      >
-        {Object.keys(SCREEN_TEMPLATE_PRESETS).map((k) => (
-          <option key={k} value={k}>
-            {k}
-          </option>
-        ))}
-      </select>
-      {layoutId === 'split-3' && (
-        <div className='grid gap-2 sm:max-w-md'>
-          <div>
-            <Label>{t('rssWidgetFeed', { default: 'RSS row — feed' })}</Label>
-            <select
-              className='border-input w-full rounded-md border p-2'
-              value={feedRss}
-              onChange={(e) => setFeedRss(e.target.value)}
-            >
-              <option value=''>{t('noFeed', { default: '—' })}</option>
-              {feedList
-                .filter((f) => f.type === 'rss')
-                .map((f) => (
-                  <option key={f.id} value={f.id!}>
-                    {f.name}
-                  </option>
-                ))}
-            </select>
-          </div>
-        </div>
-      )}
-      {layoutId === 'info-heavy' && (
-        <p className='text-muted-foreground text-sm'>
-          {t('layoutInfoHeavy', {
-            default:
-              'Info-heavy does not use RSS. Use split-3 to bind an RSS/weather feed.'
-          })}
-        </p>
-      )}
+    <div className='space-y-4'>
+      <div className='space-y-2'>
+        <Label>{t('presets', { default: 'Screen template' })}</Label>
+        <select
+          className='border-input w-full max-w-sm rounded-md border p-2'
+          value={layoutId}
+          onChange={(e) => {
+            setLayoutId(e.target.value);
+          }}
+        >
+          {Object.keys(SCREEN_TEMPLATE_PRESETS).map((k) => (
+            <option key={k} value={k}>
+              {k}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <WidgetOverlaysForm
+        key={formKey}
+        initialOverlays={serverOverlays}
+        configurableWidgets={configurableWidgets}
+        feedList={feedList}
+        t={t as (key: string, values?: { default: string }) => string}
+        isPending={updateUnit.isPending}
+        onApply={applyLayout}
+      />
+
       <div className='flex flex-wrap gap-2'>
-        <Button onClick={onSaveLayout} disabled={updateUnit.isPending}>
-          {t('applyLayout', { default: 'Apply' })}
-        </Button>
-        <Button type='button' variant='secondary' onClick={onClearLayout}>
+        <Button
+          type='button'
+          variant='secondary'
+          onClick={onClearLayout}
+          disabled={updateUnit.isPending}
+        >
           {t('classicLayout', { default: 'Use classic layout' })}
         </Button>
       </div>
+
+      <ScreenLayoutPreview
+        unitId={unitId}
+        locale={locale}
+        onRefreshKey={`${
+          (unit as { updatedAt?: string }).updatedAt ?? unit.id
+        }-${layoutId}`}
+      />
     </div>
   );
 }

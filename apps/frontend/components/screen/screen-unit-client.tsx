@@ -237,6 +237,7 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
         queueLength: snap.queueLength,
         estimatedWaitMinutes: snap.estimatedWaitMinutes,
         activeCounters: snap.activeCounters,
+        servedToday: snap.servedToday,
         services: snap.services
       });
     };

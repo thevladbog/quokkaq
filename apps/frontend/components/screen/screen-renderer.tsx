@@ -2,7 +2,12 @@
 
 import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
-import type { ScreenLayout, ScreenTemplate, Unit } from '@quokkaq/shared-types';
+import type {
+  ScreenLayout,
+  ScreenLayoutRegion,
+  ScreenTemplate
+} from '@quokkaq/shared-types';
+import type { Unit } from '@quokkaq/shared-types';
 import {
   ContentPlayer,
   type ContentSlide
@@ -48,27 +53,47 @@ type ScreenRendererProps = {
   historyLimit: number;
 };
 
-function regionPanelClass(
+type PanelStyle = NonNullable<ScreenLayoutRegion['panelStyle']>;
+
+function effectivePanelStyle(
   layout: ScreenLayout,
-  regionIndex: number,
-  regionId: string,
-  templateId: string
-): string {
-  const base = 'min-h-0 overflow-hidden';
+  region: ScreenLayoutRegion,
+  regionIndex: number
+): PanelStyle {
+  if (region.panelStyle) {
+    return region.panelStyle;
+  }
   if (
     layout.type === 'grid' &&
     layout.regions.length === 2 &&
     regionIndex === 1
   ) {
-    return `${base} bg-muted/5 flex flex-col gap-3 overflow-y-auto rounded-xl border p-3`;
+    return 'scrollPadded';
   }
-  if (templateId === 'split-3' && regionId === 'mid') {
-    return `${base} rounded-lg border p-2`;
+  if (layout.type === 'grid' && layout.regions.length >= 3) {
+    return 'splitSection';
   }
-  if (templateId === 'split-3') {
-    return `${base} rounded-lg border p-2`;
+  return 'default';
+}
+
+function regionPanelClass(
+  layout: ScreenLayout,
+  region: ScreenLayoutRegion,
+  regionIndex: number
+): string {
+  const base = 'min-h-0 overflow-hidden';
+  const style = effectivePanelStyle(layout, region, regionIndex);
+  switch (style) {
+    case 'scrollPadded':
+      return `${base} bg-muted/5 flex flex-col gap-3 overflow-y-auto rounded-xl border p-3`;
+    case 'card':
+      return `${base} rounded-lg border p-2`;
+    case 'splitSection':
+      return `${base} rounded-lg border p-2`;
+    case 'default':
+    default:
+      return base;
   }
-  return base;
 }
 
 export function ScreenRenderer(props: ScreenRendererProps) {
@@ -107,10 +132,10 @@ export function ScreenRenderer(props: ScreenRendererProps) {
       case 'queue-stats':
         return (
           <ScreenQueueStatsWidget
-            queueLength={qs?.queueLength ?? 0}
-            activeCounters={qs?.activeCounters ?? 0}
-            estimatedWaitMinutes={qs?.estimatedWaitMinutes}
-            servedToday={qs?.servedToday}
+            queueLength={qs == null ? null : qs.queueLength}
+            activeCounters={qs == null ? null : qs.activeCounters}
+            estimatedWaitMinutes={qs == null ? null : qs.estimatedWaitMinutes}
+            servedToday={qs == null ? null : qs.servedToday}
           />
         );
       case 'announcements':
@@ -230,10 +255,7 @@ export function ScreenRenderer(props: ScreenRendererProps) {
           }}
         >
           {regions.map((reg, idx) => (
-            <div
-              key={reg.id}
-              className={regionPanelClass(layout, idx, reg.id, template.id)}
-            >
+            <div key={reg.id} className={regionPanelClass(layout, reg, idx)}>
               {(widgetsByRegion.get(reg.id) ?? []).map((w) => (
                 <div
                   key={w.id}
@@ -268,7 +290,7 @@ export function ScreenRenderer(props: ScreenRendererProps) {
           {regions.map((reg) => (
             <div
               key={reg.id}
-              className={`${regionPanelClass(layout, 0, reg.id, template.id)} min-h-0`}
+              className={`${regionPanelClass(layout, reg, 0)} min-h-0`}
             >
               {(widgetsByRegion.get(reg.id) ?? []).map((w) => (
                 <div key={w.id} className='h-full min-h-0'>

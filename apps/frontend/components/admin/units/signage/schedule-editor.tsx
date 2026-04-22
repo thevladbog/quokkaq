@@ -1,18 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import * as orval from '@/lib/api/generated/units';
+import { safeParseSignageWithToast, signageZod } from '@/lib/signage-zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { ScheduleTimeline } from './schedule-timeline';
 
 export function ScheduleEditor({ unitId }: { unitId: string }) {
   const t = useTranslations('admin.signage');
   const { data: playlists } = orval.useListSignagePlaylists(unitId);
   const { data: schedules, refetch: refetchSch } =
     orval.useListSignageSchedules(unitId);
+  const playlistNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of (playlists as orval.ModelsPlaylist[] | undefined) ?? []) {
+      if (p.id) {
+        m.set(p.id, p.name ?? p.id);
+      }
+    }
+    return m;
+  }, [playlists]);
   const [scPl, setScPl] = useState('');
   const [scDays, setScDays] = useState('1,2,3,4,5');
   const [scStart, setScStart] = useState('09:00');
@@ -27,17 +38,23 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
       toast.error(t('pickPlaylist', { default: 'Select a playlist' }));
       return;
     }
+    const body = {
+      playlistId: scPl,
+      daysOfWeek: scDays,
+      startTime: scStart,
+      endTime: scEnd,
+      priority,
+      isActive: true
+    };
+    if (
+      !safeParseSignageWithToast('Schedule', signageZod.schedule, body).success
+    ) {
+      return;
+    }
     try {
       await createSc.mutateAsync({
         unitId,
-        data: {
-          playlistId: scPl,
-          daysOfWeek: scDays,
-          startTime: scStart,
-          endTime: scEnd,
-          priority,
-          isActive: true
-        } as orval.HandlersCreateScheduleRequest
+        data: body as orval.HandlersCreateScheduleRequest
       });
       toast.success(t('saved', { default: 'Saved' }));
       void refetchSch();
@@ -56,8 +73,23 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
     }
   };
 
+  const list = (schedules as orval.ModelsPlaylistSchedule[] | undefined) ?? [];
+
   return (
     <div className='space-y-4'>
+      <ScheduleTimeline
+        schedules={list.map((s) => ({
+          id: s.id ?? '',
+          startTime: s.startTime ?? '00:00',
+          endTime: s.endTime ?? '00:00',
+          daysOfWeek: s.daysOfWeek ?? '',
+          priority: s.priority ?? 0,
+          playlistId: s.playlistId,
+          playlistName: s.playlistId
+            ? (playlistNameById.get(s.playlistId) ?? s.playlistId)
+            : undefined
+        }))}
+      />
       <div className='grid gap-2 sm:grid-cols-2'>
         <div>
           <Label>Playlist</Label>
@@ -105,59 +137,56 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
         {t('create', { default: 'Create' })}
       </Button>
       <ul className='space-y-2'>
-        {((schedules as orval.ModelsPlaylistSchedule[] | undefined) ?? []).map(
-          (s) => (
-            <li
-              key={s.id}
-              className='flex flex-wrap items-center justify-between gap-2 border-b py-2 text-sm'
-            >
-              <span>
-                {s.startTime}–{s.endTime} · {s.daysOfWeek} · pri{' '}
-                {s.priority ?? 0}
-              </span>
-              <div className='flex items-center gap-1'>
-                <Button
-                  type='button'
-                  size='sm'
-                  variant='outline'
-                  onClick={async () => {
-                    if (!s.id) return;
-                    const nextP = (s.priority ?? 0) + 1;
-                    try {
-                      await updSc.mutateAsync({
-                        unitId,
-                        scheduleId: s.id,
-                        data: {
-                          playlistId: s.playlistId,
-                          daysOfWeek: s.daysOfWeek,
-                          startTime: s.startTime,
-                          endTime: s.endTime,
-                          priority: nextP,
-                          isActive: s.isActive
-                        } as orval.HandlersCreateScheduleRequest
-                      });
-                      void refetchSch();
-                    } catch (e) {
-                      toast.error(String(e));
-                    }
-                  }}
-                >
-                  {t('bumpPriority', { default: '↑ Priority' })}
-                </Button>
-                <Button
-                  type='button'
-                  size='sm'
-                  variant='ghost'
-                  onClick={() => {
-                    void onDelete(s.id!);
-                  }}
-                >
-                  Del
-                </Button>
-              </div>
-            </li>
-          )
-        )}
+        {list.map((s) => (
+          <li
+            key={s.id}
+            className='flex flex-wrap items-center justify-between gap-2 border-b py-2 text-sm'
+          >
+            <span>
+              {s.startTime}–{s.endTime} · {s.daysOfWeek} · pri {s.priority ?? 0}
+            </span>
+            <div className='flex items-center gap-1'>
+              <Button
+                type='button'
+                size='sm'
+                variant='outline'
+                onClick={async () => {
+                  if (!s.id) return;
+                  const nextP = (s.priority ?? 0) + 1;
+                  try {
+                    await updSc.mutateAsync({
+                      unitId,
+                      scheduleId: s.id,
+                      data: {
+                        playlistId: s.playlistId,
+                        daysOfWeek: s.daysOfWeek,
+                        startTime: s.startTime,
+                        endTime: s.endTime,
+                        priority: nextP,
+                        isActive: s.isActive
+                      } as orval.HandlersCreateScheduleRequest
+                    });
+                    void refetchSch();
+                  } catch (e) {
+                    toast.error(String(e));
+                  }
+                }}
+              >
+                {t('bumpPriority', { default: '↑ Priority' })}
+              </Button>
+              <Button
+                type='button'
+                size='sm'
+                variant='ghost'
+                onClick={() => {
+                  void onDelete(s.id!);
+                }}
+              >
+                Del
+              </Button>
+            </div>
+          </li>
+        ))}
       </ul>
     </div>
   );

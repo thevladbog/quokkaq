@@ -2049,6 +2049,8 @@ components:
                     type: object
                 config:
                     type: object
+                consecutiveFailures:
+                    type: integer
                 createdAt:
                     type: string
                 id:

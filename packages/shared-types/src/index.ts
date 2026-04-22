@@ -492,10 +492,20 @@ export const ScreenWidgetTypeSchema = z.enum([
   'custom-html'
 ]);
 
+/** Styling for a layout region; avoids branching on [ScreenTemplate] id in the screen renderer. */
+export const ScreenLayoutPanelStyleSchema = z.enum([
+  'default',
+  'card',
+  'scrollPadded',
+  'splitSection'
+]);
+
 export const ScreenLayoutRegionSchema = z.object({
   id: z.string(),
   area: z.string(),
-  size: z.string()
+  size: z.string(),
+  /** If omitted, the renderer uses `default` (min-h-0, overflow). */
+  panelStyle: ScreenLayoutPanelStyleSchema.optional()
 });
 
 export const ScreenLayoutSchema = z.object({
@@ -567,6 +577,8 @@ export const ExternalFeedSchema = z.object({
   url: z.string(),
   pollInterval: z.number().int().min(1).optional(),
   isActive: z.boolean().optional(),
+  lastError: z.string().optional(),
+  consecutiveFailures: z.number().int().min(0).optional(),
   config: z.record(z.string(), z.unknown()).optional()
 });
 

@@ -1859,6 +1859,7 @@ export type ModelsExternalFeedConfig = { [key: string]: unknown };
 export interface ModelsExternalFeed {
   cachedData?: ModelsExternalFeedCachedData;
   config?: ModelsExternalFeedConfig;
+  consecutiveFailures?: number;
   createdAt?: string;
   id?: string;
   isActive?: boolean;

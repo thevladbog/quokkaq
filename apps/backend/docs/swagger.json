@@ -3050,6 +3050,9 @@
                     "config": {
                         "type": "object"
                     },
+                    "consecutiveFailures": {
+                        "type": "integer"
+                    },
                     "createdAt": {
                         "type": "string"
                     },

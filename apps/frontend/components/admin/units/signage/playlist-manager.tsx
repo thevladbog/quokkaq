@@ -24,6 +24,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUpdateUnit } from '@/lib/hooks';
 import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
 import { useLegacyPlaylistMigration } from './use-legacy-playlist-migration';
+import { safeParseSignageWithToast, signageZod } from '@/lib/signage-zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -294,13 +295,22 @@ export function PlaylistManager({
       );
       return;
     }
-    const body: orval.HandlersCreatePlaylistRequest = {
-      name: plName,
+    const body = {
+      name: plName.trim(),
       items: selIds.map((id) => ({ materialId: id, duration: 10 })),
       isDefault: false
     };
+    if (
+      !safeParseSignageWithToast('Playlist', signageZod.createPlaylist, body)
+        .success
+    ) {
+      return;
+    }
     try {
-      await createPl.mutateAsync({ unitId, data: body });
+      await createPl.mutateAsync({
+        unitId,
+        data: body as orval.HandlersCreatePlaylistRequest
+      });
       setPlName('');
       setSelIds([]);
       void refetchPl();

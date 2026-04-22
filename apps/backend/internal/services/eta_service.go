@@ -84,13 +84,15 @@ type TicketETAInfo struct {
 
 // UnitETASnapshot is broadcast on unit.eta_update for real-time clients.
 type UnitETASnapshot struct {
-	UnitID               string             `json:"unitId"`
-	Timestamp            time.Time          `json:"timestamp"`
-	QueueLength          int64              `json:"queueLength"`
-	EstimatedWaitMinutes float64            `json:"estimatedWaitMinutes"`
-	ActiveCounters       int64              `json:"activeCounters"`
-	Services             []ServiceQueueInfo `json:"services,omitempty"`
-	Tickets              []TicketETAInfo    `json:"tickets,omitempty"`
+	UnitID               string    `json:"unitId"`
+	Timestamp            time.Time `json:"timestamp"`
+	QueueLength          int64     `json:"queueLength"`
+	EstimatedWaitMinutes float64   `json:"estimatedWaitMinutes"`
+	ActiveCounters       int64     `json:"activeCounters"`
+	// ServedToday matches [UnitQueueSummary] / GetUnitQueueSummary: served+completed in unit's local day.
+	ServedToday int64              `json:"servedToday"`
+	Services    []ServiceQueueInfo `json:"services,omitempty"`
+	Tickets     []TicketETAInfo    `json:"tickets,omitempty"`
 }
 
 // QueuePositionAndETA computes the 1-based queue position and an estimated wait in seconds
@@ -160,24 +162,31 @@ func (s *ETAService) GetUnitQueueSummary(unitID string) (UnitQueueSummary, error
 	if len(services) == 1 {
 		services = nil
 	}
-	var servedToday int64
-	if s.unitRepo != nil {
-		u, uerr := s.unitRepo.FindByIDLight(unitID)
-		if uerr == nil && u != nil {
-			start, end := dayRangeInTimezone(time.Now().UTC(), u.Timezone)
-			if n, cerr := s.ticketRepo.CountServedInUnitInRange(unitID, start, end); cerr == nil {
-				servedToday = n
-			}
-		}
-	}
 	out := UnitQueueSummary{
 		QueueLength:          snap.QueueLength,
 		EstimatedWaitMinutes: snap.EstimatedWaitMinutes,
 		ActiveCounters:       snap.ActiveCounters,
-		ServedToday:          servedToday,
+		ServedToday:          snap.ServedToday,
 		Services:             services,
 	}
 	return out, nil
+}
+
+// servedTodayForUnit counts completed/served tickets for the unit's local calendar day; 0 if unavailable.
+func (s *ETAService) servedTodayForUnit(unitID string) int64 {
+	if s.unitRepo == nil {
+		return 0
+	}
+	u, err := s.unitRepo.FindByIDLight(unitID)
+	if err != nil || u == nil {
+		return 0
+	}
+	start, end := dayRangeInTimezone(time.Now().UTC(), u.Timezone)
+	n, err := s.ticketRepo.CountServedInUnitInRange(unitID, start, end)
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 // ComputeUnitETASnapshot builds queue-wide and per-ticket ETAs for WebSocket push and polling.
@@ -297,6 +306,7 @@ func (s *ETAService) ComputeUnitETASnapshot(unitID string) (UnitETASnapshot, err
 		}
 	}
 
+	snap.ServedToday = s.servedTodayForUnit(unitID)
 	return snap, nil
 }
 

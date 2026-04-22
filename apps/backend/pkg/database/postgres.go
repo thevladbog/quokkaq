@@ -2530,6 +2530,20 @@ WHERE code IN ('enterprise', 'grandfathered') AND limits->'webhook_endpoints_max
 		return fmt.Errorf("failed to run v1.8.4_digital_signage migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.8.5_external_feed_consecutive_failures", func(db *gorm.DB) error {
+		if err := db.Exec(`
+ALTER TABLE external_feeds
+	ADD COLUMN IF NOT EXISTS consecutive_failures integer NOT NULL DEFAULT 0;
+UPDATE external_feeds SET consecutive_failures = 0 WHERE consecutive_failures IS NULL;
+`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.5_external_feed_consecutive_failures migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }
