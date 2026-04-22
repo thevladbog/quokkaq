@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/subscriptionfeatures"
@@ -104,10 +105,11 @@ func IntegrationAPIKeyAuth(db *gorm.DB) func(http.Handler) http.Handler {
 			if row.UnitID != nil {
 				ctx = context.WithValue(ctx, IntegrationKeyUnitIDKey, *row.UnitID)
 			}
-			touchCtx := context.WithoutCancel(r.Context())
-			go func(ctx context.Context, id string) {
+			go func(id string) {
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer cancel()
 				_ = repository.NewIntegrationAPIKeyRepository(db).TouchLastUsed(ctx, id)
-			}(touchCtx, row.ID)
+			}(row.ID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

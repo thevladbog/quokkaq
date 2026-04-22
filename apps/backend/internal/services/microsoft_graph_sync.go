@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	"quokkaq-go-backend/internal/calendar/summary"
-	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/pkg/ssocrypto"
 
@@ -126,8 +124,8 @@ func (s *CalendarIntegrationService) syncMicrosoftGraphCalendar(ctx context.Cont
 			ServiceID:     svcPtr,
 		}
 		if err := s.repo.UpsertExternalSlot(&row); err != nil {
-			logger.ErrorfCtx(ctx, "microsoft graph sync: upsert slot: %v", err)
-			continue
+			_ = s.markSyncError(integ.ID, err.Error())
+			return err
 		}
 		seen[href] = struct{}{}
 	}
@@ -139,11 +137,26 @@ func (s *CalendarIntegrationService) syncMicrosoftGraphCalendar(ctx context.Cont
 	return nil
 }
 
+const maxMicrosoftGraphCalendarViewPages = 200
+
 // fetchAllMicrosoftGraphCalendarViewPages follows @odata.nextLink until all pages are collected.
 func (s *CalendarIntegrationService) fetchAllMicrosoftGraphCalendarViewPages(ctx context.Context, integID, startURL, access string) ([]map[string]interface{}, error) {
 	var all []map[string]interface{}
 	next := strings.TrimSpace(startURL)
-	for next != "" {
+	seenLinks := make(map[string]struct{})
+	for page := 0; next != ""; page++ {
+		if page >= maxMicrosoftGraphCalendarViewPages {
+			msg := fmt.Sprintf("graph calendarView: exceeded max page limit (%d)", maxMicrosoftGraphCalendarViewPages)
+			_ = s.markSyncError(integID, msg)
+			return nil, fmt.Errorf("%s", msg)
+		}
+		if _, dup := seenLinks[next]; dup {
+			msg := "graph calendarView: duplicate @odata.nextLink (pagination loop)"
+			_ = s.markSyncError(integID, msg)
+			return nil, fmt.Errorf("%s", msg)
+		}
+		seenLinks[next] = struct{}{}
+
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, next, nil)
 		if err != nil {
 			_ = s.markSyncError(integID, err.Error())
@@ -155,9 +168,7 @@ func (s *CalendarIntegrationService) fetchAllMicrosoftGraphCalendarViewPages(ctx
 			_ = s.markSyncError(integID, err.Error())
 			return nil, err
 		}
-		body, readErr := io.ReadAll(resp.Body)
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
+		body, readErr := readMicrosoftGraphResponseBody(resp)
 		if readErr != nil {
 			_ = s.markSyncError(integID, readErr.Error())
 			return nil, readErr

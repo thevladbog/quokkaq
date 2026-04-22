@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -152,11 +151,15 @@ func (s *CalendarIntegrationService) CompleteMicrosoftCalendarOAuth(ctx context.
 	if err != nil {
 		return "", failureReturnPath, err
 	}
-	if upn == "" {
-		return "", failureReturnPath, ErrMicrosoftCalendarOAuthUserinfo
+	if err := s.VerifyUnitBelongsToCompany(payload.UnitID, payload.CompanyID); err != nil {
+		return "", failureReturnPath, err
 	}
-	if calID == "" {
-		calID = "primary"
+	n, err := s.repo.CountByUnitID(payload.UnitID)
+	if err != nil {
+		return "", failureReturnPath, err
+	}
+	if n >= MaxCalendarIntegrationsPerUnit {
+		return "", failureReturnPath, ErrCalendarIntegrationLimit
 	}
 	retPath := strings.TrimSpace(payload.ReturnPath)
 	if retPath == "" {
@@ -186,8 +189,10 @@ func microsoftGraphMeAndDefaultCalendar(ctx context.Context, accessToken string)
 	if err != nil {
 		return "", "", err
 	}
-	defer func() { _, _ = io.Copy(io.Discard, resp.Body); _ = resp.Body.Close() }()
-	b, _ := io.ReadAll(resp.Body)
+	b, rerr := readMicrosoftGraphResponseBody(resp)
+	if rerr != nil {
+		return "", "", rerr
+	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return "", "", fmt.Errorf("graph /me: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
 	}
@@ -199,28 +204,37 @@ func microsoftGraphMeAndDefaultCalendar(ctx context.Context, accessToken string)
 	if strings.TrimSpace(upn) == "" {
 		upn, _ = me["mail"].(string)
 	}
+	upn = strings.TrimSpace(upn)
+	if upn == "" {
+		return "", "", ErrMicrosoftCalendarOAuthUserinfo
+	}
 	req2, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://graph.microsoft.com/v1.0/me/calendar", nil)
 	if err != nil {
-		return strings.TrimSpace(upn), "", err
+		return upn, "", err
 	}
 	req2.Header.Set("Authorization", "Bearer "+accessToken)
 	resp2, err := microsoftOAuthHTTPClient.Do(req2)
 	if err != nil {
-		return strings.TrimSpace(upn), "", err
+		return upn, "", err
 	}
-	defer func() { _, _ = io.Copy(io.Discard, resp2.Body); _ = resp2.Body.Close() }()
-	b2, _ := io.ReadAll(resp2.Body)
+	b2, rerr2 := readMicrosoftGraphResponseBody(resp2)
+	if rerr2 != nil {
+		return upn, "", rerr2
+	}
 	if resp2.StatusCode < 200 || resp2.StatusCode > 299 {
-		return strings.TrimSpace(upn), "", nil
+		return upn, "", fmt.Errorf("graph /me/calendar: HTTP %d: %s", resp2.StatusCode, strings.TrimSpace(string(b2)))
 	}
 	var cal map[string]interface{}
 	if err := json.Unmarshal(b2, &cal); err != nil {
-		return strings.TrimSpace(upn), "", nil
+		return upn, "", fmt.Errorf("graph /me/calendar: %w", err)
 	}
 	if id, ok := cal["id"].(string); ok {
 		calendarID = strings.TrimSpace(id)
 	}
-	return strings.TrimSpace(upn), calendarID, nil
+	if calendarID == "" {
+		return upn, "", ErrMicrosoftCalendarOAuthUserinfo
+	}
+	return upn, calendarID, nil
 }
 
 // MicrosoftCalendarOAuthFailureRedirect builds a safe redirect URL for Microsoft OAuth callback errors.

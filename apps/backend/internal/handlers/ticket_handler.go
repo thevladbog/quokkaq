@@ -974,42 +974,44 @@ func (h *TicketHandler) AttachPhone(w http.ResponseWriter, r *http.Request) {
 // @Router       /units/{unitId}/queue-status [get]
 func (h *TicketHandler) GetUnitQueueStatus(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
-	if h.unitService != nil {
-		unit, uerr := h.unitService.GetUnitByID(unitID)
-		if uerr != nil || unit == nil {
-			http.Error(w, "unit not found", http.StatusNotFound)
+	if h.unitService == nil {
+		http.Error(w, "widget authorization not configured", http.StatusInternalServerError)
+		return
+	}
+	unit, uerr := h.unitService.GetUnitByID(unitID)
+	if uerr != nil || unit == nil {
+		http.Error(w, "unit not found", http.StatusNotFound)
+		return
+	}
+	ok, ferr := subscriptionfeatures.CompanyHasPublicQueueWidget(r.Context(), h.orm(), unit.CompanyID)
+	if ferr != nil || !ok {
+		http.Error(w, "public queue widget is not enabled for this subscription plan", http.StatusForbidden)
+		return
+	}
+	if qtok := strings.TrimSpace(r.URL.Query().Get("token")); qtok != "" && publicqueuewidget.SecretConfigured() {
+		wid, cid, verr := publicqueuewidget.Verify(qtok)
+		if verr != nil || !strings.EqualFold(wid, unitID) || cid != unit.CompanyID {
+			http.Error(w, "invalid widget token", http.StatusUnauthorized)
 			return
 		}
-		ok, ferr := subscriptionfeatures.CompanyHasPublicQueueWidget(r.Context(), h.orm(), unit.CompanyID)
-		if ferr != nil || !ok {
-			http.Error(w, "public queue widget is not enabled for this subscription plan", http.StatusForbidden)
-			return
-		}
-		if qtok := strings.TrimSpace(r.URL.Query().Get("token")); qtok != "" && publicqueuewidget.SecretConfigured() {
-			wid, cid, verr := publicqueuewidget.Verify(qtok)
-			if verr != nil || !strings.EqualFold(wid, unitID) || cid != unit.CompanyID {
-				http.Error(w, "invalid widget token", http.StatusUnauthorized)
+	}
+	var co models.Company
+	if err := h.orm().WithContext(r.Context()).Where("id = ?", unit.CompanyID).First(&co).Error; err == nil {
+		origins := publicqueuewidget.AllowedOriginsFromCompanySettings(co.Settings)
+		if o := strings.TrimSpace(r.Header.Get("Origin")); len(origins) > 0 && o != "" {
+			allowed := false
+			for _, a := range origins {
+				if a == o {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				http.Error(w, "origin not allowed", http.StatusForbidden)
 				return
 			}
-		}
-		var co models.Company
-		if err := h.orm().WithContext(r.Context()).Where("id = ?", unit.CompanyID).First(&co).Error; err == nil {
-			origins := publicqueuewidget.AllowedOriginsFromCompanySettings(co.Settings)
-			if o := strings.TrimSpace(r.Header.Get("Origin")); len(origins) > 0 && o != "" {
-				allowed := false
-				for _, a := range origins {
-					if a == o {
-						allowed = true
-						break
-					}
-				}
-				if !allowed {
-					http.Error(w, "origin not allowed", http.StatusForbidden)
-					return
-				}
-				w.Header().Set("Access-Control-Allow-Origin", o)
-				w.Header().Add("Vary", "Origin")
-			}
+			w.Header().Set("Access-Control-Allow-Origin", o)
+			w.Header().Add("Vary", "Origin")
 		}
 	}
 	if h.eta == nil {
@@ -1046,6 +1048,7 @@ func (h *TicketHandler) GetUnitQueueStatus(w http.ResponseWriter, r *http.Reques
 }
 
 // GetIntegrationUnitQueueSummary godoc
+// @ID           getIntegrationUnitQueueSummary
 // @Summary      Queue summary for integration API (same payload as public queue-status, authenticated by integration key)
 // @Tags         integrations
 // @Produce      json

@@ -38,7 +38,9 @@ var (
 	ErrCalendarAppPasswordRequired    = errors.New("app password is required for new calendar integration")
 	// ErrCalendarGoogleCalDAVIdentityImmutable is returned on PUT when the client tries to change CalDAV identity fields for google_caldav.
 	ErrCalendarGoogleCalDAVIdentityImmutable = errors.New("caldav base URL, calendar path, and username cannot be changed for Google Calendar connections")
-	ErrCalendarEnabledRequired               = errors.New("enabled is required")
+	// ErrCalendarOAuthIdentityImmutable is returned on PUT for OAuth-based providers (e.g. Microsoft Graph) when caldav/identity fields must stay fixed.
+	ErrCalendarOAuthIdentityImmutable = errors.New("calendar provider identity fields (base URL, calendar, username) cannot be changed for this connection")
+	ErrCalendarEnabledRequired        = errors.New("enabled is required")
 	// ErrCalendarIntegrationBlockedByActivePreRegistrations is returned when delete or disable would strand active bookings.
 	ErrCalendarIntegrationBlockedByActivePreRegistrations = errors.New("active pre-registrations still reference this calendar integration")
 )
@@ -498,8 +500,7 @@ func (s *CalendarIntegrationService) UpdateIntegration(companyID, integrationID 
 	if kind == "" {
 		kind = models.CalendarIntegrationKindYandexCalDAV
 	}
-	if kind == models.CalendarIntegrationKindGoogleCalDAV ||
-		kind == models.CalendarIntegrationKindMicrosoftGraph {
+	if kind == models.CalendarIntegrationKindGoogleCalDAV {
 		reqBase := strings.TrimSpace(req.CaldavBaseURL)
 		if reqBase != "" && reqBase != row.CaldavBaseURL {
 			return nil, ErrCalendarGoogleCalDAVIdentityImmutable
@@ -512,6 +513,22 @@ func (s *CalendarIntegrationService) UpdateIntegration(companyID, integrationID 
 		if reqUser != "" && reqUser != row.Username {
 			return nil, ErrCalendarGoogleCalDAVIdentityImmutable
 		}
+	}
+	if kind == models.CalendarIntegrationKindMicrosoftGraph {
+		reqBase := strings.TrimSpace(req.CaldavBaseURL)
+		if reqBase != "" && reqBase != row.CaldavBaseURL {
+			return nil, ErrCalendarOAuthIdentityImmutable
+		}
+		reqPath := strings.TrimSpace(req.CalendarPath)
+		if reqPath != "" && reqPath != row.CalendarPath {
+			return nil, ErrCalendarOAuthIdentityImmutable
+		}
+		reqUser := strings.TrimSpace(req.Username)
+		if reqUser != "" && reqUser != row.Username {
+			return nil, ErrCalendarOAuthIdentityImmutable
+		}
+	}
+	if kind == models.CalendarIntegrationKindGoogleCalDAV || kind == models.CalendarIntegrationKindMicrosoftGraph {
 		row.DisplayName = strings.TrimSpace(req.DisplayName)
 		row.Enabled = *req.Enabled
 		row.Timezone = req.Timezone

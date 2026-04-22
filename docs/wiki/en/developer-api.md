@@ -20,17 +20,19 @@ If every flag is `false`, the product UI typically hides the Developer API / int
 
 - Authenticate with an **integration API key** issued in Settings (see OpenAPI for the header name and format).
 - Keys carry **scopes**; each route documents required scopes. Example read-only route: **`GET /integrations/v1/units/{unitId}/queue-summary`** (requires `tickets:read` on the key; routes that create or change data need `tickets:write` where OpenAPI says so).
-- **Rate limiting:** your operator may set `INTEGRATION_API_RL_REDIS=true` on the server so limits are enforced with Redis (shared across instances). If unset or `false`, the API uses an in-memory limiter (fine for single-node dev).
+- **Rate limiting (per integration key on `/integrations/v1`):** with **`INTEGRATION_API_RL_REDIS=true`** and Redis: **up to 180 requests per key in a 60s sliding window**; shared across replicas. Otherwise: in-process limiter (~**2 req/s** sustained, **burst 60**), **resets on API restart**, **not shared** across instances.
 
 ## Webhooks
 
 - Create, list, update, and delete webhook endpoints under **`/companies/me/webhook-endpoints`** (Bearer session of a user who is allowed to manage company settings).
 - **Rotate signing secret** via the documented `POST …/rotate-secret` route when you suspect compromise; update your verifier on the receiving side immediately.
-- Delivery semantics, retry behavior, and payload shape are defined in OpenAPI and any operator runbooks — verify the **`X-QuokkaQ-Signature`** (or documented header) using the current signing secret.
+- **Delivery format, signature header, payload:** use **OpenAPI/Scalar** on your API as the tenant-facing source. **Operator-only runbooks** (if you self-host with internal docs) do not replace OpenAPI for integrators.
 
 ## Public queue widget (embed)
 
-**Server requirement:** the deployment must set **`PUBLIC_WIDGET_JWT_SECRET`** so the API can mint and verify HS256 JWTs for embed tokens.
+**Server requirement:** the deployment must set **`PUBLIC_WIDGET_JWT_SECRET`** so the API can mint and verify HS256 JWTs for embed tokens. JWTs include an **`exp`** claim; signing uses this secret.
+
+**Token lifetime:** `POST /companies/me/public-widget-token` defaults to **900 seconds (15 min)** if `ttlSeconds` is omitted; you may set **`ttlSeconds` from 60 to 86400**. Re-issue before expiry; `GET /companies/me` still provides **`publicApiUrl`** and plan info for your snippets.
 
 **Browser security:** only origins listed in **`publicQueueWidgetAllowedOrigins`** inside **`company.settings`** may load the widget in a browser (CORS). Each entry must be a full origin such as `https://kiosk.example.com` (scheme + host, optional port; no path). Configure this in Settings together with the embed snippet (the UI shows a copyable example using `publicApiUrl` from `GET /companies/me`).
 

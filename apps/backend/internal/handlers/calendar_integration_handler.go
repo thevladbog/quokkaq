@@ -78,6 +78,8 @@ func respondCalendarIntegrationError(ctx context.Context, w http.ResponseWriter,
 		http.Error(w, calendarIntMsgBadRequest, http.StatusBadRequest)
 	case errors.Is(err, services.ErrCalendarGoogleCalDAVIdentityImmutable):
 		http.Error(w, services.ErrCalendarGoogleCalDAVIdentityImmutable.Error(), http.StatusBadRequest)
+	case errors.Is(err, services.ErrCalendarOAuthIdentityImmutable):
+		http.Error(w, services.ErrCalendarOAuthIdentityImmutable.Error(), http.StatusBadRequest)
 	case errors.Is(err, services.ErrCalendarEnabledRequired):
 		http.Error(w, services.ErrCalendarEnabledRequired.Error(), http.StatusBadRequest)
 	case errors.Is(err, services.ErrCalendarIntegrationBlockedByActivePreRegistrations):

@@ -573,8 +573,8 @@ func TestCalendarIntegrationService_UpdateIntegration_MicrosoftRejectsImmutableC
 		Username:      "hacker@evil.com",
 		Timezone:      "Europe/London",
 	})
-	if !errors.Is(err, ErrCalendarGoogleCalDAVIdentityImmutable) {
-		t.Fatalf("update: want ErrCalendarGoogleCalDAVIdentityImmutable, got %v", err)
+	if !errors.Is(err, ErrCalendarOAuthIdentityImmutable) {
+		t.Fatalf("update: want ErrCalendarOAuthIdentityImmutable, got %v", err)
 	}
 	up, err := svc.UpdateIntegration("co-ms2", pub.ID, &UpdateCalendarIntegrationRequest{
 		DisplayName:   "Renamed OK",

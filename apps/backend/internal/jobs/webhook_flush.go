@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -59,8 +60,13 @@ func (w *jobWorker) handleWebhookFlushOutbox(ctx context.Context, _ *asynq.Task)
 
 		var hist models.TicketHistory
 		if err := db.WithContext(ctx).Where("id = ?", ob.TicketHistoryID).First(&hist).Error; err != nil {
-			_ = repository.WebhookOutboxReleaseSuccess(ctx, db, ob.ID)
-			continue
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				_ = repository.WebhookOutboxReleaseSuccess(ctx, db, ob.ID)
+				continue
+			}
+			applogger.ErrorfCtx(ctx, "webhook flush: load ticket_history outboxId=%s historyId=%s attemptCount=%d err=%v", ob.ID, ob.TicketHistoryID, ob.AttemptCount, err)
+			_ = repository.WebhookOutboxScheduleRetry(ctx, db, ob.ID, ob.AttemptCount+1, time.Now().UTC().Add(30*time.Second), false)
+			return err
 		}
 
 		var unitID string
@@ -100,6 +106,7 @@ func (w *jobWorker) handleWebhookFlushOutbox(ctx context.Context, _ *asynq.Task)
 
 		allOK := true
 		for j := range endpoints {
+			_ = repository.WebhookOutboxRenewLease(ctx, db, ob.ID, time.Now().UTC().Add(repository.WebhookOutboxLease))
 			ep := &endpoints[j]
 			if !netutil.WebhookTargetURLAllowed(ep.URL) {
 				allOK = false

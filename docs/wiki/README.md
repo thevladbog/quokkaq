@@ -16,3 +16,13 @@ Developer and infrastructure details for engineers: repo root `README.md`, `SETU
 The product app renders MDX under **`/{locale}/help/...`**. If a Russian page is missing, `en` is used as fallback.
 
 File names in the MDX wiki stay **ASCII** (e.g. `google-calendar.mdx`); mirror the same relative paths under each locale.
+
+## Wiki duplication (consolidation tracking)
+
+| Item | |
+| --- | --- |
+| **Source of truth** | **In-app / tenant-facing:** `apps/frontend/content/wiki/{en,ru}/` (MDX) for `/help`. **Staging / operator Markdown:** `docs/wiki/` (e.g. developer API topics) until merged into MDX. **HTTP/API contract:** always OpenAPI/Swagger served by the API. |
+| **Affected paths** | `docs/wiki/en/*.md`, `docs/wiki/ru/*.md`; `apps/frontend/content/wiki/en/**`, `apps/frontend/content/wiki/ru/**`; cross-links from [`load-wiki-page.ts`](../../apps/frontend/lib/wiki/load-wiki-page.ts). |
+| **Migration** | 1) List pages that exist in both trees; 2) pick canonical wording per topic; 3) move or replace staging copies in `docs/wiki/` with links to MDX or vice versa; 4) remove duplicate files after redirect/links updated. |
+| **Acceptance** | No conflicting HTTP/path claims between `docs/wiki` and in-app help for the same feature; OpenAPI remains authoritative for routes. **Owner:** maintainers of docs + frontend wiki (TBD in your issue tracker). |
+| **Optional check** | During consolidation, `diff` or `rsync -n` between mirrored subtrees to spot drift. |

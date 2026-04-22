@@ -39,6 +39,12 @@ RETURNING w.id, w.company_id, w.ticket_history_id, w.attempt_count, w.next_attem
 	return &row, nil
 }
 
+// WebhookOutboxRenewLease extends locked_until while a worker is still processing a claimed row
+// (e.g. long multi-endpoint delivery) so the lease does not expire mid-loop.
+func WebhookOutboxRenewLease(ctx context.Context, db *gorm.DB, id string, newExpiry time.Time) error {
+	return db.WithContext(ctx).Model(&models.WebhookOutbox{}).Where("id = ?", id).Update("locked_until", newExpiry.UTC()).Error
+}
+
 // WebhookOutboxReleaseSuccess deletes a successfully delivered outbox row.
 func WebhookOutboxReleaseSuccess(ctx context.Context, db *gorm.DB, id string) error {
 	return db.WithContext(ctx).Delete(&models.WebhookOutbox{}, "id = ?", id).Error
