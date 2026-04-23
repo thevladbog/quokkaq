@@ -34,7 +34,12 @@
 - После изменений swag/OpenAPI: из корня репозитория `pnpm nx run frontend:orval`. Проверка расхождения с коммитом: `pnpm nx run frontend:orval:check`.
 - Эндпоинты **`auth`** (логин, `/auth/me`, список организаций): сгенерированный [`lib/api/generated/auth.ts`](lib/api/generated/auth.ts) и обёртки [`lib/auth-orval.ts`](lib/auth-orval.ts) (валидация пользователя через `UserModelSchema`).
 - Остальной REST по-прежнему через [`lib/api.ts`](lib/api.ts) и TanStack Query до миграции конкретных ручек в Orval.
-- `shared-types` (Zod) остаётся для форм и ручных контрактов; типы из Orval — отдельный слой, дубли убирать постепенно.
+- `shared-types` (Zod) остаётся для форм и ручных контрактов; типы из Orval — отдельный слой, дубли убирать постепенно. Digital Signage: общая валидация сабмитов — [`lib/signage-zod.ts`](lib/signage-zod.ts) и схемы плейлистов/расписаний/фидов/шаблона экрана в `@quokkaq/shared-types`.
+
+## Digital Signage (админ + `/screen/[unitId]`)
+
+- **Админ-вкладка «Состояние»** — агрегат [`SignageHealthPanel`](components/admin/units/signage/signage-health-panel.tsx) (`useGetSignageHealth`). **Объявления** — `displayMode: banner | fullscreen` (полноэкранный слой: [`ScreenFullscreenAnnouncementOverlay`](components/screen/screen-fullscreen-announcement-overlay.tsx) в [`screen-unit-client`](components/screen/screen-unit-client.tsx)).
+- **Позиция продукта:** один `unit` = одна площадка очереди и один табло-экран; сетевые fичи (группы экранов, proof of play) — не baseline без явного B2B-запроса. Даты **YYYY-MM-DD** в формах согласованы с бэкендом (календарь в таймзоне юнита).
 
 ## Локальная разработка
 

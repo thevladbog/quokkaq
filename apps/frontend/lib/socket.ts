@@ -29,7 +29,10 @@ export const UnitETASnapshotSchema = z.object({
   timestamp: z.string(),
   queueLength: z.number(),
   estimatedWaitMinutes: z.number(),
+  maxWaitingInQueueMinutes: z.number().optional(),
   activeCounters: z.number(),
+  /** Served/completed today in unit timezone (aligns with public queue-status). */
+  servedToday: z.number().optional(),
   services: z
     .array(
       z.object({

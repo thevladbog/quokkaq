@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { getGetUnitsUnitIdMaterialsQueryKey } from '@/lib/api/generated/units';
 import { unitsApi, Material } from '@/lib/api';
@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { ImageIcon, Video, Trash2 } from 'lucide-react';
+import { ImageIcon, Search, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { LogoUpload } from '@/components/ui/logo-upload';
 import { useUpdateUnit } from '@/lib/hooks';
@@ -29,9 +29,11 @@ type UnitConfigJson = {
   config?: Partial<AdScreenConfig>;
 } & Record<string, unknown>;
 
-interface AdScreenSettingsProps {
+export interface AdScreenSettingsProps {
   unitId: string;
   currentConfig: Record<string, unknown>;
+  /** Open the Materials sub-tab (upload) in the parent display shell. */
+  onRequestOpenMaterials?: () => void;
 }
 
 const LEGACY_AD_SCREEN_COLOR_KEYS = [
@@ -78,13 +80,19 @@ function adConfigFromUnitConfig(
   return {};
 }
 
+/**
+ * Branding, ad column width, fallback material IDs — no file upload;
+ * uploads live in `UnitMediaLibrary`.
+ */
 export function AdScreenSettings({
   unitId,
-  currentConfig
+  currentConfig,
+  onRequestOpenMaterials
 }: AdScreenSettingsProps) {
   const t = useTranslations('admin.ad_screen');
+  const tDisplay = useTranslations('admin.display');
   const queryClient = useQueryClient();
-  const [uploading, setUploading] = useState(false);
+  const [fallbackQuery, setFallbackQuery] = useState('');
 
   const adPartial = adConfigFromUnitConfig(currentConfig);
   const adConfig = {
@@ -115,46 +123,12 @@ export function AdScreenSettings({
   );
   const [bodyColor, setBodyColor] = useState(adConfig.bodyColor || '#ffffff');
 
-  // Sync state with currentConfig when it changes - REMOVED
-  // We now use a key on the component to reset state when config changes.
-  // This avoids "setState in useEffect" warnings and potential loops.
-
-  // Queries and Mutations
-  const { data: materials = [] as Material[], isLoading } = useQuery({
+  const { data: materials = [] as Material[] } = useQuery({
     queryKey: getGetUnitsUnitIdMaterialsQueryKey(unitId),
     queryFn: () => unitsApi.getMaterials(unitId)
   });
 
   const updateUnitMutation = useUpdateUnit();
-
-  const uploadMutation = useMutation({
-    mutationFn: (file: File) => unitsApi.uploadMaterial(unitId, file),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: getGetUnitsUnitIdMaterialsQueryKey(unitId)
-      });
-      toast.success(t('upload_success'));
-      setUploading(false);
-    },
-    onError: () => {
-      toast.error(t('upload_error'));
-      setUploading(false);
-    }
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (materialId: string) =>
-      unitsApi.deleteMaterial(unitId, materialId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: getGetUnitsUnitIdMaterialsQueryKey(unitId)
-      });
-      toast.success(t('delete_success'));
-    },
-    onError: () => {
-      toast.error(t('delete_error'));
-    }
-  });
 
   const handleSaveSettings = () => {
     const newConfig = {
@@ -177,6 +151,9 @@ export function AdScreenSettings({
       {
         onSuccess: () => {
           toast.success(t('save_success'));
+          void queryClient.invalidateQueries({
+            queryKey: getGetUnitsUnitIdMaterialsQueryKey(unitId)
+          });
         },
         onError: () => {
           toast.error(t('save_error'));
@@ -185,21 +162,20 @@ export function AdScreenSettings({
     );
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-    uploadMutation.mutate(file);
-    // Reset input
-    e.target.value = '';
-  };
-
   const toggleMaterialSelection = (id: string) => {
     setSelectedMaterials((prev) =>
       prev.includes(id) ? prev.filter((mId) => mId !== id) : [...prev, id]
     );
   };
+
+  const filteredFallback = useMemo(() => {
+    const q = fallbackQuery.trim().toLowerCase();
+    if (!q) return materials;
+    return materials.filter(
+      (m) =>
+        m.filename.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
+    );
+  }, [materials, fallbackQuery]);
 
   return (
     <div className='space-y-6'>
@@ -283,7 +259,6 @@ export function AdScreenSettings({
             )}
           </div>
 
-          {/* Two columns × three rows so inputs share one row even when labels wrap to different heights */}
           <div className='grid grid-cols-2 gap-x-3 gap-y-2 sm:gap-x-4'>
             <Label
               htmlFor='width'
@@ -356,91 +331,123 @@ export function AdScreenSettings({
 
       <Card>
         <CardHeader>
-          <CardTitle>{t('upload_title')}</CardTitle>
-          <CardDescription>{t('upload_desc')}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className='flex items-center gap-4'>
-            <Input
-              type='file'
-              accept='image/*,video/*'
-              onChange={handleFileUpload}
-              disabled={uploading}
-              className='max-w-sm'
-            />
-            {uploading && (
-              <p className='text-muted-foreground text-sm'>{t('uploading')}</p>
-            )}
+          <div className='flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between'>
+            <div>
+              <CardTitle>
+                {tDisplay('fallbackMediaTitle', {
+                  default: 'Fallback media (no active playlist)'
+                })}
+              </CardTitle>
+              <CardDescription>
+                {tDisplay('fallbackMediaDescription', {
+                  default:
+                    'If no schedule applies a playlist, these files are used in the content area. Upload files in the Media library tab.'
+                })}
+              </CardDescription>
+            </div>
+            {onRequestOpenMaterials ? (
+              <Button
+                type='button'
+                variant='outline'
+                size='sm'
+                onClick={onRequestOpenMaterials}
+              >
+                {tDisplay('openMediaLibrary', {
+                  default: 'Media library'
+                })}
+              </Button>
+            ) : null}
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('library_title')}</CardTitle>
-          <CardDescription>{t('library_desc')}</CardDescription>
         </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <p className='text-muted-foreground'>{t('loading_materials')}</p>
-          ) : materials.length === 0 ? (
-            <p className='text-muted-foreground'>{t('no_materials')}</p>
+        <CardContent className='space-y-2'>
+          {materials.length > 0 ? (
+            <div className='relative max-w-md'>
+              <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2' />
+              <Input
+                className='pl-8'
+                value={fallbackQuery}
+                onChange={(e) => setFallbackQuery(e.target.value)}
+                placeholder={tDisplay('fallbackSearchPlaceholder', {
+                  default: 'Filter by name…'
+                })}
+              />
+            </div>
+          ) : null}
+          {materials.length === 0 ? (
+            <p className='text-muted-foreground text-sm'>
+              {tDisplay('noMaterialsForFallback', {
+                default: 'Add files in the Media library tab first.'
+              })}
+            </p>
+          ) : filteredFallback.length === 0 ? (
+            <p className='text-muted-foreground text-sm'>
+              {tDisplay('fallbackSearchNoMatch', { default: 'No matches' })}
+            </p>
           ) : (
-            <div className='grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4'>
-              {materials.map((material) => (
-                <div
-                  key={material.id}
-                  className='space-y-2 rounded-lg border p-2'
-                >
-                  <div className='bg-muted flex aspect-video items-center justify-center overflow-hidden rounded'>
-                    {material.type === 'image' ? (
-                      <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
+            <div className='max-h-56 space-y-1.5 overflow-y-auto rounded-md border p-1.5'>
+              {filteredFallback.map((material) => {
+                const cbId = `fallback-mat-${material.id}`;
+                return (
+                  <div
+                    key={material.id}
+                    className='hover:bg-muted/50 flex items-center gap-2 rounded-md p-1.5'
+                  >
+                    <Checkbox
+                      id={cbId}
+                      checked={selectedMaterials.includes(material.id)}
+                      onCheckedChange={() =>
+                        toggleMaterialSelection(material.id)
+                      }
+                      aria-label={material.filename}
+                    />
+                    <div
+                      className='bg-muted relative h-9 w-12 shrink-0 overflow-hidden rounded border'
+                      aria-hidden
+                    >
+                      {material.type === 'image' && material.url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={material.url}
-                          alt='Material'
+                          alt=''
                           className='h-full w-full object-cover'
                         />
-                      </>
-                    ) : (
-                      <Video className='text-muted-foreground h-12 w-12' />
-                    )}
-                  </div>
-
-                  <div className='flex items-center justify-between'>
-                    <div className='flex items-center gap-2'>
-                      <Checkbox
-                        checked={selectedMaterials.includes(material.id)}
-                        onCheckedChange={() =>
-                          toggleMaterialSelection(material.id)
-                        }
-                      />
-                      <span className='text-sm'>
-                        {material.type === 'image' ? (
+                      ) : material.type === 'image' ? (
+                        <div className='text-muted-foreground flex h-full items-center justify-center'>
                           <ImageIcon className='h-4 w-4' />
-                        ) : (
+                        </div>
+                      ) : (
+                        <div className='text-muted-foreground flex h-full items-center justify-center'>
                           <Video className='h-4 w-4' />
-                        )}
-                      </span>
+                        </div>
+                      )}
                     </div>
-
-                    <Button
-                      variant='ghost'
-                      size='icon'
-                      onClick={() => {
-                        if (confirm(t('delete_confirm'))) {
-                          deleteMutation.mutate(material.id);
-                        }
-                      }}
-                      disabled={deleteMutation.isPending}
+                    <label
+                      htmlFor={cbId}
+                      className='min-w-0 flex-1 cursor-pointer truncate text-sm'
+                      title={material.filename}
                     >
-                      <Trash2 className='text-destructive h-4 w-4' />
-                    </Button>
+                      {material.filename}
+                    </label>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
+          <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+            <p className='text-muted-foreground text-xs'>
+              {tDisplay('fallbackSaveHint', {
+                default:
+                  'Saves with the same settings as the card above (brand & column).'
+              })}
+            </p>
+            <Button
+              type='button'
+              onClick={handleSaveSettings}
+              disabled={updateUnitMutation.isPending}
+            >
+              {updateUnitMutation.isPending ? t('saving') : t('save_settings')}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

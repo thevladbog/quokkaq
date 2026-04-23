@@ -47,6 +47,8 @@ func CanonicalPermissionVariants(required string) []string {
 		add("UNIT_SERVICES_MANAGE")
 	case PermUnitTicketScreenManage:
 		add("UNIT_TICKET_SCREEN_MANAGE")
+	case PermUnitSignageManage:
+		add("UNIT_SIGNAGE_MANAGE")
 	case PermUnitUsersManage:
 		add("UNIT_USERS_MANAGE")
 	}

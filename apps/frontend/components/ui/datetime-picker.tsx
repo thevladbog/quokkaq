@@ -3,8 +3,8 @@
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import { DatePicker } from '@/components/ui/date-picker';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { TimePicker } from '@/components/ui/time-picker';
 import { cn } from '@/lib/utils';
 
 /** Hours 00–23 and minutes 00–59 (leading zeros required). */
@@ -50,7 +50,7 @@ export function DateTimePicker({
   variant = 'default'
 }: DateTimePickerProps) {
   const t = useTranslations('common');
-  const timeInputId = React.useId();
+  const timeFieldId = React.useId();
   const { date, time } = React.useMemo(() => splitDateTime(value), [value]);
   const stacked = variant === 'stacked';
 
@@ -58,8 +58,8 @@ export function DateTimePicker({
     onChange?.(joinDateTime(d, time));
   };
 
-  const handleTime = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange?.(joinDateTime(date, e.target.value));
+  const handleTime = (next: string) => {
+    onChange?.(joinDateTime(date, next));
   };
 
   return (
@@ -79,25 +79,27 @@ export function DateTimePicker({
           placeholder={t('pickDate', { defaultValue: 'Select date' })}
         />
       </div>
-      <div
+      <Field
         className={cn(
-          'flex w-full flex-col gap-1.5',
-          stacked ? 'w-full' : 'sm:w-[9rem]'
+          'w-full',
+          !stacked && 'sm:max-w-[16rem] sm:min-w-[12rem] sm:shrink-0'
         )}
       >
-        <Label htmlFor={timeInputId} className='text-muted-foreground text-xs'>
+        <FieldLabel
+          htmlFor={timeFieldId}
+          className='text-muted-foreground text-xs'
+        >
           {t('time', { defaultValue: 'Time' })}
-        </Label>
-        <Input
-          id={timeInputId}
-          type='time'
-          step={60}
-          className={stacked ? 'h-10 w-full' : undefined}
+        </FieldLabel>
+        <TimePicker
+          id={timeFieldId}
           value={date ? time : ''}
-          disabled={disabled || !date}
           onChange={handleTime}
+          disabled={disabled || !date}
+          step={60}
+          className={stacked ? 'h-10 w-full' : 'w-full'}
         />
-      </div>
+      </Field>
     </div>
   );
 }

@@ -21,6 +21,7 @@ import {
   PermUnitServicesManage,
   PermUnitSettingsManage,
   PermUnitTicketScreenManage,
+  PermUnitSignageManage,
   PermUnitUsersManage
 } from '@/lib/permission-variants';
 
@@ -29,6 +30,7 @@ export const UNIT_PERMISSIONS = [
   { id: PermUnitGridManage, label: 'Manage Grid' },
   { id: PermUnitServicesManage, label: 'Manage Services' },
   { id: PermUnitTicketScreenManage, label: 'Manage Ticket Screen' },
+  { id: PermUnitSignageManage, label: 'Manage digital signage' },
   { id: PermUnitUsersManage, label: 'Manage Unit Users' },
   { id: PermTicketsRead, label: 'View tickets' },
   { id: PermTicketsWrite, label: 'Create and update tickets' },

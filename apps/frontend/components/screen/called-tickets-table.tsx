@@ -85,10 +85,10 @@ export function CalledTicketsTable({
 
   return (
     <div
-      className='bg-background flex h-full flex-col gap-3 p-4'
+      className='bg-background flex h-full flex-col gap-2 p-3 md:gap-3 md:p-4 xl:p-4'
       style={{ backgroundColor: backgroundColor || undefined }}
     >
-      <div className='text-muted-foreground shrink-0 text-center text-lg tracking-widest uppercase md:text-2xl'>
+      <div className='text-muted-foreground shrink-0 text-center text-base tracking-widest uppercase md:text-lg xl:text-xl'>
         {t('nowServing')}
       </div>
 
@@ -103,7 +103,7 @@ export function CalledTicketsTable({
       ) : null}
 
       <LayoutGroup>
-        <div className='flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1'>
+        <div className='flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1 md:gap-2.5 xl:gap-3'>
           <AnimatePresence initial={false} mode='popLayout'>
             {displayed.map((ticket) => {
               const isCalled = ticket.status === 'called';
@@ -128,11 +128,11 @@ export function CalledTicketsTable({
                 ? 'text-primary-foreground/75'
                 : 'text-muted-foreground';
               const ticketCounterSize = isCalled
-                ? 'text-4xl leading-none font-black tracking-tighter md:text-5xl lg:text-6xl'
-                : 'text-2xl font-black tracking-tight md:text-3xl lg:text-4xl';
+                ? 'text-3xl leading-none font-black tracking-tighter md:text-4xl xl:text-5xl'
+                : 'text-xl font-black tracking-tight md:text-2xl xl:text-3xl';
               const statusSize = isCalled
-                ? 'text-base font-semibold leading-snug md:text-lg'
-                : 'text-sm font-semibold md:text-base';
+                ? 'text-sm font-semibold leading-snug md:text-base xl:text-lg'
+                : 'text-xs font-semibold md:text-sm xl:text-base';
 
               const dividerTone = isCalled
                 ? 'bg-primary-foreground/25'
@@ -144,13 +144,13 @@ export function CalledTicketsTable({
 
               const inner = (
                 <div
-                  className={`flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-6 md:gap-10 ${isCalled ? 'px-4 py-5 md:px-6 md:py-6' : 'px-4 py-3 md:px-5 md:py-4'}`}
+                  className={`flex flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-4 md:gap-6 xl:gap-8 ${isCalled ? 'px-3 py-4 md:px-4 md:py-5 xl:px-5 xl:py-6' : 'px-3 py-2.5 md:px-4 md:py-3 xl:px-5 xl:py-4'}`}
                 >
                   {/* Слева: фиксированная зона талона | черта | статус (без flex-1 — иначе «центрируется» в строке) */}
                   <div className='flex min-w-0 shrink-0 flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-0'>
-                    <div className='min-w-0 sm:w-[14rem] md:w-[16rem] lg:w-[18rem]'>
+                    <div className='min-w-0 sm:w-[11rem] md:w-[13rem] xl:w-[15rem]'>
                       <div
-                        className={`mb-1 text-[10px] font-semibold tracking-wider uppercase md:text-xs ${labelTone}`}
+                        className={`mb-0.5 text-[9px] font-semibold tracking-wider uppercase md:mb-1 md:text-[10px] xl:text-xs ${labelTone}`}
                       >
                         {t('row_ticket_label')}
                       </div>
@@ -164,9 +164,9 @@ export function CalledTicketsTable({
                       orientation='vertical'
                     />
 
-                    <div className='flex min-w-0 shrink-0 flex-col justify-center text-left sm:max-w-[20rem] sm:pl-2 md:max-w-[24rem] md:pl-3'>
+                    <div className='flex min-w-0 shrink-0 flex-col justify-center text-left sm:max-w-[16rem] sm:pl-2 md:max-w-[18rem] md:pl-3 xl:max-w-[20rem] xl:pl-4'>
                       <div
-                        className={`mb-1 text-[10px] font-semibold tracking-wider uppercase md:text-xs ${labelTone}`}
+                        className={`mb-0.5 text-[9px] font-semibold tracking-wider uppercase md:mb-1 md:text-[10px] xl:text-xs ${labelTone}`}
                       >
                         {t('row_status_label')}
                       </div>
@@ -202,9 +202,9 @@ export function CalledTicketsTable({
                     orientation='horizontal'
                   />
 
-                  <div className='flex min-w-0 flex-col sm:ml-auto sm:max-w-[min(52%,28rem)] sm:items-end sm:text-right'>
+                  <div className='flex min-w-0 flex-col sm:ml-auto sm:max-w-[min(50%,22rem)] sm:items-end sm:text-right xl:max-w-[min(50%,26rem)]'>
                     <div
-                      className={`mb-1 text-[10px] font-semibold tracking-wider uppercase md:text-xs ${labelTone} sm:text-right`}
+                      className={`mb-0.5 text-[9px] font-semibold tracking-wider uppercase md:mb-1 md:text-[10px] xl:text-xs ${labelTone} sm:text-right`}
                     >
                       {t('row_counter_label')}
                     </div>

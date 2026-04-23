@@ -232,6 +232,86 @@ func RequireUnitPermission(userRepo repository.UserRepository, tr repository.Ten
 	}
 }
 
+// RequireUnitAnyPermission allows the request if the user has any of the given unit-scoped permissions
+// (user_units and tenant_role_units), with the same superuser bypass as RequireUnitPermission.
+func RequireUnitAnyPermission(userRepo repository.UserRepository, tr repository.TenantRBACRepository, unitRepo repository.UnitRepository, urlUnitParam string, permissions []string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if typ, _ := r.Context().Value(TokenTypeKey).(string); typ == "terminal" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			userID, ok := GetUserIDFromContext(r.Context())
+			if !ok {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			unitID := unitIDFromRequest(r, urlUnitParam)
+			if unitID == "" {
+				http.Error(w, "Unit ID required", http.StatusBadRequest)
+				return
+			}
+			u, err := unitRepo.FindByIDLight(unitID)
+			if err != nil {
+				if repository.IsNotFound(err) {
+					http.Error(w, "Not found", http.StatusNotFound)
+					return
+				}
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			okPlat, err := userRepo.IsPlatformAdmin(userID)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if okPlat {
+				next.ServeHTTP(w, r)
+				return
+			}
+			okAdm, err := userRepo.IsAdmin(userID)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if okAdm {
+				next.ServeHTTP(w, r)
+				return
+			}
+			okSys, err := userRepo.HasTenantSystemAdminRoleInCompany(userID, u.CompanyID)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if okSys {
+				next.ServeHTTP(w, r)
+				return
+			}
+			direct, err := userRepo.UserMatchesAnyUnitPermission(userID, unitID, permissions)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if direct {
+				next.ServeHTTP(w, r)
+				return
+			}
+			for _, p := range permissions {
+				okTenant, err := tr.UserHasTenantPermission(userID, u.CompanyID, unitID, p)
+				if err != nil {
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+				if okTenant {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+			http.Error(w, "Forbidden", http.StatusForbidden)
+		})
+	}
+}
+
 // RequireUnitStatisticsAccess requires branch membership plus any statistics scope permission (catalog or legacy zone/subdivision flags).
 func RequireUnitStatisticsAccess(userRepo repository.UserRepository, tr repository.TenantRBACRepository, unitRepo repository.UnitRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

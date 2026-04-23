@@ -31,6 +31,7 @@ type jobWorker struct {
 	settingsSvc  *services.DeploymentSaaSSettingsService
 	notifService *services.NotificationService
 	anomalySvc   *services.AnomalyService
+	signageFeed  SignageFeedPollRunner
 }
 
 func NewJobWorker(ttsService services.TtsService, ticketRepo repository.TicketRepository) JobWorker {
@@ -108,6 +109,15 @@ func WithAnomalyService(w JobWorker, a *services.AnomalyService) JobWorker {
 	if jw, ok := w.(*jobWorker); ok && a != nil {
 		jw.anomalySvc = a
 		jw.mux.HandleFunc(TypeAnomalyCheck, jw.handleAnomalyCheck)
+	}
+	return w
+}
+
+// WithSignageService registers the signage feed poll handler (TypeSignageFeedPoll).
+func WithSignageService(w JobWorker, s SignageFeedPollRunner) JobWorker {
+	if jw, ok := w.(*jobWorker); ok && s != nil {
+		jw.signageFeed = s
+		jw.mux.HandleFunc(TypeSignageFeedPoll, jw.handleSignageFeedPoll)
 	}
 	return w
 }
@@ -236,4 +246,14 @@ func (w *jobWorker) handleAnomalyCheck(ctx context.Context, _ *asynq.Task) error
 		return nil
 	}
 	return w.anomalySvc.RunPeriodicCheck(ctx)
+}
+
+func (w *jobWorker) handleSignageFeedPoll(ctx context.Context, _ *asynq.Task) error {
+	if w.signageFeed == nil {
+		return nil
+	}
+	if err := w.signageFeed.PollDueFeeds(ctx); err != nil {
+		return fmt.Errorf("signage feed poll: %w", err)
+	}
+	return nil
 }

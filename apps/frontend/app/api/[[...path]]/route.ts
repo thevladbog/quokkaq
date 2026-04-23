@@ -25,6 +25,7 @@ async function proxy(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const target = `${upstreamBase()}/${suffix}${req.nextUrl.search}`;
 
   const headers = new Headers();
+  // Intentionally omit x-forwarded-for / x-real-ip: client values can spoof IP when the Go API uses TRUSTED_PROXY_CIDRS.
   for (const name of [
     'authorization',
     'cookie',

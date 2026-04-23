@@ -520,7 +520,9 @@ export const unitsApi = {
     return res.json() as Promise<{
       queueLength: number;
       estimatedWaitMinutes: number;
+      maxWaitingInQueueMinutes?: number;
       activeCounters: number;
+      servedToday?: number;
       services?: Array<{
         serviceId: string;
         serviceName: string;
@@ -656,6 +658,31 @@ export const unitsApi = {
   getMaterials: async (unitId: string) => {
     const res = await orvalUnits.getUnitsUnitIdMaterials(unitId);
     return (res.data ?? []) as Material[];
+  },
+
+  getActivePlaylist: async (unitId: string) => {
+    const res = await orvalUnits.getActiveSignagePlaylist(unitId);
+    return res.data;
+  },
+
+  getPublicScreenAnnouncements: async (unitId: string) => {
+    const res = await orvalUnits.listSignageAnnouncementsPublic(unitId);
+    return (res.data ?? []) as Array<{
+      id: string;
+      unitId: string;
+      text: string;
+      priority: number;
+      style: string;
+      startsAt?: string | null;
+      expiresAt?: string | null;
+      isActive: boolean;
+      createdAt: string;
+    }>;
+  },
+
+  getPublicFeedData: async (unitId: string, feedId: string) => {
+    const res = await orvalUnits.getSignageFeedDataPublic(unitId, feedId);
+    return res.data;
   },
 
   deleteMaterial: async (unitId: string, materialId: string) => {

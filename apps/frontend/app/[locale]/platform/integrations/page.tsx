@@ -69,7 +69,7 @@ function toFormValues(
     trackerTypeSupport: data.trackerTypeSupport ?? '',
     smsProvider:
       (data as PlatformIntegrationsFormValues & { smsProvider?: string })
-        .smsProvider ?? '',
+        .smsProvider ?? 'none',
     smsApiKey: '',
     smsApiSecret: '',
     smsFromName:
@@ -111,7 +111,10 @@ function PlatformIntegrationsForm({
         trackerTypeError: values.trackerTypeError ?? '',
         supportTrackerQueue: values.supportTrackerQueue ?? '',
         trackerTypeSupport: values.trackerTypeSupport ?? '',
-        smsProvider: values.smsProvider || undefined,
+        smsProvider:
+          values.smsProvider === 'none'
+            ? undefined
+            : values.smsProvider || undefined,
         smsApiKey: values.smsApiKey || undefined,
         smsApiSecret: values.smsApiSecret || undefined,
         smsFromName: values.smsFromName || undefined,
@@ -283,7 +286,9 @@ function PlatformIntegrationsForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value=''>{t('smsProviderDisabled')}</SelectItem>
+                    <SelectItem value='none'>
+                      {t('smsProviderDisabled')}
+                    </SelectItem>
                     <SelectItem value='smsc'>{t('smsProviderSMSC')}</SelectItem>
                     <SelectItem value='smsru'>
                       {t('smsProviderSMSRu')}

@@ -75,13 +75,15 @@ export function formatAppDateTime(
 
 export function formatAppTime(
   value: string | Date | null | undefined,
-  intlLocale: string
+  intlLocale: string,
+  opts?: { hour12?: boolean }
 ): string {
   const d = parseDate(value);
   if (!d) return '';
   return new Intl.DateTimeFormat(intlLocale, {
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    ...(opts?.hour12 !== undefined ? { hour12: opts.hour12 } : {})
   }).format(d);
 }
 

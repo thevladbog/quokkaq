@@ -478,10 +478,247 @@ export const KioskConfigSchema = z
   })
   .passthrough();
 
+export {
+  ScreenWidgetTypeSchema,
+  ScreenLayoutPanelStyleSchema,
+  ScreenLayoutRegionSchema,
+  ScreenLayoutSchema,
+  ScreenWidgetPositionSchema,
+  ScreenWidgetSizeSchema,
+  ScreenWidgetStyleSchema,
+  ScreenWidgetConfigSchema,
+  type ScreenWidgetType,
+  type ScreenLayoutRegion,
+  type ScreenLayout,
+  type ScreenWidgetConfig
+} from './screen-template-widgets';
+
+import {
+  ScreenWidgetPositionSchema,
+  ScreenWidgetSizeSchema,
+  ScreenWidgetStyleSchema
+} from './screen-template-widgets';
+
+export {
+  ScreenCellGridPlacementSchema,
+  ScreenCellGridWidgetSchema,
+  ScreenTemplateRegionsSchema,
+  ScreenTemplateCellGridSchema,
+  normalizeScreenTemplateInput,
+  isScreenTemplateCellGrid,
+  isScreenTemplateRegions,
+  type ScreenTemplateUnion,
+  type ScreenTemplateCellGrid,
+  type ScreenTemplateRegions,
+  type ScreenCellGridWidget,
+  type ScreenCellGridFace,
+  type ScreenCellGridPlacement
+} from './screen-template-layout';
+
+export { migrateRegionsToCellGrid } from './screen-template-migrate-regions';
+
+import {
+  ScreenTemplateCellGridSchema,
+  ScreenTemplateRegionsSchema,
+  normalizeScreenTemplateInput
+} from './screen-template-layout';
+
+/** Drop removed widget types so stored unit configs still parse. */
+function stripDeprecatedScreenTemplateWidgets(input: unknown): unknown {
+  if (input == null || typeof input !== 'object') {
+    return input;
+  }
+  const o = input as Record<string, unknown>;
+  const filterProg = (arr: unknown): unknown[] | null => {
+    if (!Array.isArray(arr)) return null;
+    return arr.filter(
+      (w) =>
+        !(
+          w &&
+          typeof w === 'object' &&
+          (w as Record<string, unknown>).type === 'progress-bar'
+        )
+    );
+  };
+  const portrait = o.portrait;
+  const landscape = o.landscape;
+  if (
+    portrait &&
+    typeof portrait === 'object' &&
+    landscape &&
+    typeof landscape === 'object'
+  ) {
+    const po = portrait as Record<string, unknown>;
+    const lo = landscape as Record<string, unknown>;
+    const pw = filterProg(po.widgets);
+    const lw = filterProg(lo.widgets);
+    if (pw && lw) {
+      const origP = po.widgets as unknown[];
+      const origL = lo.widgets as unknown[];
+      const pChanged = pw.length !== origP.length;
+      const lChanged = lw.length !== origL.length;
+      if (pChanged || lChanged) {
+        return {
+          ...o,
+          portrait: { ...po, widgets: pw },
+          landscape: { ...lo, widgets: lw }
+        };
+      }
+    }
+  }
+  const widgets = o.widgets;
+  if (!Array.isArray(widgets)) {
+    return input;
+  }
+  const filtered = widgets.filter(
+    (w) =>
+      !(
+        w &&
+        typeof w === 'object' &&
+        (w as Record<string, unknown>).type === 'progress-bar'
+      )
+  );
+  if (filtered.length === widgets.length) {
+    return input;
+  }
+  return { ...o, widgets: filtered };
+}
+
+export const ScreenTemplateSchema = z.preprocess(
+  (raw) =>
+    normalizeScreenTemplateInput(stripDeprecatedScreenTemplateWidgets(raw)),
+  z.discriminatedUnion('layoutKind', [
+    ScreenTemplateRegionsSchema,
+    ScreenTemplateCellGridSchema
+  ])
+);
+
+/** Runtime shape for `UnitConfig.screenTemplate` (regions or cell-grid). */
+export type ScreenWidgetPosition = z.infer<typeof ScreenWidgetPositionSchema>;
+export type ScreenWidgetSize = z.infer<typeof ScreenWidgetSizeSchema>;
+export type ScreenWidgetStyle = z.infer<typeof ScreenWidgetStyleSchema>;
+export type ScreenTemplate = z.infer<typeof ScreenTemplateSchema>;
+
+/** Set after legacy `adScreen.activeMaterialIds` is imported as a default playlist in admin. */
+export const SignageConfigSchema = z
+  .object({
+    /** ISO timestamp when a default playlist was created from `adScreen.activeMaterialIds`. */
+    legacyActiveMaterialsImportedAt: z.string().optional()
+  })
+  .passthrough();
+
+export type SignageConfig = z.infer<typeof SignageConfigSchema>;
+
+/** Optional YYYY-MM-DD (empty/undefined allowed). */
+const optionalSignageYmd = z
+  .string()
+  .optional()
+  .refine(
+    (s) =>
+      s === undefined ||
+      s.trim() === '' ||
+      /^\d{4}-\d{2}-\d{2}$/.test(s.trim()),
+    { message: 'Date must be YYYY-MM-DD' }
+  );
+
+export const PlaylistItemInputSchema = z
+  .object({
+    materialId: z.string(),
+    sortOrder: z.number().int().optional(),
+    duration: z.number().int().min(0).optional(),
+    validFrom: optionalSignageYmd,
+    validTo: optionalSignageYmd
+  })
+  .refine(
+    (o) => {
+      const a = o.validFrom?.trim();
+      const b = o.validTo?.trim();
+      if (!a || !b) return true;
+      return a <= b;
+    },
+    { path: ['validTo'], message: 'validTo must be on or after validFrom' }
+  );
+
+export const PlaylistSchema = z.object({
+  id: z.string().optional(),
+  unitId: z.string().optional(),
+  name: z.string(),
+  description: z.string().optional(),
+  isDefault: z.boolean().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  items: z.array(PlaylistItemInputSchema).optional()
+});
+
+/** Object shape for schedule rows (use this with `.omit()`; full schema has refinements). */
+export const PlaylistScheduleObjectSchema = z.object({
+  id: z.string().optional(),
+  unitId: z.string().optional(),
+  playlistId: z.string(),
+  daysOfWeek: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+  validFrom: optionalSignageYmd,
+  validTo: optionalSignageYmd,
+  priority: z.number().int().optional(),
+  isActive: z.boolean().optional()
+});
+
+function refinePlaylistScheduleYmdOrder<
+  T extends { validFrom?: string; validTo?: string }
+>(o: T) {
+  const a = o.validFrom?.trim();
+  const b = o.validTo?.trim();
+  if (!a || !b) return true;
+  return a <= b;
+}
+
+export const PlaylistScheduleSchema = PlaylistScheduleObjectSchema.refine(
+  refinePlaylistScheduleYmdOrder,
+  { path: ['validTo'], message: 'validTo must be on or after validFrom' }
+);
+
+/** API body for PATCH schedule (omits `id` / `unitId` from path) — `PlaylistScheduleSchema.omit()` is not allowed after `.refine()`. */
+export const PlaylistScheduleUpdateBodySchema =
+  PlaylistScheduleObjectSchema.omit({ id: true, unitId: true }).refine(
+    refinePlaylistScheduleYmdOrder,
+    { path: ['validTo'], message: 'validTo must be on or after validFrom' }
+  );
+
+export const ExternalFeedTypeSchema = z.enum(['rss', 'weather', 'custom_url']);
+export const ExternalFeedSchema = z.object({
+  id: z.string().optional(),
+  unitId: z.string().optional(),
+  name: z.string(),
+  type: z.union([ExternalFeedTypeSchema, z.string()]),
+  url: z.string(),
+  pollInterval: z.number().int().min(1).optional(),
+  isActive: z.boolean().optional(),
+  lastError: z.string().optional(),
+  consecutiveFailures: z.number().int().min(0).optional(),
+  config: z.record(z.string(), z.unknown()).optional()
+});
+
+export const ScreenAnnouncementSchema = z.object({
+  id: z.string().optional(),
+  unitId: z.string().optional(),
+  text: z.string(),
+  priority: z.number().int().optional(),
+  style: z.string().optional(),
+  displayMode: z.enum(['banner', 'fullscreen']).optional(),
+  startsAt: z.string().nullable().optional(),
+  expiresAt: z.string().nullable().optional(),
+  isActive: z.boolean().optional()
+});
+
+export type PlaylistItemInput = z.infer<typeof PlaylistItemInputSchema>;
+
 /** Runtime shape for unit `config` JSON (matches {@link UnitConfig}). */
 export const UnitConfigSchema = z
   .object({
     adScreen: AdScreenConfigSchema.optional(),
+    screenTemplate: ScreenTemplateSchema.optional(),
+    signage: SignageConfigSchema.optional(),
     kiosk: KioskConfigSchema.optional(),
     logoUrl: z.string().optional()
   })
@@ -776,6 +1013,10 @@ export interface KioskConfig {
 
 export interface UnitConfig {
   adScreen?: AdScreenConfig;
+  /** When set, `/screen/[unitId]` uses {@link ScreenRenderer} instead of the legacy fixed layout. */
+  screenTemplate?: ScreenTemplate;
+  /** Digital signage: migration markers and future keys. */
+  signage?: SignageConfig;
   kiosk?: KioskConfig;
   logoUrl?: string;
   [key: string]: unknown;

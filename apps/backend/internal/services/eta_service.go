@@ -84,13 +84,17 @@ type TicketETAInfo struct {
 
 // UnitETASnapshot is broadcast on unit.eta_update for real-time clients.
 type UnitETASnapshot struct {
-	UnitID               string             `json:"unitId"`
-	Timestamp            time.Time          `json:"timestamp"`
-	QueueLength          int64              `json:"queueLength"`
-	EstimatedWaitMinutes float64            `json:"estimatedWaitMinutes"`
-	ActiveCounters       int64              `json:"activeCounters"`
-	Services             []ServiceQueueInfo `json:"services,omitempty"`
-	Tickets              []TicketETAInfo    `json:"tickets,omitempty"`
+	UnitID               string    `json:"unitId"`
+	Timestamp            time.Time `json:"timestamp"`
+	QueueLength          int64     `json:"queueLength"`
+	EstimatedWaitMinutes float64   `json:"estimatedWaitMinutes"`
+	// MaxWaitingInQueueMinutes is the longest current wait among waiting tickets (now − created_at), in minutes.
+	MaxWaitingInQueueMinutes float64 `json:"maxWaitingInQueueMinutes"`
+	ActiveCounters           int64   `json:"activeCounters"`
+	// ServedToday matches [UnitQueueSummary] / GetUnitQueueSummary: served+completed in unit's local day.
+	ServedToday int64              `json:"servedToday"`
+	Services    []ServiceQueueInfo `json:"services,omitempty"`
+	Tickets     []TicketETAInfo    `json:"tickets,omitempty"`
 }
 
 // QueuePositionAndETA computes the 1-based queue position and an estimated wait in seconds
@@ -124,10 +128,46 @@ type ServiceQueueInfo struct {
 type UnitQueueSummary struct {
 	QueueLength          int64   `json:"queueLength"`
 	EstimatedWaitMinutes float64 `json:"estimatedWaitMinutes"`
-	ActiveCounters       int64   `json:"activeCounters"`
+	// MaxWaitingInQueueMinutes is the longest current wait among waiting tickets (now − created_at), in minutes.
+	MaxWaitingInQueueMinutes float64 `json:"maxWaitingInQueueMinutes"`
+	ActiveCounters           int64   `json:"activeCounters"`
+	// ServedToday is tickets with status served/completed that finished today in the unit timezone.
+	ServedToday int64 `json:"servedToday"`
 	// Services contains per-service breakdown when multiple services have waiting tickets.
 	// Omitted when only one service is active (redundant with the top-level fields).
 	Services []ServiceQueueInfo `json:"services,omitempty"`
+}
+
+// maxWaitingMinutesAmongWaiting returns the longest current wait in minutes (now − created_at) among waiting tickets.
+func maxWaitingMinutesAmongWaiting(now time.Time, waiting []models.Ticket) float64 {
+	var maxSec float64
+	for i := range waiting {
+		elapsed := now.Sub(waiting[i].CreatedAt)
+		if elapsed < 0 {
+			elapsed = 0
+		}
+		if s := elapsed.Seconds(); s > maxSec {
+			maxSec = s
+		}
+	}
+	return maxSec / 60.0
+}
+
+// dayRangeInTimezone returns [start, end) in UTC for the current calendar day in `tz` (IANA) or UTC on error.
+func dayRangeInTimezone(nowUTC time.Time, tzName string) (time.Time, time.Time) {
+	tz := strings.TrimSpace(tzName)
+	if tz == "" {
+		tz = "UTC"
+	}
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		loc = time.UTC
+	}
+	nowIn := nowUTC.In(loc)
+	start := time.Date(nowIn.Year(), nowIn.Month(), nowIn.Day(), 0, 0, 0, 0, loc)
+	// End of local calendar day; use calendar math so DST (23/25h days) is correct.
+	end := start.AddDate(0, 0, 1)
+	return start.UTC(), end.UTC()
 }
 
 // GetUnitQueueSummary returns queue length, estimated wait (minutes), and active counter count
@@ -143,12 +183,31 @@ func (s *ETAService) GetUnitQueueSummary(unitID string) (UnitQueueSummary, error
 		services = nil
 	}
 	out := UnitQueueSummary{
-		QueueLength:          snap.QueueLength,
-		EstimatedWaitMinutes: snap.EstimatedWaitMinutes,
-		ActiveCounters:       snap.ActiveCounters,
-		Services:             services,
+		QueueLength:              snap.QueueLength,
+		EstimatedWaitMinutes:     snap.EstimatedWaitMinutes,
+		MaxWaitingInQueueMinutes: snap.MaxWaitingInQueueMinutes,
+		ActiveCounters:           snap.ActiveCounters,
+		ServedToday:              snap.ServedToday,
+		Services:                 services,
 	}
 	return out, nil
+}
+
+// servedTodayForUnit counts completed/served tickets for the unit's local calendar day; 0 if unavailable.
+func (s *ETAService) servedTodayForUnit(unitID string) int64 {
+	if s.unitRepo == nil {
+		return 0
+	}
+	u, err := s.unitRepo.FindByIDLight(unitID)
+	if err != nil || u == nil {
+		return 0
+	}
+	start, end := dayRangeInTimezone(time.Now().UTC(), u.Timezone)
+	n, err := s.ticketRepo.CountServedInUnitInRange(unitID, start, end)
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 // ComputeUnitETASnapshot builds queue-wide and per-ticket ETAs for WebSocket push and polling.
@@ -191,6 +250,7 @@ func (s *ETAService) ComputeUnitETASnapshot(unitID string) (UnitETASnapshot, err
 	if err != nil {
 		return snap, err
 	}
+	snap.MaxWaitingInQueueMinutes = maxWaitingMinutesAmongWaiting(now, waiting)
 
 	uniqService := make(map[string]struct{}, len(waiting)+1)
 	for i := range waiting {
@@ -268,6 +328,7 @@ func (s *ETAService) ComputeUnitETASnapshot(unitID string) (UnitETASnapshot, err
 		}
 	}
 
+	snap.ServedToday = s.servedTodayForUnit(unitID)
 	return snap, nil
 }
 

@@ -2514,6 +2514,85 @@ WHERE code IN ('enterprise', 'grandfathered') AND limits->'webhook_endpoints_max
 		return fmt.Errorf("failed to run v1.8.3_subscription_plan_integration_limits migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.8.4_digital_signage", func(db *gorm.DB) error {
+		if err := db.AutoMigrate(
+			&dbmodels.Playlist{},
+			&dbmodels.PlaylistItem{},
+			&dbmodels.PlaylistSchedule{},
+			&dbmodels.ExternalFeed{},
+			&dbmodels.ScreenAnnouncement{},
+		); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.4_digital_signage migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.8.5_external_feed_consecutive_failures", func(db *gorm.DB) error {
+		if err := db.Exec(`
+ALTER TABLE external_feeds
+	ADD COLUMN IF NOT EXISTS consecutive_failures integer NOT NULL DEFAULT 0;
+UPDATE external_feeds SET consecutive_failures = 0 WHERE consecutive_failures IS NULL;
+`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.5_external_feed_consecutive_failures migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.8.6_signage_validity", func(db *gorm.DB) error {
+		if err := db.Exec(`
+ALTER TABLE playlist_items
+    ADD COLUMN IF NOT EXISTS valid_from date,
+    ADD COLUMN IF NOT EXISTS valid_to date;
+ALTER TABLE playlist_schedules
+    ADD COLUMN IF NOT EXISTS valid_from date,
+    ADD COLUMN IF NOT EXISTS valid_to date;
+ALTER TABLE screen_announcements
+    ADD COLUMN IF NOT EXISTS display_mode text NOT NULL DEFAULT 'banner';
+UPDATE screen_announcements SET display_mode = 'banner' WHERE display_mode IS NULL OR display_mode = '';
+`).Error; err != nil {
+			return err
+		}
+		if err := db.AutoMigrate(
+			&dbmodels.PlaylistItem{},
+			&dbmodels.PlaylistSchedule{},
+			&dbmodels.ScreenAnnouncement{},
+		); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.6_signage_validity migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.8.7_screen_layout_templates", func(db *gorm.DB) error {
+		if err := db.AutoMigrate(&dbmodels.ScreenLayoutTemplate{}); err != nil {
+			return err
+		}
+		if err := db.Exec(`
+UPDATE subscription_plans
+SET features = COALESCE(features, '{}'::jsonb) || '{"custom_screen_layouts": true}'::jsonb
+WHERE code IN ('professional', 'enterprise', 'grandfathered')
+  AND (features->>'custom_screen_layouts') IS NULL;
+UPDATE subscription_plans
+SET features = COALESCE(features, '{}'::jsonb) || '{"custom_screen_layouts": false}'::jsonb
+WHERE code = 'starter'
+  AND (features->>'custom_screen_layouts') IS NULL;
+`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.7_screen_layout_templates migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

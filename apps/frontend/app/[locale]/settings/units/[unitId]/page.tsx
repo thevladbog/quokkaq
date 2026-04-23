@@ -1,6 +1,7 @@
 'use client';
 
 import { use, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
@@ -24,7 +25,7 @@ import { CountersList } from '@/components/admin/units/counters-list';
 import { ServiceZoneWorkplacesPanel } from '@/components/admin/units/service-zone-workplaces-panel';
 import { SubdivisionStationsAndZonesPanel } from '@/components/admin/units/subdivision-stations-and-zones-panel';
 import { WorkplaceParentBanner } from '@/components/admin/units/workplace-parent-banner';
-import { AdScreenSettings } from '@/components/admin/units/ad-screen-settings';
+import { UnitDisplaySettings } from '@/components/admin/units/unit-display-settings';
 import { UnitServicesManager } from '@/components/admin/units/unit-services-manager';
 import { KioskSettings } from '@/components/admin/units/kiosk-settings';
 import { Link } from '@/src/i18n/navigation';
@@ -42,6 +43,7 @@ import {
   PermUnitGridManage,
   PermUnitServicesManage,
   PermUnitSettingsManage,
+  PermUnitSignageManage,
   PermUnitTicketScreenManage
 } from '@/lib/permission-variants';
 import { toast } from 'sonner';
@@ -61,6 +63,15 @@ export default function UnitPage({ params }: UnitPageProps) {
   const t = useTranslations('admin'); // Using admin namespace
   const locale = useLocale();
   const [activeTab, setActiveTab] = useState('general');
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const d = searchParams.get('display');
+    if (d === 'materials' || d === 'look' || d === 'content') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- URL should open the Display settings tab
+      setActiveTab('display');
+    }
+  }, [searchParams]);
 
   const { data: unit } = useQuery({
     queryKey: getGetUnitByIDQueryKey(unitId),
@@ -291,11 +302,11 @@ export default function UnitPage({ params }: UnitPageProps) {
               </TabsTrigger>
             </PermissionGuard>
             <PermissionGuard
-              permissions={[PermUnitTicketScreenManage]}
+              permissions={[PermUnitTicketScreenManage, PermUnitSignageManage]}
               unitId={unitId}
             >
-              <TabsTrigger value='ad-screen'>
-                {t('ad_screen.title')}
+              <TabsTrigger value='display'>
+                {t('display.tab', { default: 'Display' })}
               </TabsTrigger>
             </PermissionGuard>
           </TabsList>
@@ -432,14 +443,16 @@ export default function UnitPage({ params }: UnitPageProps) {
             </PermissionGuard>
           </TabsContent>
 
-          <TabsContent value='ad-screen' className='mt-6'>
+          <TabsContent value='display' className='mt-6'>
             <PermissionGuard
-              permissions={[PermUnitTicketScreenManage]}
+              permissions={[PermUnitTicketScreenManage, PermUnitSignageManage]}
               unitId={unitId}
+              requireAll={false}
               fallback={<div>{t('access_denied')}</div>}
             >
-              <AdScreenSettings
-                key={JSON.stringify(unit.config?.adScreen)}
+              <UnitDisplaySettings
+                key={unitId}
+                unit={unit}
                 unitId={unitId}
                 currentConfig={unit.config || {}}
               />
@@ -552,10 +565,12 @@ export default function UnitPage({ params }: UnitPageProps) {
             </TabsTrigger>
           </PermissionGuard>
           <PermissionGuard
-            permissions={[PermUnitTicketScreenManage]}
+            permissions={[PermUnitTicketScreenManage, PermUnitSignageManage]}
             unitId={unitId}
           >
-            <TabsTrigger value='ad-screen'>{t('ad_screen.title')}</TabsTrigger>
+            <TabsTrigger value='display'>
+              {t('display.tab', { default: 'Display' })}
+            </TabsTrigger>
           </PermissionGuard>
           <PermissionGuard
             permissions={[PermUnitSettingsManage]}
@@ -724,14 +739,16 @@ export default function UnitPage({ params }: UnitPageProps) {
         <TabsContent value='counters' className='mt-6'>
           {stationsAndStructure}
         </TabsContent>
-        <TabsContent value='ad-screen' className='mt-6'>
+        <TabsContent value='display' className='mt-6'>
           <PermissionGuard
-            permissions={[PermUnitTicketScreenManage]}
+            permissions={[PermUnitTicketScreenManage, PermUnitSignageManage]}
             unitId={unitId}
+            requireAll={false}
             fallback={<div>{t('access_denied')}</div>}
           >
-            <AdScreenSettings
-              key={JSON.stringify(unit.config?.adScreen)}
+            <UnitDisplaySettings
+              key={unitId}
+              unit={unit}
               unitId={unitId}
               currentConfig={unit.config || {}}
             />

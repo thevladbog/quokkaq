@@ -36,6 +36,24 @@ export interface HandlersAccessibleCompaniesResponse {
   companies?: HandlersAccessibleCompanyItem[];
 }
 
+export type HandlersAnnouncementRequestDisplayMode = typeof HandlersAnnouncementRequestDisplayMode[keyof typeof HandlersAnnouncementRequestDisplayMode];
+
+
+export const HandlersAnnouncementRequestDisplayMode = {
+  banner: 'banner',
+  fullscreen: 'fullscreen',
+} as const;
+
+export interface HandlersAnnouncementRequest {
+  displayMode?: HandlersAnnouncementRequestDisplayMode;
+  expiresAt?: string;
+  isActive?: boolean;
+  priority?: number;
+  startsAt?: string;
+  style?: string;
+  text?: string;
+}
+
 export interface HandlersAssignUnitRequest {
   permissions?: string[];
   unitId?: string;
@@ -413,6 +431,17 @@ export interface HandlersCreateDesktopTerminalResponse {
   terminal?: HandlersDesktopTerminalJSON;
 }
 
+export type HandlersCreateFeedRequestConfig = { [key: string]: unknown };
+
+export interface HandlersCreateFeedRequest {
+  config?: HandlersCreateFeedRequestConfig;
+  isActive?: boolean;
+  name?: string;
+  pollInterval?: number;
+  type?: string;
+  url?: string;
+}
+
 export type HandlersCreateInvitationRequestTargetRoles = { [key: string]: unknown };
 
 export type HandlersCreateInvitationRequestTargetUnits = { [key: string]: unknown };
@@ -422,6 +451,40 @@ export interface HandlersCreateInvitationRequest {
   targetRoles?: HandlersCreateInvitationRequestTargetRoles;
   targetUnits?: HandlersCreateInvitationRequestTargetUnits;
   templateId?: string;
+}
+
+export interface HandlersPlaylistItemInput {
+  duration?: number;
+  materialId?: string;
+  /** YYYY-MM-DD, optional; inclusive */
+  validFrom?: string;
+  /** YYYY-MM-DD, optional; inclusive */
+  validTo?: string;
+}
+
+export interface HandlersCreatePlaylistRequest {
+  description?: string;
+  isDefault?: boolean;
+  items?: HandlersPlaylistItemInput[];
+  name?: string;
+}
+
+export interface HandlersCreateScheduleRequest {
+  daysOfWeek?: string;
+  endTime?: string;
+  isActive?: boolean;
+  playlistId?: string;
+  priority?: number;
+  startTime?: string;
+  validFrom?: string;
+  validTo?: string;
+}
+
+export type HandlersCreateScreenLayoutTemplateRequestDefinition = { [key: string]: unknown };
+
+export interface HandlersCreateScreenLayoutTemplateRequest {
+  definition?: HandlersCreateScreenLayoutTemplateRequestDefinition;
+  name?: string;
 }
 
 export interface HandlersTenantRoleUnitJSON {
@@ -1021,6 +1084,20 @@ export interface HandlersUpdateDesktopTerminalRequest {
   unitId?: string;
 }
 
+export interface HandlersUpdatePlaylistRequest {
+  description?: string;
+  isDefault?: boolean;
+  items?: HandlersPlaylistItemInput[];
+  name?: string;
+}
+
+export type HandlersUpdateScreenLayoutTemplateRequestDefinition = { [key: string]: unknown };
+
+export interface HandlersUpdateScreenLayoutTemplateRequest {
+  definition?: HandlersUpdateScreenLayoutTemplateRequestDefinition;
+  name?: string;
+}
+
 export interface HandlersUpdateStatusRequest {
   status?: string;
 }
@@ -1438,6 +1515,7 @@ export interface ModelsCompany {
 
 export interface HandlersPlanCapabilitiesDTO {
   apiAccess?: boolean;
+  customScreenLayouts?: boolean;
   outboundWebhooks?: boolean;
   publicQueueWidget?: boolean;
 }
@@ -1823,6 +1901,28 @@ export interface ModelsDayScheduleWithBookings {
   updatedAt?: string;
 }
 
+export type ModelsExternalFeedCachedData = { [key: string]: unknown };
+
+export type ModelsExternalFeedConfig = { [key: string]: unknown };
+
+export interface ModelsExternalFeed {
+  cachedData?: ModelsExternalFeedCachedData;
+  config?: ModelsExternalFeedConfig;
+  consecutiveFailures?: number;
+  createdAt?: string;
+  id?: string;
+  isActive?: boolean;
+  lastError?: string;
+  lastFetchAt?: string;
+  name?: string;
+  pollInterval?: number;
+  /** rss | weather | custom_url */
+  type?: string;
+  unitId?: string;
+  updatedAt?: string;
+  url?: string;
+}
+
 export interface ModelsGenerateSlotsRequest {
   /** inclusive start date (YYYY-MM-DD) */
   from?: string;
@@ -1871,6 +1971,57 @@ export interface ModelsOperatorSkill {
   serviceId?: string;
   unitId?: string;
   userId?: string;
+}
+
+export interface ModelsUnitMaterial {
+  createdAt?: string;
+  filename?: string;
+  id?: string;
+  type?: string;
+  unitId?: string;
+  url?: string;
+}
+
+export interface ModelsPlaylistItem {
+  duration?: number;
+  id?: string;
+  material?: ModelsUnitMaterial;
+  materialId?: string;
+  playlistId?: string;
+  sortOrder?: number;
+  validFrom?: string;
+  validTo?: string;
+}
+
+export interface ModelsPlaylist {
+  createdAt?: string;
+  description?: string;
+  id?: string;
+  isDefault?: boolean;
+  items?: ModelsPlaylistItem[];
+  name?: string;
+  unitId?: string;
+  updatedAt?: string;
+}
+
+export interface ModelsPlaylistSchedule {
+  createdAt?: string;
+  /** Comma-separated weekday numbers 1=Mon .. 7=Sun (e.g. "1,2,3,4,5"). */
+  daysOfWeek?: string;
+  /** "HH:MM" */
+  endTime?: string;
+  id?: string;
+  isActive?: boolean;
+  playlist?: ModelsPlaylist;
+  playlistId?: string;
+  priority?: number;
+  /** "HH:MM" */
+  startTime?: string;
+  unitId?: string;
+  updatedAt?: string;
+  /** Optional calendar range (inclusive) when the schedule applies, interpreted with the unit’s timezone. Nil = unbounded. */
+  validFrom?: string;
+  validTo?: string;
 }
 
 export interface ModelsPreRegCalendarSlotItem {
@@ -1930,6 +2081,36 @@ export interface ModelsPreRegistrationUpdateRequest {
   /** Status optional; only "canceled" is accepted to cancel an active pre-registration. */
   status?: ModelsPreRegistrationUpdateRequestStatus;
   time?: string;
+}
+
+export interface ModelsScreenAnnouncement {
+  createdAt?: string;
+  /** DisplayMode: "banner" (in-layout list) or "fullscreen" (full-screen alert overlay; highest priority first). */
+  displayMode?: string;
+  expiresAt?: string;
+  id?: string;
+  isActive?: boolean;
+  priority?: number;
+  startsAt?: string;
+  style?: string;
+  text?: string;
+  unitId?: string;
+  updatedAt?: string;
+}
+
+/**
+ * swaggertype:object — stored as JSONB; API returns arbitrary JSON object.
+ */
+export type ModelsScreenLayoutTemplateDefinition = { [key: string]: unknown };
+
+export interface ModelsScreenLayoutTemplate {
+  companyId?: string;
+  createdAt?: string;
+  /** swaggertype:object — stored as JSONB; API returns arbitrary JSON object. */
+  definition?: ModelsScreenLayoutTemplateDefinition;
+  id?: string;
+  name?: string;
+  updatedAt?: string;
 }
 
 export interface ModelsSlotSuccessResponse {
@@ -2025,15 +2206,6 @@ export interface ModelsTenantRole {
   updatedAt?: string;
 }
 
-export interface ModelsUnitMaterial {
-  createdAt?: string;
-  filename?: string;
-  id?: string;
-  type?: string;
-  unitId?: string;
-  url?: string;
-}
-
 export interface ModelsUpdateDayScheduleRequest {
   isDayOff?: boolean;
   slots?: ModelsServiceSlot[];
@@ -2076,6 +2248,13 @@ export interface RepositorySupportReportShareCandidate {
   email?: string;
   name?: string;
   userId?: string;
+}
+
+export interface ServicesActivePlaylistDTO {
+  playlist?: ModelsPlaylist;
+  /** schedule | default | fallback | none */
+  source?: string;
+  unitId?: string;
 }
 
 export interface ServicesAnomalyAlertItem {
@@ -2215,6 +2394,16 @@ export interface ServicesEmployeeRadarResponse {
   slaWait?: number;
   ticketsPerHour?: number;
   userId?: string;
+}
+
+export interface ServicesFeedHealth {
+  consecutiveFailures?: number;
+  healthy?: boolean;
+  id?: string;
+  isActive?: boolean;
+  lastError?: string;
+  lastFetchAt?: string;
+  name?: string;
 }
 
 /**
@@ -2397,6 +2586,29 @@ export interface ServicesShiftCounterDTO {
   unitId?: string;
 }
 
+export interface ServicesSignagePlaylistRef {
+  id?: string;
+  name?: string;
+}
+
+export interface ServicesSignageActive {
+  /** no slides after item-date filtering */
+  empty?: boolean;
+  playlist?: ServicesSignagePlaylistRef;
+  reason?: string;
+  source?: string;
+}
+
+export interface ServicesSignageHealthDTO {
+  active?: ServicesSignageActive;
+  feeds?: ServicesFeedHealth[];
+  hasDefaultPlaylist?: boolean;
+  playlistCount?: number;
+  scheduleCount?: number;
+  timezone?: string;
+  unitId?: string;
+}
+
 export interface ServicesSlaSummaryResponse {
   breachPct?: number;
   computedAt?: string;
@@ -2576,7 +2788,11 @@ export interface ServicesUnitClientListResponse {
 export interface ServicesUnitQueueSummary {
   activeCounters?: number;
   estimatedWaitMinutes?: number;
+  /** MaxWaitingInQueueMinutes is the longest current wait among waiting tickets (now − created_at), in minutes. */
+  maxWaitingInQueueMinutes?: number;
   queueLength?: number;
+  /** ServedToday is tickets with status served/completed that finished today in the unit timezone. */
+  servedToday?: number;
   /** Services contains per-service breakdown when multiple services have waiting tickets.
   Omitted when only one service is active (redundant with the top-level fields). */
   services?: ServicesServiceQueueInfo[];
