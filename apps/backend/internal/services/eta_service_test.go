@@ -368,6 +368,41 @@ func TestComputeUnitETASnapshot_ServedToday_matchesGetUnitQueueSummary(t *testin
 	}
 }
 
+func TestComputeUnitETASnapshot_maxWaitingInQueue(t *testing.T) {
+	t.Parallel()
+	unitID := "u1"
+	svcID := "s1"
+	samples := []int{60, 60, 60, 60, 60}
+	now := time.Now().UTC()
+	twentyMinAgo := now.Add(-20 * time.Minute)
+	waiting := []models.Ticket{
+		{ID: "t1", Status: "waiting", UnitID: unitID, ServiceID: svcID, CreatedAt: twentyMinAgo},
+		{ID: "t2", Status: "waiting", UnitID: unitID, ServiceID: svcID, CreatedAt: now.Add(-5 * time.Minute)},
+	}
+	repo := &countingTicketRepo{
+		etaTicketRepo: etaTicketRepo{
+			recentTimes:   map[string][]int{unitID + "|" + svcID: samples},
+			waitingByUnit: 2,
+		},
+		waitingTickets: waiting,
+	}
+	svc := NewETAService(repo, &etaCounterRepo{activeCount: 1})
+	snap, err := svc.ComputeUnitETASnapshot(unitID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if snap.MaxWaitingInQueueMinutes < 19.5 || snap.MaxWaitingInQueueMinutes > 20.5 {
+		t.Errorf("max waiting in queue minutes: want ~20, got %f", snap.MaxWaitingInQueueMinutes)
+	}
+	summary, err := svc.GetUnitQueueSummary(unitID)
+	if err != nil {
+		t.Fatalf("GetUnitQueueSummary: %v", err)
+	}
+	if summary.MaxWaitingInQueueMinutes < 19.5 || summary.MaxWaitingInQueueMinutes > 20.5 {
+		t.Errorf("summary max waiting: want ~20, got %f", summary.MaxWaitingInQueueMinutes)
+	}
+}
+
 func TestComputeUnitETASnapshot_fetchesOccupiedCounterSamplesOnce(t *testing.T) {
 	t.Parallel()
 	unitID := "u1"

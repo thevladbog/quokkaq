@@ -88,7 +88,9 @@ type UnitETASnapshot struct {
 	Timestamp            time.Time `json:"timestamp"`
 	QueueLength          int64     `json:"queueLength"`
 	EstimatedWaitMinutes float64   `json:"estimatedWaitMinutes"`
-	ActiveCounters       int64     `json:"activeCounters"`
+	// MaxWaitingInQueueMinutes is the longest current wait among waiting tickets (now − created_at), in minutes.
+	MaxWaitingInQueueMinutes float64 `json:"maxWaitingInQueueMinutes"`
+	ActiveCounters           int64   `json:"activeCounters"`
 	// ServedToday matches [UnitQueueSummary] / GetUnitQueueSummary: served+completed in unit's local day.
 	ServedToday int64              `json:"servedToday"`
 	Services    []ServiceQueueInfo `json:"services,omitempty"`
@@ -126,12 +128,29 @@ type ServiceQueueInfo struct {
 type UnitQueueSummary struct {
 	QueueLength          int64   `json:"queueLength"`
 	EstimatedWaitMinutes float64 `json:"estimatedWaitMinutes"`
-	ActiveCounters       int64   `json:"activeCounters"`
+	// MaxWaitingInQueueMinutes is the longest current wait among waiting tickets (now − created_at), in minutes.
+	MaxWaitingInQueueMinutes float64 `json:"maxWaitingInQueueMinutes"`
+	ActiveCounters           int64   `json:"activeCounters"`
 	// ServedToday is tickets with status served/completed that finished today in the unit timezone.
 	ServedToday int64 `json:"servedToday"`
 	// Services contains per-service breakdown when multiple services have waiting tickets.
 	// Omitted when only one service is active (redundant with the top-level fields).
 	Services []ServiceQueueInfo `json:"services,omitempty"`
+}
+
+// maxWaitingMinutesAmongWaiting returns the longest current wait in minutes (now − created_at) among waiting tickets.
+func maxWaitingMinutesAmongWaiting(now time.Time, waiting []models.Ticket) float64 {
+	var maxSec float64
+	for i := range waiting {
+		elapsed := now.Sub(waiting[i].CreatedAt)
+		if elapsed < 0 {
+			elapsed = 0
+		}
+		if s := elapsed.Seconds(); s > maxSec {
+			maxSec = s
+		}
+	}
+	return maxSec / 60.0
 }
 
 // dayRangeInTimezone returns [start, end) in UTC for the current calendar day in `tz` (IANA) or UTC on error.
@@ -163,11 +182,12 @@ func (s *ETAService) GetUnitQueueSummary(unitID string) (UnitQueueSummary, error
 		services = nil
 	}
 	out := UnitQueueSummary{
-		QueueLength:          snap.QueueLength,
-		EstimatedWaitMinutes: snap.EstimatedWaitMinutes,
-		ActiveCounters:       snap.ActiveCounters,
-		ServedToday:          snap.ServedToday,
-		Services:             services,
+		QueueLength:              snap.QueueLength,
+		EstimatedWaitMinutes:     snap.EstimatedWaitMinutes,
+		MaxWaitingInQueueMinutes: snap.MaxWaitingInQueueMinutes,
+		ActiveCounters:           snap.ActiveCounters,
+		ServedToday:              snap.ServedToday,
+		Services:                 services,
 	}
 	return out, nil
 }
@@ -229,6 +249,7 @@ func (s *ETAService) ComputeUnitETASnapshot(unitID string) (UnitETASnapshot, err
 	if err != nil {
 		return snap, err
 	}
+	snap.MaxWaitingInQueueMinutes = maxWaitingMinutesAmongWaiting(now, waiting)
 
 	uniqService := make(map[string]struct{}, len(waiting)+1)
 	for i := range waiting {

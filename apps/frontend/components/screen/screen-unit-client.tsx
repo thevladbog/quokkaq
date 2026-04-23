@@ -29,12 +29,34 @@ import { CalledTicketsTable } from '@/components/screen/called-tickets-table';
 import { QueueTicker } from '@/components/screen/queue-ticker';
 import { Spinner } from '@/components/ui/spinner';
 import { getUnitDisplayName } from '@/lib/unit-display';
+import {
+  displayEstimateToCallMinutes,
+  displayMaxWaitInQueueMinutes
+} from '@/lib/queue-eta-display';
 
 interface ScreenUnitClientProps {
   unitId: string;
 }
 
 const EMPTY_TICKET_LIST: Ticket[] = [];
+
+/** Overlay per-ticket queue positions from `unit.eta_update` (not on REST list before merge). */
+function mergeTicketsQueuePositionFromEta(
+  waiting: Ticket[],
+  rows: UnitETASnapshot['tickets']
+): Ticket[] {
+  if (!rows?.length) {
+    return waiting;
+  }
+  const m = new Map(rows.map((r) => [r.ticketId, r.queuePosition]));
+  return waiting.map((t) => {
+    const qp = m.get(t.id);
+    if (qp == null) {
+      return t;
+    }
+    return { ...t, queuePosition: qp };
+  });
+}
 
 function deriveCalledTicketsForScreen(tickets: Ticket[]): Ticket[] {
   const activePool = tickets.filter(
@@ -170,6 +192,7 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
   const [queueStatus, setQueueStatus] = useState<{
     queueLength: number;
     estimatedWaitMinutes: number;
+    maxWaitingInQueueMinutes?: number;
     activeCounters: number;
     servedToday?: number;
     services?: Array<{
@@ -179,6 +202,9 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       estimatedWaitMinutes: number;
     }>;
   } | null>(null);
+
+  const [etaTicketRows, setEtaTicketRows] =
+    useState<UnitETASnapshot['tickets']>(undefined);
 
   useEffect(() => {
     if (!unitId) return;
@@ -241,10 +267,12 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       setQueueStatus({
         queueLength: snap.queueLength,
         estimatedWaitMinutes: snap.estimatedWaitMinutes,
+        maxWaitingInQueueMinutes: snap.maxWaitingInQueueMinutes,
         activeCounters: snap.activeCounters,
         servedToday: snap.servedToday,
         services: snap.services
       });
+      setEtaTicketRows(snap.tickets);
     };
 
     const handleSignage = () => {
@@ -386,6 +414,11 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
         new Date(b.createdAt || 0).getTime()
     );
 
+  const waitingTicketsForScreen = mergeTicketsQueuePositionFromEta(
+    waitingTickets,
+    etaTicketRows
+  );
+
   const config = unit.config as UnitConfig;
   const adConfig = config?.adScreen;
   const showContent =
@@ -484,7 +517,7 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
             template={useScreenTemplate}
             unit={unit}
             calledTickets={calledTickets}
-            waitingTickets={waitingTickets}
+            waitingTickets={waitingTicketsForScreen}
             queueStatus={queueStatus}
             contentSlides={contentSlides}
             defaultImageSeconds={adConfig?.duration || 5}
@@ -543,8 +576,9 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
                     </strong>
                     <span className='text-muted-foreground'>
                       {t('serviceQueue', { count: svc.queueLength })}
-                      {svc.estimatedWaitMinutes > 0 &&
-                        ` · ~${Math.round(svc.estimatedWaitMinutes)} ${t('minutes')}`}
+                      {displayEstimateToCallMinutes(svc.estimatedWaitMinutes) >
+                        0 &&
+                        ` · ~${displayEstimateToCallMinutes(svc.estimatedWaitMinutes)} ${t('minutes')}`}
                     </span>
                   </span>
                 ))
@@ -557,11 +591,29 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
                       {queueStatus.queueLength}
                     </strong>
                   </span>
-                  {queueStatus.estimatedWaitMinutes > 0 && (
+                  {displayEstimateToCallMinutes(
+                    queueStatus.estimatedWaitMinutes
+                  ) > 0 && (
                     <span>
-                      {t('estimatedWait')}:{' '}
+                      {t('estimateToCall')}:{' '}
                       <strong className='tabular-nums transition-all duration-300'>
-                        ~{Math.round(queueStatus.estimatedWaitMinutes)}{' '}
+                        ~
+                        {displayEstimateToCallMinutes(
+                          queueStatus.estimatedWaitMinutes
+                        )}{' '}
+                        {t('minutes')}
+                      </strong>
+                    </span>
+                  )}
+                  {displayMaxWaitInQueueMinutes(
+                    queueStatus.maxWaitingInQueueMinutes
+                  ) > 0 && (
+                    <span>
+                      {t('maxWaitInQueueNow')}:{' '}
+                      <strong className='tabular-nums transition-all duration-300'>
+                        {displayMaxWaitInQueueMinutes(
+                          queueStatus.maxWaitingInQueueMinutes
+                        )}{' '}
                         {t('minutes')}
                       </strong>
                     </span>
@@ -606,7 +658,7 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       {/* Bottom: Ticker (classic) */}
       {!useScreenTemplate && (
         <div className='z-20 flex-none'>
-          <QueueTicker tickets={waitingTickets} />
+          <QueueTicker tickets={waitingTicketsForScreen} />
         </div>
       )}
     </div>

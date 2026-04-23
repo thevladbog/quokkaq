@@ -9,6 +9,10 @@ import { socketClient, type UnitETASnapshot } from '@/lib/socket';
 import { useUnit } from '@/lib/hooks';
 import type { Service } from '@/lib/api';
 import { getLocalizedName } from '@/lib/utils';
+import {
+  displayEstimateToCallMinutes,
+  displayMaxWaitInQueueMinutes
+} from '@/lib/queue-eta-display';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +23,7 @@ import { Combobox } from '@/components/ui/combobox';
 interface QueueStatus {
   queueLength: number;
   estimatedWaitMinutes: number;
+  maxWaitingInQueueMinutes?: number;
   activeCounters: number;
   services?: Array<{
     serviceId: string;
@@ -72,6 +77,7 @@ export default function VirtualQueuePage() {
       setQueueStatus({
         queueLength: snap.queueLength,
         estimatedWaitMinutes: snap.estimatedWaitMinutes,
+        maxWaitingInQueueMinutes: snap.maxWaitingInQueueMinutes,
         activeCounters: snap.activeCounters,
         services: snap.services
       });
@@ -172,10 +178,25 @@ export default function VirtualQueuePage() {
                 <span className='bg-muted rounded-full px-3 py-1 text-sm'>
                   {t('queue_length', { count: queueStatus.queueLength })}
                 </span>
-                {queueStatus.estimatedWaitMinutes > 0 && (
+                {displayEstimateToCallMinutes(
+                  queueStatus.estimatedWaitMinutes
+                ) > 0 && (
                   <span className='bg-muted rounded-full px-3 py-1 text-sm transition-all duration-300'>
                     {t('estimated_wait', {
-                      minutes: Math.round(queueStatus.estimatedWaitMinutes)
+                      minutes: displayEstimateToCallMinutes(
+                        queueStatus.estimatedWaitMinutes
+                      )
+                    })}
+                  </span>
+                )}
+                {displayMaxWaitInQueueMinutes(
+                  queueStatus.maxWaitingInQueueMinutes
+                ) > 0 && (
+                  <span className='bg-muted rounded-full px-3 py-1 text-sm transition-all duration-300'>
+                    {t('max_queue_wait', {
+                      minutes: displayMaxWaitInQueueMinutes(
+                        queueStatus.maxWaitingInQueueMinutes
+                      )
                     })}
                   </span>
                 )}
@@ -191,9 +212,12 @@ export default function VirtualQueuePage() {
                       className='bg-muted/60 max-w-[200px] truncate rounded-full px-2 py-0.5'
                     >
                       {svc.serviceName}: {svc.queueLength}
-                      {svc.estimatedWaitMinutes > 0
+                      {displayEstimateToCallMinutes(svc.estimatedWaitMinutes) >
+                      0
                         ? ` · ${t('estimated_wait_short', {
-                            minutes: Math.round(svc.estimatedWaitMinutes)
+                            minutes: displayEstimateToCallMinutes(
+                              svc.estimatedWaitMinutes
+                            )
                           })}`
                         : ''}
                     </span>

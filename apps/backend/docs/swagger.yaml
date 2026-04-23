@@ -4158,6 +4158,9 @@ components:
                     type: integer
                 estimatedWaitMinutes:
                     type: number
+                maxWaitingInQueueMinutes:
+                    description: MaxWaitingInQueueMinutes is the longest current wait among waiting tickets (now − created_at), in minutes.
+                    type: number
                 queueLength:
                     type: integer
                 servedToday:
@@ -14463,7 +14466,7 @@ paths:
                 - signage
     /units/{unitId}/queue-status:
         get:
-            description: Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required. Requires subscription plan feature public_queue_widget.
+            description: Returns queue length, estimated time-to-call (minutes), longest current in-queue wait (minutes), and active counter count. Public endpoint, no authentication required. Requires subscription plan feature public_queue_widget.
             operationId: getUnitQueueStatus
             parameters:
                 - description: Unit ID

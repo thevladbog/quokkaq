@@ -2739,6 +2739,8 @@ export interface ServicesUnitClientListResponse {
 export interface ServicesUnitQueueSummary {
   activeCounters?: number;
   estimatedWaitMinutes?: number;
+  /** MaxWaitingInQueueMinutes is the longest current wait among waiting tickets (now − created_at), in minutes. */
+  maxWaitingInQueueMinutes?: number;
   queueLength?: number;
   /** ServedToday is tickets with status served/completed that finished today in the unit timezone. */
   servedToday?: number;

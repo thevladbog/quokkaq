@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, type ReactNode, type CSSProperties } from 'react';
 import { useTranslations } from 'next-intl';
 import type {
   ScreenLayout,
@@ -18,9 +18,9 @@ import { ScreenClockWidget } from '@/components/screen/widgets/screen-clock-widg
 import { ScreenEtaWidget } from '@/components/screen/widgets/screen-eta-widget';
 import { ScreenQueueStatsWidget } from '@/components/screen/widgets/screen-queue-stats-widget';
 import { ScreenAnnouncementsWidget } from '@/components/screen/widgets/screen-announcements-widget';
-import { ScreenProgressBarWidget } from '@/components/screen/widgets/screen-progress-widget';
 import { ScreenRssFeedWidget } from '@/components/screen/widgets/screen-rss-widget';
 import { ScreenWeatherWidget } from '@/components/screen/widgets/screen-weather-widget';
+import { clockUse24HourFromConfig } from '@/lib/screen-clock-config';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { cn } from '@/lib/utils';
 import type { Ticket } from '@/lib/api';
@@ -28,6 +28,7 @@ import type { Ticket } from '@/lib/api';
 type QueueStatus = {
   queueLength: number;
   estimatedWaitMinutes: number;
+  maxWaitingInQueueMinutes?: number;
   activeCounters: number;
   servedToday?: number;
 };
@@ -91,6 +92,13 @@ function effectivePanelStyle(
   return 'default';
 }
 
+function regionBoxStyle(region: ScreenLayoutRegion): CSSProperties | undefined {
+  if (!region.backgroundColor) {
+    return undefined;
+  }
+  return { backgroundColor: region.backgroundColor };
+}
+
 function regionPanelClass(
   layout: ScreenLayout,
   region: ScreenLayoutRegion,
@@ -126,7 +134,6 @@ export function ScreenRenderer(props: ScreenRendererProps) {
   } = props;
   const t = useTranslations('screen');
   const qs = queueStatus;
-  const firstWait = waitingTickets[0] ?? null;
 
   const widgetsByRegion = useMemo(() => {
     const m = new Map<string, typeof template.widgets>();
@@ -144,14 +151,16 @@ export function ScreenRenderer(props: ScreenRendererProps) {
     o?: WidgetRenderOpts
   ) => {
     switch (type) {
-      case 'clock':
+      case 'clock': {
         return (
           <ScreenClockWidget
             locale={locale}
             textAlign={o?.clockTextAlign === 'left' ? 'left' : 'center'}
             size={o?.clockSize === 'compact' ? 'compact' : 'default'}
+            use24Hour={clockUse24HourFromConfig(config)}
           />
         );
+      }
       case 'eta-display':
         return (
           <ScreenEtaWidget
@@ -165,19 +174,26 @@ export function ScreenRenderer(props: ScreenRendererProps) {
             queueLength={qs == null ? null : qs.queueLength}
             activeCounters={qs == null ? null : qs.activeCounters}
             estimatedWaitMinutes={qs == null ? null : qs.estimatedWaitMinutes}
+            maxWaitingInQueueMinutes={
+              qs == null ? null : qs.maxWaitingInQueueMinutes
+            }
             servedToday={qs == null ? null : qs.servedToday}
             inlineRow={o?.queueStatsInlineRow === true}
           />
         );
-      case 'announcements':
+      case 'announcements': {
+        const max = (config as { maxItems?: number })?.maxItems;
+        const list =
+          typeof max === 'number' && max > 0
+            ? announcements.slice(0, max)
+            : announcements;
         return (
           <ScreenAnnouncementsWidget
-            items={announcements}
+            items={list}
             strip={o?.announcementsStrip === true}
           />
         );
-      case 'progress-bar':
-        return <ScreenProgressBarWidget ticket={firstWait} />;
+      }
       case 'content-player': {
         const overlayTickets =
           (config as { overlayTickets?: boolean }).overlayTickets === true;
@@ -332,7 +348,16 @@ export function ScreenRenderer(props: ScreenRendererProps) {
         continue;
       }
       const wopts: WidgetRenderOpts | undefined = !strip
-        ? undefined
+        ? (() => {
+            const o: WidgetRenderOpts = {};
+            if (
+              a.type === 'eta-display' &&
+              (a.config as { compact?: boolean } | undefined)?.compact === true
+            ) {
+              o.etaCompact = true;
+            }
+            return Object.keys(o).length > 0 ? o : undefined;
+          })()
         : a.type === 'eta-display'
           ? { etaCompact: true }
           : a.type === 'queue-stats'
@@ -340,6 +365,23 @@ export function ScreenRenderer(props: ScreenRendererProps) {
             : a.type === 'announcements'
               ? { announcementsStrip: true }
               : undefined;
+      const boxStyle: CSSProperties = {
+        ...(a.style?.backgroundColor
+          ? { backgroundColor: a.style.backgroundColor }
+          : {}),
+        ...(a.style?.textColor ? { color: a.style.textColor } : {}),
+        ...(a.style?.fontSize ? { fontSize: a.style.fontSize } : {}),
+        ...(a.style?.padding ? { padding: a.style.padding } : {}),
+        ...(a.size?.width ? { width: a.size.width, maxWidth: '100%' } : {}),
+        ...(a.size?.height ? { minHeight: a.size.height } : {}),
+        ...(a.position
+          ? {
+              position: 'relative' as const,
+              left: a.position.x,
+              top: a.position.y
+            }
+          : {})
+      };
       out.push(
         <div
           key={a.id}
@@ -348,6 +390,7 @@ export function ScreenRenderer(props: ScreenRendererProps) {
             a.type === 'called-tickets' ? 'h-full min-h-0 p-1' : '',
             strip ? 'min-w-0 flex-1 self-center' : 'w-full'
           )}
+          style={Object.keys(boxStyle).length > 0 ? boxStyle : undefined}
         >
           {a.type === 'content-player' ? (
             <div className='h-full min-h-[200px]'>
@@ -371,7 +414,10 @@ export function ScreenRenderer(props: ScreenRendererProps) {
       return (
         <div className='flex min-h-0 flex-1 flex-col overflow-hidden p-2'>
           {regions[0] ? (
-            <div className='relative min-h-0 flex-1'>
+            <div
+              className='relative min-h-0 flex-1'
+              style={regionBoxStyle(regions[0]!)}
+            >
               {mapRegionWidgets(widgetsByRegion.get(regions[0].id) ?? [])}
             </div>
           ) : null}
@@ -389,14 +435,22 @@ export function ScreenRenderer(props: ScreenRendererProps) {
           className='h-full min-h-0 w-full flex-1 gap-2 overflow-hidden p-2 landscape:gap-4 landscape:p-4'
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(0,1fr) minmax(0,min(24rem,32vw))',
+            gridTemplateColumns: `minmax(0,${mainR.size}) minmax(0,${sideR.size})`,
             gridTemplateRows: 'minmax(0,1fr)'
           }}
         >
-          <div key={mainR.id} className={regionPanelClass(layout, mainR, 0)}>
+          <div
+            key={mainR.id}
+            className={regionPanelClass(layout, mainR, 0)}
+            style={regionBoxStyle(mainR)}
+          >
             {mapRegionWidgets(mainW)}
           </div>
-          <div key={sideR.id} className={regionPanelClass(layout, sideR, 1)}>
+          <div
+            key={sideR.id}
+            className={regionPanelClass(layout, sideR, 1)}
+            style={regionBoxStyle(sideR)}
+          >
             {mapRegionWidgets(sideWidgets)}
           </div>
         </div>
@@ -445,6 +499,7 @@ export function ScreenRenderer(props: ScreenRendererProps) {
             <div
               key={reg.id}
               className={`${regionPanelClass(layout, reg, 0)} min-h-0`}
+              style={regionBoxStyle(reg)}
             >
               {mapRegionWidgets(widgetsByRegion.get(reg.id) ?? [])}
             </div>
@@ -460,6 +515,7 @@ export function ScreenRenderer(props: ScreenRendererProps) {
             <div
               key={reg.id}
               className='min-h-0 overflow-hidden rounded-lg border p-2'
+              style={regionBoxStyle(reg)}
             >
               {mapRegionWidgets(widgetsByRegion.get(reg.id) ?? [])}
             </div>

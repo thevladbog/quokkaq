@@ -302,6 +302,21 @@ func (h *TicketHandler) GetTicketsByUnit(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// Same virtual fields as GetTicketByID so public screen / signage can show queue position without N+1 fetches.
+	if h.eta != nil {
+		for i := range tickets {
+			if tickets[i].Status != "waiting" {
+				continue
+			}
+			t := &tickets[i]
+			if result, etaErr := h.eta.QueuePositionAndETA(t); etaErr == nil && result.Position > 0 {
+				t.QueuePosition = &result.Position
+				if result.EstimatedWaitSec > 0 {
+					t.EstimatedWaitSeconds = &result.EstimatedWaitSec
+				}
+			}
+		}
+	}
 	RespondJSON(w, tickets)
 }
 
@@ -964,7 +979,7 @@ func (h *TicketHandler) AttachPhone(w http.ResponseWriter, r *http.Request) {
 // GetUnitQueueStatus godoc
 // @ID           getUnitQueueStatus
 // @Summary      Get public queue status for a unit
-// @Description  Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required. Requires subscription plan feature public_queue_widget.
+// @Description  Returns queue length, estimated time-to-call (minutes), longest current in-queue wait (minutes), and active counter count. Public endpoint, no authentication required. Requires subscription plan feature public_queue_widget.
 // @Tags         tickets
 // @Produce      json
 // @Param        unitId  path      string  true  "Unit ID"
@@ -1016,10 +1031,11 @@ func (h *TicketHandler) GetUnitQueueStatus(w http.ResponseWriter, r *http.Reques
 	}
 	if h.eta == nil {
 		RespondJSON(w, map[string]interface{}{
-			"queueLength":          0,
-			"estimatedWaitMinutes": 0.0,
-			"activeCounters":       0,
-			"servedToday":          0,
+			"queueLength":              0,
+			"estimatedWaitMinutes":     0.0,
+			"maxWaitingInQueueMinutes": 0.0,
+			"activeCounters":           0,
+			"servedToday":              0,
 		})
 		return
 	}
@@ -1064,10 +1080,11 @@ func (h *TicketHandler) GetIntegrationUnitQueueSummary(w http.ResponseWriter, r 
 	}
 	if h.eta == nil {
 		RespondJSON(w, map[string]interface{}{
-			"queueLength":          0,
-			"estimatedWaitMinutes": 0.0,
-			"activeCounters":       0,
-			"servedToday":          0,
+			"queueLength":              0,
+			"estimatedWaitMinutes":     0.0,
+			"maxWaitingInQueueMinutes": 0.0,
+			"activeCounters":           0,
+			"servedToday":              0,
 		})
 		return
 	}

@@ -7,12 +7,15 @@ import { formatAppTime, intlLocaleFromAppLocale } from '@/lib/format-datetime';
 export function ScreenClockWidget({
   locale,
   textAlign = 'center',
-  size = 'default'
+  size = 'default',
+  use24Hour
 }: {
   locale: string;
   textAlign?: 'left' | 'center';
   /** Smaller digits in bottom strip / portrait row. */
   size?: 'default' | 'compact';
+  /** When set, forces 24h (overrides locale default for am/pm). */
+  use24Hour?: boolean;
 }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -33,7 +36,15 @@ export function ScreenClockWidget({
           size === 'compact' ? 'text-2xl sm:text-3xl' : 'text-4xl sm:text-5xl'
         )}
       >
-        {formatAppTime(now, intl)}
+        {formatAppTime(
+          now,
+          intl,
+          use24Hour === true
+            ? { hour12: false }
+            : use24Hour === false
+              ? { hour12: true }
+              : undefined
+        )}
       </div>
     </div>
   );

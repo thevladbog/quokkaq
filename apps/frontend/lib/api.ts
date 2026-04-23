@@ -520,6 +520,7 @@ export const unitsApi = {
     return res.json() as Promise<{
       queueLength: number;
       estimatedWaitMinutes: number;
+      maxWaitingInQueueMinutes?: number;
       activeCounters: number;
       servedToday?: number;
       services?: Array<{

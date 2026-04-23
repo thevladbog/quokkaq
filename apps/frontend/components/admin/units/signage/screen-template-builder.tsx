@@ -1,18 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import type { Unit } from '@quokkaq/shared-types';
-import {
-  ScreenTemplateSchema,
-  type ScreenTemplate
-} from '@quokkaq/shared-types';
-import * as orval from '@/lib/api/generated/units';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUpdateUnit } from '@/lib/hooks';
 import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
-import { SCREEN_TEMPLATE_PRESETS } from '@/lib/screen-template-presets';
-import { safeParseSignageWithToast, signageZod } from '@/lib/signage-zod';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -22,185 +15,29 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle
+} from '@/components/ui/sheet';
 import { toast } from 'sonner';
-import { ScreenLayoutPreview } from './screen-layout-preview';
+import { Save } from 'lucide-react';
+import { useScreenBuilderStore } from '@/lib/stores/screen-builder-store';
+import { SCREEN_TEMPLATE_PRESETS } from '@/lib/screen-template-presets';
+import {
+  getInitialScreenTemplateFromUnit,
+  getTabPresetKeyFromUnit,
+  normalizeBuilderPresetId,
+  SCREEN_TEMPLATE_PRESET_KEYS
+} from '@/lib/screen-template-from-unit';
+import { safeParseSignageWithToast, signageZod } from '@/lib/signage-zod';
+import { ScreenVisualBuilder } from './screen-visual-builder';
 
-function cloneTemplate(t: ScreenTemplate): ScreenTemplate {
-  return JSON.parse(JSON.stringify(t)) as ScreenTemplate;
-}
+const PRESET_KEYS = SCREEN_TEMPLATE_PRESET_KEYS;
 
-type WidgetOverlay = { feedId?: string; html?: string };
-
-function overlaysFromTemplate(
-  tpl: ScreenTemplate
-): Record<string, WidgetOverlay> {
-  const o: Record<string, WidgetOverlay> = {};
-  for (const w of tpl.widgets) {
-    if (w.type === 'rss-feed' || w.type === 'weather') {
-      o[w.id] = {
-        feedId: String(
-          (w.config as { feedId?: string } | undefined)?.feedId ?? ''
-        )
-      };
-    } else if (w.type === 'custom-html') {
-      o[w.id] = {
-        html: String((w.config as { html?: string } | undefined)?.html ?? '')
-      };
-    }
-  }
-  return o;
-}
-
-function WidgetOverlaysForm({
-  initialOverlays,
-  configurableWidgets,
-  feedList,
-  t,
-  isPending,
-  onApply
-}: {
-  initialOverlays: Record<string, WidgetOverlay>;
-  configurableWidgets: ScreenTemplate['widgets'];
-  feedList: orval.ModelsExternalFeed[];
-  t: (key: string, values?: { default: string }) => string;
-  isPending: boolean;
-  onApply: (overlays: Record<string, WidgetOverlay>) => void;
-}) {
-  const [overlays, setOverlays] = useState(initialOverlays);
-  return (
-    <>
-      {configurableWidgets.length > 0 ? (
-        <div className='space-y-3'>
-          {configurableWidgets.map((w) => (
-            <div
-              key={w.id}
-              className='bg-muted/30 space-y-2 rounded-lg border p-3'
-            >
-              <p className='text-muted-foreground text-xs font-medium tracking-wide'>
-                {w.type} <span className='font-mono'>({w.id})</span>
-              </p>
-              {w.type === 'rss-feed' && (
-                <div className='space-y-1.5'>
-                  <Label htmlFor={`feed-${w.id}`}>
-                    {t('rssWidgetFeed', { default: 'RSS — feed' })}
-                  </Label>
-                  <Select
-                    value={overlays[w.id]?.feedId || '_none'}
-                    onValueChange={(v) =>
-                      setOverlays((prev) => ({
-                        ...prev,
-                        [w.id]: {
-                          ...prev[w.id],
-                          feedId: v === '_none' ? '' : v
-                        }
-                      }))
-                    }
-                  >
-                    <SelectTrigger
-                      id={`feed-${w.id}`}
-                      className='w-full max-w-md'
-                    >
-                      <SelectValue
-                        placeholder={t('noFeed', { default: '—' })}
-                      />
-                    </SelectTrigger>
-                    <SelectContent align='start' className='max-w-md'>
-                      <SelectItem value='_none'>
-                        {t('noFeed', { default: '—' })}
-                      </SelectItem>
-                      {feedList
-                        .filter((f) => f.type === 'rss' && f.id)
-                        .map((f) => (
-                          <SelectItem key={f.id} value={f.id!}>
-                            {f.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {w.type === 'weather' && (
-                <div className='space-y-1.5'>
-                  <Label htmlFor={`w-${w.id}`}>
-                    {t('weatherWidgetFeed', { default: 'Weather — feed' })}
-                  </Label>
-                  <Select
-                    value={overlays[w.id]?.feedId || '_none'}
-                    onValueChange={(v) =>
-                      setOverlays((prev) => ({
-                        ...prev,
-                        [w.id]: {
-                          ...prev[w.id],
-                          feedId: v === '_none' ? '' : v
-                        }
-                      }))
-                    }
-                  >
-                    <SelectTrigger id={`w-${w.id}`} className='w-full max-w-md'>
-                      <SelectValue
-                        placeholder={t('noFeed', { default: '—' })}
-                      />
-                    </SelectTrigger>
-                    <SelectContent align='start' className='max-w-md'>
-                      <SelectItem value='_none'>
-                        {t('noFeed', { default: '—' })}
-                      </SelectItem>
-                      {feedList
-                        .filter((f) => f.type === 'weather' && f.id)
-                        .map((f) => (
-                          <SelectItem key={f.id} value={f.id!}>
-                            {f.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {w.type === 'custom-html' && (
-                <div>
-                  <Label htmlFor={`html-${w.id}`}>
-                    {t('customHtml', { default: 'Custom HTML' })}
-                  </Label>
-                  <Textarea
-                    id={`html-${w.id}`}
-                    className='mt-1 font-mono text-sm'
-                    rows={4}
-                    value={overlays[w.id]?.html ?? ''}
-                    onChange={(e) =>
-                      setOverlays((prev) => ({
-                        ...prev,
-                        [w.id]: { ...prev[w.id], html: e.target.value }
-                      }))
-                    }
-                    placeholder='HTML'
-                  />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className='text-muted-foreground text-sm'>
-          {t('noWidgetConfig', {
-            default: 'This preset has no feed/HTML widgets to configure.'
-          })}
-        </p>
-      )}
-
-      <div className='pt-1'>
-        <Button
-          type='button'
-          onClick={() => {
-            onApply(overlays);
-          }}
-          disabled={isPending}
-        >
-          {t('applyLayout', { default: 'Apply' })}
-        </Button>
-      </div>
-    </>
-  );
+function cloneTemplate<T>(v: T): T {
+  return JSON.parse(JSON.stringify(v)) as T;
 }
 
 export function ScreenTemplateBuilder({
@@ -211,75 +48,40 @@ export function ScreenTemplateBuilder({
   unitId: string;
 }) {
   const t = useTranslations('admin.signage');
-  const locale = useLocale();
   const qc = useQueryClient();
   const updateUnit = useUpdateUnit();
-  const { data: feedsRes } = orval.useListSignageFeeds(unitId);
-  const feedList: orval.ModelsExternalFeed[] = feedsRes?.data ?? [];
+  const [editorOpen, setEditorOpen] = useState(false);
 
-  const raw = (unit.config as { screenTemplate?: unknown } | null)
-    ?.screenTemplate;
-  const initialLayoutId = useMemo(() => {
-    if (raw) {
-      const p = ScreenTemplateSchema.safeParse(raw);
-      if (p.success) {
-        return p.data.id;
-      }
+  const savedPresetKey = useMemo(() => getTabPresetKeyFromUnit(unit), [unit]);
+
+  const [pendingPreset, setPendingPreset] =
+    useState<(typeof PRESET_KEYS)[number]>('info-heavy');
+
+  useEffect(() => {
+    setPendingPreset(savedPresetKey);
+  }, [savedPresetKey]);
+
+  /** Re-sync draft when the sheet is open and server unit config changed. */
+  useEffect(() => {
+    if (!editorOpen) {
+      return;
     }
-    return Object.keys(SCREEN_TEMPLATE_PRESETS)[0] ?? 'info-heavy';
-  }, [raw]);
-  const [layoutId, setLayoutId] = useState(initialLayoutId);
+    const { template, sourcePresetId } = getInitialScreenTemplateFromUnit(unit);
+    useScreenBuilderStore
+      .getState()
+      .initFrom(template, normalizeBuilderPresetId(sourcePresetId));
+  }, [editorOpen, unit]);
 
-  const rawParsed = useMemo(
-    () => (raw ? ScreenTemplateSchema.safeParse(raw) : null),
-    [raw]
-  );
-
-  const serverOverlays = useMemo(() => {
-    if (rawParsed?.success && rawParsed.data.id === layoutId) {
-      return overlaysFromTemplate(rawParsed.data);
-    }
-    return {};
-  }, [rawParsed, layoutId]);
-
-  const preset = SCREEN_TEMPLATE_PRESETS[layoutId];
-  const configurableWidgets = useMemo(
-    () =>
-      preset
-        ? preset.widgets.filter(
-            (w) =>
-              w.type === 'rss-feed' ||
-              w.type === 'weather' ||
-              w.type === 'custom-html'
-          )
-        : [],
-    [preset]
-  );
-
-  const formKey = `${layoutId}|${(unit as { updatedAt?: string }).updatedAt ?? unit.id}`;
-
-  const applyLayout = (overlays: Record<string, WidgetOverlay>) => {
+  const applyPresetFromTab = useCallback(() => {
+    const preset = SCREEN_TEMPLATE_PRESETS[pendingPreset];
     if (!preset) {
       return;
     }
-    const v0 = cloneTemplate(preset);
-    for (const w of v0.widgets) {
-      const o = overlays[w.id];
-      if (!o) {
-        continue;
-      }
-      if (w.type === 'rss-feed' || w.type === 'weather') {
-        if (o.feedId) {
-          w.config = { ...(w.config ?? {}), feedId: o.feedId };
-        }
-      } else if (w.type === 'custom-html' && o.html != null) {
-        w.config = { ...(w.config ?? {}), html: o.html };
-      }
-    }
+    const tpl = cloneTemplate(preset);
     const v = safeParseSignageWithToast(
       'Screen template',
       signageZod.screenTemplate,
-      v0
+      tpl
     );
     if (!v.success) {
       return;
@@ -302,13 +104,24 @@ export function ScreenTemplateBuilder({
           void qc.invalidateQueries({
             queryKey: getGetUnitByIDQueryKey(unitId)
           });
+          useScreenBuilderStore
+            .getState()
+            .initFrom(v.data, normalizeBuilderPresetId(pendingPreset));
           toast.success(t('saved', { default: 'Saved' }));
         }
       }
     );
-  };
+  }, [pendingPreset, qc, t, unit, unitId, updateUnit]);
 
-  const onClearLayout = () => {
+  const openEditor = useCallback(() => {
+    const { template, sourcePresetId } = getInitialScreenTemplateFromUnit(unit);
+    useScreenBuilderStore
+      .getState()
+      .initFrom(template, normalizeBuilderPresetId(sourcePresetId));
+    setEditorOpen(true);
+  }, [unit]);
+
+  const onClearLayout = useCallback(() => {
     const current = (
       unit.config && typeof unit.config === 'object'
         ? (unit.config as Record<string, unknown>)
@@ -327,54 +140,102 @@ export function ScreenTemplateBuilder({
         }
       }
     );
-  };
-
-  if (!preset) {
-    return null;
-  }
+  }, [qc, t, unit, unitId, updateUnit]);
 
   return (
     <div className='space-y-4'>
-      <div className='space-y-1.5'>
-        <Label htmlFor='signage-screen-template-preset'>
-          {t('presets', { default: 'Screen template' })}
-        </Label>
-        <Select value={layoutId} onValueChange={setLayoutId}>
-          <SelectTrigger
-            id='signage-screen-template-preset'
-            className='w-full max-w-sm'
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {(
-              Object.keys(SCREEN_TEMPLATE_PRESETS) as Array<
-                keyof typeof SCREEN_TEMPLATE_PRESETS
-              >
-            ).map((k) => (
-              <SelectItem key={k} value={k}>
-                {k === 'info-heavy'
-                  ? t('presetNameInfoHeavy')
-                  : k === 'media-focus'
-                    ? t('presetNameMediaFocus')
-                    : t('presetNameSplit3')}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className='bg-card/40 space-y-3 rounded-lg border p-4'>
+        <div className='space-y-1'>
+          <h3 className='text-foreground text-sm font-semibold'>
+            {t('layoutTabSummaryTitle', {
+              default: 'Screen layout'
+            })}
+          </h3>
+          <p className='text-muted-foreground text-xs'>
+            {t('layoutTabSummaryHint', {
+              default:
+                'Pick a ready-made layout and apply. Open the visual editor only if you need to customize widgets or regions.'
+            })}
+          </p>
+        </div>
+        <div className='flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end'>
+          <div className='min-w-0 flex-1 space-y-1.5 sm:max-w-md'>
+            <Label className='text-foreground/90' htmlFor='tab-screen-preset'>
+              {t('presets')}
+            </Label>
+            <Select
+              value={pendingPreset}
+              onValueChange={(v) => {
+                setPendingPreset(
+                  (v in SCREEN_TEMPLATE_PRESETS
+                    ? v
+                    : 'info-heavy') as (typeof PRESET_KEYS)[number]
+                );
+              }}
+            >
+              <SelectTrigger id='tab-screen-preset' className='w-full min-w-0'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PRESET_KEYS.map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {k === 'info-heavy'
+                      ? t('presetNameInfoHeavy', { default: 'Info + side' })
+                      : k === 'media-focus'
+                        ? t('presetNameMediaFocus', { default: 'Media' })
+                        : t('presetNameSplit3', { default: '3-way split' })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className='flex flex-wrap gap-2'>
+            <Button
+              type='button'
+              onClick={applyPresetFromTab}
+              disabled={updateUnit.isPending}
+              className='gap-1.5'
+            >
+              <Save className='h-3.5 w-3.5' />
+              {t('applyLayout', { default: 'Apply layout' })}
+            </Button>
+            <Button type='button' variant='outline' onClick={openEditor}>
+              {t('openVisualEditor', { default: 'Open visual editor' })}
+            </Button>
+          </div>
+        </div>
       </div>
 
-      <WidgetOverlaysForm
-        key={formKey}
-        initialOverlays={serverOverlays}
-        configurableWidgets={configurableWidgets}
-        feedList={feedList}
-        t={t as (key: string, values?: { default: string }) => string}
-        isPending={updateUnit.isPending}
-        onApply={applyLayout}
-      />
+      <Sheet open={editorOpen} onOpenChange={setEditorOpen}>
+        <SheetContent
+          side='right'
+          className='flex h-dvh max-h-dvh w-[calc(100vw-12px)] max-w-none flex-col gap-0 overflow-hidden border-l p-0 sm:max-w-none md:max-w-[min(100vw-12px,1600px)]'
+        >
+          <SheetHeader className='border-border shrink-0 border-b px-4 py-2.5 pr-12'>
+            <SheetTitle className='text-base'>
+              {t('layoutEditorTitle', { default: 'Visual screen template' })}
+            </SheetTitle>
+          </SheetHeader>
+          <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-3 pb-6'>
+            {editorOpen ? (
+              <ScreenVisualBuilder
+                key={unitId}
+                unit={unit}
+                unitId={unitId}
+                canEdit
+              />
+            ) : null}
+          </div>
+        </SheetContent>
+      </Sheet>
 
-      <div className='flex flex-wrap gap-2'>
+      <div className='flex flex-wrap items-center justify-between gap-2 border-t pt-3'>
+        <p className='text-muted-foreground text-xs sm:max-w-sm'>
+          {t('builderClassicHint', {
+            default:
+              '“Classic layout” removes the saved screen template. The public screen will use the default built-in layout until you apply again.'
+          })}
+        </p>
         <Button
           type='button'
           variant='secondary'
@@ -384,13 +245,6 @@ export function ScreenTemplateBuilder({
           {t('classicLayout', { default: 'Use classic layout' })}
         </Button>
       </div>
-
-      <ScreenLayoutPreview
-        unitId={unitId}
-        locale={locale}
-        onRefreshKey={(unit as { updatedAt?: string }).updatedAt ?? unit.id}
-        schematicTemplate={SCREEN_TEMPLATE_PRESETS[layoutId]}
-      />
     </div>
   );
 }

@@ -483,7 +483,6 @@ export const ScreenWidgetTypeSchema = z.enum([
   'content-player',
   'queue-stats',
   'eta-display',
-  'progress-bar',
   'announcements',
   'rss-feed',
   'weather',
@@ -505,7 +504,9 @@ export const ScreenLayoutRegionSchema = z.object({
   area: z.string(),
   size: z.string(),
   /** If omitted, the renderer uses `default` (min-h-0, overflow). */
-  panelStyle: ScreenLayoutPanelStyleSchema.optional()
+  panelStyle: ScreenLayoutPanelStyleSchema.optional(),
+  /** Optional CSS color for region background (e.g. `#0f172a` or `transparent`). */
+  backgroundColor: z.string().optional()
 });
 
 export const ScreenLayoutSchema = z.object({
@@ -513,18 +514,66 @@ export const ScreenLayoutSchema = z.object({
   regions: z.array(ScreenLayoutRegionSchema)
 });
 
+export const ScreenWidgetPositionSchema = z.object({
+  x: z.number().optional(),
+  y: z.number().optional()
+});
+
+export const ScreenWidgetSizeSchema = z.object({
+  width: z.string().optional(),
+  height: z.string().optional()
+});
+
+export const ScreenWidgetStyleSchema = z.object({
+  backgroundColor: z.string().optional(),
+  textColor: z.string().optional(),
+  fontSize: z.string().optional(),
+  padding: z.string().optional()
+});
+
 export const ScreenWidgetConfigSchema = z.object({
   id: z.string(),
   type: ScreenWidgetTypeSchema,
   regionId: z.string(),
-  config: z.record(z.string(), z.any()).optional()
+  config: z.record(z.string(), z.any()).optional(),
+  /** Free positioning within a region (optional; public screen may ignore for flow layouts). */
+  position: ScreenWidgetPositionSchema.optional(),
+  size: ScreenWidgetSizeSchema.optional(),
+  style: ScreenWidgetStyleSchema.optional()
 });
 
-export const ScreenTemplateSchema = z.object({
-  id: z.string(),
-  layout: ScreenLayoutSchema,
-  widgets: z.array(ScreenWidgetConfigSchema)
-});
+/** Drop removed widget types so stored unit configs still parse. */
+function stripDeprecatedScreenTemplateWidgets(input: unknown): unknown {
+  if (input == null || typeof input !== 'object') {
+    return input;
+  }
+  const o = input as Record<string, unknown>;
+  const widgets = o.widgets;
+  if (!Array.isArray(widgets)) {
+    return input;
+  }
+  const filtered = widgets.filter(
+    (w) =>
+      !(
+        w &&
+        typeof w === 'object' &&
+        (w as Record<string, unknown>).type === 'progress-bar'
+      )
+  );
+  if (filtered.length === widgets.length) {
+    return input;
+  }
+  return { ...o, widgets: filtered };
+}
+
+export const ScreenTemplateSchema = z.preprocess(
+  stripDeprecatedScreenTemplateWidgets,
+  z.object({
+    id: z.string(),
+    layout: ScreenLayoutSchema,
+    widgets: z.array(ScreenWidgetConfigSchema)
+  })
+);
 
 /** Runtime shape for `UnitConfig.screenTemplate` (dynamic ticket screen layout). */
 export type ScreenLayoutRegion = z.infer<typeof ScreenLayoutRegionSchema>;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { displayEstimateToCallMinutes } from '@/lib/queue-eta-display';
 import { cn } from '@/lib/utils';
 
 export function ScreenEtaWidget({
@@ -11,7 +12,7 @@ export function ScreenEtaWidget({
   compact?: boolean;
 }) {
   const t = useTranslations('screen');
-  const m = Math.max(0, Math.round(minutes));
+  const m = displayEstimateToCallMinutes(minutes);
   return (
     <div
       className={cn(
@@ -25,7 +26,7 @@ export function ScreenEtaWidget({
           compact ? 'text-[10px] leading-tight' : 'text-sm'
         )}
       >
-        {t('eta.estimate', { default: 'Est. wait' })}
+        {t('eta.estimate', { default: 'Est. time to call' })}
       </div>
       <div
         className={cn(
