@@ -1,28 +1,17 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import { useLocale, useTranslations } from 'next-intl';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo, type CSSProperties } from 'react';
+import { useTranslations } from 'next-intl';
 import QRCode from 'react-qr-code';
 import {
   ScreenTemplateSchema,
+  isScreenTemplateCellGrid,
   type ScreenTemplate
 } from '@quokkaq/shared-types';
-import {
-  formatAppDate,
-  formatAppTime,
-  intlLocaleFromAppLocale
-} from '@/lib/format-datetime';
+import { formatAppDate, formatAppTime } from '@/lib/format-datetime';
 import { getGetUnitsUnitIdTicketsQueryKey } from '@/lib/api/generated/tickets-counters';
-import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
-import { Ticket, unitsApi, Material, UnitConfig } from '@/lib/api';
-import { logger } from '@/lib/logger';
-import { useTickets, useUnit } from '@/lib/hooks';
-import { socketClient, type UnitETASnapshot } from '@/lib/socket';
-import {
-  ContentPlayer,
-  type ContentSlide
-} from '@/components/screen/content-player';
+import { useScreenRendererLiveData } from '@/components/screen/use-screen-renderer-live-data';
+import { ContentPlayer } from '@/components/screen/content-player';
 import { ScreenFullscreenAnnouncementOverlay } from '@/components/screen/screen-fullscreen-announcement-overlay';
 import { ScreenRenderer } from '@/components/screen/screen-renderer';
 import { CalledTicketsTable } from '@/components/screen/called-tickets-table';
@@ -38,110 +27,30 @@ interface ScreenUnitClientProps {
   unitId: string;
 }
 
-const EMPTY_TICKET_LIST: Ticket[] = [];
-
-/** Overlay per-ticket queue positions from `unit.eta_update` (not on REST list before merge). */
-function mergeTicketsQueuePositionFromEta(
-  waiting: Ticket[],
-  rows: UnitETASnapshot['tickets']
-): Ticket[] {
-  if (!rows?.length) {
-    return waiting;
-  }
-  const m = new Map(rows.map((r) => [r.ticketId, r.queuePosition]));
-  return waiting.map((t) => {
-    const qp = m.get(t.id);
-    if (qp == null) {
-      return t;
-    }
-    return { ...t, queuePosition: qp };
-  });
-}
-
-function deriveCalledTicketsForScreen(tickets: Ticket[]): Ticket[] {
-  const activePool = tickets.filter(
-    (t) =>
-      t.status === 'called' ||
-      t.status === 'in_service' ||
-      t.status === 'served' ||
-      t.status === 'completed'
-  );
-  const statusRank = (s: string) =>
-    s === 'called'
-      ? 3
-      : s === 'in_service'
-        ? 2
-        : s === 'served' || s === 'completed'
-          ? 1
-          : 0;
-  const byCounter = new Map<string, Ticket[]>();
-  for (const tick of activePool) {
-    const key = tick.counter?.id ?? `no-counter:${tick.id}`;
-    const list = byCounter.get(key);
-    if (list) list.push(tick);
-    else byCounter.set(key, [tick]);
-  }
-  const out: Ticket[] = [];
-  for (const group of byCounter.values()) {
-    group.sort((a, b) => {
-      const dr = statusRank(b.status) - statusRank(a.status);
-      if (dr !== 0) return dr;
-      return (
-        new Date(b.calledAt || 0).getTime() -
-        new Date(a.calledAt || 0).getTime()
-      );
-    });
-    const winner = group[0];
-    if (winner) out.push(winner);
-  }
-  out.sort((a, b) => {
-    const dr = statusRank(b.status) - statusRank(a.status);
-    if (dr !== 0) return dr;
-    return (
-      new Date(b.calledAt || 0).getTime() - new Date(a.calledAt || 0).getTime()
-    );
-  });
-  return out;
-}
-
 export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
   const t = useTranslations('screen');
-  const locale = useLocale();
-  const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
-  const queryClient = useQueryClient();
-
-  const ticketsQuery = useTickets(unitId, {
-    enabled: !!unitId,
-    refetchInterval: 12_000
-  });
+  const live = useScreenRendererLiveData(unitId);
   const {
-    data: ticketsData,
-    isLoading: ticketsLoading,
-    isPending: ticketsPending,
-    isError: ticketsError
-  } = ticketsQuery;
-
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [materials, setMaterials] = useState<Material[]>([]);
-
-  // Use useUnit hook with polling
-  const { data: unit, isLoading: isUnitLoading } = useUnit(unitId, {
-    refetchInterval: 120000
-  });
-
-  const { data: activePlData } = useQuery({
-    queryKey: ['signage', 'active-playlist', unitId],
-    queryFn: () => unitsApi.getActivePlaylist(unitId),
-    enabled: Boolean(unitId),
-    refetchInterval: 60_000
-  });
-
-  const { data: publicAnnouncements = [] } = useQuery({
-    queryKey: ['signage', 'public-ann', unitId],
-    queryFn: () => unitsApi.getPublicScreenAnnouncements(unitId),
-    enabled: Boolean(unitId),
-    refetchInterval: 120_000
-  });
+    locale,
+    intlLocale,
+    queryClient,
+    unit,
+    isUnitLoading,
+    ticketsLoading,
+    ticketsPending,
+    ticketsError,
+    currentTime,
+    contentSlides,
+    queueStatus,
+    calledTickets,
+    waitingTicketsForScreen,
+    annForRenderer,
+    annFullscreen,
+    virtualQueueEnabled,
+    queueUrl,
+    config,
+    adConfig
+  } = live;
 
   const screenTmpl: ScreenTemplate | null = useMemo(() => {
     if (!unit?.config) return null;
@@ -157,205 +66,31 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     return v.success ? v.data : null;
   }, [screenTmpl]);
 
-  const contentSlides: ContentSlide[] = useMemo(() => {
-    const pl = activePlData as
-      | {
-          source?: string;
-          playlist?: {
-            items?: Array<{
-              id: string;
-              duration?: number;
-              material?: { type?: string; url?: string };
-            }>;
-          };
-        }
-      | undefined;
-    if (pl?.source && pl.source !== 'none' && pl.playlist?.items?.length) {
-      return pl.playlist.items
-        .filter((it) => it.material?.url)
-        .map((it) => ({
-          id: it.id,
-          type: it.material?.type || 'image',
-          url: it.material!.url!,
-          durationSec: it.duration ?? 0
-        }));
+  const screenTemplateHasClock = useMemo(() => {
+    const v = useScreenTemplate;
+    if (!v) return false;
+    if (isScreenTemplateCellGrid(v)) {
+      return (
+        v.portrait.widgets.some((w) => w.type === 'clock') ||
+        v.landscape.widgets.some((w) => w.type === 'clock')
+      );
     }
-    return materials.map((m) => ({
-      id: m.id,
-      type: m.type,
-      url: m.url,
-      durationSec: 0
-    }));
-  }, [activePlData, materials]);
+    return v.widgets.some((w) => w.type === 'clock');
+  }, [useScreenTemplate]);
 
-  // Queue status for ETA display (state must be declared before WebSocket handlers use setQueueStatus)
-  const [queueStatus, setQueueStatus] = useState<{
-    queueLength: number;
-    estimatedWaitMinutes: number;
-    maxWaitingInQueueMinutes?: number;
-    activeCounters: number;
-    servedToday?: number;
-    services?: Array<{
-      serviceId: string;
-      serviceName: string;
-      queueLength: number;
-      estimatedWaitMinutes: number;
-    }>;
-  } | null>(null);
+  /** Cell-grid layouts define chrome via widgets only — never the legacy unit top bar. */
+  const showDefaultUnitTopBar = useMemo(
+    () => !useScreenTemplate || !isScreenTemplateCellGrid(useScreenTemplate),
+    [useScreenTemplate]
+  );
 
-  const [etaTicketRows, setEtaTicketRows] =
-    useState<UnitETASnapshot['tickets']>(undefined);
+  const showContent =
+    Boolean(adConfig && adConfig.width > 0) && contentSlides.length > 0;
+  const adWidth = adConfig?.width || 0;
 
-  useEffect(() => {
-    if (!unitId) return;
-    const fetch = () => {
-      unitsApi
-        .getQueueStatus(unitId)
-        .then(setQueueStatus)
-        .catch(() => null);
-    };
-    fetch();
-    const iv = setInterval(fetch, 60_000);
-    return () => clearInterval(iv);
-  }, [unitId]);
-
-  // Clock
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const unitKind = unit?.kind;
-  const unitParentId = unit?.parentId;
-
-  // WebSocket room matches ticket.UnitID on the server (subdivision); URL may be a service_zone.
-  useEffect(() => {
-    if (!unitId || unitKind == null) return;
-
-    const wsRoomId =
-      unitKind === 'service_zone' && unitParentId ? unitParentId : unitId;
-
-    const ticketsQueryKey = getGetUnitsUnitIdTicketsQueryKey(unitId);
-    const wsDebounceRef = { t: null as ReturnType<typeof setTimeout> | null };
-    /** Batches public API refetches so rapid WS events do not stampede /units/... public routes. */
-    const signageDebounceRef = {
-      t: null as ReturnType<typeof setTimeout> | null
-    };
-
-    const scheduleWsRefetch = () => {
-      if (wsDebounceRef.t) {
-        clearTimeout(wsDebounceRef.t);
-      }
-      wsDebounceRef.t = setTimeout(() => {
-        wsDebounceRef.t = null;
-        void queryClient.invalidateQueries({ queryKey: ticketsQueryKey });
-      }, 80);
-    };
-
-    socketClient.connect(wsRoomId);
-
-    const handleTicketUpdate = () => {
-      scheduleWsRefetch();
-    };
-
-    const handleEOD = () => {
-      logger.log('EOD event received, refreshing tickets');
-      scheduleWsRefetch();
-    };
-
-    const handleEta = (snap: UnitETASnapshot) => {
-      setQueueStatus({
-        queueLength: snap.queueLength,
-        estimatedWaitMinutes: snap.estimatedWaitMinutes,
-        maxWaitingInQueueMinutes: snap.maxWaitingInQueueMinutes,
-        activeCounters: snap.activeCounters,
-        servedToday: snap.servedToday,
-        services: snap.services
-      });
-      setEtaTicketRows(snap.tickets);
-    };
-
-    const handleSignage = () => {
-      if (signageDebounceRef.t) {
-        clearTimeout(signageDebounceRef.t);
-      }
-      signageDebounceRef.t = setTimeout(() => {
-        signageDebounceRef.t = null;
-        void queryClient.invalidateQueries({
-          queryKey: ['signage', 'active-playlist', unitId]
-        });
-        void queryClient.invalidateQueries({
-          queryKey: ['signage', 'public-ann', unitId]
-        });
-        void queryClient.invalidateQueries({
-          queryKey: getGetUnitByIDQueryKey(unitId)
-        });
-        scheduleWsRefetch();
-      }, 300);
-    };
-
-    socketClient.onTicketCreated(handleTicketUpdate);
-    socketClient.onTicketUpdated(handleTicketUpdate);
-    socketClient.onTicketCalled(handleTicketUpdate);
-    socketClient.onUnitEOD(handleEOD);
-    socketClient.onEtaUpdate(handleEta);
-    socketClient.on('screen.content_updated', handleSignage);
-    socketClient.on('feed.updated', handleSignage);
-    socketClient.on('screen.announcement', handleSignage);
-
-    return () => {
-      if (wsDebounceRef.t) {
-        clearTimeout(wsDebounceRef.t);
-        wsDebounceRef.t = null;
-      }
-      if (signageDebounceRef.t) {
-        clearTimeout(signageDebounceRef.t);
-        signageDebounceRef.t = null;
-      }
-      socketClient.off('ticket.created', handleTicketUpdate);
-      socketClient.off('ticket.updated', handleTicketUpdate);
-      socketClient.off('ticket.called', handleTicketUpdate);
-      socketClient.off('unit.eod', handleEOD);
-      socketClient.offEtaUpdate(handleEta);
-      socketClient.off('screen.content_updated', handleSignage);
-      socketClient.off('feed.updated', handleSignage);
-      socketClient.off('screen.announcement', handleSignage);
-      socketClient.disconnect();
-    };
-  }, [unitId, unitKind, unitParentId, queryClient]);
-
-  // Fetch materials
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchMaterials = async () => {
-      try {
-        const allMaterials = await unitsApi.getMaterials(unitId);
-        if (isMounted && unit) {
-          const config = unit.config as UnitConfig;
-          const adConfig = config?.adScreen;
-          const activeIds = adConfig?.activeMaterialIds || [];
-
-          const filtered = allMaterials.filter((m: Material) =>
-            activeIds.includes(m.id)
-          );
-          setMaterials(filtered);
-        }
-      } catch (error) {
-        logger.error('Failed to fetch materials:', error);
-      }
-    };
-
-    if (unit) {
-      fetchMaterials();
-    }
-
-    const interval = setInterval(fetchMaterials, 60000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [unitId, unit]);
+  const isCustomColorsEnabled = adConfig?.isCustomColorsEnabled || false;
+  const headerColor = isCustomColorsEnabled ? adConfig?.headerColor || '' : '';
+  const bodyColor = isCustomColorsEnabled ? adConfig?.bodyColor || '' : '';
 
   if (isUnitLoading) {
     return (
@@ -402,66 +137,6 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     );
   }
 
-  const tickets = ticketsData ?? EMPTY_TICKET_LIST;
-
-  const calledTickets = deriveCalledTicketsForScreen(tickets);
-
-  const waitingTickets = tickets
-    .filter((t) => t.status === 'waiting')
-    .sort(
-      (a, b) =>
-        new Date(a.createdAt || 0).getTime() -
-        new Date(b.createdAt || 0).getTime()
-    );
-
-  const waitingTicketsForScreen = mergeTicketsQueuePositionFromEta(
-    waitingTickets,
-    etaTicketRows
-  );
-
-  const config = unit.config as UnitConfig;
-  const adConfig = config?.adScreen;
-  const showContent =
-    Boolean(adConfig && adConfig.width > 0) && contentSlides.length > 0;
-  const adWidth = adConfig?.width || 0;
-
-  const virtualQueueEnabled =
-    (config as { virtualQueue?: { enabled?: boolean } } | null)?.virtualQueue
-      ?.enabled === true;
-  const queueUrl =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/${locale}/queue/${unitId}`
-      : `/${locale}/queue/${unitId}`;
-
-  const screenTemplateHasClock = Boolean(
-    useScreenTemplate?.widgets?.some((w) => w.type === 'clock')
-  );
-
-  // Custom colors
-  const isCustomColorsEnabled = adConfig?.isCustomColorsEnabled || false;
-  const headerColor = isCustomColorsEnabled ? adConfig?.headerColor || '' : '';
-  const bodyColor = isCustomColorsEnabled ? adConfig?.bodyColor || '' : '';
-
-  const annForRenderer = publicAnnouncements
-    .filter(
-      (a) =>
-        ((a as { displayMode?: string }).displayMode || 'banner') === 'banner'
-    )
-    .map((a) => ({
-      id: a.id ?? '',
-      text: a.text ?? '',
-      style: a.style ?? 'info',
-      priority: a.priority ?? 0
-    }));
-  const annFullscreen = publicAnnouncements
-    .filter((a) => (a as { displayMode?: string }).displayMode === 'fullscreen')
-    .map((a) => ({
-      id: a.id ?? '',
-      text: a.text ?? '',
-      style: a.style ?? 'info',
-      priority: a.priority ?? 0
-    }));
-
   return (
     <div
       className='bg-background text-foreground flex h-screen w-screen flex-col overflow-hidden'
@@ -470,45 +145,45 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       {annFullscreen.length > 0 && (
         <ScreenFullscreenAnnouncementOverlay items={annFullscreen} />
       )}
-      {/* Top Bar: Unit Name + Date/Time */}
-      <div
-        className='bg-card z-10 flex h-20 flex-none items-center justify-between border-b px-8 shadow-sm'
-        style={{ backgroundColor: headerColor || undefined }}
-      >
-        <div className='flex items-center gap-4'>
-          {(config?.adScreen?.logoUrl || config?.logoUrl) && (
-            <div className='relative h-12 w-auto md:h-16'>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={config?.adScreen?.logoUrl || config?.logoUrl || ''}
-                alt='Logo'
-                className='h-full w-auto object-contain'
-              />
+      {showDefaultUnitTopBar && (
+        <div
+          className='bg-card z-10 flex h-20 flex-none items-center justify-between border-b px-8 shadow-sm'
+          style={{ backgroundColor: headerColor || undefined }}
+        >
+          <div className='flex items-center gap-4'>
+            {(config?.adScreen?.logoUrl || config?.logoUrl) && (
+              <div className='relative h-12 w-auto md:h-16'>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={config?.adScreen?.logoUrl || config?.logoUrl || ''}
+                  alt='Logo'
+                  className='h-full w-auto object-contain'
+                />
+              </div>
+            )}
+            <h1 className='text-primary text-4xl font-bold'>
+              {getUnitDisplayName(unit, locale)}
+            </h1>
+          </div>
+          <div className='text-right'>
+            {!screenTemplateHasClock && (
+              <div className='font-mono text-3xl font-bold'>
+                {formatAppTime(currentTime, intlLocale)}
+              </div>
+            )}
+            <div
+              className={
+                screenTemplateHasClock
+                  ? 'text-muted-foreground text-xl'
+                  : 'text-muted-foreground text-lg'
+              }
+            >
+              {formatAppDate(currentTime, intlLocale, 'full')}
             </div>
-          )}
-          <h1 className='text-primary text-4xl font-bold'>
-            {getUnitDisplayName(unit, locale)}
-          </h1>
-        </div>
-        <div className='text-right'>
-          {!screenTemplateHasClock && (
-            <div className='font-mono text-3xl font-bold'>
-              {formatAppTime(currentTime, intlLocale)}
-            </div>
-          )}
-          <div
-            className={
-              screenTemplateHasClock
-                ? 'text-muted-foreground text-xl'
-                : 'text-muted-foreground text-lg'
-            }
-          >
-            {formatAppDate(currentTime, intlLocale, 'full')}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Main body: custom screen template or classic split */}
       {useScreenTemplate ? (
         <div className='min-h-0 flex-1 overflow-hidden'>
           <ScreenRenderer
@@ -524,6 +199,9 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
             announcements={annForRenderer}
             adBodyColor={bodyColor}
             historyLimit={adConfig?.recentCallsHistoryLimit ?? 0}
+            currentTime={currentTime}
+            virtualQueueEnabled={virtualQueueEnabled}
+            queueUrl={queueUrl}
           />
         </div>
       ) : (
@@ -532,7 +210,7 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
           style={
             {
               '--ad-size': `${adWidth}%`
-            } as React.CSSProperties
+            } as CSSProperties
           }
         >
           {showContent && (
@@ -558,13 +236,10 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
         </div>
       )}
 
-      {/* Bottom: ETA stats + QR (classic layout only — templates embed their own stats/ticker) */}
       {!useScreenTemplate && (queueStatus || virtualQueueEnabled) && (
         <div className='bg-card/90 z-20 flex flex-none items-center justify-between gap-6 border-t px-8 py-2'>
-          {/* Queue stats */}
           {queueStatus && (
             <div className='flex flex-wrap items-center gap-4 text-sm'>
-              {/* Per-service breakdown (live WS + snapshot; hidden when API omits single-service legacy shape) */}
               {queueStatus.services && queueStatus.services.length > 0 ? (
                 queueStatus.services.map((svc) => (
                   <span
@@ -583,7 +258,6 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
                   </span>
                 ))
               ) : (
-                // Aggregate view (single service or no breakdown)
                 <>
                   <span>
                     {t('queueLength')}:{' '}
@@ -628,7 +302,6 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
               )}
             </div>
           )}
-          {/* Virtual queue QR */}
           {virtualQueueEnabled && (
             <div className='flex items-center gap-3'>
               <p className='text-muted-foreground max-w-[120px] text-right text-xs leading-tight'>
@@ -642,23 +315,9 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
         </div>
       )}
 
-      {useScreenTemplate && virtualQueueEnabled && (
-        <div className='bg-card/90 z-20 flex flex-none items-center justify-end gap-6 border-t px-8 py-2'>
-          <div className='flex items-center gap-3'>
-            <p className='text-muted-foreground max-w-[120px] text-right text-xs leading-tight'>
-              {t('scanToJoinQueue')}
-            </p>
-            <div className='rounded bg-white p-1'>
-              <QRCode value={queueUrl} size={64} />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom: Ticker (classic) */}
       {!useScreenTemplate && (
         <div className='z-20 flex-none'>
-          <QueueTicker tickets={waitingTicketsForScreen} />
+          <QueueTicker tickets={waitingTicketsForScreen} locale={locale} />
         </div>
       )}
     </div>

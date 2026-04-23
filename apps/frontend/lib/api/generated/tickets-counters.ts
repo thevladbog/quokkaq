@@ -480,6 +480,8 @@ export interface HandlersCreateScheduleRequest {
   validTo?: string;
 }
 
+export interface HandlersCreateScreenLayoutTemplateRequest { [key: string]: unknown }
+
 export interface HandlersTenantRoleUnitJSON {
   permissions?: string[];
   unitId?: string;
@@ -1084,6 +1086,8 @@ export interface HandlersUpdatePlaylistRequest {
   name?: string;
 }
 
+export interface HandlersUpdateScreenLayoutTemplateRequest { [key: string]: unknown }
+
 export interface HandlersUpdateStatusRequest {
   status?: string;
 }
@@ -1501,6 +1505,7 @@ export interface ModelsCompany {
 
 export interface HandlersPlanCapabilitiesDTO {
   apiAccess?: boolean;
+  customScreenLayouts?: boolean;
   outboundWebhooks?: boolean;
   publicQueueWidget?: boolean;
 }
@@ -2080,6 +2085,21 @@ export interface ModelsScreenAnnouncement {
   style?: string;
   text?: string;
   unitId?: string;
+  updatedAt?: string;
+}
+
+/**
+ * swaggertype:object — stored as JSONB; API returns arbitrary JSON object.
+ */
+export type ModelsScreenLayoutTemplateDefinition = { [key: string]: unknown };
+
+export interface ModelsScreenLayoutTemplate {
+  companyId?: string;
+  createdAt?: string;
+  /** swaggertype:object — stored as JSONB; API returns arbitrary JSON object. */
+  definition?: ModelsScreenLayoutTemplateDefinition;
+  id?: string;
+  name?: string;
   updatedAt?: string;
 }
 
@@ -5233,7 +5253,7 @@ export const useCreateUnitCounter = <TError = string | HandlersQuotaExceededErro
     }
 
 /**
- * Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required. Requires subscription plan feature public_queue_widget.
+ * Returns queue length, estimated time-to-call (minutes), longest current in-queue wait (minutes), and active counter count. Public endpoint, no authentication required. Requires subscription plan feature public_queue_widget.
  * @summary Get public queue status for a unit
  */
 export type getUnitQueueStatusResponse200 = {

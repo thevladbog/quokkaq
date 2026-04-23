@@ -1,70 +1,165 @@
-import type { ScreenTemplate } from '@quokkaq/shared-types';
+import type {
+  ScreenTemplate,
+  ScreenTemplateCellGrid
+} from '@quokkaq/shared-types';
 
-/** Built-in screen layouts for `/screen/[unitId]`. */
-export const SCREEN_TEMPLATE_PRESETS: Record<string, ScreenTemplate> = {
+/** Built-in cell-grid layouts (same ids in portrait and landscape; placements may differ). */
+export const SCREEN_TEMPLATE_PRESETS: Record<string, ScreenTemplateCellGrid> = {
   'info-heavy': {
+    layoutKind: 'cellGrid',
     id: 'info-heavy',
-    layout: {
-      type: 'grid',
-      regions: [
-        { id: 'main', area: 'main', size: '1fr', panelStyle: 'default' },
+    portrait: {
+      columns: 12,
+      rows: 12,
+      widgets: [
         {
-          id: 'side',
-          area: 'side',
-          /** Capped with % and rem: on portrait kiosks the strip stays narrow, main list keeps width. */
-          size: 'min(30%, 16rem)',
-          panelStyle: 'scrollPadded'
+          id: 'w1',
+          type: 'called-tickets',
+          placement: { col: 1, row: 1, colSpan: 8, rowSpan: 12 },
+          config: {}
+        },
+        {
+          id: 'w2',
+          type: 'clock',
+          placement: { col: 9, row: 1, colSpan: 4, rowSpan: 2 },
+          config: {}
+        },
+        {
+          id: 'w6-weather',
+          type: 'weather',
+          placement: { col: 9, row: 3, colSpan: 4, rowSpan: 2 },
+          config: { feedId: '' }
+        },
+        {
+          id: 'w4',
+          type: 'queue-stats',
+          placement: { col: 9, row: 5, colSpan: 4, rowSpan: 4 },
+          config: {}
+        },
+        {
+          id: 'w5',
+          type: 'announcements',
+          placement: { col: 9, row: 9, colSpan: 4, rowSpan: 4 },
+          config: {}
         }
       ]
     },
-    widgets: [
-      { id: 'w1', type: 'called-tickets', regionId: 'main', config: {} },
-      { id: 'w2', type: 'clock', regionId: 'side', config: {} },
-      {
-        id: 'w6-weather',
-        type: 'weather',
-        regionId: 'side',
-        config: { feedId: '' }
-      },
-      { id: 'w4', type: 'queue-stats', regionId: 'side', config: {} },
-      { id: 'w5', type: 'announcements', regionId: 'side', config: {} }
-    ]
+    landscape: {
+      columns: 12,
+      rows: 12,
+      widgets: [
+        {
+          id: 'w1',
+          type: 'called-tickets',
+          placement: { col: 1, row: 1, colSpan: 8, rowSpan: 12 },
+          config: {}
+        },
+        {
+          id: 'w2',
+          type: 'clock',
+          placement: { col: 9, row: 1, colSpan: 4, rowSpan: 2 },
+          config: {}
+        },
+        {
+          id: 'w6-weather',
+          type: 'weather',
+          placement: { col: 9, row: 3, colSpan: 4, rowSpan: 2 },
+          config: { feedId: '' }
+        },
+        {
+          id: 'w4',
+          type: 'queue-stats',
+          placement: { col: 9, row: 5, colSpan: 4, rowSpan: 4 },
+          config: {}
+        },
+        {
+          id: 'w5',
+          type: 'announcements',
+          placement: { col: 9, row: 9, colSpan: 4, rowSpan: 4 },
+          config: {}
+        }
+      ]
+    }
   },
   'media-focus': {
+    layoutKind: 'cellGrid',
     id: 'media-focus',
-    layout: {
-      type: 'fullscreen',
-      regions: [{ id: 'full', area: 'full', size: '1fr' }]
-    },
-    widgets: [
-      {
-        id: 'w1',
-        type: 'content-player',
-        regionId: 'full',
-        config: { overlayTickets: true }
-      }
-    ]
-  },
-  'split-3': {
-    id: 'split-3',
-    layout: {
-      type: 'grid',
-      regions: [
-        { id: 'top', area: 'top', size: '40%', panelStyle: 'splitSection' },
-        { id: 'mid', area: 'mid', size: '35%', panelStyle: 'card' },
+    portrait: {
+      columns: 12,
+      rows: 12,
+      widgets: [
         {
-          id: 'bottom',
-          area: 'bottom',
-          size: '25%',
-          panelStyle: 'splitSection'
+          id: 'w1',
+          type: 'content-player',
+          placement: { col: 1, row: 1, colSpan: 12, rowSpan: 12 },
+          config: { overlayTickets: true }
         }
       ]
     },
-    widgets: [
-      { id: 'w1', type: 'called-tickets', regionId: 'top', config: {} },
-      { id: 'w2', type: 'content-player', regionId: 'mid', config: {} },
-      { id: 'w3', type: 'rss-feed', regionId: 'bottom', config: { feedId: '' } }
-    ]
+    landscape: {
+      columns: 12,
+      rows: 12,
+      widgets: [
+        {
+          id: 'w1',
+          type: 'content-player',
+          placement: { col: 1, row: 1, colSpan: 12, rowSpan: 12 },
+          config: { overlayTickets: true }
+        }
+      ]
+    }
+  },
+  'split-3': {
+    layoutKind: 'cellGrid',
+    id: 'split-3',
+    portrait: {
+      columns: 12,
+      rows: 12,
+      widgets: [
+        {
+          id: 'w1',
+          type: 'called-tickets',
+          placement: { col: 1, row: 1, colSpan: 12, rowSpan: 4 },
+          config: {}
+        },
+        {
+          id: 'w2',
+          type: 'content-player',
+          placement: { col: 1, row: 5, colSpan: 12, rowSpan: 4 },
+          config: { overlayTickets: false }
+        },
+        {
+          id: 'w3',
+          type: 'rss-feed',
+          placement: { col: 1, row: 9, colSpan: 12, rowSpan: 4 },
+          config: { feedId: '' }
+        }
+      ]
+    },
+    landscape: {
+      columns: 12,
+      rows: 12,
+      widgets: [
+        {
+          id: 'w1',
+          type: 'called-tickets',
+          placement: { col: 1, row: 1, colSpan: 6, rowSpan: 12 },
+          config: {}
+        },
+        {
+          id: 'w2',
+          type: 'content-player',
+          placement: { col: 7, row: 1, colSpan: 6, rowSpan: 6 },
+          config: { overlayTickets: false }
+        },
+        {
+          id: 'w3',
+          type: 'rss-feed',
+          placement: { col: 7, row: 7, colSpan: 6, rowSpan: 6 },
+          config: { feedId: '' }
+        }
+      ]
+    }
   }
 };
 

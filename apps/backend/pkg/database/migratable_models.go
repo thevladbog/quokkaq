@@ -46,6 +46,7 @@ func AllMigratableModels() []any {
 		&models.PlaylistSchedule{},
 		&models.ExternalFeed{},
 		&models.ScreenAnnouncement{},
+		&models.ScreenLayoutTemplate{},
 		&models.Invitation{},
 		&models.MessageTemplate{},
 		&models.PasswordResetToken{},

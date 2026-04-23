@@ -359,6 +359,9 @@ func run() error {
 		pubApp,
 	)
 	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo, tenantRBACRepo, database.DB)
+	screenLayoutTemplateRepo := repository.NewScreenLayoutTemplateRepository()
+	screenLayoutTemplateService := services.NewScreenLayoutTemplateService(screenLayoutTemplateRepo)
+	screenLayoutTemplateHandler := handlers.NewScreenLayoutTemplateHandler(screenLayoutTemplateService, userRepo)
 	onecSettingsHandler := handlers.NewOneCSettingsHandler(companyRepo, onecSettingsRepo)
 	commerceMLExchangeHandler := handlers.NewCommerceMLExchangeHandler(companyRepo, invoiceRepo, onecSettingsRepo, onecSessionStore)
 	platformHandler := handlers.NewPlatformHandler(companyRepo, subscriptionRepo, invoiceRepo, catalogRepo)
@@ -864,6 +867,13 @@ func run() error {
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.RequireTenantAdmin(userRepo, tenantRBACRepo))
 			r.Post("/me/complete-onboarding", companyHandler.CompleteOnboarding)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.RequireTenantPermission(userRepo, tenantRBACRepo, rbac.PermUnitSignageManage))
+			r.Get("/me/screen-layout-templates", screenLayoutTemplateHandler.List)
+			r.Post("/me/screen-layout-templates", screenLayoutTemplateHandler.Create)
+			r.Put("/me/screen-layout-templates/{templateId}", screenLayoutTemplateHandler.Update)
+			r.Delete("/me/screen-layout-templates/{templateId}", screenLayoutTemplateHandler.Delete)
 		})
 		r.Get("/{companyId}/usage-metrics", usageHandler.GetUsageMetrics)
 	})

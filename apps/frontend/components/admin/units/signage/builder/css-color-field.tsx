@@ -34,6 +34,8 @@ type Props = {
   onTextBlur?: () => void;
   onTextKeyDown?: KeyboardEventHandler<HTMLInputElement>;
   className?: string;
+  /** Compact mode - hide label and show only color picker */
+  compact?: boolean;
 };
 
 /**
@@ -50,9 +52,31 @@ export function CssColorField({
   pickerFallback = '#0f172a',
   onTextBlur,
   onTextKeyDown,
-  className
+  className,
+  compact = false
 }: Props) {
   const hex = hexForPicker(value, pickerFallback);
+
+  if (compact) {
+    return (
+      <input
+        type='color'
+        className={cn(
+          'border-input h-8 w-8 shrink-0 cursor-pointer rounded border bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-50',
+          className
+        )}
+        value={hex}
+        disabled={disabled}
+        aria-label={label}
+        onChange={(e) => {
+          const v = e.target.value;
+          onWellChange?.(v);
+          onValueChange(v);
+        }}
+      />
+    );
+  }
+
   return (
     <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
       <Label

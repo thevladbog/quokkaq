@@ -2,10 +2,12 @@
 
 import { useMemo, type ReactNode, type CSSProperties } from 'react';
 import { useTranslations } from 'next-intl';
-import type {
-  ScreenLayout,
-  ScreenLayoutRegion,
-  ScreenTemplate
+import {
+  isScreenTemplateCellGrid,
+  type ScreenLayout,
+  type ScreenLayoutRegion,
+  type ScreenTemplate,
+  type ScreenTemplateRegions
 } from '@quokkaq/shared-types';
 import type { Unit } from '@quokkaq/shared-types';
 import {
@@ -20,7 +22,13 @@ import { ScreenQueueStatsWidget } from '@/components/screen/widgets/screen-queue
 import { ScreenAnnouncementsWidget } from '@/components/screen/widgets/screen-announcements-widget';
 import { ScreenRssFeedWidget } from '@/components/screen/widgets/screen-rss-widget';
 import { ScreenWeatherWidget } from '@/components/screen/widgets/screen-weather-widget';
+import { ScreenRendererCellGrid } from '@/components/screen/screen-renderer-cell-grid';
+import {
+  ScreenJoinQueueQrWidget,
+  parseJoinQueueQrAlign
+} from '@/components/screen/widgets/screen-join-queue-qr-widget';
 import { clockUse24HourFromConfig } from '@/lib/screen-clock-config';
+import { queueTickerConfigFromRecord } from '@/lib/queue-ticker-config';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { cn } from '@/lib/utils';
 import type { Ticket } from '@/lib/api';
@@ -31,6 +39,12 @@ type QueueStatus = {
   maxWaitingInQueueMinutes?: number;
   activeCounters: number;
   servedToday?: number;
+  services?: Array<{
+    serviceId: string;
+    serviceName: string;
+    queueLength: number;
+    estimatedWaitMinutes: number;
+  }>;
 };
 
 type Ann = {
@@ -40,7 +54,7 @@ type Ann = {
   priority: number;
 };
 
-type TemplateWidget = ScreenTemplate['widgets'][number];
+type TemplateWidget = ScreenTemplateRegions['widgets'][number];
 
 type WidgetRenderOpts = {
   clockTextAlign?: 'left' | 'center';
@@ -67,6 +81,10 @@ type ScreenRendererProps = {
   announcements: Ann[];
   adBodyColor: string;
   historyLimit: number;
+  currentTime: Date;
+  virtualQueueEnabled: boolean;
+  queueUrl: string;
+  forcedLayoutFace?: 'portrait' | 'landscape';
 };
 
 type PanelStyle = NonNullable<ScreenLayoutRegion['panelStyle']>;
@@ -121,7 +139,7 @@ function regionPanelClass(
 
 export function ScreenRenderer(props: ScreenRendererProps) {
   const {
-    template,
+    template: tpl,
     calledTickets,
     waitingTickets,
     queueStatus,
@@ -130,20 +148,58 @@ export function ScreenRenderer(props: ScreenRendererProps) {
     announcements,
     adBodyColor,
     historyLimit,
-    locale
+    locale,
+    currentTime,
+    virtualQueueEnabled,
+    queueUrl
   } = props;
+
   const t = useTranslations('screen');
   const qs = queueStatus;
 
   const widgetsByRegion = useMemo(() => {
-    const m = new Map<string, typeof template.widgets>();
-    for (const w of template.widgets) {
+    if (isScreenTemplateCellGrid(tpl)) {
+      return new Map<string, TemplateWidget[]>();
+    }
+    const legacy = tpl;
+    const m = new Map<string, typeof legacy.widgets>();
+    for (const w of legacy.widgets) {
       const list = m.get(w.regionId) ?? [];
       list.push(w);
       m.set(w.regionId, list);
     }
     return m;
-  }, [template]);
+  }, [tpl]);
+
+  if (isScreenTemplateCellGrid(tpl)) {
+    return (
+      <ScreenRendererCellGrid
+        unitId={props.unitId}
+        locale={locale}
+        template={tpl}
+        unit={props.unit}
+        calledTickets={calledTickets}
+        waitingTickets={waitingTickets}
+        queueStatus={queueStatus}
+        contentSlides={contentSlides}
+        defaultImageSeconds={defaultImageSeconds}
+        announcements={announcements}
+        adBodyColor={adBodyColor}
+        historyLimit={historyLimit}
+        currentTime={currentTime}
+        virtualQueueEnabled={virtualQueueEnabled}
+        queueUrl={queueUrl}
+        forcedLayoutFace={props.forcedLayoutFace}
+      />
+    );
+  }
+
+  const template = tpl;
+
+  /** Avoid duplicate strip: `queue-ticker` may already live in a region. */
+  const legacyEmbedsQueueTicker = template.widgets.some(
+    (w) => w.type === 'queue-ticker'
+  );
 
   const renderWidget = (
     type: string,
@@ -178,6 +234,7 @@ export function ScreenRenderer(props: ScreenRendererProps) {
               qs == null ? null : qs.maxWaitingInQueueMinutes
             }
             servedToday={qs == null ? null : qs.servedToday}
+            config={config as Record<string, unknown>}
             inlineRow={o?.queueStatsInlineRow === true}
           />
         );
@@ -233,8 +290,29 @@ export function ScreenRenderer(props: ScreenRendererProps) {
             historyLimit={historyLimit}
           />
         );
-      case 'queue-ticker':
-        return <QueueTicker tickets={waitingTickets} />;
+      case 'queue-ticker': {
+        const q = queueTickerConfigFromRecord(config);
+        return (
+          <QueueTicker
+            tickets={waitingTickets}
+            locale={locale}
+            labelRu={q.labelRu}
+            labelEn={q.labelEn}
+            direction={q.direction}
+            durationSeconds={q.durationSeconds}
+          />
+        );
+      }
+      case 'join-queue-qr':
+        return (
+          <ScreenJoinQueueQrWidget
+            virtualQueueEnabled={virtualQueueEnabled}
+            queueUrl={queueUrl}
+            align={parseJoinQueueQrAlign(
+              (config as { align?: unknown } | undefined)?.align
+            )}
+          />
+        );
       case 'rss-feed': {
         const feedId = String(
           (config as { feedId?: string })?.feedId ?? ''
@@ -371,7 +449,11 @@ export function ScreenRenderer(props: ScreenRendererProps) {
           : {}),
         ...(a.style?.textColor ? { color: a.style.textColor } : {}),
         ...(a.style?.fontSize ? { fontSize: a.style.fontSize } : {}),
-        ...(a.style?.padding ? { padding: a.style.padding } : {}),
+        ...(a.type === 'queue-ticker'
+          ? {}
+          : a.style?.padding
+            ? { padding: a.style.padding }
+            : {}),
         ...(a.size?.width ? { width: a.size.width, maxWidth: '100%' } : {}),
         ...(a.size?.height ? { minHeight: a.size.height } : {}),
         ...(a.position
@@ -388,6 +470,7 @@ export function ScreenRenderer(props: ScreenRendererProps) {
           data-screen-widget={a.type}
           className={cn(
             a.type === 'called-tickets' ? 'h-full min-h-0 p-1' : '',
+            a.type === 'queue-ticker' ? 'flex h-full min-h-0 flex-col' : '',
             strip ? 'min-w-0 flex-1 self-center' : 'w-full'
           )}
           style={Object.keys(boxStyle).length > 0 ? boxStyle : undefined}
@@ -534,9 +617,11 @@ export function ScreenRenderer(props: ScreenRendererProps) {
   return (
     <div className='flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden'>
       <div className='min-h-0 flex-1 overflow-hidden'>{mainGrid}</div>
-      <div className='shrink-0 border-t py-1'>
-        <QueueTicker tickets={waitingTickets} />
-      </div>
+      {!legacyEmbedsQueueTicker ? (
+        <div className='min-h-12 shrink-0 border-t'>
+          <QueueTicker tickets={waitingTickets} locale={locale} />
+        </div>
+      ) : null}
     </div>
   );
 }

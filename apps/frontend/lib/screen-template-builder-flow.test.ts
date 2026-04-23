@@ -14,7 +14,7 @@ describe('screen template builder → save contract', () => {
   });
 
   it('validates after adding a widget and tweaking layout', () => {
-    useScreenBuilderStore.getState().addWidget('clock', 'main', 0);
+    useScreenBuilderStore.getState().addWidget('rss-feed', 'main', 0);
     useScreenBuilderStore.getState().setTemplateId('custom-1');
     const tpl = useScreenBuilderStore.getState().template;
     const r = signageZod.screenTemplate.safeParse(tpl);

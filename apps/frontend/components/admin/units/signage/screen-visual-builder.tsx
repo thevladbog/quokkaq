@@ -12,21 +12,26 @@ import {
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useCallback, useEffect, useState } from 'react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import type { Unit, ScreenWidgetType } from '@quokkaq/shared-types';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUpdateUnit } from '@/lib/hooks';
 import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
 import { toast } from 'sonner';
 import { safeParseSignageWithToast, signageZod } from '@/lib/signage-zod';
+import { ensureTenantScreenTemplateId } from '@/lib/screen-template-tenant-id';
 import { useScreenBuilderStore } from '@/lib/stores/screen-builder-store';
 import { screenBuilderDndModifiers } from './builder/screen-builder-snap';
-import { parseLibraryId, parseRegionDropId } from './builder/screen-dnd-ids';
+import {
+  parseLibraryId,
+  parseCanvasCellId,
+  parseCanvasWidgetId
+} from './builder/screen-dnd-ids';
 import { BuilderToolbar } from './builder/builder-toolbar';
 import { BuilderWidgetLibraryPanel } from './builder/widget-library-panel';
 import { BuilderCanvas } from './builder/builder-canvas';
 import { BuilderPropertiesPanel } from './builder/builder-properties-panel';
-import { BuilderPreviewDock } from './builder/builder-preview-dock';
+import { BuilderScreenDraftPreview } from './builder/builder-screen-draft-preview';
 import { BuilderCanvasPreviewSplit } from './builder/builder-canvas-preview-split';
 import { useScreenBuilderKeyboard } from './builder/use-screen-builder-keyboard';
 import { motion } from 'framer-motion';
@@ -36,12 +41,21 @@ type Props = {
   unit: Unit;
   unitId: string;
   canEdit: boolean;
+  /**
+   * When true (e.g. layout editor sheet), changes stay in the builder store only —
+   * use the unit «Layout» tab to apply to the device, or save to the library from the sheet header.
+   */
+  draftOnly?: boolean;
 };
 
-export function ScreenVisualBuilder({ unit, unitId, canEdit }: Props) {
+export function ScreenVisualBuilder({
+  unit,
+  unitId,
+  canEdit,
+  draftOnly = false
+}: Props) {
   const t = useTranslations('admin.signage');
   const st = useTranslations('admin.screenBuilder');
-  const locale = useLocale();
   const qc = useQueryClient();
   const updateUnit = useUpdateUnit();
   const [showPreview, setShowPreview] = useState(false);
@@ -51,8 +65,6 @@ export function ScreenVisualBuilder({ unit, unitId, canEdit }: Props) {
     type?: ScreenWidgetType;
     widgetId?: string;
   } | null>(null);
-  const [previewColWidth, setPreviewColWidth] = useState(400);
-
   useEffect(() => {
     if (!a11yDnd) {
       return;
@@ -70,9 +82,9 @@ export function ScreenVisualBuilder({ unit, unitId, canEdit }: Props) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const template = useScreenBuilderStore((s) => s.template);
+  const editOrientation = useScreenBuilderStore((s) => s.editOrientation);
   const addWidget = useScreenBuilderStore((s) => s.addWidget);
-  const moveWidget = useScreenBuilderStore((s) => s.moveWidget);
-  const reorderInRegion = useScreenBuilderStore((s) => s.reorderInRegion);
+  const setWidgetPlacement = useScreenBuilderStore((s) => s.setWidgetPlacement);
   const isDirty = useScreenBuilderStore((s) => s.isDirty);
   const markSaved = useScreenBuilderStore((s) => s.markSaved);
   const removeWidget = useScreenBuilderStore((s) => s.removeWidget);
@@ -81,13 +93,6 @@ export function ScreenVisualBuilder({ unit, unitId, canEdit }: Props) {
   const setSelection = useScreenBuilderStore((s) => s.setSelection);
   const setZoom = useScreenBuilderStore((s) => s.setZoom);
   const selectedWidget = selection.kind === 'widget' ? selection.id : null;
-
-  const inRegion = useCallback(
-    (rid: string) => {
-      return template.widgets.filter((w) => w.regionId === rid);
-    },
-    [template.widgets]
-  );
 
   const onDragOver = useCallback(() => {}, []);
 
@@ -108,71 +113,75 @@ export function ScreenVisualBuilder({ unit, unitId, canEdit }: Props) {
     }
 
     const fromLib = parseLibraryId(aId);
+    const fromCanvas = parseCanvasWidgetId(aId);
+    const dropCell = parseCanvasCellId(oId);
+
     if (fromLib) {
-      let targetRegion: string;
-      let insertAt: number;
-      const regionFromOver = parseRegionDropId(oId);
-      if (regionFromOver) {
-        targetRegion = regionFromOver;
-        insertAt = inRegion(targetRegion).length;
-      } else {
-        const w = template.widgets.find((x) => x.id === oId);
-        if (!w) {
+      if (dropCell) {
+        addWidget(fromLib.type, {
+          col: dropCell.col,
+          row: dropCell.row
+        });
+        announce(st('a11y.dropped', { default: 'Widget placed' }));
+        return;
+      }
+      if (oId === 'builder-canvas-drop') {
+        addWidget(fromLib.type);
+        announce(st('a11y.dropped', { default: 'Widget placed' }));
+        return;
+      }
+      announce(st('a11y.noTarget', { default: 'No drop target' }));
+      return;
+    }
+
+    if (fromCanvas && dropCell) {
+      const face = useScreenBuilderStore.getState().editOrientation;
+      const f = useScreenBuilderStore.getState().template[face];
+      const w = f.widgets.find((x) => x.id === fromCanvas.widgetId);
+      if (w) {
+        const { colSpan, rowSpan } = w.placement;
+        const col = Math.max(
+          1,
+          Math.min(dropCell.col, f.columns - colSpan + 1)
+        );
+        const row = Math.max(1, Math.min(dropCell.row, f.rows - rowSpan + 1));
+        if (w.placement.col === col && w.placement.row === row) {
           return;
         }
-        targetRegion = w.regionId;
-        const li = inRegion(targetRegion);
-        const ix = li.findIndex((q) => q.id === w.id);
-        insertAt = ix < 0 ? li.length : ix;
-      }
-      addWidget(fromLib.type, targetRegion, insertAt);
-      announce(st('a11y.dropped', { default: 'Widget placed' }));
-      return;
-    }
-    const wActive = template.widgets.find((q) => q.id === aId);
-    if (!wActive) {
-      return;
-    }
-    if (parseRegionDropId(oId)) {
-      const rid = parseRegionDropId(oId)!;
-      if (wActive.regionId === rid) {
-        moveWidget(wActive.id, rid, Math.max(0, inRegion(rid).length - 1));
+        setWidgetPlacement(
+          fromCanvas.widgetId,
+          { col, row, colSpan, rowSpan },
+          face
+        );
+        announce(st('a11y.widgetMoved', { default: 'Widget moved' }));
       } else {
-        moveWidget(wActive.id, rid, inRegion(rid).length);
+        announce(st('a11y.noTarget', { default: 'No drop target' }));
       }
-      announce(st('a11y.dropped', { default: 'Layout updated' }));
       return;
     }
-    const wOver = template.widgets.find((q) => q.id === oId);
-    if (!wOver) {
+
+    if (fromCanvas) {
+      announce(
+        st('a11y.dragWidgetCanvasNoCell', {
+          default: 'Drop the block on an empty grid cell'
+        })
+      );
       return;
     }
-    if (wActive.regionId === wOver.regionId) {
-      const li = inRegion(wOver.regionId);
-      const oi = li.findIndex((q) => q.id === aId);
-      const di = li.findIndex((q) => q.id === wOver.id);
-      if (oi < 0 || di < 0) {
-        return;
-      }
-      if (oi !== di) {
-        reorderInRegion(wOver.regionId, oi, di);
-        announce(st('a11y.dropped', { default: 'Order updated' }));
-      }
-    } else {
-      const li = inRegion(wOver.regionId);
-      const di = li.findIndex((q) => q.id === wOver.id);
-      if (di < 0) {
-        return;
-      }
-      moveWidget(wActive.id, wOver.regionId, di);
-      announce(st('a11y.dropped', { default: 'Layout updated' }));
-    }
+
+    announce(
+      st('a11y.dragWidgetPending', {
+        default: 'Use properties to adjust grid placement'
+      })
+    );
   };
   const onSave = useCallback(() => {
-    if (!canEdit) {
+    if (!canEdit || draftOnly) {
       return;
     }
-    const tpl = useScreenBuilderStore.getState().template;
+    const tpl = ensureTenantScreenTemplateId(
+      useScreenBuilderStore.getState().template
+    );
     const v = safeParseSignageWithToast(
       'Screen template',
       signageZod.screenTemplate,
@@ -205,7 +214,18 @@ export function ScreenVisualBuilder({ unit, unitId, canEdit }: Props) {
         }
       }
     );
-  }, [canEdit, markSaved, qc, setA11yDnd, st, t, unit, unitId, updateUnit]);
+  }, [
+    canEdit,
+    draftOnly,
+    markSaved,
+    qc,
+    setA11yDnd,
+    st,
+    t,
+    unit,
+    unitId,
+    updateUnit
+  ]);
   useScreenBuilderKeyboard({
     enabled: canEdit,
     onSave,
@@ -267,8 +287,9 @@ export function ScreenVisualBuilder({ unit, unitId, canEdit }: Props) {
         </div>
         <BuilderToolbar
           canSave={canEdit}
-          isSaving={updateUnit.isPending}
+          isSaving={draftOnly ? false : updateUnit.isPending}
           onSave={onSave}
+          showApplyToUnit={!draftOnly}
           showPreview={showPreview}
           onTogglePreview={() => {
             setShowPreview((p) => !p);
@@ -287,9 +308,7 @@ export function ScreenVisualBuilder({ unit, unitId, canEdit }: Props) {
           >
             <BuilderCanvasPreviewSplit
               showPreview={showPreview}
-              previewWidth={previewColWidth}
-              onPreviewWidth={setPreviewColWidth}
-              canvas={<BuilderCanvas />}
+              canvas={<BuilderCanvas canEdit={canEdit} />}
               belowCanvas={
                 isDirty ? (
                   <div className='mt-2 flex items-center gap-2'>
@@ -297,25 +316,23 @@ export function ScreenVisualBuilder({ unit, unitId, canEdit }: Props) {
                       className='inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
                       aria-live='polite'
                     >
-                      {st('draft', { default: 'Unsaved changes' })}
+                      {draftOnly
+                        ? st('draftSheetHint', {
+                            default:
+                              'Unsaved draft — save to the library from the header, or use «Apply layout» on the unit Layout tab.'
+                          })
+                        : st('draft', { default: 'Unsaved changes' })}
                     </span>
                   </div>
                 ) : null
               }
               preview={
                 <motion.div
-                  className='mt-3 w-full min-w-0 min-xl:mt-0'
+                  className='w-full min-w-0'
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                 >
-                  <BuilderPreviewDock
-                    unitId={unitId}
-                    locale={locale}
-                    onRefreshKey={
-                      (unit as { updatedAt?: string }).updatedAt ?? unitId
-                    }
-                    template={template}
-                  />
+                  <BuilderScreenDraftPreview unitId={unitId} />
                 </motion.div>
               }
             />
@@ -335,18 +352,16 @@ export function ScreenVisualBuilder({ unit, unitId, canEdit }: Props) {
             <BuilderWidgetPreview
               widget={{
                 id: '…',
-                type: activeDrag.type!,
-                regionId: '…',
-                config: {}
+                type: activeDrag.type!
               }}
             />
           </div>
         ) : activeDrag?.from === 'widget' && activeDrag.widgetId ? (
           <div className='w-64 rounded border-2 border-dashed p-0.5 opacity-90 ring-1'>
             {(() => {
-              const w = useScreenBuilderStore
-                .getState()
-                .template.widgets.find((q) => q.id === activeDrag.widgetId!);
+              const w = template[editOrientation].widgets.find(
+                (q) => q.id === activeDrag.widgetId!
+              );
               return w ? <BuilderWidgetPreview widget={w} /> : null;
             })()}
           </div>

@@ -21,6 +21,8 @@ type Props = {
   canSave: boolean;
   isSaving: boolean;
   onSave: () => void;
+  /** When false, the «Apply layout» / save-to-unit control is hidden (draft-only editor). */
+  showApplyToUnit?: boolean;
   /** Live preview in dock */
   showPreview: boolean;
   onTogglePreview: () => void;
@@ -34,6 +36,7 @@ export function BuilderToolbar({
   canSave,
   isSaving,
   onSave,
+  showApplyToUnit = true,
   showPreview,
   onTogglePreview,
   showPresetPicker = true,
@@ -56,6 +59,8 @@ export function BuilderToolbar({
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
   const setZoom = useScreenBuilderStore((s) => s.setZoom);
+  const editOrientation = useScreenBuilderStore((s) => s.editOrientation);
+  const setEditOrientation = useScreenBuilderStore((s) => s.setEditOrientation);
 
   return (
     <div className='flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between'>
@@ -103,11 +108,11 @@ export function BuilderToolbar({
             </div>
           </>
         ) : null}
-        <p className='text-muted-foreground text-xs' aria-live='polite'>
-          {isDirty
-            ? tb('toolbar.unsaved', { default: 'Unsaved' })
-            : tb('toolbar.saved', { default: 'In sync with last apply' })}
-        </p>
+        {isDirty ? (
+          <p className='text-muted-foreground text-xs' aria-live='polite'>
+            {tb('toolbar.unsaved', { default: 'Unsaved' })}
+          </p>
+        ) : null}
       </div>
 
       <div className='flex flex-wrap items-center gap-2 sm:shrink-0 md:max-w-full'>
@@ -169,6 +174,44 @@ export function BuilderToolbar({
           aria-hidden
         />
 
+        <div className='flex min-w-0 items-center gap-2'>
+          <Label
+            htmlFor='builder-orientation'
+            className='text-muted-foreground shrink-0 text-xs leading-none whitespace-nowrap'
+          >
+            {tb('toolbar.editOrientation', { default: 'Canvas' })}
+          </Label>
+          <Select
+            value={editOrientation}
+            onValueChange={(v) => {
+              if (v === 'portrait' || v === 'landscape') {
+                setEditOrientation(v);
+              }
+            }}
+          >
+            <SelectTrigger
+              id='builder-orientation'
+              className='h-8 max-w-[10rem] min-w-[6.75rem] text-xs'
+              size='sm'
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='portrait'>
+                {tb('toolbar.orientationPortrait', { default: 'Portrait' })}
+              </SelectItem>
+              <SelectItem value='landscape'>
+                {tb('toolbar.orientationLandscape', { default: 'Landscape' })}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div
+          className='bg-border mx-0.5 hidden h-6 w-px sm:block'
+          aria-hidden
+        />
+
         <Button
           type='button'
           variant='ghost'
@@ -192,18 +235,20 @@ export function BuilderToolbar({
           <Redo2 className='h-3.5 w-3.5' />
         </Button>
 
-        <Button
-          type='button'
-          onClick={onSave}
-          disabled={isSaving || !isDirty || !canSave}
-          className={cn(
-            'gap-1.5',
-            (isSaving || !canSave) && 'pointer-events-auto'
-          )}
-        >
-          <Save className='h-3.5 w-3.5' />
-          {t('applyLayout', { default: 'Apply' })}
-        </Button>
+        {showApplyToUnit ? (
+          <Button
+            type='button'
+            onClick={onSave}
+            disabled={isSaving || !isDirty || !canSave}
+            className={cn(
+              'gap-1.5',
+              (isSaving || !canSave) && 'pointer-events-auto'
+            )}
+          >
+            <Save className='h-3.5 w-3.5' />
+            {t('applyLayout', { default: 'Apply' })}
+          </Button>
+        ) : null}
       </div>
     </div>
   );

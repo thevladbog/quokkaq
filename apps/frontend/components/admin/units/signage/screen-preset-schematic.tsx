@@ -2,41 +2,13 @@
 
 import { useTranslations } from 'next-intl';
 import type { ScreenTemplate } from '@quokkaq/shared-types';
+import {
+  isScreenTemplateCellGrid,
+  isScreenTemplateRegions
+} from '@quokkaq/shared-types';
+import { widgetSchematicKey } from '@/lib/widget-display-name';
 
 type Props = { template: ScreenTemplate };
-
-function widgetSchematicKey(
-  type: string
-):
-  | 'tickets'
-  | 'clock'
-  | 'weather'
-  | 'eta'
-  | 'queueStats'
-  | 'announcements'
-  | 'content'
-  | 'rss' {
-  switch (type) {
-    case 'called-tickets':
-      return 'tickets';
-    case 'clock':
-      return 'clock';
-    case 'weather':
-      return 'weather';
-    case 'eta-display':
-      return 'eta';
-    case 'queue-stats':
-      return 'queueStats';
-    case 'announcements':
-      return 'announcements';
-    case 'content-player':
-      return 'content';
-    case 'rss-feed':
-      return 'rss';
-    default:
-      return 'tickets';
-  }
-}
 
 /**
  * Simplified structure of the **selected** built-in template (updates on preset change, before Apply).
@@ -47,6 +19,47 @@ export function ScreenPresetSchematic({ template }: Props) {
     const k = widgetSchematicKey(type);
     return t(`schematicWidget.${k}`);
   };
+
+  if (isScreenTemplateCellGrid(template)) {
+    const { columns, rows, widgets } = template.portrait;
+    return (
+      <div
+        className='bg-border grid h-full min-h-0 w-full flex-1 gap-px overflow-hidden rounded border p-px'
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+          gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+          minHeight: '84px'
+        }}
+      >
+        {widgets.map((w) => (
+          <div
+            key={w.id}
+            className='bg-muted/40 text-muted-foreground flex min-h-0 items-start overflow-hidden rounded-sm p-0.5 text-left text-[7px] leading-tight sm:text-[8px]'
+            style={{
+              gridColumn: `${w.placement.col} / span ${w.placement.colSpan}`,
+              gridRow: `${w.placement.row} / span ${w.placement.rowSpan}`
+            }}
+          >
+            <span className='line-clamp-2'>{wlabel(w.type)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (!isScreenTemplateRegions(template)) {
+    const id =
+      template && typeof template === 'object' && 'id' in template
+        ? String((template as { id?: string }).id ?? '')
+        : '';
+    return (
+      <div className='text-muted-foreground flex h-full min-h-0 w-full items-center p-1 text-center text-xs'>
+        {t('schematicWidget.unknown', { id, default: '—' })}
+      </div>
+    );
+  }
+
   const { layout } = template;
   const regions = layout.regions;
 

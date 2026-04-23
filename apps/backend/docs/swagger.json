@@ -328,6 +328,9 @@
                 },
                 "type": "object"
             },
+            "handlers.CreateScreenLayoutTemplateRequest": {
+                "type": "object"
+            },
             "handlers.CreateTenantRoleJSON": {
                 "properties": {
                     "description": {
@@ -1719,6 +1722,9 @@
                 },
                 "type": "object"
             },
+            "handlers.UpdateScreenLayoutTemplateRequest": {
+                "type": "object"
+            },
             "handlers.UpdateStatusRequest": {
                 "properties": {
                     "status": {
@@ -2288,6 +2294,9 @@
             "handlers.planCapabilitiesDTO": {
                 "properties": {
                     "apiAccess": {
+                        "type": "boolean"
+                    },
+                    "customScreenLayouts": {
                         "type": "boolean"
                     },
                     "outboundWebhooks": {
@@ -3775,6 +3784,30 @@
                         "type": "string"
                     },
                     "unitId": {
+                        "type": "string"
+                    },
+                    "updatedAt": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "models.ScreenLayoutTemplate": {
+                "properties": {
+                    "companyId": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "definition": {
+                        "description": "swaggertype:object — stored as JSONB; API returns arbitrary JSON object.",
+                        "type": "object"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
                         "type": "string"
                     },
                     "updatedAt": {
@@ -9478,6 +9511,194 @@
                     }
                 ],
                 "summary": "List global permission keys (tenant RBAC catalog)",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/screen-layout-templates": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/models.ScreenLayoutTemplate"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List screen layout templates for the tenant",
+                "tags": [
+                    "companies"
+                ]
+            },
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.CreateScreenLayoutTemplateRequest"
+                            }
+                        }
+                    },
+                    "description": "Template",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.ScreenLayoutTemplate"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create a screen layout template",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/screen-layout-templates/{templateId}": {
+            "delete": {
+                "parameters": [
+                    {
+                        "description": "Template ID",
+                        "in": "path",
+                        "name": "templateId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete a screen layout template",
+                "tags": [
+                    "companies"
+                ]
+            },
+            "put": {
+                "parameters": [
+                    {
+                        "description": "Template ID",
+                        "in": "path",
+                        "name": "templateId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.UpdateScreenLayoutTemplateRequest"
+                            }
+                        }
+                    },
+                    "description": "Template",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.ScreenLayoutTemplate"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update a screen layout template",
                 "tags": [
                     "companies"
                 ]

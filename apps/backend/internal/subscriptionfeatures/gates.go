@@ -132,3 +132,32 @@ func CompanyHasPublicQueueWidget(ctx context.Context, db *gorm.DB, companyID str
 	}
 	return planFeatureTruthy(v), nil
 }
+
+// CompanyHasCustomScreenLayouts is true when plan.features.custom_screen_layouts is truthy; absent → false.
+func CompanyHasCustomScreenLayouts(ctx context.Context, db *gorm.DB, companyID string) (bool, error) {
+	if strings.TrimSpace(companyID) == "" {
+		return false, nil
+	}
+	if op, err := companyIsSaaSOperator(ctx, db, companyID); err == nil && op {
+		return true, nil
+	}
+	raw, err := loadPlanFeaturesJSON(ctx, db, companyID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	if len(raw) == 0 || string(raw) == "null" {
+		return false, nil
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return false, nil
+	}
+	v, ok := m["custom_screen_layouts"]
+	if !ok || v == nil {
+		return false, nil
+	}
+	return planFeatureTruthy(v), nil
+}

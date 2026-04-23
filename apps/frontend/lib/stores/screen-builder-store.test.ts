@@ -3,7 +3,9 @@ import { useScreenBuilderStore, newWidgetId } from './screen-builder-store';
 import { SCREEN_TEMPLATE_PRESETS } from '@/lib/screen-template-presets';
 import type { ScreenTemplate } from '@quokkaq/shared-types';
 
-const base: ScreenTemplate = {
+/** Legacy regions template — store migrates to cell grid on init. */
+const legacyRegions: ScreenTemplate = {
+  layoutKind: 'regions',
   id: 't1',
   layout: {
     type: 'grid',
@@ -19,47 +21,64 @@ const base: ScreenTemplate = {
 };
 
 beforeEach(() => {
-  useScreenBuilderStore.getState().initFrom(base, 'info-heavy');
+  useScreenBuilderStore.getState().initFrom(legacyRegions, 'info-heavy');
 });
 
 describe('useScreenBuilderStore', () => {
-  it('initFrom orders widgets and clears history', () => {
+  it('initFrom migrates to cell grid and clears history', () => {
     const s = useScreenBuilderStore.getState();
-    expect(s.template.widgets.map((w) => w.id)).toEqual(['w1', 'w2']);
+    expect(s.template.layoutKind).toBe('cellGrid');
+    expect(s.template.portrait.widgets.length).toBeGreaterThan(0);
+    expect(s.template.landscape.widgets.length).toBeGreaterThan(0);
     expect(s.isDirty).toBe(false);
     expect(s.historyIndex).toBe(0);
   });
 
-  it('addWidget inserts in region and marks dirty', () => {
+  it('addWidget inserts in both orientations and marks dirty', () => {
+    const before =
+      useScreenBuilderStore.getState().template.portrait.widgets.length;
     useScreenBuilderStore.getState().addWidget('rss-feed', 'main', 0);
-    const w = useScreenBuilderStore.getState().template.widgets[0]!;
+    const s = useScreenBuilderStore.getState();
+    expect(s.template.portrait.widgets.length).toBe(before + 1);
+    expect(s.template.landscape.widgets.length).toBe(before + 1);
+    const w =
+      s.template.portrait.widgets[s.template.portrait.widgets.length - 1]!;
     expect(w.type).toBe('rss-feed');
-    expect(w.regionId).toBe('main');
-    expect(useScreenBuilderStore.getState().isDirty).toBe(true);
+    expect(w.placement.col).toBeGreaterThanOrEqual(1);
+    expect(s.isDirty).toBe(true);
   });
 
-  it('moveWidget across regions', () => {
+  it('moveWidget is a no-op for cell grid', () => {
+    const before =
+      useScreenBuilderStore.getState().template.portrait.widgets.length;
     useScreenBuilderStore.getState().moveWidget('w1', 'side', 0);
-    const s = useScreenBuilderStore.getState();
-    const side = s.template.widgets.filter((w) => w.regionId === 'side');
-    expect(side.some((w) => w.id === 'w1')).toBe(true);
+    expect(
+      useScreenBuilderStore.getState().template.portrait.widgets.length
+    ).toBe(before);
   });
 
   it('undo and redo', () => {
+    const before =
+      useScreenBuilderStore.getState().template.portrait.widgets.length;
     useScreenBuilderStore.getState().addWidget('clock', 'main', 0);
-    const h1 = useScreenBuilderStore.getState().template.widgets.length;
-    expect(h1).toBeGreaterThan(2);
+    expect(
+      useScreenBuilderStore.getState().template.portrait.widgets.length
+    ).toBe(before + 1);
     useScreenBuilderStore.getState().undo();
-    expect(useScreenBuilderStore.getState().template.widgets.length).toBe(2);
+    expect(
+      useScreenBuilderStore.getState().template.portrait.widgets.length
+    ).toBe(before);
     useScreenBuilderStore.getState().redo();
-    expect(useScreenBuilderStore.getState().template.widgets.length).toBe(h1);
+    expect(
+      useScreenBuilderStore.getState().template.portrait.widgets.length
+    ).toBe(before + 1);
   });
 
   it('resetToPreset', () => {
     useScreenBuilderStore.getState().resetToPreset('info-heavy');
     const t = useScreenBuilderStore.getState().template;
     expect(t.id).toBe(SCREEN_TEMPLATE_PRESETS['info-heavy']?.id);
-    expect(t.widgets.length).toBeGreaterThan(0);
+    expect(t.portrait.widgets.length).toBeGreaterThan(0);
   });
 
   it('markSaved resets history', () => {
@@ -70,17 +89,17 @@ describe('useScreenBuilderStore', () => {
     expect(useScreenBuilderStore.getState().historyIndex).toBe(0);
   });
 
-  it('setRegionBackground', () => {
+  it('setRegionBackground is a no-op for cell grid', () => {
     useScreenBuilderStore.getState().setRegionBackground('main', '#111827');
-    const r = useScreenBuilderStore
-      .getState()
-      .template.layout.regions.find((x) => x.id === 'main');
-    expect(r?.backgroundColor).toBe('#111827');
-    useScreenBuilderStore.getState().setRegionBackground('main', null);
-    const r2 = useScreenBuilderStore
-      .getState()
-      .template.layout.regions.find((x) => x.id === 'main');
-    expect(r2?.backgroundColor).toBeUndefined();
+    expect(useScreenBuilderStore.getState().template.layoutKind).toBe(
+      'cellGrid'
+    );
+  });
+
+  it('setGridDimensions clamps portrait columns', () => {
+    useScreenBuilderStore.getState().setGridDimensions(8, 8, 'portrait');
+    expect(useScreenBuilderStore.getState().template.portrait.columns).toBe(8);
+    expect(useScreenBuilderStore.getState().template.portrait.rows).toBe(8);
   });
 });
 

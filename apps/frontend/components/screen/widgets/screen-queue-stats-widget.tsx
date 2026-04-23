@@ -7,17 +7,28 @@ import {
   displayEstimateToCallMinutes,
   displayMaxWaitInQueueMinutes
 } from '@/lib/queue-eta-display';
+import {
+  getQueueStatsCards,
+  type QueueStatsWidgetConfig,
+  type QueueStatCardType
+} from '@/lib/queue-stats-config';
 
 function StatCell({
   label,
   children,
   compact,
-  className
+  className,
+  style,
+  labelFontSize,
+  valueFontSize
 }: {
   label: string;
   children: ReactNode;
   compact?: boolean;
   className?: string;
+  style?: React.CSSProperties;
+  labelFontSize?: string;
+  valueFontSize?: string;
 }) {
   return (
     <div
@@ -26,12 +37,14 @@ function StatCell({
         compact ? 'min-h-[4.25rem] p-1.5' : 'min-h-[5.5rem] p-3',
         className
       )}
+      style={style}
     >
       <div
         className={cn(
           'text-muted-foreground uppercase',
           compact ? 'text-[7px] leading-tight font-medium' : 'text-xs'
         )}
+        style={labelFontSize ? { fontSize: labelFontSize } : undefined}
       >
         {label}
       </div>
@@ -40,6 +53,7 @@ function StatCell({
           'leading-tight font-bold tabular-nums',
           compact ? 'text-sm' : 'text-3xl'
         )}
+        style={valueFontSize ? { fontSize: valueFontSize } : undefined}
       >
         {children}
       </div>
@@ -108,6 +122,7 @@ export function ScreenQueueStatsWidget({
   estimatedWaitMinutes,
   maxWaitingInQueueMinutes,
   servedToday,
+  config,
   /** One horizontal row of five metrics (portrait bottom strip). */
   inlineRow = false
 }: {
@@ -116,52 +131,92 @@ export function ScreenQueueStatsWidget({
   estimatedWaitMinutes?: number | null;
   maxWaitingInQueueMinutes?: number | null;
   servedToday?: number | null;
+  config?: QueueStatsWidgetConfig;
   inlineRow?: boolean;
 }) {
   const t = useTranslations('screen');
   const c = inlineRow;
+
+  const cards = getQueueStatsCards(config);
+  const enabledCards = cards.filter((card) => card.enabled);
+
+  // Map card types to their data and labels
+  const cardDataMap: Record<
+    QueueStatCardType,
+    { label: string; content: ReactNode }
+  > = {
+    queueLength: {
+      label: t('stats.inQueue', { default: 'In queue' }),
+      content: fmtCount(t, queueLength)
+    },
+    activeCounters: {
+      label: t('stats.openWindows', { default: 'Open windows' }),
+      content: fmtCount(t, activeCounters)
+    },
+    estimatedWait: {
+      label: t('stats.estimateToCall', { default: 'Est. time to call' }),
+      content: fmtEstimateToCall(t, estimatedWaitMinutes)
+    },
+    maxWait: {
+      label: t('stats.maxWaitInQueue', { default: 'Longest wait (now)' }),
+      content: fmtMaxWaitInQueue(t, maxWaitingInQueueMinutes)
+    },
+    servedToday: {
+      label: t('stats.servedToday', { default: 'Served today' }),
+      content: fmtCount(t, servedToday)
+    }
+  };
+
+  // Determine grid columns class based on enabled cards count
+  const gridColsClass = inlineRow
+    ? enabledCards.length === 1
+      ? 'grid-cols-1'
+      : enabledCards.length === 2
+        ? 'grid-cols-2'
+        : enabledCards.length === 3
+          ? 'grid-cols-3'
+          : enabledCards.length === 4
+            ? 'grid-cols-4'
+            : 'grid-cols-5'
+    : 'grid-cols-2';
+
   return (
     <div
       className={cn(
         'min-w-0 text-center',
         inlineRow ? 'w-max shrink-0' : 'w-full',
         inlineRow
-          ? 'grid auto-cols-[minmax(0,1fr)] grid-cols-5 gap-0.5 sm:gap-1'
+          ? `grid auto-cols-[minmax(0,1fr)] ${gridColsClass} gap-0.5 sm:gap-1`
           : 'grid grid-cols-2 gap-1.5 sm:gap-2'
       )}
       role='region'
       aria-label={t('stats.aria', { default: 'Queue summary' })}
     >
-      <StatCell compact={c} label={t('stats.inQueue', { default: 'In queue' })}>
-        {fmtCount(t, queueLength)}
-      </StatCell>
-      <StatCell
-        compact={c}
-        label={t('stats.openWindows', { default: 'Open windows' })}
-      >
-        {fmtCount(t, activeCounters)}
-      </StatCell>
-      <StatCell
-        compact={c}
-        label={t('stats.estimateToCall', { default: 'Est. time to call' })}
-      >
-        {fmtEstimateToCall(t, estimatedWaitMinutes)}
-      </StatCell>
-      <StatCell
-        compact={c}
-        label={t('stats.maxWaitInQueue', {
-          default: 'Longest wait (now)'
-        })}
-      >
-        {fmtMaxWaitInQueue(t, maxWaitingInQueueMinutes)}
-      </StatCell>
-      <StatCell
-        compact={c}
-        className={!inlineRow ? 'col-span-2' : undefined}
-        label={t('stats.servedToday', { default: 'Served today' })}
-      >
-        {fmtCount(t, servedToday)}
-      </StatCell>
+      {enabledCards.map((card) => {
+        const data = cardDataMap[card.type];
+        const style: React.CSSProperties = {
+          ...(card.backgroundColor && {
+            backgroundColor: card.backgroundColor
+          }),
+          ...(card.textColor && { color: card.textColor })
+        };
+
+        return (
+          <StatCell
+            key={card.type}
+            compact={c}
+            label={data.label}
+            className={
+              !inlineRow && card.width === 2 ? 'col-span-2' : undefined
+            }
+            style={Object.keys(style).length > 0 ? style : undefined}
+            labelFontSize={card.labelFontSize}
+            valueFontSize={card.valueFontSize}
+          >
+            {data.content}
+          </StatCell>
+        );
+      })}
     </div>
   );
 }

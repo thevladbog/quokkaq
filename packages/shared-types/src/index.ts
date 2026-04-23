@@ -478,69 +478,50 @@ export const KioskConfigSchema = z
   })
   .passthrough();
 
-export const ScreenWidgetTypeSchema = z.enum([
-  'called-tickets',
-  'content-player',
-  'queue-stats',
-  'eta-display',
-  'announcements',
-  'rss-feed',
-  'weather',
-  'clock',
-  'queue-ticker',
-  'custom-html'
-]);
+export {
+  ScreenWidgetTypeSchema,
+  ScreenLayoutPanelStyleSchema,
+  ScreenLayoutRegionSchema,
+  ScreenLayoutSchema,
+  ScreenWidgetPositionSchema,
+  ScreenWidgetSizeSchema,
+  ScreenWidgetStyleSchema,
+  ScreenWidgetConfigSchema,
+  type ScreenWidgetType,
+  type ScreenLayoutRegion,
+  type ScreenLayout,
+  type ScreenWidgetConfig
+} from './screen-template-widgets';
 
-/** Styling for a layout region; avoids branching on [ScreenTemplate] id in the screen renderer. */
-export const ScreenLayoutPanelStyleSchema = z.enum([
-  'default',
-  'card',
-  'scrollPadded',
-  'splitSection'
-]);
+import {
+  ScreenWidgetPositionSchema,
+  ScreenWidgetSizeSchema,
+  ScreenWidgetStyleSchema
+} from './screen-template-widgets';
 
-export const ScreenLayoutRegionSchema = z.object({
-  id: z.string(),
-  area: z.string(),
-  size: z.string(),
-  /** If omitted, the renderer uses `default` (min-h-0, overflow). */
-  panelStyle: ScreenLayoutPanelStyleSchema.optional(),
-  /** Optional CSS color for region background (e.g. `#0f172a` or `transparent`). */
-  backgroundColor: z.string().optional()
-});
+export {
+  ScreenCellGridPlacementSchema,
+  ScreenCellGridWidgetSchema,
+  ScreenTemplateRegionsSchema,
+  ScreenTemplateCellGridSchema,
+  normalizeScreenTemplateInput,
+  isScreenTemplateCellGrid,
+  isScreenTemplateRegions,
+  type ScreenTemplateUnion,
+  type ScreenTemplateCellGrid,
+  type ScreenTemplateRegions,
+  type ScreenCellGridWidget,
+  type ScreenCellGridFace,
+  type ScreenCellGridPlacement
+} from './screen-template-layout';
 
-export const ScreenLayoutSchema = z.object({
-  type: z.enum(['split-h', 'split-v', 'grid', 'fullscreen']),
-  regions: z.array(ScreenLayoutRegionSchema)
-});
+export { migrateRegionsToCellGrid } from './screen-template-migrate-regions';
 
-export const ScreenWidgetPositionSchema = z.object({
-  x: z.number().optional(),
-  y: z.number().optional()
-});
-
-export const ScreenWidgetSizeSchema = z.object({
-  width: z.string().optional(),
-  height: z.string().optional()
-});
-
-export const ScreenWidgetStyleSchema = z.object({
-  backgroundColor: z.string().optional(),
-  textColor: z.string().optional(),
-  fontSize: z.string().optional(),
-  padding: z.string().optional()
-});
-
-export const ScreenWidgetConfigSchema = z.object({
-  id: z.string(),
-  type: ScreenWidgetTypeSchema,
-  regionId: z.string(),
-  config: z.record(z.string(), z.any()).optional(),
-  /** Free positioning within a region (optional; public screen may ignore for flow layouts). */
-  position: ScreenWidgetPositionSchema.optional(),
-  size: ScreenWidgetSizeSchema.optional(),
-  style: ScreenWidgetStyleSchema.optional()
-});
+import {
+  ScreenTemplateCellGridSchema,
+  ScreenTemplateRegionsSchema,
+  normalizeScreenTemplateInput
+} from './screen-template-layout';
 
 /** Drop removed widget types so stored unit configs still parse. */
 function stripDeprecatedScreenTemplateWidgets(input: unknown): unknown {
@@ -548,6 +529,43 @@ function stripDeprecatedScreenTemplateWidgets(input: unknown): unknown {
     return input;
   }
   const o = input as Record<string, unknown>;
+  const filterProg = (arr: unknown): unknown[] | null => {
+    if (!Array.isArray(arr)) return null;
+    return arr.filter(
+      (w) =>
+        !(
+          w &&
+          typeof w === 'object' &&
+          (w as Record<string, unknown>).type === 'progress-bar'
+        )
+    );
+  };
+  const portrait = o.portrait;
+  const landscape = o.landscape;
+  if (
+    portrait &&
+    typeof portrait === 'object' &&
+    landscape &&
+    typeof landscape === 'object'
+  ) {
+    const po = portrait as Record<string, unknown>;
+    const lo = landscape as Record<string, unknown>;
+    const pw = filterProg(po.widgets);
+    const lw = filterProg(lo.widgets);
+    if (pw && lw) {
+      const origP = po.widgets as unknown[];
+      const origL = lo.widgets as unknown[];
+      const pChanged = pw.length !== origP.length;
+      const lChanged = lw.length !== origL.length;
+      if (pChanged || lChanged) {
+        return {
+          ...o,
+          portrait: { ...po, widgets: pw },
+          landscape: { ...lo, widgets: lw }
+        };
+      }
+    }
+  }
   const widgets = o.widgets;
   if (!Array.isArray(widgets)) {
     return input;
@@ -567,18 +585,18 @@ function stripDeprecatedScreenTemplateWidgets(input: unknown): unknown {
 }
 
 export const ScreenTemplateSchema = z.preprocess(
-  stripDeprecatedScreenTemplateWidgets,
-  z.object({
-    id: z.string(),
-    layout: ScreenLayoutSchema,
-    widgets: z.array(ScreenWidgetConfigSchema)
-  })
+  (raw) =>
+    normalizeScreenTemplateInput(stripDeprecatedScreenTemplateWidgets(raw)),
+  z.discriminatedUnion('layoutKind', [
+    ScreenTemplateRegionsSchema,
+    ScreenTemplateCellGridSchema
+  ])
 );
 
-/** Runtime shape for `UnitConfig.screenTemplate` (dynamic ticket screen layout). */
-export type ScreenLayoutRegion = z.infer<typeof ScreenLayoutRegionSchema>;
-export type ScreenLayout = z.infer<typeof ScreenLayoutSchema>;
-export type ScreenWidgetType = z.infer<typeof ScreenWidgetTypeSchema>;
+/** Runtime shape for `UnitConfig.screenTemplate` (regions or cell-grid). */
+export type ScreenWidgetPosition = z.infer<typeof ScreenWidgetPositionSchema>;
+export type ScreenWidgetSize = z.infer<typeof ScreenWidgetSizeSchema>;
+export type ScreenWidgetStyle = z.infer<typeof ScreenWidgetStyleSchema>;
 export type ScreenTemplate = z.infer<typeof ScreenTemplateSchema>;
 
 /** Set after legacy `adScreen.activeMaterialIds` is imported as a default playlist in admin. */

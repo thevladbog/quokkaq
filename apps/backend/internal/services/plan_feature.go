@@ -13,6 +13,9 @@ const PlanFeatureCounterGuestSurvey = "counter_guest_survey"
 // PlanFeatureCounterBoard is the subscription plan.features key for above-counter ticket board terminals.
 const PlanFeatureCounterBoard = "counter_board"
 
+// PlanFeatureCustomScreenLayouts enables tenant library CRUD for visual screen templates (cell-grid studio).
+const PlanFeatureCustomScreenLayouts = "custom_screen_layouts"
+
 // CompanyHasCounterBoardFeature is true when the plan enables counter_board, or when it has websocket_updates
 // (older plans omitted counter_board in JSON; must match CounterBoardSession / ensureCounterBoardFeatureForUnit).
 func CompanyHasCounterBoardFeature(companyID string) (bool, error) {
@@ -24,6 +27,11 @@ func CompanyHasCounterBoardFeature(companyID string) (bool, error) {
 	// subscription plan row reliably has PlanFeatureCounterBoard ("counter_board") in JSON — older plans
 	// used CompanyHasPlanFeature(companyID, "websocket_updates") only; see CompanyHasCounterBoardFeature.
 	return CompanyHasPlanFeature(companyID, "websocket_updates")
+}
+
+// CompanyHasCustomScreenLayouts is true when plan.features.custom_screen_layouts is truthy.
+func CompanyHasCustomScreenLayouts(companyID string) (bool, error) {
+	return CompanyHasPlanFeature(companyID, PlanFeatureCustomScreenLayouts)
 }
 
 // CompanyHasPlanFeature returns whether the company's subscription plan enables the feature (boolean JSON).

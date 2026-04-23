@@ -7,17 +7,20 @@ import {
   Code2,
   Film,
   ListOrdered,
+  PanelTop,
+  QrCode,
+  ScanQrCode,
   Radio,
   Timer,
   Ticket,
   Users
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import type { ScreenWidgetType, ScreenTemplate } from '@quokkaq/shared-types';
+import type { ScreenWidgetType } from '@quokkaq/shared-types';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type W = ScreenTemplate['widgets'][number];
+export type BuilderWidgetPreviewModel = { id: string; type: ScreenWidgetType };
 
 const WIDGET_ICONS: Record<ScreenWidgetType, LucideIcon> = {
   'called-tickets': Ticket,
@@ -29,7 +32,10 @@ const WIDGET_ICONS: Record<ScreenWidgetType, LucideIcon> = {
   weather: CloudSun,
   clock: Clock,
   'queue-ticker': ListOrdered,
-  'custom-html': Code2
+  'custom-html': Code2,
+  'screen-header': PanelTop,
+  'screen-footer-qr': QrCode,
+  'join-queue-qr': ScanQrCode
 };
 
 export function widgetShortLabel(
@@ -46,7 +52,10 @@ export function widgetShortLabel(
     weather: { key: 'widget.weather', d: 'Weather' },
     clock: { key: 'widget.clock', d: 'Time' },
     'queue-ticker': { key: 'widget.ticker', d: 'Wait line' },
-    'custom-html': { key: 'widget.customHtml', d: 'HTML' }
+    'custom-html': { key: 'widget.customHtml', d: 'HTML' },
+    'screen-header': { key: 'widget.screenHeader', d: 'Header' },
+    'screen-footer-qr': { key: 'widget.screenFooterQr', d: 'Footer + QR' },
+    'join-queue-qr': { key: 'widget.joinQueueQr', d: 'Join queue QR' }
   };
   const m = map[type] ?? { key: 'widget.unknown', d: type };
   return t(m.key, { default: m.d });
@@ -56,7 +65,7 @@ export function BuilderWidgetPreview({
   widget,
   className
 }: {
-  widget: W;
+  widget: BuilderWidgetPreviewModel;
   className?: string;
 }) {
   const t = useTranslations('admin.screenBuilder');

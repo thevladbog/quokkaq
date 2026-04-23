@@ -25,6 +25,9 @@ const QUEUE: ScreenWidgetType[] = [
   'queue-ticker'
 ];
 const INFO: ScreenWidgetType[] = [
+  'screen-header',
+  'screen-footer-qr',
+  'join-queue-qr',
   'clock',
   'weather',
   'announcements',
