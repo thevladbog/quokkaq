@@ -49,6 +49,10 @@ export function ScreenJoinQueueQrWidget({
     );
   }
 
+  if (!queueUrl.trim()) {
+    return null;
+  }
+
   return (
     <div
       className={cn(

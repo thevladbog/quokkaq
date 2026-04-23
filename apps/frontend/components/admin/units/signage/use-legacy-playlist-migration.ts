@@ -5,12 +5,7 @@ import { isApiHttpError } from '@/lib/api-errors';
 type MinimalPlaylist = { id?: string };
 
 function isDuplicateDefaultConflict(e: unknown): boolean {
-  if (isApiHttpError(e) && e.status === 409) {
-    return true;
-  }
-  const s = e instanceof Error ? e.message : String(e);
-  const t = s.toLowerCase();
-  return t.includes('a playlist named default already exists');
+  return isApiHttpError(e) && e.status === 409;
 }
 
 /**

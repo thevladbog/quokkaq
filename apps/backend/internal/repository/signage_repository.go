@@ -1,10 +1,13 @@
 package repository
 
 import (
+	"context"
+
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // SignageRepository persists digital signage entities (playlists, schedules, feeds, announcements).
@@ -31,6 +34,9 @@ type SignageRepository interface {
 	CreateFeed(f *models.ExternalFeed) error
 	UpdateFeed(f *models.ExternalFeed) error
 	DeleteFeed(id string) error
+	// WithFeedLockedForUpdate loads the row FOR UPDATE, runs fn (mutates the in-memory struct), then saves.
+	// Serializes polling so concurrent pollers for the same feed cannot clobber [ExternalFeed] updates.
+	WithFeedLockedForUpdate(ctx context.Context, feedID string, fn func(*models.ExternalFeed) error) error
 	// For poller: active feeds with stale last fetch
 	ListActiveFeeds() ([]models.ExternalFeed, error)
 	// Announcements
@@ -173,6 +179,19 @@ func (r *signageRepository) UpdateFeed(f *models.ExternalFeed) error {
 
 func (r *signageRepository) DeleteFeed(id string) error {
 	return r.db.Delete(&models.ExternalFeed{}, "id = ?", id).Error
+}
+
+func (r *signageRepository) WithFeedLockedForUpdate(ctx context.Context, feedID string, fn func(*models.ExternalFeed) error) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var f models.ExternalFeed
+		if err := tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", feedID).First(&f).Error; err != nil {
+			return err
+		}
+		if err := fn(&f); err != nil {
+			return err
+		}
+		return tx.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: true}).Save(&f).Error
+	})
 }
 
 func (r *signageRepository) ListActiveFeeds() ([]models.ExternalFeed, error) {

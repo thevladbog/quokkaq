@@ -45,14 +45,28 @@ func (r *screenLayoutTemplateRepository) Create(row *models.ScreenLayoutTemplate
 }
 
 func (r *screenLayoutTemplateRepository) Update(row *models.ScreenLayoutTemplate) error {
-	return r.db.Model(&models.ScreenLayoutTemplate{}).
+	res := r.db.Model(&models.ScreenLayoutTemplate{}).
 		Where("id = ? AND company_id = ?", row.ID, row.CompanyID).
 		Updates(map[string]interface{}{
 			"name":       row.Name,
 			"definition": row.Definition,
-		}).Error
+		})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *screenLayoutTemplateRepository) Delete(id, companyID string) error {
-	return r.db.Where("id = ? AND company_id = ?", id, companyID).Delete(&models.ScreenLayoutTemplate{}).Error
+	res := r.db.Where("id = ? AND company_id = ?", id, companyID).Delete(&models.ScreenLayoutTemplate{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }

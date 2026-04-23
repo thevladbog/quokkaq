@@ -3,6 +3,17 @@
 import { useEffect } from 'react';
 import { useScreenBuilderStore } from '@/lib/stores/screen-builder-store';
 
+function isTextLikeTarget(t: EventTarget | null): boolean {
+  if (!(t instanceof HTMLElement)) {
+    return false;
+  }
+  if (t.isContentEditable) {
+    return true;
+  }
+  const tag = t.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+}
+
 type Opts = {
   enabled: boolean;
   onSave: () => void;
@@ -72,6 +83,9 @@ export function useScreenBuilderKeyboard({
       }
       const m = e.metaKey || e.ctrlKey;
       if (m && (e.key === 's' || e.key === 'S')) {
+        if (isTextLikeTarget(t)) {
+          return;
+        }
         e.preventDefault();
         onSave();
         return;
@@ -120,17 +134,15 @@ export function useScreenBuilderKeyboard({
         return;
       }
       if (m && (e.key === 'd' || e.key === 'D')) {
+        if (isTextLikeTarget(t)) {
+          return;
+        }
         e.preventDefault();
         onDuplicate();
         return;
       }
       if (e.key.startsWith('Arrow')) {
-        const t = e.target as HTMLElement;
-        if (
-          t.tagName === 'INPUT' ||
-          t.tagName === 'TEXTAREA' ||
-          t.tagName === 'SELECT'
-        ) {
+        if (isTextLikeTarget(t)) {
           return;
         }
         e.preventDefault();

@@ -3,7 +3,9 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
+	"strings"
 
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
@@ -46,6 +48,7 @@ func (h *ScreenLayoutTemplateHandler) resolveCompanyID(w http.ResponseWriter, r 
 }
 
 // ListScreenLayoutTemplates godoc
+// @ID           ListScreenLayoutTemplates
 // @Summary      List screen layout templates for the tenant
 // @Tags         companies
 // @Produce      json
@@ -60,7 +63,8 @@ func (h *ScreenLayoutTemplateHandler) List(w http.ResponseWriter, r *http.Reques
 	}
 	list, err := h.svc.List(companyID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("ListScreenLayoutTemplates", "err", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -69,19 +73,21 @@ func (h *ScreenLayoutTemplateHandler) List(w http.ResponseWriter, r *http.Reques
 
 // CreateScreenLayoutTemplateRequest is the body for POST /companies/me/screen-layout-templates.
 type CreateScreenLayoutTemplateRequest struct {
-	Name       string          `json:"name"`
-	Definition json.RawMessage `json:"definition"`
+	Name       string          `json:"name" example:"Lobby wide"`
+	Definition json.RawMessage `json:"definition" swaggertype:"object"`
 }
 
 // CreateScreenLayoutTemplate godoc
+// @ID           CreateScreenLayoutTemplate
 // @Summary      Create a screen layout template
 // @Tags         companies
 // @Accept       json
 // @Produce      json
-// @Param        body body CreateScreenLayoutTemplateRequest true "Template"
+// @Param        body body CreateScreenLayoutTemplateRequest true "Template (name + JSON definition matching ScreenTemplate)"
 // @Success      201 {object} models.ScreenLayoutTemplate
 // @Failure      400 {string} string "Bad request"
 // @Failure      403 {string} string "Forbidden"
+// @Failure      500 {string} string "Internal error"
 // @Router       /companies/me/screen-layout-templates [post]
 // @Security     BearerAuth
 func (h *ScreenLayoutTemplateHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -104,7 +110,12 @@ func (h *ScreenLayoutTemplateHandler) Create(w http.ResponseWriter, r *http.Requ
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		if strings.Contains(err.Error(), "name required") {
+			http.Error(w, "name required", http.StatusBadRequest)
+			return
+		}
+		slog.Error("CreateScreenLayoutTemplate", "err", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -114,11 +125,12 @@ func (h *ScreenLayoutTemplateHandler) Create(w http.ResponseWriter, r *http.Requ
 
 // UpdateScreenLayoutTemplateRequest is the body for PUT /companies/me/screen-layout-templates/{templateId}.
 type UpdateScreenLayoutTemplateRequest struct {
-	Name       string          `json:"name"`
-	Definition json.RawMessage `json:"definition"`
+	Name       string          `json:"name" example:"Lobby wide"`
+	Definition json.RawMessage `json:"definition" swaggertype:"object"`
 }
 
-// Update godoc
+// UpdateScreenLayoutTemplate godoc
+// @ID           UpdateScreenLayoutTemplate
 // @Summary      Update a screen layout template
 // @Tags         companies
 // @Accept       json
@@ -126,7 +138,9 @@ type UpdateScreenLayoutTemplateRequest struct {
 // @Param        templateId path string true "Template ID"
 // @Param        body body UpdateScreenLayoutTemplateRequest true "Template"
 // @Success      200 {object} models.ScreenLayoutTemplate
+// @Failure      400 {string} string "Bad request"
 // @Failure      404 {string} string "Not found"
+// @Failure      500 {string} string "Internal error"
 // @Router       /companies/me/screen-layout-templates/{templateId} [put]
 // @Security     BearerAuth
 func (h *ScreenLayoutTemplateHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -154,19 +168,27 @@ func (h *ScreenLayoutTemplateHandler) Update(w http.ResponseWriter, r *http.Requ
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		if strings.Contains(err.Error(), "name required") {
+			http.Error(w, "name required", http.StatusBadRequest)
+			return
+		}
+		slog.Error("UpdateScreenLayoutTemplate", "err", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(row)
 }
 
-// Delete godoc
+// DeleteScreenLayoutTemplate godoc
+// @ID           DeleteScreenLayoutTemplate
 // @Summary      Delete a screen layout template
 // @Tags         companies
 // @Param        templateId path string true "Template ID"
 // @Success      204
+// @Failure      403 {string} string "Forbidden"
 // @Failure      404 {string} string "Not found"
+// @Failure      500 {string} string "Internal error"
 // @Router       /companies/me/screen-layout-templates/{templateId} [delete]
 // @Security     BearerAuth
 func (h *ScreenLayoutTemplateHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -180,7 +202,12 @@ func (h *ScreenLayoutTemplateHandler) Delete(w http.ResponseWriter, r *http.Requ
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		slog.Error("DeleteScreenLayoutTemplate", "err", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

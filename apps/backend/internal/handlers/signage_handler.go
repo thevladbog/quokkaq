@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -16,12 +17,18 @@ import (
 
 // SignageHandler serves digital signage APIs.
 type SignageHandler struct {
-	svc services.SignageService
+	svc      services.SignageService
+	unitRepo unitRepository
+}
+
+// unitRepository is the subset of [repository.UnitRepository] needed for timezone alignment.
+type unitRepository interface {
+	FindByIDLight(id string) (*models.Unit, error)
 }
 
 // NewSignageHandler constructs the handler.
-func NewSignageHandler(svc services.SignageService) *SignageHandler {
-	return &SignageHandler{svc: svc}
+func NewSignageHandler(svc services.SignageService, unitRepo unitRepository) *SignageHandler {
+	return &SignageHandler{svc: svc, unitRepo: unitRepo}
 }
 
 // CreatePlaylistRequest is the body for POST /units/{unitId}/playlists.
@@ -76,6 +83,7 @@ func (h *SignageHandler) ListPlaylists(w http.ResponseWriter, r *http.Request) {
 // @Router       /units/{unitId}/playlists/{playlistId} [get]
 // @Security     BearerAuth
 func (h *SignageHandler) GetPlaylist(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
 	id := chi.URLParam(r, "playlistId")
 	out, err := h.svc.GetPlaylist(id)
 	if err != nil {
@@ -84,6 +92,10 @@ func (h *SignageHandler) GetPlaylist(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if out.UnitID != unitID {
+		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
 	RespondJSON(w, out)
@@ -111,6 +123,7 @@ func (h *SignageHandler) CreatePlaylist(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "name required", http.StatusBadRequest)
 		return
 	}
+	loc := h.unitTimeLocation(unitID)
 	p := &models.Playlist{
 		Name:        req.Name,
 		Description: req.Description,
@@ -118,7 +131,7 @@ func (h *SignageHandler) CreatePlaylist(w http.ResponseWriter, r *http.Request) 
 	}
 	items := make([]models.PlaylistItem, len(req.Items))
 	for i := range req.Items {
-		vf, vt, err := playlistItemDateFields(req.Items[i].ValidFrom, req.Items[i].ValidTo)
+		vf, vt, err := playlistItemDateFields(req.Items[i].ValidFrom, req.Items[i].ValidTo, loc)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -165,6 +178,7 @@ func (h *SignageHandler) UpdatePlaylist(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "name required", http.StatusBadRequest)
 		return
 	}
+	loc := h.unitTimeLocation(unitID)
 	p := &models.Playlist{
 		Name:        req.Name,
 		Description: req.Description,
@@ -172,7 +186,7 @@ func (h *SignageHandler) UpdatePlaylist(w http.ResponseWriter, r *http.Request) 
 	}
 	items := make([]models.PlaylistItem, len(req.Items))
 	for i := range req.Items {
-		vf, vt, err := playlistItemDateFields(req.Items[i].ValidFrom, req.Items[i].ValidTo)
+		vf, vt, err := playlistItemDateFields(req.Items[i].ValidFrom, req.Items[i].ValidTo, loc)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -180,6 +194,10 @@ func (h *SignageHandler) UpdatePlaylist(w http.ResponseWriter, r *http.Request) 
 		items[i] = models.PlaylistItem{MaterialID: req.Items[i].MaterialID, Duration: req.Items[i].Duration, ValidFrom: vf, ValidTo: vt}
 	}
 	if err := h.svc.UpdatePlaylist(unitID, playlistID, p, items); err != nil {
+		if errors.Is(err, services.ErrDuplicateDefaultPlaylistName) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		writeSignageError(w, err)
 		return
 	}
@@ -239,6 +257,7 @@ func (h *SignageHandler) ListSchedules(w http.ResponseWriter, r *http.Request) {
 // @Router       /units/{unitId}/playlist-schedules/{scheduleId} [get]
 // @Security     BearerAuth
 func (h *SignageHandler) GetSchedule(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
 	id := chi.URLParam(r, "scheduleId")
 	out, err := h.svc.GetSchedule(id)
 	if err != nil {
@@ -247,6 +266,10 @@ func (h *SignageHandler) GetSchedule(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if out.UnitID != unitID {
+		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
 	RespondJSON(w, out)
@@ -281,7 +304,8 @@ func (h *SignageHandler) CreateSchedule(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	vf, vt, derr := playlistItemDateFields(req.ValidFrom, req.ValidTo)
+	loc := h.unitTimeLocation(unitID)
+	vf, vt, derr := playlistItemDateFields(req.ValidFrom, req.ValidTo, loc)
 	if derr != nil {
 		http.Error(w, derr.Error(), http.StatusBadRequest)
 		return
@@ -301,6 +325,14 @@ func (h *SignageHandler) CreateSchedule(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if err := h.svc.CreateSchedule(unitID, s); err != nil {
+		if errors.Is(err, services.ErrSignageScheduleOverlap) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		if strings.HasPrefix(err.Error(), "startTime:") || strings.HasPrefix(err.Error(), "endTime:") {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		writeSignageError(w, err)
 		return
 	}
@@ -338,7 +370,8 @@ func (h *SignageHandler) UpdateSchedule(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	vf, vt, derr := playlistItemDateFields(req.ValidFrom, req.ValidTo)
+	loc := h.unitTimeLocation(unitID)
+	vf, vt, derr := playlistItemDateFields(req.ValidFrom, req.ValidTo, loc)
 	if derr != nil {
 		http.Error(w, derr.Error(), http.StatusBadRequest)
 		return
@@ -352,6 +385,14 @@ func (h *SignageHandler) UpdateSchedule(w http.ResponseWriter, r *http.Request) 
 	existing.Priority = req.Priority
 	existing.IsActive = req.IsActive
 	if err := h.svc.UpdateSchedule(unitID, sid, existing); err != nil {
+		if errors.Is(err, services.ErrSignageScheduleOverlap) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		if strings.HasPrefix(err.Error(), "startTime:") || strings.HasPrefix(err.Error(), "endTime:") {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		writeSignageError(w, err)
 		return
 	}
@@ -492,7 +533,12 @@ func (h *SignageHandler) CreateFeed(w http.ResponseWriter, r *http.Request) {
 		writeSignageError(w, err)
 		return
 	}
-	created, _ := h.svc.GetFeed(f.ID)
+	created, gerr := h.svc.GetFeed(f.ID)
+	if gerr != nil {
+		slog.Error("GetFeed after CreateFeed", "feedId", f.ID, "err", gerr)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 	RespondJSONWithStatus(w, http.StatusCreated, created)
 }
 
@@ -546,7 +592,12 @@ func (h *SignageHandler) UpdateFeed(w http.ResponseWriter, r *http.Request) {
 		writeSignageError(w, err)
 		return
 	}
-	out, _ := h.svc.GetFeed(fid)
+	out, gerr := h.svc.GetFeed(fid)
+	if gerr != nil {
+		slog.Error("GetFeed after UpdateFeed", "feedId", fid, "err", gerr)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 	RespondJSON(w, out)
 }
 
@@ -785,6 +836,26 @@ func (h *SignageHandler) DeleteAnnouncement(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// unitTimeLocation returns the IANA location for a unit, or UTC if unknown.
+func (h *SignageHandler) unitTimeLocation(unitID string) *time.Location {
+	if h.unitRepo == nil {
+		return time.UTC
+	}
+	u, err := h.unitRepo.FindByIDLight(unitID)
+	if err != nil || u == nil {
+		return time.UTC
+	}
+	tz := strings.TrimSpace(u.Timezone)
+	if tz == "" {
+		return time.UTC
+	}
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		return time.UTC
+	}
+	return loc
+}
+
 func writeSignageError(w http.ResponseWriter, err error) {
 	if err == nil {
 		return
@@ -793,10 +864,18 @@ func writeSignageError(w http.ResponseWriter, err error) {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
+	if errors.Is(err, services.ErrDuplicateDefaultPlaylistName) {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	if errors.Is(err, services.ErrSignageScheduleOverlap) {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
-func parseOptDateYMD(s *string) (*time.Time, error) {
+func parseOptDateYMD(s *string, loc *time.Location) (*time.Time, error) {
 	if s == nil {
 		return nil, nil
 	}
@@ -804,21 +883,23 @@ func parseOptDateYMD(s *string) (*time.Time, error) {
 	if t == "" {
 		return nil, nil
 	}
-	parsed, err := time.Parse("2006-01-02", t)
+	if loc == nil {
+		loc = time.UTC
+	}
+	parsed, err := time.ParseInLocation("2006-01-02", t, loc)
 	if err != nil {
 		return nil, err
 	}
-	u := time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, time.UTC)
-	return &u, nil
+	return &parsed, nil
 }
 
-// playlistItemDateFields parses optional YYYY-MM-DD bounds. Used for both playlist item and schedule.
-func playlistItemDateFields(from, to *string) (vf, vt *time.Time, err error) {
-	vf, err = parseOptDateYMD(from)
+// playlistItemDateFields parses optional YYYY-MM-DD bounds in the unit’s timezone. Used for both playlist item and schedule.
+func playlistItemDateFields(from, to *string, loc *time.Location) (vf, vt *time.Time, err error) {
+	vf, err = parseOptDateYMD(from, loc)
 	if err != nil {
 		return nil, nil, errors.New("validFrom: use YYYY-MM-DD")
 	}
-	vt, err = parseOptDateYMD(to)
+	vt, err = parseOptDateYMD(to, loc)
 	if err != nil {
 		return nil, nil, errors.New("validTo: use YYYY-MM-DD")
 	}

@@ -507,7 +507,12 @@ export interface HandlersCreateScheduleRequest {
   validTo?: string;
 }
 
-export interface HandlersCreateScreenLayoutTemplateRequest { [key: string]: unknown }
+export type HandlersCreateScreenLayoutTemplateRequestDefinition = { [key: string]: unknown };
+
+export interface HandlersCreateScreenLayoutTemplateRequest {
+  definition?: HandlersCreateScreenLayoutTemplateRequestDefinition;
+  name?: string;
+}
 
 export interface HandlersTenantRoleUnitJSON {
   permissions?: string[];
@@ -1113,7 +1118,12 @@ export interface HandlersUpdatePlaylistRequest {
   name?: string;
 }
 
-export interface HandlersUpdateScreenLayoutTemplateRequest { [key: string]: unknown }
+export type HandlersUpdateScreenLayoutTemplateRequestDefinition = { [key: string]: unknown };
+
+export interface HandlersUpdateScreenLayoutTemplateRequest {
+  definition?: HandlersUpdateScreenLayoutTemplateRequestDefinition;
+  name?: string;
+}
 
 export interface HandlersUpdateStatusRequest {
   status?: string;
@@ -2269,7 +2279,7 @@ export interface RepositorySupportReportShareCandidate {
 
 export interface ServicesActivePlaylistDTO {
   playlist?: ModelsPlaylist;
-  /** schedule | default | none */
+  /** schedule | default | fallback | none */
   source?: string;
   unitId?: string;
 }

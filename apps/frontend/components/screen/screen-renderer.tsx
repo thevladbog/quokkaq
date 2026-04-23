@@ -31,6 +31,7 @@ import { clockUse24HourFromConfig } from '@/lib/screen-clock-config';
 import { queueTickerConfigFromRecord } from '@/lib/queue-ticker-config';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { cn } from '@/lib/utils';
+import { sanitizeHtml } from '@/lib/sanitize-html';
 import type { Ticket } from '@/lib/api';
 
 type QueueStatus = {
@@ -352,7 +353,9 @@ export function ScreenRenderer(props: ScreenRendererProps) {
         );
       }
       case 'custom-html': {
-        const html = String((config as { html?: string })?.html ?? '');
+        const raw = String((config as { html?: string })?.html ?? '');
+        if (!raw) return null;
+        const html = sanitizeHtml(raw);
         if (!html) return null;
         return (
           <div

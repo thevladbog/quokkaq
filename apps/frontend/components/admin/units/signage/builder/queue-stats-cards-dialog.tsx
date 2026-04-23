@@ -236,6 +236,9 @@ export function QueueStatsCardsDialog({ cards, canEdit, onSave }: Props) {
     setLocalCards((items) => {
       const oldIndex = items.findIndex((item) => item.type === active.id);
       const newIndex = items.findIndex((item) => item.type === over.id);
+      if (oldIndex < 0 || newIndex < 0) {
+        return items;
+      }
       const reordered = arrayMove(items, oldIndex, newIndex);
       return reordered.map((item, idx) => ({ ...item, order: idx }));
     });

@@ -263,6 +263,16 @@ function PlaylistOrderPanel(props: {
         validTo: bd.to.trim() || undefined
       } as orval.HandlersPlaylistItemInput;
     });
+    for (const it of its) {
+      if (
+        it.validFrom &&
+        it.validTo &&
+        String(it.validFrom).trim() > String(it.validTo).trim()
+      ) {
+        toast.error(t('playlistDateRangeOrder'));
+        return;
+      }
+    }
     const data = {
       name: playlist.name ?? '',
       isDefault: playlist.isDefault,

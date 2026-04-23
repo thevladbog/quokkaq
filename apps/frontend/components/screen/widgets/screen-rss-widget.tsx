@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { unitsApi } from '@/lib/api';
 import { logger } from '@/lib/logger';
 
@@ -17,21 +17,18 @@ export function ScreenRssFeedWidget({
   unitId: string;
   feedId: string;
 }) {
-  const [data, setData] = useState<RssPayload | null>(null);
-  useEffect(() => {
-    if (!feedId) return;
-    const load = async () => {
-      try {
-        const raw = await unitsApi.getPublicFeedData(unitId, feedId);
-        setData((raw as unknown as RssPayload | undefined) ?? null);
-      } catch (e) {
-        logger.error('RSS widget', e);
-      }
-    };
-    void load();
-    const iv = setInterval(load, 120_000);
-    return () => clearInterval(iv);
-  }, [unitId, feedId]);
+  const { data, isError, error } = useQuery({
+    queryKey: ['publicFeed', unitId, feedId],
+    queryFn: async () => {
+      const raw = await unitsApi.getPublicFeedData(unitId, feedId);
+      return (raw as unknown as RssPayload | undefined) ?? null;
+    },
+    refetchInterval: 120_000,
+    enabled: Boolean(unitId && feedId)
+  });
+  if (isError && error) {
+    logger.error('RSS widget', error);
+  }
   if (!data?.items?.length) {
     return (
       <div className='text-muted-foreground text-sm'>{data?.title ?? '—'}</div>

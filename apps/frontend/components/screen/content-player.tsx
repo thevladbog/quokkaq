@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 export type ContentSlide = {
   id: string;
@@ -17,7 +17,7 @@ interface ContentPlayerProps {
   defaultImageSeconds: number;
   /** When true, show a compact tickets strip at the bottom (media-focus template) */
   overlayMode?: boolean;
-  overlay?: React.ReactNode;
+  overlay?: ReactNode;
 }
 
 export function ContentPlayer({
@@ -48,6 +48,12 @@ export function ContentPlayer({
       );
       return () => clearTimeout(timer);
     }
+    // If `onEnded` / completion never runs (e.g. broken or stuck video), do not block rotation forever.
+    const cap = 10 * 60_000;
+    const timer = setTimeout(() => {
+      setCurrentIndex((prev) => (prev + 1) % slides.length);
+    }, cap);
+    return () => clearTimeout(timer);
   }, [safeIndex, slides, defaultImageSeconds]);
 
   const handleVideoEnded = () => {
@@ -98,6 +104,7 @@ export function ContentPlayer({
               muted
               playsInline
               onEnded={handleVideoEnded}
+              onError={handleVideoEnded}
               className='max-h-full max-w-full object-contain'
             />
           )}

@@ -329,6 +329,15 @@
                 "type": "object"
             },
             "handlers.CreateScreenLayoutTemplateRequest": {
+                "properties": {
+                    "definition": {
+                        "type": "object"
+                    },
+                    "name": {
+                        "example": "Lobby wide",
+                        "type": "string"
+                    }
+                },
                 "type": "object"
             },
             "handlers.CreateTenantRoleJSON": {
@@ -1723,6 +1732,15 @@
                 "type": "object"
             },
             "handlers.UpdateScreenLayoutTemplateRequest": {
+                "properties": {
+                    "definition": {
+                        "type": "object"
+                    },
+                    "name": {
+                        "example": "Lobby wide",
+                        "type": "string"
+                    }
+                },
                 "type": "object"
             },
             "handlers.UpdateStatusRequest": {
@@ -4925,7 +4943,7 @@
                         "$ref": "#/components/schemas/models.Playlist"
                     },
                     "source": {
-                        "description": "schedule | default | none",
+                        "description": "schedule | default | fallback | none",
                         "type": "string"
                     },
                     "unitId": {
@@ -9518,6 +9536,7 @@
         },
         "/companies/me/screen-layout-templates": {
             "get": {
+                "operationId": "ListScreenLayoutTemplates",
                 "responses": {
                     "200": {
                         "content": {
@@ -9554,6 +9573,7 @@
                 ]
             },
             "post": {
+                "operationId": "CreateScreenLayoutTemplate",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -9562,7 +9582,7 @@
                             }
                         }
                     },
-                    "description": "Template",
+                    "description": "Template (name + JSON definition matching ScreenTemplate)",
                     "required": true,
                     "x-originalParamName": "body"
                 },
@@ -9596,6 +9616,16 @@
                             }
                         },
                         "description": "Forbidden"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal error"
                     }
                 },
                 "security": [
@@ -9611,6 +9641,7 @@
         },
         "/companies/me/screen-layout-templates/{templateId}": {
             "delete": {
+                "operationId": "DeleteScreenLayoutTemplate",
                 "parameters": [
                     {
                         "description": "Template ID",
@@ -9626,6 +9657,16 @@
                     "204": {
                         "description": "No Content"
                     },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
                     "404": {
                         "content": {
                             "application/json": {
@@ -9635,6 +9676,16 @@
                             }
                         },
                         "description": "Not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal error"
                     }
                 },
                 "security": [
@@ -9648,6 +9699,7 @@
                 ]
             },
             "put": {
+                "operationId": "UpdateScreenLayoutTemplate",
                 "parameters": [
                     {
                         "description": "Template ID",
@@ -9682,6 +9734,16 @@
                         },
                         "description": "OK"
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
                     "404": {
                         "content": {
                             "application/json": {
@@ -9691,6 +9753,16 @@
                             }
                         },
                         "description": "Not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal error"
                     }
                 },
                 "security": [

@@ -110,7 +110,7 @@ export function ScreenFooterQrWidget({
       ) : (
         <div className='min-w-0 flex-1' />
       )}
-      {showQr && virtualQueueEnabled ? (
+      {showQr && virtualQueueEnabled && queueUrl?.trim() ? (
         <div className='flex shrink-0 items-center gap-2'>
           <p className='text-muted-foreground max-w-[100px] text-right text-xs leading-tight'>
             {t('scanToJoinQueue')}

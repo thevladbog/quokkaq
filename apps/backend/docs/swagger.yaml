@@ -217,6 +217,12 @@ components:
                     type: string
             type: object
         handlers.CreateScreenLayoutTemplateRequest:
+            properties:
+                definition:
+                    type: object
+                name:
+                    example: Lobby wide
+                    type: string
             type: object
         handlers.CreateTenantRoleJSON:
             properties:
@@ -1167,6 +1173,12 @@ components:
                     type: string
             type: object
         handlers.UpdateScreenLayoutTemplateRequest:
+            properties:
+                definition:
+                    type: object
+                name:
+                    example: Lobby wide
+                    type: string
             type: object
         handlers.UpdateStatusRequest:
             properties:
@@ -3336,7 +3348,7 @@ components:
                 playlist:
                     $ref: '#/components/schemas/models.Playlist'
                 source:
-                    description: schedule | default | none
+                    description: schedule | default | fallback | none
                     type: string
                 unitId:
                     type: string
@@ -6267,6 +6279,7 @@ paths:
                 - companies
     /companies/me/screen-layout-templates:
         get:
+            operationId: ListScreenLayoutTemplates
             responses:
                 "200":
                     content:
@@ -6288,12 +6301,13 @@ paths:
             tags:
                 - companies
         post:
+            operationId: CreateScreenLayoutTemplate
             requestBody:
                 content:
                     application/json:
                         schema:
                             $ref: '#/components/schemas/handlers.CreateScreenLayoutTemplateRequest'
-                description: Template
+                description: Template (name + JSON definition matching ScreenTemplate)
                 required: true
                 x-originalParamName: body
             responses:
@@ -6315,6 +6329,12 @@ paths:
                             schema:
                                 type: string
                     description: Forbidden
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Internal error
             security:
                 - BearerAuth: []
             summary: Create a screen layout template
@@ -6322,6 +6342,7 @@ paths:
                 - companies
     /companies/me/screen-layout-templates/{templateId}:
         delete:
+            operationId: DeleteScreenLayoutTemplate
             parameters:
                 - description: Template ID
                   in: path
@@ -6332,18 +6353,31 @@ paths:
             responses:
                 "204":
                     description: No Content
+                "403":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Forbidden
                 "404":
                     content:
                         application/json:
                             schema:
                                 type: string
                     description: Not found
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Internal error
             security:
                 - BearerAuth: []
             summary: Delete a screen layout template
             tags:
                 - companies
         put:
+            operationId: UpdateScreenLayoutTemplate
             parameters:
                 - description: Template ID
                   in: path
@@ -6366,12 +6400,24 @@ paths:
                             schema:
                                 $ref: '#/components/schemas/models.ScreenLayoutTemplate'
                     description: OK
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Bad request
                 "404":
                     content:
                         application/json:
                             schema:
                                 type: string
                     description: Not found
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Internal error
             security:
                 - BearerAuth: []
             summary: Update a screen layout template

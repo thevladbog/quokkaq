@@ -165,7 +165,8 @@ func dayRangeInTimezone(nowUTC time.Time, tzName string) (time.Time, time.Time) 
 	}
 	nowIn := nowUTC.In(loc)
 	start := time.Date(nowIn.Year(), nowIn.Month(), nowIn.Day(), 0, 0, 0, 0, loc)
-	end := start.Add(24 * time.Hour)
+	// End of local calendar day; use calendar math so DST (23/25h days) is correct.
+	end := start.AddDate(0, 0, 1)
 	return start.UTC(), end.UTC()
 }
 

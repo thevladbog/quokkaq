@@ -480,7 +480,12 @@ export interface HandlersCreateScheduleRequest {
   validTo?: string;
 }
 
-export interface HandlersCreateScreenLayoutTemplateRequest { [key: string]: unknown }
+export type HandlersCreateScreenLayoutTemplateRequestDefinition = { [key: string]: unknown };
+
+export interface HandlersCreateScreenLayoutTemplateRequest {
+  definition?: HandlersCreateScreenLayoutTemplateRequestDefinition;
+  name?: string;
+}
 
 export interface HandlersTenantRoleUnitJSON {
   permissions?: string[];
@@ -1086,7 +1091,12 @@ export interface HandlersUpdatePlaylistRequest {
   name?: string;
 }
 
-export interface HandlersUpdateScreenLayoutTemplateRequest { [key: string]: unknown }
+export type HandlersUpdateScreenLayoutTemplateRequestDefinition = { [key: string]: unknown };
+
+export interface HandlersUpdateScreenLayoutTemplateRequest {
+  definition?: HandlersUpdateScreenLayoutTemplateRequestDefinition;
+  name?: string;
+}
 
 export interface HandlersUpdateStatusRequest {
   status?: string;
@@ -2242,7 +2252,7 @@ export interface RepositorySupportReportShareCandidate {
 
 export interface ServicesActivePlaylistDTO {
   playlist?: ModelsPlaylist;
-  /** schedule | default | none */
+  /** schedule | default | fallback | none */
   source?: string;
   unitId?: string;
 }
@@ -5711,26 +5721,26 @@ export function useGetPermissionCatalog<TData = Awaited<ReturnType<typeof getPer
 /**
  * @summary List screen layout templates for the tenant
  */
-export type getCompaniesMeScreenLayoutTemplatesResponse200 = {
+export type listScreenLayoutTemplatesResponse200 = {
   data: ModelsScreenLayoutTemplate[]
   status: 200
 }
 
-export type getCompaniesMeScreenLayoutTemplatesResponse401 = {
+export type listScreenLayoutTemplatesResponse401 = {
   data: string
   status: 401
 }
 
-export type getCompaniesMeScreenLayoutTemplatesResponseSuccess = (getCompaniesMeScreenLayoutTemplatesResponse200) & {
+export type listScreenLayoutTemplatesResponseSuccess = (listScreenLayoutTemplatesResponse200) & {
   headers: Headers;
 };
-export type getCompaniesMeScreenLayoutTemplatesResponseError = (getCompaniesMeScreenLayoutTemplatesResponse401) & {
+export type listScreenLayoutTemplatesResponseError = (listScreenLayoutTemplatesResponse401) & {
   headers: Headers;
 };
 
-export type getCompaniesMeScreenLayoutTemplatesResponse = (getCompaniesMeScreenLayoutTemplatesResponseSuccess | getCompaniesMeScreenLayoutTemplatesResponseError)
+export type listScreenLayoutTemplatesResponse = (listScreenLayoutTemplatesResponseSuccess | listScreenLayoutTemplatesResponseError)
 
-export const getGetCompaniesMeScreenLayoutTemplatesUrl = () => {
+export const getListScreenLayoutTemplatesUrl = () => {
 
 
 
@@ -5738,9 +5748,9 @@ export const getGetCompaniesMeScreenLayoutTemplatesUrl = () => {
   return `/companies/me/screen-layout-templates`
 }
 
-export const getCompaniesMeScreenLayoutTemplates = async ( options?: RequestInit): Promise<getCompaniesMeScreenLayoutTemplatesResponse> => {
+export const listScreenLayoutTemplates = async ( options?: RequestInit): Promise<listScreenLayoutTemplatesResponse> => {
 
-  return orvalMutator<getCompaniesMeScreenLayoutTemplatesResponse>(getGetCompaniesMeScreenLayoutTemplatesUrl(),
+  return orvalMutator<listScreenLayoutTemplatesResponse>(getListScreenLayoutTemplatesUrl(),
   {
     ...options,
     method: 'GET'
@@ -5753,69 +5763,69 @@ export const getCompaniesMeScreenLayoutTemplates = async ( options?: RequestInit
 
 
 
-export const getGetCompaniesMeScreenLayoutTemplatesQueryKey = () => {
+export const getListScreenLayoutTemplatesQueryKey = () => {
     return [
     `/companies/me/screen-layout-templates`
     ] as const;
     }
 
 
-export const getGetCompaniesMeScreenLayoutTemplatesQueryOptions = <TData = Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getListScreenLayoutTemplatesQueryOptions = <TData = Awaited<ReturnType<typeof listScreenLayoutTemplates>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listScreenLayoutTemplates>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetCompaniesMeScreenLayoutTemplatesQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListScreenLayoutTemplatesQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>> = ({ signal }) => getCompaniesMeScreenLayoutTemplates({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listScreenLayoutTemplates>>> = ({ signal }) => listScreenLayoutTemplates({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listScreenLayoutTemplates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetCompaniesMeScreenLayoutTemplatesQueryResult = NonNullable<Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>>
-export type GetCompaniesMeScreenLayoutTemplatesQueryError = string
+export type ListScreenLayoutTemplatesQueryResult = NonNullable<Awaited<ReturnType<typeof listScreenLayoutTemplates>>>
+export type ListScreenLayoutTemplatesQueryError = string
 
 
-export function useGetCompaniesMeScreenLayoutTemplates<TData = Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>, TError = string>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>, TError, TData>> & Pick<
+export function useListScreenLayoutTemplates<TData = Awaited<ReturnType<typeof listScreenLayoutTemplates>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listScreenLayoutTemplates>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>,
+          Awaited<ReturnType<typeof listScreenLayoutTemplates>>,
           TError,
-          Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>
+          Awaited<ReturnType<typeof listScreenLayoutTemplates>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCompaniesMeScreenLayoutTemplates<TData = Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>, TError, TData>> & Pick<
+export function useListScreenLayoutTemplates<TData = Awaited<ReturnType<typeof listScreenLayoutTemplates>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listScreenLayoutTemplates>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>,
+          Awaited<ReturnType<typeof listScreenLayoutTemplates>>,
           TError,
-          Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>
+          Awaited<ReturnType<typeof listScreenLayoutTemplates>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCompaniesMeScreenLayoutTemplates<TData = Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListScreenLayoutTemplates<TData = Awaited<ReturnType<typeof listScreenLayoutTemplates>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listScreenLayoutTemplates>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List screen layout templates for the tenant
  */
 
-export function useGetCompaniesMeScreenLayoutTemplates<TData = Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeScreenLayoutTemplates>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListScreenLayoutTemplates<TData = Awaited<ReturnType<typeof listScreenLayoutTemplates>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listScreenLayoutTemplates>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetCompaniesMeScreenLayoutTemplatesQueryOptions(options)
+  const queryOptions = getListScreenLayoutTemplatesQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -5831,31 +5841,36 @@ export function useGetCompaniesMeScreenLayoutTemplates<TData = Awaited<ReturnTyp
 /**
  * @summary Create a screen layout template
  */
-export type postCompaniesMeScreenLayoutTemplatesResponse201 = {
+export type createScreenLayoutTemplateResponse201 = {
   data: ModelsScreenLayoutTemplate
   status: 201
 }
 
-export type postCompaniesMeScreenLayoutTemplatesResponse400 = {
+export type createScreenLayoutTemplateResponse400 = {
   data: string
   status: 400
 }
 
-export type postCompaniesMeScreenLayoutTemplatesResponse403 = {
+export type createScreenLayoutTemplateResponse403 = {
   data: string
   status: 403
 }
 
-export type postCompaniesMeScreenLayoutTemplatesResponseSuccess = (postCompaniesMeScreenLayoutTemplatesResponse201) & {
+export type createScreenLayoutTemplateResponse500 = {
+  data: string
+  status: 500
+}
+
+export type createScreenLayoutTemplateResponseSuccess = (createScreenLayoutTemplateResponse201) & {
   headers: Headers;
 };
-export type postCompaniesMeScreenLayoutTemplatesResponseError = (postCompaniesMeScreenLayoutTemplatesResponse400 | postCompaniesMeScreenLayoutTemplatesResponse403) & {
+export type createScreenLayoutTemplateResponseError = (createScreenLayoutTemplateResponse400 | createScreenLayoutTemplateResponse403 | createScreenLayoutTemplateResponse500) & {
   headers: Headers;
 };
 
-export type postCompaniesMeScreenLayoutTemplatesResponse = (postCompaniesMeScreenLayoutTemplatesResponseSuccess | postCompaniesMeScreenLayoutTemplatesResponseError)
+export type createScreenLayoutTemplateResponse = (createScreenLayoutTemplateResponseSuccess | createScreenLayoutTemplateResponseError)
 
-export const getPostCompaniesMeScreenLayoutTemplatesUrl = () => {
+export const getCreateScreenLayoutTemplateUrl = () => {
 
 
 
@@ -5863,9 +5878,9 @@ export const getPostCompaniesMeScreenLayoutTemplatesUrl = () => {
   return `/companies/me/screen-layout-templates`
 }
 
-export const postCompaniesMeScreenLayoutTemplates = async (handlersCreateScreenLayoutTemplateRequest: HandlersCreateScreenLayoutTemplateRequest, options?: RequestInit): Promise<postCompaniesMeScreenLayoutTemplatesResponse> => {
+export const createScreenLayoutTemplate = async (handlersCreateScreenLayoutTemplateRequest: HandlersCreateScreenLayoutTemplateRequest, options?: RequestInit): Promise<createScreenLayoutTemplateResponse> => {
 
-  return orvalMutator<postCompaniesMeScreenLayoutTemplatesResponse>(getPostCompaniesMeScreenLayoutTemplatesUrl(),
+  return orvalMutator<createScreenLayoutTemplateResponse>(getCreateScreenLayoutTemplateUrl(),
   {
     ...options,
     method: 'POST',
@@ -5878,11 +5893,11 @@ export const postCompaniesMeScreenLayoutTemplates = async (handlersCreateScreenL
 
 
 
-export const getPostCompaniesMeScreenLayoutTemplatesMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeScreenLayoutTemplates>>, TError,{data: HandlersCreateScreenLayoutTemplateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeScreenLayoutTemplates>>, TError,{data: HandlersCreateScreenLayoutTemplateRequest}, TContext> => {
+export const getCreateScreenLayoutTemplateMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createScreenLayoutTemplate>>, TError,{data: HandlersCreateScreenLayoutTemplateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createScreenLayoutTemplate>>, TError,{data: HandlersCreateScreenLayoutTemplateRequest}, TContext> => {
 
-const mutationKey = ['postCompaniesMeScreenLayoutTemplates'];
+const mutationKey = ['createScreenLayoutTemplate'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -5892,10 +5907,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postCompaniesMeScreenLayoutTemplates>>, {data: HandlersCreateScreenLayoutTemplateRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createScreenLayoutTemplate>>, {data: HandlersCreateScreenLayoutTemplateRequest}> = (props) => {
           const {data} = props ?? {};
 
-          return  postCompaniesMeScreenLayoutTemplates(data,requestOptions)
+          return  createScreenLayoutTemplate(data,requestOptions)
         }
 
 
@@ -5905,47 +5920,57 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostCompaniesMeScreenLayoutTemplatesMutationResult = NonNullable<Awaited<ReturnType<typeof postCompaniesMeScreenLayoutTemplates>>>
-    export type PostCompaniesMeScreenLayoutTemplatesMutationBody = HandlersCreateScreenLayoutTemplateRequest
-    export type PostCompaniesMeScreenLayoutTemplatesMutationError = string
+    export type CreateScreenLayoutTemplateMutationResult = NonNullable<Awaited<ReturnType<typeof createScreenLayoutTemplate>>>
+    export type CreateScreenLayoutTemplateMutationBody = HandlersCreateScreenLayoutTemplateRequest
+    export type CreateScreenLayoutTemplateMutationError = string
 
     /**
  * @summary Create a screen layout template
  */
-export const usePostCompaniesMeScreenLayoutTemplates = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeScreenLayoutTemplates>>, TError,{data: HandlersCreateScreenLayoutTemplateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useCreateScreenLayoutTemplate = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createScreenLayoutTemplate>>, TError,{data: HandlersCreateScreenLayoutTemplateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postCompaniesMeScreenLayoutTemplates>>,
+        Awaited<ReturnType<typeof createScreenLayoutTemplate>>,
         TError,
         {data: HandlersCreateScreenLayoutTemplateRequest},
         TContext
       > => {
-      return useMutation(getPostCompaniesMeScreenLayoutTemplatesMutationOptions(options), queryClient);
+      return useMutation(getCreateScreenLayoutTemplateMutationOptions(options), queryClient);
     }
 
 /**
  * @summary Delete a screen layout template
  */
-export type deleteCompaniesMeScreenLayoutTemplatesTemplateIdResponse204 = {
+export type deleteScreenLayoutTemplateResponse204 = {
   data: void
   status: 204
 }
 
-export type deleteCompaniesMeScreenLayoutTemplatesTemplateIdResponse404 = {
+export type deleteScreenLayoutTemplateResponse403 = {
+  data: string
+  status: 403
+}
+
+export type deleteScreenLayoutTemplateResponse404 = {
   data: string
   status: 404
 }
 
-export type deleteCompaniesMeScreenLayoutTemplatesTemplateIdResponseSuccess = (deleteCompaniesMeScreenLayoutTemplatesTemplateIdResponse204) & {
+export type deleteScreenLayoutTemplateResponse500 = {
+  data: string
+  status: 500
+}
+
+export type deleteScreenLayoutTemplateResponseSuccess = (deleteScreenLayoutTemplateResponse204) & {
   headers: Headers;
 };
-export type deleteCompaniesMeScreenLayoutTemplatesTemplateIdResponseError = (deleteCompaniesMeScreenLayoutTemplatesTemplateIdResponse404) & {
+export type deleteScreenLayoutTemplateResponseError = (deleteScreenLayoutTemplateResponse403 | deleteScreenLayoutTemplateResponse404 | deleteScreenLayoutTemplateResponse500) & {
   headers: Headers;
 };
 
-export type deleteCompaniesMeScreenLayoutTemplatesTemplateIdResponse = (deleteCompaniesMeScreenLayoutTemplatesTemplateIdResponseSuccess | deleteCompaniesMeScreenLayoutTemplatesTemplateIdResponseError)
+export type deleteScreenLayoutTemplateResponse = (deleteScreenLayoutTemplateResponseSuccess | deleteScreenLayoutTemplateResponseError)
 
-export const getDeleteCompaniesMeScreenLayoutTemplatesTemplateIdUrl = (templateId: string,) => {
+export const getDeleteScreenLayoutTemplateUrl = (templateId: string,) => {
 
 
 
@@ -5953,9 +5978,9 @@ export const getDeleteCompaniesMeScreenLayoutTemplatesTemplateIdUrl = (templateI
   return `/companies/me/screen-layout-templates/${templateId}`
 }
 
-export const deleteCompaniesMeScreenLayoutTemplatesTemplateId = async (templateId: string, options?: RequestInit): Promise<deleteCompaniesMeScreenLayoutTemplatesTemplateIdResponse> => {
+export const deleteScreenLayoutTemplate = async (templateId: string, options?: RequestInit): Promise<deleteScreenLayoutTemplateResponse> => {
 
-  return orvalMutator<deleteCompaniesMeScreenLayoutTemplatesTemplateIdResponse>(getDeleteCompaniesMeScreenLayoutTemplatesTemplateIdUrl(templateId),
+  return orvalMutator<deleteScreenLayoutTemplateResponse>(getDeleteScreenLayoutTemplateUrl(templateId),
   {
     ...options,
     method: 'DELETE'
@@ -5967,11 +5992,11 @@ export const deleteCompaniesMeScreenLayoutTemplatesTemplateId = async (templateI
 
 
 
-export const getDeleteCompaniesMeScreenLayoutTemplatesTemplateIdMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeScreenLayoutTemplatesTemplateId>>, TError,{templateId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeScreenLayoutTemplatesTemplateId>>, TError,{templateId: string}, TContext> => {
+export const getDeleteScreenLayoutTemplateMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteScreenLayoutTemplate>>, TError,{templateId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteScreenLayoutTemplate>>, TError,{templateId: string}, TContext> => {
 
-const mutationKey = ['deleteCompaniesMeScreenLayoutTemplatesTemplateId'];
+const mutationKey = ['deleteScreenLayoutTemplate'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -5981,10 +6006,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCompaniesMeScreenLayoutTemplatesTemplateId>>, {templateId: string}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteScreenLayoutTemplate>>, {templateId: string}> = (props) => {
           const {templateId} = props ?? {};
 
-          return  deleteCompaniesMeScreenLayoutTemplatesTemplateId(templateId,requestOptions)
+          return  deleteScreenLayoutTemplate(templateId,requestOptions)
         }
 
 
@@ -5994,47 +6019,57 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type DeleteCompaniesMeScreenLayoutTemplatesTemplateIdMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCompaniesMeScreenLayoutTemplatesTemplateId>>>
+    export type DeleteScreenLayoutTemplateMutationResult = NonNullable<Awaited<ReturnType<typeof deleteScreenLayoutTemplate>>>
 
-    export type DeleteCompaniesMeScreenLayoutTemplatesTemplateIdMutationError = string
+    export type DeleteScreenLayoutTemplateMutationError = string
 
     /**
  * @summary Delete a screen layout template
  */
-export const useDeleteCompaniesMeScreenLayoutTemplatesTemplateId = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeScreenLayoutTemplatesTemplateId>>, TError,{templateId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useDeleteScreenLayoutTemplate = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteScreenLayoutTemplate>>, TError,{templateId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteCompaniesMeScreenLayoutTemplatesTemplateId>>,
+        Awaited<ReturnType<typeof deleteScreenLayoutTemplate>>,
         TError,
         {templateId: string},
         TContext
       > => {
-      return useMutation(getDeleteCompaniesMeScreenLayoutTemplatesTemplateIdMutationOptions(options), queryClient);
+      return useMutation(getDeleteScreenLayoutTemplateMutationOptions(options), queryClient);
     }
 
 /**
  * @summary Update a screen layout template
  */
-export type putCompaniesMeScreenLayoutTemplatesTemplateIdResponse200 = {
+export type updateScreenLayoutTemplateResponse200 = {
   data: ModelsScreenLayoutTemplate
   status: 200
 }
 
-export type putCompaniesMeScreenLayoutTemplatesTemplateIdResponse404 = {
+export type updateScreenLayoutTemplateResponse400 = {
+  data: string
+  status: 400
+}
+
+export type updateScreenLayoutTemplateResponse404 = {
   data: string
   status: 404
 }
 
-export type putCompaniesMeScreenLayoutTemplatesTemplateIdResponseSuccess = (putCompaniesMeScreenLayoutTemplatesTemplateIdResponse200) & {
+export type updateScreenLayoutTemplateResponse500 = {
+  data: string
+  status: 500
+}
+
+export type updateScreenLayoutTemplateResponseSuccess = (updateScreenLayoutTemplateResponse200) & {
   headers: Headers;
 };
-export type putCompaniesMeScreenLayoutTemplatesTemplateIdResponseError = (putCompaniesMeScreenLayoutTemplatesTemplateIdResponse404) & {
+export type updateScreenLayoutTemplateResponseError = (updateScreenLayoutTemplateResponse400 | updateScreenLayoutTemplateResponse404 | updateScreenLayoutTemplateResponse500) & {
   headers: Headers;
 };
 
-export type putCompaniesMeScreenLayoutTemplatesTemplateIdResponse = (putCompaniesMeScreenLayoutTemplatesTemplateIdResponseSuccess | putCompaniesMeScreenLayoutTemplatesTemplateIdResponseError)
+export type updateScreenLayoutTemplateResponse = (updateScreenLayoutTemplateResponseSuccess | updateScreenLayoutTemplateResponseError)
 
-export const getPutCompaniesMeScreenLayoutTemplatesTemplateIdUrl = (templateId: string,) => {
+export const getUpdateScreenLayoutTemplateUrl = (templateId: string,) => {
 
 
 
@@ -6042,10 +6077,10 @@ export const getPutCompaniesMeScreenLayoutTemplatesTemplateIdUrl = (templateId: 
   return `/companies/me/screen-layout-templates/${templateId}`
 }
 
-export const putCompaniesMeScreenLayoutTemplatesTemplateId = async (templateId: string,
-    handlersUpdateScreenLayoutTemplateRequest: HandlersUpdateScreenLayoutTemplateRequest, options?: RequestInit): Promise<putCompaniesMeScreenLayoutTemplatesTemplateIdResponse> => {
+export const updateScreenLayoutTemplate = async (templateId: string,
+    handlersUpdateScreenLayoutTemplateRequest: HandlersUpdateScreenLayoutTemplateRequest, options?: RequestInit): Promise<updateScreenLayoutTemplateResponse> => {
 
-  return orvalMutator<putCompaniesMeScreenLayoutTemplatesTemplateIdResponse>(getPutCompaniesMeScreenLayoutTemplatesTemplateIdUrl(templateId),
+  return orvalMutator<updateScreenLayoutTemplateResponse>(getUpdateScreenLayoutTemplateUrl(templateId),
   {
     ...options,
     method: 'PUT',
@@ -6058,11 +6093,11 @@ export const putCompaniesMeScreenLayoutTemplatesTemplateId = async (templateId: 
 
 
 
-export const getPutCompaniesMeScreenLayoutTemplatesTemplateIdMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putCompaniesMeScreenLayoutTemplatesTemplateId>>, TError,{templateId: string;data: HandlersUpdateScreenLayoutTemplateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof putCompaniesMeScreenLayoutTemplatesTemplateId>>, TError,{templateId: string;data: HandlersUpdateScreenLayoutTemplateRequest}, TContext> => {
+export const getUpdateScreenLayoutTemplateMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateScreenLayoutTemplate>>, TError,{templateId: string;data: HandlersUpdateScreenLayoutTemplateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateScreenLayoutTemplate>>, TError,{templateId: string;data: HandlersUpdateScreenLayoutTemplateRequest}, TContext> => {
 
-const mutationKey = ['putCompaniesMeScreenLayoutTemplatesTemplateId'];
+const mutationKey = ['updateScreenLayoutTemplate'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -6072,10 +6107,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putCompaniesMeScreenLayoutTemplatesTemplateId>>, {templateId: string;data: HandlersUpdateScreenLayoutTemplateRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateScreenLayoutTemplate>>, {templateId: string;data: HandlersUpdateScreenLayoutTemplateRequest}> = (props) => {
           const {templateId,data} = props ?? {};
 
-          return  putCompaniesMeScreenLayoutTemplatesTemplateId(templateId,data,requestOptions)
+          return  updateScreenLayoutTemplate(templateId,data,requestOptions)
         }
 
 
@@ -6085,22 +6120,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PutCompaniesMeScreenLayoutTemplatesTemplateIdMutationResult = NonNullable<Awaited<ReturnType<typeof putCompaniesMeScreenLayoutTemplatesTemplateId>>>
-    export type PutCompaniesMeScreenLayoutTemplatesTemplateIdMutationBody = HandlersUpdateScreenLayoutTemplateRequest
-    export type PutCompaniesMeScreenLayoutTemplatesTemplateIdMutationError = string
+    export type UpdateScreenLayoutTemplateMutationResult = NonNullable<Awaited<ReturnType<typeof updateScreenLayoutTemplate>>>
+    export type UpdateScreenLayoutTemplateMutationBody = HandlersUpdateScreenLayoutTemplateRequest
+    export type UpdateScreenLayoutTemplateMutationError = string
 
     /**
  * @summary Update a screen layout template
  */
-export const usePutCompaniesMeScreenLayoutTemplatesTemplateId = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putCompaniesMeScreenLayoutTemplatesTemplateId>>, TError,{templateId: string;data: HandlersUpdateScreenLayoutTemplateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useUpdateScreenLayoutTemplate = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateScreenLayoutTemplate>>, TError,{templateId: string;data: HandlersUpdateScreenLayoutTemplateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof putCompaniesMeScreenLayoutTemplatesTemplateId>>,
+        Awaited<ReturnType<typeof updateScreenLayoutTemplate>>,
         TError,
         {templateId: string;data: HandlersUpdateScreenLayoutTemplateRequest},
         TContext
       > => {
-      return useMutation(getPutCompaniesMeScreenLayoutTemplatesTemplateIdMutationOptions(options), queryClient);
+      return useMutation(getUpdateScreenLayoutTemplateMutationOptions(options), queryClient);
     }
 
 /**

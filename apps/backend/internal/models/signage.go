@@ -8,8 +8,8 @@ import (
 // Playlist groups UnitMaterial items for digital signage rotation.
 type Playlist struct {
 	ID          string    `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	UnitID      string    `gorm:"not null;index" json:"unitId"`
-	Name        string    `gorm:"not null" json:"name"`
+	UnitID      string    `gorm:"not null;uniqueIndex:idx_signage_playlist_unit_name" json:"unitId"`
+	Name        string    `gorm:"not null;uniqueIndex:idx_signage_playlist_unit_name" json:"name"`
 	Description string    `gorm:"not null;default:''" json:"description"`
 	IsDefault   bool      `gorm:"not null;default:false" json:"isDefault"`
 	CreatedAt   time.Time `gorm:"default:now()" json:"createdAt"`

@@ -17,11 +17,18 @@ export function ScreenClockWidget({
   /** When set, forces 24h (overrides locale default for am/pm). */
   use24Hour?: boolean;
 }) {
-  const [now, setNow] = useState(new Date());
+  const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
+    const raf = requestAnimationFrame(() => setNow(new Date()));
     const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(t);
+    };
   }, []);
+  if (now == null) {
+    return <div className='min-w-0' aria-hidden />;
+  }
   const intl = intlLocaleFromAppLocale(locale);
   return (
     <div

@@ -83,9 +83,12 @@ func (a *apTestSignage) ListFeedsByUnit(string) ([]models.ExternalFeed, error)  
 func (a *apTestSignage) GetFeedByID(string) (*models.ExternalFeed, error) {
 	return nil, gorm.ErrRecordNotFound
 }
-func (a *apTestSignage) CreateFeed(*models.ExternalFeed) error           { return nil }
-func (a *apTestSignage) UpdateFeed(*models.ExternalFeed) error           { return nil }
-func (a *apTestSignage) DeleteFeed(string) error                         { return gorm.ErrRecordNotFound }
+func (a *apTestSignage) CreateFeed(*models.ExternalFeed) error { return nil }
+func (a *apTestSignage) UpdateFeed(*models.ExternalFeed) error { return nil }
+func (a *apTestSignage) DeleteFeed(string) error               { return gorm.ErrRecordNotFound }
+func (a *apTestSignage) WithFeedLockedForUpdate(_ context.Context, _ string, _ func(*models.ExternalFeed) error) error {
+	return nil
+}
 func (a *apTestSignage) ListActiveFeeds() ([]models.ExternalFeed, error) { return nil, nil }
 func (a *apTestSignage) ListAnnouncementsByUnit(string, bool) ([]models.ScreenAnnouncement, error) {
 	return nil, nil

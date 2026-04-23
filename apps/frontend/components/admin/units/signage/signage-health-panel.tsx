@@ -13,11 +13,13 @@ function translateSignageSource(
 ): string {
   switch (source) {
     case 'none':
-      return t('healthSourceNone', { default: 'None' });
+      return t('healthSourceNone');
     case 'schedule':
-      return t('healthSourceSchedule', { default: 'Schedule' });
+      return t('healthSourceSchedule');
     case 'default':
-      return t('healthSourceDefault', { default: 'Default playlist' });
+      return t('healthSourceDefault');
+    case 'fallback':
+      return t('healthSourceFallback');
     default:
       return source ?? '—';
   }

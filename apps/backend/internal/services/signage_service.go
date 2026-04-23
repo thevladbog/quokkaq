@@ -28,6 +28,10 @@ var activePlaylistNow = time.Now
 // (legacy ad-screen import should only add one; duplicate rows were possible if the client re-ran import).
 var ErrDuplicateDefaultPlaylistName = errors.New("a playlist named Default already exists for this unit")
 
+// ErrSignageScheduleOverlap is returned when two *active* schedules on the same unit can apply on the
+// same day at the same clock time (overlapping calendar+weekday+time windows).
+var ErrSignageScheduleOverlap = errors.New("an active schedule already covers this time window (adjust dates, days, or time range)")
+
 // SignageService manages digital signage playlists, schedules, external feeds, and screen announcements.
 type SignageService interface {
 	// Playlists
@@ -66,7 +70,7 @@ type SignageService interface {
 
 // ActivePlaylistDTO is the public wire shape for the currently effective playlist.
 type ActivePlaylistDTO struct {
-	Source   string           `json:"source"` // schedule | default | none
+	Source   string           `json:"source"` // schedule | default | fallback | none
 	Playlist *models.Playlist `json:"playlist,omitempty"`
 	UnitID   string           `json:"unitId"`
 }
@@ -241,6 +245,16 @@ func (s *signageService) UpdatePlaylist(unitID, playlistID string, p *models.Pla
 	if err != nil {
 		return err
 	}
+	// Prevent a second "Default" playlist in the same unit (same rule as CreatePlaylist)
+	if p.Name == "Default" && existing.Name != "Default" {
+		n, err := s.signageRepo.CountPlaylistsByUnitWithName(unitID, "Default")
+		if err != nil {
+			return err
+		}
+		if n > 0 {
+			return ErrDuplicateDefaultPlaylistName
+		}
+	}
 	existing.Name = p.Name
 	existing.Description = p.Description
 	existing.IsDefault = p.IsDefault
@@ -314,6 +328,12 @@ func (s *signageService) CreateSchedule(unitID string, sc *models.PlaylistSchedu
 	if sc.DaysOfWeek == "" {
 		sc.DaysOfWeek = "1,2,3,4,5,6,7"
 	}
+	if err := validateScheduleTimeFields(sc); err != nil {
+		return err
+	}
+	if err := s.assertNoActiveScheduleConflict(unitID, sc, ""); err != nil {
+		return err
+	}
 	if err := s.signageRepo.CreateSchedule(sc); err != nil {
 		return err
 	}
@@ -333,6 +353,15 @@ func (s *signageService) UpdateSchedule(unitID, scheduleID string, sc *models.Pl
 	}
 	sc.ID = scheduleID
 	sc.UnitID = unitID
+	if sc.DaysOfWeek == "" {
+		sc.DaysOfWeek = "1,2,3,4,5,6,7"
+	}
+	if err := validateScheduleTimeFields(sc); err != nil {
+		return err
+	}
+	if err := s.assertNoActiveScheduleConflict(unitID, sc, scheduleID); err != nil {
+		return err
+	}
 	if err := s.signageRepo.UpdateSchedule(sc); err != nil {
 		return err
 	}
@@ -410,6 +439,111 @@ func timeInWindow(curMin, startMin, endMin int) bool {
 	}
 	// overnight
 	return curMin >= startMin || curMin < endMin
+}
+
+func ymdOrMinForSchedule(t *time.Time) string {
+	if t == nil {
+		return "0000-01-01"
+	}
+	return ymdStringFromDatePtr(t)
+}
+
+func ymdOrMaxForSchedule(t *time.Time) string {
+	if t == nil {
+		return "9999-12-31"
+	}
+	return ymdStringFromDatePtr(t)
+}
+
+// scheduleCalendarRangesTouch is true if the [validFrom, validTo] (inclusive) date ranges can both apply
+// on at least one common calendar day.
+func scheduleCalendarRangesTouch(a, b *models.PlaylistSchedule) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	a0, a1 := ymdOrMinForSchedule(a.ValidFrom), ymdOrMaxForSchedule(a.ValidTo)
+	b0, b1 := ymdOrMinForSchedule(b.ValidFrom), ymdOrMaxForSchedule(b.ValidTo)
+	return a0 <= b1 && b0 <= a1
+}
+
+func daySetsOverlapStr(d1, d2 string) bool {
+	s1, s2 := parseDaySet(d1), parseDaySet(d2)
+	for d := range s1 {
+		if _, ok := s2[d]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// timeWindowsOverlapAnyMinute returns true if the two [start,end) windows share at least one minute
+// in a 24h day (including overnight windows).
+func timeWindowsOverlapAnyMinute(start1, end1, start2, end2 int) bool {
+	if end1 == start1 || end2 == start2 {
+		// A full 24h window in our model; treat as overlapping with any other window.
+		return true
+	}
+	for m := 0; m < 24*60; m++ {
+		if timeInWindow(m, start1, end1) && timeInWindow(m, start2, end2) {
+			return true
+		}
+	}
+	return false
+}
+
+func validateScheduleTimeFields(sc *models.PlaylistSchedule) error {
+	if sc == nil {
+		return errors.New("schedule is nil")
+	}
+	if _, err := parseHHMM(sc.StartTime); err != nil {
+		return errors.New("startTime: use HH:MM (24h)")
+	}
+	if _, err := parseHHMM(sc.EndTime); err != nil {
+		return errors.New("endTime: use HH:MM (24h)")
+	}
+	return nil
+}
+
+func schedulesActivelyConflict(a, b *models.PlaylistSchedule) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	if !a.IsActive || !b.IsActive {
+		return false
+	}
+	if !scheduleCalendarRangesTouch(a, b) {
+		return false
+	}
+	if !daySetsOverlapStr(a.DaysOfWeek, b.DaysOfWeek) {
+		return false
+	}
+	aStart, err1 := parseHHMM(a.StartTime)
+	aEnd, err2 := parseHHMM(a.EndTime)
+	bStart, err3 := parseHHMM(b.StartTime)
+	bEnd, err4 := parseHHMM(b.EndTime)
+	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+		return false
+	}
+	return timeWindowsOverlapAnyMinute(aStart, aEnd, bStart, bEnd)
+}
+
+func (s *signageService) assertNoActiveScheduleConflict(unitID string, sc *models.PlaylistSchedule, excludeID string) error {
+	if sc == nil || !sc.IsActive {
+		return nil
+	}
+	others, err := s.signageRepo.ListSchedulesByUnit(unitID)
+	if err != nil {
+		return err
+	}
+	for i := range others {
+		if excludeID != "" && others[i].ID == excludeID {
+			continue
+		}
+		if schedulesActivelyConflict(sc, &others[i]) {
+			return ErrSignageScheduleOverlap
+		}
+	}
+	return nil
 }
 
 func (s *signageService) ActivePlaylist(ctx context.Context, unitID string) (*ActivePlaylistDTO, error) {
@@ -500,7 +634,8 @@ func (s *signageService) ActivePlaylist(ctx context.Context, unitID string) (*Ac
 			return nil, err
 		}
 		full = filterActivePlaylistItems(full, todayYMD)
-		return &ActivePlaylistDTO{Source: "default", Playlist: full, UnitID: unitID}, nil
+		// "fallback" = we’re using the first available playlist, not a playlist marked default.
+		return &ActivePlaylistDTO{Source: "fallback", Playlist: full, UnitID: unitID}, nil
 	}
 	return &ActivePlaylistDTO{Source: "none", UnitID: unitID}, nil
 }
@@ -600,7 +735,12 @@ func (s *signageService) CreateFeed(unitID string, f *models.ExternalFeed) error
 	if err := s.signageRepo.CreateFeed(f); err != nil {
 		return err
 	}
-	_ = s.PollFeedByID(context.Background(), f.ID)
+	fid := f.ID
+	go func() {
+		pctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+		defer cancel()
+		_ = s.PollFeedByID(pctx, fid)
+	}()
 	s.wsBroadcastForUnit(u, "feed.updated", map[string]interface{}{"kind": "feed", "feedId": f.ID})
 	return nil
 }
@@ -639,56 +779,58 @@ func (s *signageService) DeleteFeed(unitID, feedID string) error {
 	return nil
 }
 
-// PollFeedByID fetches remote data and stores cachedData.
+// PollFeedByID fetches remote data and stores cachedData. Row-level locking prevents
+// concurrent polls of the same feed from overwriting one another.
 func (s *signageService) PollFeedByID(ctx context.Context, feedID string) error {
-	f, err := s.signageRepo.GetFeedByID(feedID)
+	var feedUnitID string
+	err := s.signageRepo.WithFeedLockedForUpdate(ctx, feedID, func(f *models.ExternalFeed) error {
+		feedUnitID = f.UnitID
+		if !f.IsActive {
+			return nil
+		}
+		var raw json.RawMessage
+		var errFetch error
+		switch strings.ToLower(f.Type) {
+		case "rss":
+			raw, errFetch = s.pollRSS(ctx, f.URL)
+		case "weather":
+			raw, errFetch = s.pollWeather(ctx, f.Config, f.URL)
+		case "custom_url", "custom":
+			raw, errFetch = s.pollCustomURL(ctx, f.URL)
+		default:
+			errFetch = fmt.Errorf("unknown feed type: %s", f.Type)
+		}
+		now := time.Now()
+		f.LastFetchAt = &now
+		if errFetch != nil {
+			f.ConsecutiveFailures++
+			f.LastError = errFetch.Error()
+		} else {
+			f.ConsecutiveFailures = 0
+			f.LastError = ""
+			f.CachedData = raw
+		}
+		return nil
+	})
 	if err != nil {
 		return err
 	}
-	if !f.IsActive {
-		return nil
-	}
-	var raw json.RawMessage
-	var errFetch error
-	switch strings.ToLower(f.Type) {
-	case "rss":
-		raw, errFetch = s.pollRSS(ctx, f.URL)
-	case "weather":
-		raw, errFetch = s.pollWeather(f.Config, f.URL)
-	case "custom_url", "custom":
-		raw, errFetch = s.pollCustomURL(ctx, f.URL)
-	default:
-		errFetch = fmt.Errorf("unknown feed type: %s", f.Type)
-	}
-	now := time.Now()
-	f.LastFetchAt = &now
-	if errFetch != nil {
-		f.ConsecutiveFailures++
-		f.LastError = errFetch.Error()
-	} else {
-		f.ConsecutiveFailures = 0
-		f.LastError = ""
-		f.CachedData = raw
-	}
-	if err := s.signageRepo.UpdateFeed(f); err != nil {
-		return err
-	}
-	unit, _ := s.unitRepo.FindByIDLight(f.UnitID)
+	unit, _ := s.unitRepo.FindByIDLight(feedUnitID)
 	if unit != nil {
 		room := WebSocketRoomIDForUnit(unit)
 		if s.hub != nil {
 			s.hub.BroadcastEvent("feed.updated", map[string]interface{}{
 				"unitId": room,
-				"feedId": f.ID,
+				"feedId": feedID,
 			}, room)
 		}
 	}
 	return nil
 }
 
-func (s *signageService) pollRSS(_ context.Context, u string) (json.RawMessage, error) {
+func (s *signageService) pollRSS(ctx context.Context, u string) (json.RawMessage, error) {
 	fp := gofeed.NewParser()
-	feed, err := fp.ParseURL(u)
+	feed, err := fp.ParseURLWithContext(u, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -723,7 +865,7 @@ func (s *signageService) pollRSS(_ context.Context, u string) (json.RawMessage, 
 
 // pollWeather fetches current conditions from Open-Meteo (no API key; rate limits apply). Prefer config.lat/lon;
 // when missing, a full URL in fallbackURL is fetched like custom_url.
-func (s *signageService) pollWeather(config json.RawMessage, fallbackURL string) (json.RawMessage, error) {
+func (s *signageService) pollWeather(ctx context.Context, config json.RawMessage, fallbackURL string) (json.RawMessage, error) {
 	type cfg struct {
 		Lat *float64 `json:"lat"`
 		Lon *float64 `json:"lon"`
@@ -732,10 +874,10 @@ func (s *signageService) pollWeather(config json.RawMessage, fallbackURL string)
 	_ = json.Unmarshal(config, &c)
 	if c.Lat != nil && c.Lon != nil {
 		u := fmt.Sprintf("https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m,weather_code&timezone=auto", *c.Lat, *c.Lon)
-		return s.httpGetJSON(u)
+		return s.httpGetJSON(ctx, u)
 	}
 	if strings.TrimSpace(fallbackURL) != "" {
-		return s.httpGetJSON(fallbackURL)
+		return s.httpGetJSON(ctx, fallbackURL)
 	}
 	return nil, errors.New("weather feed requires config.lat / config.lon or a URL")
 }
@@ -744,10 +886,10 @@ func (s *signageService) pollCustomURL(ctx context.Context, u string) (json.RawM
 	var last error
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
-			if ctx.Err() != nil {
-				return nil, ctx.Err()
+			delay := time.Duration(200*int(math.Pow(2, float64(attempt-1)))) * time.Millisecond
+			if err := waitCtx(ctx, delay); err != nil {
+				return nil, err
 			}
-			time.Sleep(time.Duration(200*int(math.Pow(2, float64(attempt-1)))) * time.Millisecond)
 		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 		if err != nil {
@@ -783,13 +925,38 @@ func (s *signageService) pollCustomURL(ctx context.Context, u string) (json.RawM
 	return nil, errors.New("pollCustomURL: exhausted retries")
 }
 
-func (s *signageService) httpGetJSON(u string) (json.RawMessage, error) {
+// waitCtx sleeps for d or returns ctx.Err() if the context is cancelled.
+func waitCtx(ctx context.Context, d time.Duration) error {
+	if d <= 0 {
+		return ctx.Err()
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
+}
+
+func (s *signageService) httpGetJSON(ctx context.Context, u string) (json.RawMessage, error) {
 	var last error
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
-			time.Sleep(time.Duration(200*int(math.Pow(2, float64(attempt-1)))) * time.Millisecond)
+			delay := time.Duration(200*int(math.Pow(2, float64(attempt-1)))) * time.Millisecond
+			if err := waitCtx(ctx, delay); err != nil {
+				return nil, err
+			}
 		}
-		res, err := s.httpClient.Get(u)
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+		res, err := s.httpClient.Do(req)
 		if err != nil {
 			last = err
 			continue

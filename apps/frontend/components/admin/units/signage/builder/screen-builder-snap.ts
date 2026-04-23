@@ -5,7 +5,7 @@ import type { Modifier } from '@dnd-kit/core';
 const GRID = 16;
 
 /**
- * Snaps the drag overlay to an 8px grid (reduces “floaty” drag feel).
+ * Snaps the drag overlay to a 16px grid (reduces “floaty” drag feel).
  */
 export const screenBuilderSnap = createSnapModifier(GRID);
 
@@ -13,7 +13,7 @@ export const GRID_PX = GRID;
 
 /**
  * `restrictToWindowEdges` — keep the overlay inside the viewport.
- * `screenBuilderSnap` — 8px grid snap.
+ * `screenBuilderSnap` — 16px grid snap.
  */
 export const screenBuilderDndModifiers: Modifier[] = [
   restrictToWindowEdges,

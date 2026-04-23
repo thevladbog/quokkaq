@@ -9,7 +9,6 @@ import {
   BuilderWidgetSchematicChips,
   widgetShortLabel
 } from './widget-preview';
-import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -44,46 +43,33 @@ function DraggableWidgetCard({ type }: { type: ScreenWidgetType }) {
     });
   const style = { transform: CSS.Translate.toString(transform) };
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      className='touch-manipulation'
-    >
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div>
-            <Card
-              className={cn(
-                'cursor-grab border-dashed p-2 transition-shadow select-none',
-                isDragging ? 'ring-primary ring-2' : 'hover:bg-muted/40'
-              )}
-              role='listitem'
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                }
-              }}
-              aria-label={t('library.drag', {
-                name: widgetShortLabel(t, type)
-              })}
-              {...listeners}
-            >
-              <BuilderWidgetSchematicChips type={type} />
-            </Card>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side='right' className='max-w-md'>
-          <p className='font-medium'>{widgetShortLabel(t, type)}</p>
-          <p className='text-muted-foreground text-xs'>
-            {t('library.dragToRegion', {
-              default: 'Drag into a screen region'
-            })}
-          </p>
-        </TooltipContent>
-      </Tooltip>
-    </div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          ref={setNodeRef}
+          style={style}
+          {...attributes}
+          {...listeners}
+          className={cn(
+            'bg-card text-card-foreground border-border flex cursor-grab touch-manipulation flex-col gap-1 rounded-xl border border-dashed p-2 shadow-sm transition-shadow select-none',
+            isDragging ? 'ring-primary ring-2' : 'hover:bg-muted/40'
+          )}
+          aria-label={t('library.drag', {
+            name: widgetShortLabel(t, type)
+          })}
+        >
+          <BuilderWidgetSchematicChips type={type} />
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side='right' className='max-w-md'>
+        <p className='font-medium'>{widgetShortLabel(t, type)}</p>
+        <p className='text-muted-foreground text-xs'>
+          {t('library.dragToRegion', {
+            default: 'Drag into a screen region'
+          })}
+        </p>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

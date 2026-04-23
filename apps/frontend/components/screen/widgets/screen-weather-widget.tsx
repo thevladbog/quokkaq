@@ -29,13 +29,14 @@ export function ScreenWeatherWidget({
 
   useEffect(() => {
     if (!feedId) return;
+    let active = true;
     const load = async () => {
       try {
         const raw = (await unitsApi.getPublicFeedData(
           unitId,
           feedId
         )) as unknown as Record<string, unknown> | null;
-        if (!raw) return;
+        if (!raw || !active) return;
         setData(resolveOpenMeteoSnapshot(raw));
       } catch (e) {
         logger.error('weather widget', e);
@@ -43,7 +44,10 @@ export function ScreenWeatherWidget({
     };
     void load();
     const iv = setInterval(load, 300_000);
-    return () => clearInterval(iv);
+    return () => {
+      active = false;
+      clearInterval(iv);
+    };
   }, [unitId, feedId]);
 
   if (!data || data.temperatureC == null) {

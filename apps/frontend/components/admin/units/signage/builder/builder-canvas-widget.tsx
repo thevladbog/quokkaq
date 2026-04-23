@@ -38,7 +38,6 @@ export function BuilderCanvasWidget({
   const setWidgetPlacement = useScreenBuilderStore((s) => s.setWidgetPlacement);
 
   const placementKey = `${widget.placement.col}-${widget.placement.row}-${widget.placement.colSpan}-${widget.placement.rowSpan}`;
-  const [lastPlacementKey, setLastPlacementKey] = useState(placementKey);
   const [resizeSpan, setResizeSpan] = useState<{
     colSpan: number;
     rowSpan: number;
@@ -53,10 +52,12 @@ export function BuilderCanvasWidget({
     resizeSpanRef.current = resizeSpan;
   }, [resizeSpan]);
 
-  if (placementKey !== lastPlacementKey) {
-    setLastPlacementKey(placementKey);
-    setResizeSpan(null);
-  }
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      setResizeSpan(null);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [placementKey]);
 
   const itemStyle = useMemo(() => {
     const effectivePlacement = resizeSpan

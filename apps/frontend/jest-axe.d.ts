@@ -1,6 +1,11 @@
 declare module 'jest-axe' {
-  import type { Result } from 'axe-core';
+  import type { AxeResults, RunOptions } from 'axe-core';
 
-  export function axe(element: Element): Promise<Result>;
-  export const toHaveNoViolations: unknown;
+  export function axe(
+    html: Element | string,
+    options?: RunOptions
+  ): Promise<AxeResults>;
+  export const toHaveNoViolations: {
+    toHaveNoViolations: (results?: Partial<AxeResults>) => unknown;
+  };
 }

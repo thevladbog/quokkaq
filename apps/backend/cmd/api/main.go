@@ -268,7 +268,7 @@ func run() error {
 	companySSOHTTP := handlers.NewCompanySSOHTTP(ssoService, userRepo, companyRepo)
 	tenantRBACHTTP := handlers.NewTenantRBACHTTP(tenantRBACRepo, userRepo, ssoService)
 	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService, userRepo)
-	signageHandler := handlers.NewSignageHandler(signageService)
+	signageHandler := handlers.NewSignageHandler(signageService, unitRepo)
 	etaService := services.NewETAServiceFull(ticketRepo, counterRepo, serviceRepo, unitRepo, statsRepo)
 	predictionService := services.NewPredictionService(database.DB, hub, etaService, unitRepo, ticketRepo)
 	etaBroadcaster := services.NewETABroadcaster(etaService, hub, 0)

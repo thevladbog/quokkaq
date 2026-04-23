@@ -302,17 +302,24 @@ func (h *TicketHandler) GetTicketsByUnit(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// Same virtual fields as GetTicketByID so public screen / signage can show queue position without N+1 fetches.
+	// Same virtual fields as GetTicketByID so public screen / signage can show queue position without N+1 DB fetches.
 	if h.eta != nil {
-		for i := range tickets {
-			if tickets[i].Status != "waiting" {
-				continue
+		snap, etaErr := h.eta.ComputeUnitETASnapshot(unitID)
+		if etaErr == nil {
+			byID := make(map[string]services.TicketETAInfo, len(snap.Tickets))
+			for j := range snap.Tickets {
+				byID[snap.Tickets[j].TicketID] = snap.Tickets[j]
 			}
-			t := &tickets[i]
-			if result, etaErr := h.eta.QueuePositionAndETA(t); etaErr == nil && result.Position > 0 {
-				t.QueuePosition = &result.Position
-				if result.EstimatedWaitSec > 0 {
-					t.EstimatedWaitSeconds = &result.EstimatedWaitSec
+			for i := range tickets {
+				if tickets[i].Status != "waiting" {
+					continue
+				}
+				t := &tickets[i]
+				if ti, ok := byID[t.ID]; ok && ti.Position > 0 {
+					t.QueuePosition = &ti.Position
+					if ti.EstimatedWaitSec > 0 {
+						t.EstimatedWaitSeconds = &ti.EstimatedWaitSec
+					}
 				}
 			}
 		}
