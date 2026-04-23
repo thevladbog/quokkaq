@@ -29,6 +29,20 @@ func TestScheduleInCalendarWindow(t *testing.T) {
 	}
 }
 
+func TestScheduleInCalendarWindow_unbounded(t *testing.T) {
+	if !scheduleInCalendarWindow(&models.PlaylistSchedule{}, "2025-01-01") {
+		t.Fatal("expected true with no validFrom/validTo")
+	}
+	vf := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+	if !scheduleInCalendarWindow(&models.PlaylistSchedule{ValidFrom: &vf}, "2025-06-01") {
+		t.Fatal("expected true on first day")
+	}
+	vt := time.Date(2025, 6, 30, 0, 0, 0, 0, time.UTC)
+	if !scheduleInCalendarWindow(&models.PlaylistSchedule{ValidTo: &vt}, "2025-06-30") {
+		t.Fatal("expected true on last day")
+	}
+}
+
 func TestFilterActivePlaylistItems(t *testing.T) {
 	v0 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	v1 := time.Date(2030, 12, 31, 0, 0, 0, 0, time.UTC)

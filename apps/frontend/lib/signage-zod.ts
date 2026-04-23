@@ -5,6 +5,7 @@ import {
   PlaylistItemInputSchema,
   PlaylistSchema,
   PlaylistScheduleSchema,
+  PlaylistScheduleUpdateBodySchema,
   ScreenAnnouncementSchema,
   ScreenTemplateSchema
 } from '@quokkaq/shared-types';
@@ -48,10 +49,7 @@ export const updatePlaylistRequestSchema = z.object({
   items: z.array(PlaylistItemInputSchema).min(1, 'at least one item')
 });
 
-export const updateSignageScheduleBodySchema = PlaylistScheduleSchema.omit({
-  id: true,
-  unitId: true
-});
+export const updateSignageScheduleBodySchema = PlaylistScheduleUpdateBodySchema;
 
 export const signageZod = {
   playlist: PlaylistSchema,

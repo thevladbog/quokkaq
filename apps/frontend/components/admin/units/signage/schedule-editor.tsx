@@ -1,7 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import {
+  getCivilYmdInIanaTimeZone,
+  scheduleInCalendarForTodayYmd
+} from '@/lib/signage-date';
 import * as orval from '@/lib/api/generated/units';
 import {
   safeParseSignageWithToast,
@@ -9,20 +13,127 @@ import {
   updateSignageScheduleBodySchema
 } from '@/lib/signage-zod';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import { TimePicker } from '@/components/ui/time-picker';
 import { toast } from 'sonner';
 import { newScheduleOverlapsAnyExisting } from '@/lib/signage-schedule-overlap';
 import { ScheduleTimeline } from './schedule-timeline';
 
-export function ScheduleEditor({ unitId }: { unitId: string }) {
+const emptyPlaylists: orval.ModelsPlaylist[] = [];
+const emptySchedules: orval.ModelsPlaylistSchedule[] = [];
+const DOW = [1, 2, 3, 4, 5, 6, 7] as const;
+const DOW_NAME_KEYS = [
+  'dayNameMon',
+  'dayNameTue',
+  'dayNameWed',
+  'dayNameThu',
+  'dayNameFri',
+  'dayNameSat',
+  'dayNameSun'
+] as const;
+
+function WeekdayMultiSelect({
+  value,
+  onChange,
+  t
+}: {
+  value: number[];
+  onChange: (next: number[]) => void;
+  t: (key: string, o?: { default?: string }) => string;
+}) {
+  const dayLabels = DOW_NAME_KEYS.map((k) => t(k));
+  const labelText = value
+    .slice()
+    .sort((a, b) => a - b)
+    .map((d) => dayLabels[d - 1] ?? d)
+    .join(', ');
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type='button'
+          variant='outline'
+          className='border-input bg-background h-auto min-h-10 w-full justify-start py-2 text-left font-normal whitespace-normal'
+        >
+          {value.length === 0 ? (
+            <span className='text-muted-foreground'>
+              {t('selectDays', { default: 'Select days' })}
+            </span>
+          ) : (
+            labelText
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className='p-2 sm:w-72' align='start'>
+        <div className='flex max-h-72 min-w-0 flex-col gap-0.5'>
+          {DOW.map((d) => {
+            const checked = value.includes(d);
+            return (
+              <label
+                key={d}
+                className='hover:bg-accent/60 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm'
+              >
+                <Checkbox
+                  checked={checked}
+                  onCheckedChange={(c) => {
+                    if (c === true) {
+                      onChange([...value, d].sort((a, b) => a - b));
+                    } else {
+                      onChange(value.filter((x) => x !== d));
+                    }
+                  }}
+                />
+                <span className='min-w-0 flex-1 leading-snug'>
+                  {dayLabels[d - 1] ?? d}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export function ScheduleEditor({
+  unitId,
+  unitTimezone
+}: {
+  unitId: string;
+  unitTimezone: string;
+}) {
   const t = useTranslations('admin.signage');
-  const { data: playlists } = orval.useListSignagePlaylists(unitId);
-  const { data: schedules, refetch: refetchSch } =
+  const tCommon = useTranslations('common');
+  const timeStartId = useId();
+  const timeEndId = useId();
+  const todayYmd = useMemo(
+    () => getCivilYmdInIanaTimeZone(unitTimezone || 'UTC'),
+    [unitTimezone]
+  );
+  const { data: playlistsRes } = orval.useListSignagePlaylists(unitId);
+  const { data: schedulesRes, refetch: refetchSch } =
     orval.useListSignageSchedules(unitId);
+  const playlists = playlistsRes?.data ?? emptyPlaylists;
   const playlistNameById = useMemo(() => {
     const m = new Map<string, string>();
-    for (const p of (playlists as orval.ModelsPlaylist[] | undefined) ?? []) {
+    for (const p of playlists) {
       if (p.id) {
         m.set(p.id, p.name ?? p.id);
       }
@@ -30,7 +141,7 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
     return m;
   }, [playlists]);
   const [scPl, setScPl] = useState('');
-  const [scDays, setScDays] = useState('1,2,3,4,5');
+  const [dayNums, setDayNums] = useState<number[]>([1, 2, 3, 4, 5]);
   const [scStart, setScStart] = useState('09:00');
   const [scEnd, setScEnd] = useState('18:00');
   const [scValidFrom, setScValidFrom] = useState('');
@@ -39,13 +150,23 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
   const createSc = orval.useCreateSignageSchedule();
   const delSc = orval.useDeleteSignageSchedule();
   const updSc = orval.useUpdateSignageSchedule();
-  const list = (schedules as orval.ModelsPlaylistSchedule[] | undefined) ?? [];
+  const list = schedulesRes?.data ?? emptySchedules;
 
   const onCreate = async () => {
     if (!scPl) {
       toast.error(t('pickPlaylist', { default: 'Select a playlist' }));
       return;
     }
+    if (dayNums.length === 0) {
+      toast.error(
+        t('selectAtLeastOneDay', { default: 'Select at least one day' })
+      );
+      return;
+    }
+    const scDays = dayNums
+      .slice()
+      .sort((a, b) => a - b)
+      .join(',');
     const body = {
       playlistId: scPl,
       daysOfWeek: scDays,
@@ -83,7 +204,13 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
   };
 
   const onDelete = async (scheduleId: string) => {
-    if (!window.confirm('Delete this schedule?')) return;
+    if (
+      !window.confirm(
+        t('confirmDeleteSchedule', { default: 'Delete this schedule?' })
+      )
+    ) {
+      return;
+    }
     try {
       await delSc.mutateAsync({ unitId, scheduleId });
       void refetchSch();
@@ -95,74 +222,106 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
   return (
     <div className='space-y-4'>
       <ScheduleTimeline
-        schedules={list.map((s) => ({
-          id: s.id ?? '',
-          startTime: s.startTime ?? '00:00',
-          endTime: s.endTime ?? '00:00',
-          daysOfWeek: s.daysOfWeek ?? '',
-          priority: s.priority ?? 0,
-          playlistId: s.playlistId,
-          playlistName: s.playlistId
-            ? (playlistNameById.get(s.playlistId) ?? s.playlistId)
-            : undefined
-        }))}
+        todayYmd={todayYmd}
+        schedules={list.map((s) => {
+          const vf = s.validFrom ? String(s.validFrom).slice(0, 10) : undefined;
+          const vt = s.validTo ? String(s.validTo).slice(0, 10) : undefined;
+          return {
+            id: s.id ?? '',
+            startTime: s.startTime ?? '00:00',
+            endTime: s.endTime ?? '00:00',
+            daysOfWeek: s.daysOfWeek ?? '',
+            priority: s.priority ?? 0,
+            playlistId: s.playlistId,
+            playlistName: s.playlistId
+              ? (playlistNameById.get(s.playlistId) ?? s.playlistId)
+              : undefined,
+            validFrom: vf,
+            validTo: vt
+          };
+        })}
       />
-      <div className='grid gap-2 sm:grid-cols-2'>
-        <div>
-          <Label>Playlist</Label>
-          <select
-            className='border-input bg-background w-full rounded-md border px-2 py-1'
-            value={scPl}
-            onChange={(e) => setScPl(e.target.value)}
+      <div className='grid gap-4 sm:grid-cols-2'>
+        <div className='min-w-0 space-y-2'>
+          <Label>{t('playlistField', { default: 'Playlist' })}</Label>
+          <Select
+            value={scPl || undefined}
+            onValueChange={(v) => setScPl(v === '_none' ? '' : v)}
           >
-            <option value=''>—</option>
-            {((playlists as orval.ModelsPlaylist[] | undefined) ?? []).map(
-              (p) => (
-                <option key={p.id} value={p.id ?? ''}>
-                  {p.name}
-                </option>
-              )
-            )}
-          </select>
+            <SelectTrigger className='border-input bg-background w-full'>
+              <SelectValue placeholder='—' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='_none'>—</SelectItem>
+              {playlists
+                .filter(
+                  (p): p is typeof p & { id: string } =>
+                    typeof p.id === 'string' && p.id.length > 0
+                )
+                .map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
         </div>
-        <div>
-          <Label>{t('daysLabel', { default: 'Days (1=Mon … 7=Sun)' })}</Label>
-          <Input value={scDays} onChange={(e) => setScDays(e.target.value)} />
+        <div className='min-w-0 space-y-2'>
+          <Label>{t('daysLabel', { default: 'Days of week' })}</Label>
+          <WeekdayMultiSelect value={dayNums} onChange={setDayNums} t={t} />
         </div>
-        <div>
-          <Label>Start</Label>
-          <Input value={scStart} onChange={(e) => setScStart(e.target.value)} />
+        <Field className='w-full min-w-0'>
+          <FieldLabel htmlFor={timeStartId}>
+            {t('scheduleStart', { default: 'Start' })}
+          </FieldLabel>
+          <TimePicker
+            id={timeStartId}
+            value={scStart}
+            onChange={setScStart}
+            step={60}
+            className='w-full'
+          />
+        </Field>
+        <Field className='w-full min-w-0'>
+          <FieldLabel htmlFor={timeEndId}>
+            {t('scheduleEnd', { default: 'End' })}
+          </FieldLabel>
+          <TimePicker
+            id={timeEndId}
+            value={scEnd}
+            onChange={setScEnd}
+            step={60}
+            className='w-full'
+          />
+        </Field>
+        <div className='min-w-0 space-y-2'>
+          <Label>
+            {t('scheduleValidFrom', { default: 'Valid from (date, optional)' })}
+          </Label>
+          <DatePicker
+            value={scValidFrom}
+            onChange={setScValidFrom}
+            placeholder={tCommon('pickDate', { default: 'Select date' })}
+            className='w-full'
+          />
         </div>
-        <div>
-          <Label>End</Label>
-          <Input value={scEnd} onChange={(e) => setScEnd(e.target.value)} />
+        <div className='min-w-0 space-y-2'>
+          <Label>
+            {t('scheduleValidTo', { default: 'Valid to (date, optional)' })}
+          </Label>
+          <DatePicker
+            value={scValidTo}
+            onChange={setScValidTo}
+            placeholder={tCommon('pickDate', { default: 'Select date' })}
+            className='w-full'
+          />
         </div>
-        <div>
-          <Label>Priority</Label>
+        <div className='min-w-0 space-y-2 sm:max-w-xs'>
+          <Label>{t('schedulePriority', { default: 'Priority' })}</Label>
           <Input
             type='number'
             value={priority}
             onChange={(e) => setPriority(parseInt(e.target.value, 10) || 0)}
-          />
-        </div>
-        <div>
-          <Label>
-            {t('scheduleValidFrom', { default: 'Valid from (date, optional)' })}
-          </Label>
-          <Input
-            type='date'
-            value={scValidFrom}
-            onChange={(e) => setScValidFrom(e.target.value)}
-          />
-        </div>
-        <div>
-          <Label>
-            {t('scheduleValidTo', { default: 'Valid to (date, optional)' })}
-          </Label>
-          <Input
-            type='date'
-            value={scValidTo}
-            onChange={(e) => setScValidTo(e.target.value)}
           />
         </div>
       </div>
@@ -184,6 +343,15 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
               {s.validFrom || s.validTo
                 ? ` · ${(s.validFrom ?? '…').toString().slice(0, 10)}–${(s.validTo ?? '…').toString().slice(0, 10)}`
                 : ''}
+              {s.validFrom || s.validTo
+                ? !scheduleInCalendarForTodayYmd(
+                    s.validFrom ? String(s.validFrom).slice(0, 10) : undefined,
+                    s.validTo ? String(s.validTo).slice(0, 10) : undefined,
+                    todayYmd
+                  )
+                  ? ` · [${t('scheduleOutsideCalendar', { default: 'outside calendar today' })}]`
+                  : null
+                : null}
             </span>
             <div className='flex items-center gap-1'>
               <Button

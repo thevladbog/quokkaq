@@ -15,6 +15,13 @@ import { SCREEN_TEMPLATE_PRESETS } from '@/lib/screen-template-presets';
 import { safeParseSignageWithToast, signageZod } from '@/lib/signage-zod';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { ScreenLayoutPreview } from './screen-layout-preview';
@@ -74,57 +81,80 @@ function WidgetOverlaysForm({
                 {w.type} <span className='font-mono'>({w.id})</span>
               </p>
               {w.type === 'rss-feed' && (
-                <div>
+                <div className='space-y-1.5'>
                   <Label htmlFor={`feed-${w.id}`}>
                     {t('rssWidgetFeed', { default: 'RSS — feed' })}
                   </Label>
-                  <select
-                    id={`feed-${w.id}`}
-                    className='border-input mt-1 w-full max-w-md rounded-md border p-2'
-                    value={overlays[w.id]?.feedId ?? ''}
-                    onChange={(e) =>
+                  <Select
+                    value={overlays[w.id]?.feedId || '_none'}
+                    onValueChange={(v) =>
                       setOverlays((prev) => ({
                         ...prev,
-                        [w.id]: { ...prev[w.id], feedId: e.target.value }
+                        [w.id]: {
+                          ...prev[w.id],
+                          feedId: v === '_none' ? '' : v
+                        }
                       }))
                     }
                   >
-                    <option value=''>{t('noFeed', { default: '—' })}</option>
-                    {feedList
-                      .filter((f) => f.type === 'rss')
-                      .map((f) => (
-                        <option key={f.id} value={f.id!}>
-                          {f.name}
-                        </option>
-                      ))}
-                  </select>
+                    <SelectTrigger
+                      id={`feed-${w.id}`}
+                      className='w-full max-w-md'
+                    >
+                      <SelectValue
+                        placeholder={t('noFeed', { default: '—' })}
+                      />
+                    </SelectTrigger>
+                    <SelectContent align='start' className='max-w-md'>
+                      <SelectItem value='_none'>
+                        {t('noFeed', { default: '—' })}
+                      </SelectItem>
+                      {feedList
+                        .filter((f) => f.type === 'rss' && f.id)
+                        .map((f) => (
+                          <SelectItem key={f.id} value={f.id!}>
+                            {f.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
               {w.type === 'weather' && (
-                <div>
+                <div className='space-y-1.5'>
                   <Label htmlFor={`w-${w.id}`}>
                     {t('weatherWidgetFeed', { default: 'Weather — feed' })}
                   </Label>
-                  <select
-                    id={`w-${w.id}`}
-                    className='border-input mt-1 w-full max-w-md rounded-md border p-2'
-                    value={overlays[w.id]?.feedId ?? ''}
-                    onChange={(e) =>
+                  <Select
+                    value={overlays[w.id]?.feedId || '_none'}
+                    onValueChange={(v) =>
                       setOverlays((prev) => ({
                         ...prev,
-                        [w.id]: { ...prev[w.id], feedId: e.target.value }
+                        [w.id]: {
+                          ...prev[w.id],
+                          feedId: v === '_none' ? '' : v
+                        }
                       }))
                     }
                   >
-                    <option value=''>{t('noFeed', { default: '—' })}</option>
-                    {feedList
-                      .filter((f) => f.type === 'weather')
-                      .map((f) => (
-                        <option key={f.id} value={f.id!}>
-                          {f.name}
-                        </option>
-                      ))}
-                  </select>
+                    <SelectTrigger id={`w-${w.id}`} className='w-full max-w-md'>
+                      <SelectValue
+                        placeholder={t('noFeed', { default: '—' })}
+                      />
+                    </SelectTrigger>
+                    <SelectContent align='start' className='max-w-md'>
+                      <SelectItem value='_none'>
+                        {t('noFeed', { default: '—' })}
+                      </SelectItem>
+                      {feedList
+                        .filter((f) => f.type === 'weather' && f.id)
+                        .map((f) => (
+                          <SelectItem key={f.id} value={f.id!}>
+                            {f.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
               {w.type === 'custom-html' && (
@@ -184,8 +214,8 @@ export function ScreenTemplateBuilder({
   const locale = useLocale();
   const qc = useQueryClient();
   const updateUnit = useUpdateUnit();
-  const { data: feeds } = orval.useListSignageFeeds(unitId);
-  const feedList = (feeds as orval.ModelsExternalFeed[] | undefined) ?? [];
+  const { data: feedsRes } = orval.useListSignageFeeds(unitId);
+  const feedList: orval.ModelsExternalFeed[] = feedsRes?.data ?? [];
 
   const raw = (unit.config as { screenTemplate?: unknown } | null)
     ?.screenTemplate;
@@ -305,21 +335,25 @@ export function ScreenTemplateBuilder({
 
   return (
     <div className='space-y-4'>
-      <div className='space-y-2'>
-        <Label>{t('presets', { default: 'Screen template' })}</Label>
-        <select
-          className='border-input w-full max-w-sm rounded-md border p-2'
-          value={layoutId}
-          onChange={(e) => {
-            setLayoutId(e.target.value);
-          }}
-        >
-          {Object.keys(SCREEN_TEMPLATE_PRESETS).map((k) => (
-            <option key={k} value={k}>
-              {k}
-            </option>
-          ))}
-        </select>
+      <div className='space-y-1.5'>
+        <Label htmlFor='signage-screen-template-preset'>
+          {t('presets', { default: 'Screen template' })}
+        </Label>
+        <Select value={layoutId} onValueChange={setLayoutId}>
+          <SelectTrigger
+            id='signage-screen-template-preset'
+            className='w-full max-w-sm'
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.keys(SCREEN_TEMPLATE_PRESETS).map((k) => (
+              <SelectItem key={k} value={k}>
+                {k}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <WidgetOverlaysForm

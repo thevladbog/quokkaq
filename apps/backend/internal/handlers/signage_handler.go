@@ -126,6 +126,10 @@ func (h *SignageHandler) CreatePlaylist(w http.ResponseWriter, r *http.Request) 
 		items[i] = models.PlaylistItem{MaterialID: req.Items[i].MaterialID, Duration: req.Items[i].Duration, ValidFrom: vf, ValidTo: vt}
 	}
 	if err := h.svc.CreatePlaylist(unitID, p, items); err != nil {
+		if errors.Is(err, services.ErrDuplicateDefaultPlaylistName) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		writeSignageError(w, err)
 		return
 	}

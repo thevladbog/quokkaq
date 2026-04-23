@@ -1,7 +1,17 @@
 import { useEffect, useRef } from 'react';
 import type { Unit } from '@quokkaq/shared-types';
+import { isApiHttpError } from '@/lib/api-errors';
 
 type MinimalPlaylist = { id?: string };
+
+function isDuplicateDefaultConflict(e: unknown): boolean {
+  if (isApiHttpError(e) && e.status === 409) {
+    return true;
+  }
+  const s = e instanceof Error ? e.message : String(e);
+  const t = s.toLowerCase();
+  return t.includes('a playlist named default already exists');
+}
 
 /**
  * When the unit has legacy `adScreen.activeMaterialIds` but no playlists yet, create a default
@@ -20,7 +30,8 @@ export function useLegacyPlaylistMigration(params: {
       items: { materialId: string; duration: number }[];
     };
   }) => Promise<unknown>;
-  patchUnitConfig: (config: Record<string, unknown>) => void;
+  /** Must complete only after the unit has been persisted with `legacyActiveMaterialsImportedAt`. */
+  patchUnitConfig: (config: Record<string, unknown>) => Promise<void> | void;
   onDone: () => void;
 }): void {
   const {
@@ -33,9 +44,10 @@ export function useLegacyPlaylistMigration(params: {
     onDone
   } = params;
   const ran = useRef(false);
+  const inFlight = useRef(false);
 
   useEffect(() => {
-    if (!isPlaylistsSuccess || ran.current) return;
+    if (!isPlaylistsSuccess || ran.current || inFlight.current) return;
     const cfg = unit.config;
     if (!cfg || typeof cfg !== 'object') return;
     const rec = cfg as Record<string, unknown>;
@@ -50,8 +62,22 @@ export function useLegacyPlaylistMigration(params: {
     const ids = ad?.activeMaterialIds?.filter(Boolean) ?? [];
     if (ids.length === 0) return;
     const duration = typeof ad?.duration === 'number' ? ad.duration : 10;
+
+    const markImportedConfig: Record<string, unknown> = {
+      ...rec,
+      signage: {
+        ...(typeof signage === 'object' && signage ? signage : {}),
+        legacyActiveMaterialsImportedAt: new Date().toISOString()
+      }
+    };
+
+    inFlight.current = true;
     ran.current = true;
     void (async () => {
+      const finishPatch = async () => {
+        await Promise.resolve(patchUnitConfig(markImportedConfig));
+        onDone();
+      };
       try {
         await createPlaylist({
           unitId,
@@ -61,16 +87,19 @@ export function useLegacyPlaylistMigration(params: {
             items: ids.map((materialId) => ({ materialId, duration }))
           }
         });
-        patchUnitConfig({
-          ...rec,
-          signage: {
-            ...(typeof signage === 'object' && signage ? signage : {}),
-            legacyActiveMaterialsImportedAt: new Date().toISOString()
+        await finishPatch();
+      } catch (e) {
+        if (isDuplicateDefaultConflict(e)) {
+          try {
+            await finishPatch();
+          } catch {
+            ran.current = false;
           }
-        });
-        onDone();
-      } catch {
-        ran.current = false;
+        } else {
+          ran.current = false;
+        }
+      } finally {
+        inFlight.current = false;
       }
     })();
   }, [

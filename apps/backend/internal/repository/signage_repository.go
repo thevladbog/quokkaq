@@ -11,6 +11,7 @@ import (
 type SignageRepository interface {
 	// Playlists
 	ListPlaylistsByUnit(unitID string) ([]models.Playlist, error)
+	CountPlaylistsByUnitWithName(unitID, name string) (int64, error)
 	GetPlaylistByID(id string) (*models.Playlist, error)
 	GetPlaylistByIDWithItems(id string) (*models.Playlist, error)
 	CreatePlaylist(p *models.Playlist) error
@@ -54,6 +55,12 @@ func (r *signageRepository) ListPlaylistsByUnit(unitID string) ([]models.Playlis
 	var out []models.Playlist
 	err := r.db.Where("unit_id = ?", unitID).Order("name ASC").Find(&out).Error
 	return out, err
+}
+
+func (r *signageRepository) CountPlaylistsByUnitWithName(unitID, name string) (int64, error) {
+	var c int64
+	err := r.db.Model(&models.Playlist{}).Where("unit_id = ? AND name = ?", unitID, name).Count(&c).Error
+	return c, err
 }
 
 func (r *signageRepository) GetPlaylistByID(id string) (*models.Playlist, error) {

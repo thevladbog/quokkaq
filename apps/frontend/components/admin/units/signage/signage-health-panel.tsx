@@ -2,7 +2,41 @@
 
 import { useTranslations } from 'next-intl';
 import * as orval from '@/lib/api/generated/units';
+import { formatIanaWithUtcOffset } from '@/lib/iana-timezone-combobox-options';
 import { Button } from '@/components/ui/button';
+
+type SignageT = (k: string, o?: { default: string }) => string;
+
+function translateSignageSource(
+  source: string | undefined,
+  t: SignageT
+): string {
+  switch (source) {
+    case 'none':
+      return t('healthSourceNone', { default: 'None' });
+    case 'schedule':
+      return t('healthSourceSchedule', { default: 'Schedule' });
+    case 'default':
+      return t('healthSourceDefault', { default: 'Default playlist' });
+    default:
+      return source ?? '—';
+  }
+}
+
+function translateSignageReason(reason: string, t: SignageT): string {
+  switch (reason) {
+    case 'no_playlist':
+      return t('healthReasonNoPlaylist', {
+        default: 'No playlist applies for the current time'
+      });
+    case 'no_slides_after_date_filter':
+      return t('healthReasonNoSlidesDateFilter', {
+        default: 'All slides are outside their date range for today'
+      });
+    default:
+      return reason;
+  }
+}
 
 export function SignageHealthPanel({ unitId }: { unitId: string }) {
   const t = useTranslations('admin.signage');
@@ -39,13 +73,15 @@ export function SignageHealthPanel({ unitId }: { unitId: string }) {
             <span className='text-muted-foreground'>
               {t('healthTimezone', { default: 'Timezone' })}:{' '}
             </span>
-            {h.timezone}
+            {h.timezone ? formatIanaWithUtcOffset(h.timezone) : '—'}
           </p>
           {h.active ? (
             <div>
               <p>
                 {t('healthActiveSource', { default: 'Active playlist' })}:{' '}
-                <code className='text-xs'>{h.active.source}</code>
+                <code className='text-xs'>
+                  {translateSignageSource(h.active.source, t)}
+                </code>
                 {h.active.empty ? (
                   <span className='text-destructive ml-2'>
                     {t('healthEmpty', {
@@ -56,15 +92,15 @@ export function SignageHealthPanel({ unitId }: { unitId: string }) {
               </p>
               {h.active.reason ? (
                 <p className='text-muted-foreground text-xs'>
-                  {h.active.reason}
+                  {translateSignageReason(h.active.reason, t)}
                 </p>
               ) : null}
             </div>
           ) : null}
           <p>
-            {t('healthPlaylists', { default: 'Playlists' })}: {h.playlistCount}{' '}
-            ·{t('healthSchedules', { default: ' Schedules' })}:{' '}
-            {h.scheduleCount}
+            {t('healthPlaylists', { default: 'Playlists' })}: {h.playlistCount}
+            {' · '}
+            {t('healthSchedules', { default: 'Schedules' })}: {h.scheduleCount}
             {h.hasDefaultPlaylist
               ? ` · ${t('hasDefault', { default: 'has default' })}`
               : ` · ${t('noDefault', { default: 'no default' })}`}

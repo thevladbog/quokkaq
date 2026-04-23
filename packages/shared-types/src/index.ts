@@ -540,13 +540,35 @@ export const SignageConfigSchema = z
 
 export type SignageConfig = z.infer<typeof SignageConfigSchema>;
 
-export const PlaylistItemInputSchema = z.object({
-  materialId: z.string(),
-  sortOrder: z.number().int().optional(),
-  duration: z.number().int().min(0).optional(),
-  validFrom: z.string().optional(),
-  validTo: z.string().optional()
-});
+/** Optional YYYY-MM-DD (empty/undefined allowed). */
+const optionalSignageYmd = z
+  .string()
+  .optional()
+  .refine(
+    (s) =>
+      s === undefined ||
+      s.trim() === '' ||
+      /^\d{4}-\d{2}-\d{2}$/.test(s.trim()),
+    { message: 'Date must be YYYY-MM-DD' }
+  );
+
+export const PlaylistItemInputSchema = z
+  .object({
+    materialId: z.string(),
+    sortOrder: z.number().int().optional(),
+    duration: z.number().int().min(0).optional(),
+    validFrom: optionalSignageYmd,
+    validTo: optionalSignageYmd
+  })
+  .refine(
+    (o) => {
+      const a = o.validFrom?.trim();
+      const b = o.validTo?.trim();
+      if (!a || !b) return true;
+      return a <= b;
+    },
+    { path: ['validTo'], message: 'validTo must be on or after validFrom' }
+  );
 
 export const PlaylistSchema = z.object({
   id: z.string().optional(),
@@ -559,18 +581,40 @@ export const PlaylistSchema = z.object({
   items: z.array(PlaylistItemInputSchema).optional()
 });
 
-export const PlaylistScheduleSchema = z.object({
+/** Object shape for schedule rows (use this with `.omit()`; full schema has refinements). */
+export const PlaylistScheduleObjectSchema = z.object({
   id: z.string().optional(),
   unitId: z.string().optional(),
   playlistId: z.string(),
   daysOfWeek: z.string(),
   startTime: z.string(),
   endTime: z.string(),
-  validFrom: z.string().optional(),
-  validTo: z.string().optional(),
+  validFrom: optionalSignageYmd,
+  validTo: optionalSignageYmd,
   priority: z.number().int().optional(),
   isActive: z.boolean().optional()
 });
+
+function refinePlaylistScheduleYmdOrder<
+  T extends { validFrom?: string; validTo?: string }
+>(o: T) {
+  const a = o.validFrom?.trim();
+  const b = o.validTo?.trim();
+  if (!a || !b) return true;
+  return a <= b;
+}
+
+export const PlaylistScheduleSchema = PlaylistScheduleObjectSchema.refine(
+  refinePlaylistScheduleYmdOrder,
+  { path: ['validTo'], message: 'validTo must be on or after validFrom' }
+);
+
+/** API body for PATCH schedule (omits `id` / `unitId` from path) — `PlaylistScheduleSchema.omit()` is not allowed after `.refine()`. */
+export const PlaylistScheduleUpdateBodySchema =
+  PlaylistScheduleObjectSchema.omit({ id: true, unitId: true }).refine(
+    refinePlaylistScheduleYmdOrder,
+    { path: ['validTo'], message: 'validTo must be on or after validFrom' }
+  );
 
 export const ExternalFeedTypeSchema = z.enum(['rss', 'weather', 'custom_url']);
 export const ExternalFeedSchema = z.object({

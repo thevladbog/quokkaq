@@ -8,6 +8,15 @@ import { unitsApi } from '@/lib/api';
 import { safeParseSignageWithToast, signageZod } from '@/lib/signage-zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   Tooltip,
@@ -16,10 +25,27 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip';
 
+function feedTypeUiLabel(
+  t: (key: string, o?: { default: string }) => string,
+  apiType: string | undefined
+): string {
+  switch (apiType) {
+    case 'rss':
+      return t('feedTypeRss', { default: 'RSS' });
+    case 'weather':
+      return t('feedTypeWeatherList', { default: 'Weather' });
+    case 'custom_url':
+      return t('feedTypeCustomUrl', { default: 'Custom URL' });
+    default:
+      return apiType ?? '';
+  }
+}
+
 export function FeedConfig({ unitId }: { unitId: string }) {
   const t = useTranslations('admin.signage');
-  const { data: feeds, refetch: refetchFeeds } =
+  const { data: feedsRes, refetch: refetchFeeds } =
     orval.useListSignageFeeds(unitId);
+  const feeds: orval.ModelsExternalFeed[] = feedsRes?.data ?? [];
   const [feedName, setFeedName] = useState('');
   const [feedType, setFeedType] = useState('rss');
   const [feedUrl, setFeedUrl] = useState('');
@@ -30,7 +56,10 @@ export function FeedConfig({ unitId }: { unitId: string }) {
   const deleteFeed = orval.useDeleteSignageFeed();
 
   const onCreate = async () => {
-    if (!feedName || !feedUrl) {
+    if (!feedName.trim() || !feedUrl.trim()) {
+      toast.error(
+        t('feedFormIncomplete', { default: 'Name and URL are required' })
+      );
       return;
     }
     const data = {
@@ -58,7 +87,11 @@ export function FeedConfig({ unitId }: { unitId: string }) {
   };
 
   const onDelete = async (id: string) => {
-    if (!window.confirm('Delete feed?')) return;
+    if (
+      !window.confirm(t('confirmDeleteFeed', { default: 'Delete this feed?' }))
+    ) {
+      return;
+    }
     try {
       await deleteFeed.mutateAsync({ unitId, feedId: id });
       void refetchFeeds();
@@ -80,33 +113,71 @@ export function FeedConfig({ unitId }: { unitId: string }) {
   return (
     <TooltipProvider>
       <div className='space-y-3'>
-        <div className='grid gap-2 sm:grid-cols-2'>
-          <Input
-            value={feedName}
-            onChange={(e) => setFeedName(e.target.value)}
-            placeholder='Name'
-          />
-          <select
-            className='border-input h-9 rounded-md border'
-            value={feedType}
-            onChange={(e) => setFeedType(e.target.value)}
-          >
-            <option value='rss'>rss</option>
-            <option value='weather'>
-              weather (Open-Meteo, lat/lon in config)
-            </option>
-            <option value='custom_url'>custom_url</option>
-          </select>
-          <Input
-            className='sm:col-span-2'
-            value={feedUrl}
-            onChange={(e) => setFeedUrl(e.target.value)}
-            placeholder='https://…'
-          />
-          <div className='flex items-center gap-2 sm:col-span-2'>
-            <span className='text-muted-foreground text-sm'>Poll s</span>
+        <div className='grid gap-4 sm:grid-cols-2'>
+          <div className='min-w-0 space-y-2'>
+            <Label htmlFor='signage-feed-name'>
+              {t('feedNameLabel', { default: 'Name' })}
+            </Label>
             <Input
-              className='w-24'
+              id='signage-feed-name'
+              value={feedName}
+              onChange={(e) => setFeedName(e.target.value)}
+              placeholder={t('feedNamePlaceholder', { default: 'Feed name' })}
+            />
+          </div>
+          <div className='min-w-0 space-y-2'>
+            <Label htmlFor='signage-feed-type'>
+              {t('feedTypeLabel', { default: 'Type' })}
+            </Label>
+            <Select value={feedType} onValueChange={setFeedType}>
+              <SelectTrigger
+                id='signage-feed-type'
+                className={cn(
+                  'h-auto min-h-9 w-full max-w-full items-start gap-2 py-2 pl-3 text-left leading-snug !whitespace-normal',
+                  '*:data-[slot=select-value]:!line-clamp-2 *:data-[slot=select-value]:max-w-full *:data-[slot=select-value]:items-start *:data-[slot=select-value]:!py-0 *:data-[slot=select-value]:!whitespace-normal'
+                )}
+              >
+                <SelectValue
+                  placeholder={t('feedTypeRss', { default: 'RSS' })}
+                />
+              </SelectTrigger>
+              <SelectContent align='start' className='max-w-[min(100%,28rem)]'>
+                <SelectItem className='py-2 pr-2 pl-2' value='rss'>
+                  {t('feedTypeRss', { default: 'RSS' })}
+                </SelectItem>
+                <SelectItem
+                  className='py-2.5 pr-2 pl-2 text-left leading-snug whitespace-normal'
+                  value='weather'
+                >
+                  {t('feedTypeWeather', {
+                    default: 'Weather (Open-Meteo — lat/lon in config)'
+                  })}
+                </SelectItem>
+                <SelectItem className='py-2 pr-2 pl-2' value='custom_url'>
+                  {t('feedTypeCustomUrl', { default: 'Custom URL' })}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className='min-w-0 space-y-2 sm:col-span-2'>
+            <Label htmlFor='signage-feed-url'>
+              {t('feedUrlLabel', { default: 'URL' })}
+            </Label>
+            <Input
+              id='signage-feed-url'
+              className='w-full'
+              value={feedUrl}
+              onChange={(e) => setFeedUrl(e.target.value)}
+              placeholder={t('feedUrlPlaceholder', { default: 'https://…' })}
+            />
+          </div>
+          <div className='min-w-0 space-y-2 sm:col-span-2 sm:max-w-xs'>
+            <Label htmlFor='signage-feed-poll'>
+              {t('feedPollInterval', { default: 'Poll interval (seconds)' })}
+            </Label>
+            <Input
+              id='signage-feed-poll'
+              className='w-28'
               type='number'
               min={60}
               value={poll}
@@ -122,74 +193,72 @@ export function FeedConfig({ unitId }: { unitId: string }) {
           {t('create', { default: 'Create' })}
         </Button>
         <ul className='space-y-1'>
-          {((feeds as orval.ModelsExternalFeed[] | undefined) ?? []).map(
-            (f) => {
-              const fails =
-                (f.consecutiveFailures ?? 0) > 0 ||
-                (f.lastError && String(f.lastError).length > 0);
-              return (
-                <li
-                  key={f.id}
-                  className='flex flex-wrap items-center justify-between gap-2 text-sm'
-                >
-                  <span className='flex min-w-0 flex-1 items-center gap-1'>
-                    {fails ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span
-                            className='shrink-0'
-                            aria-label={t('feedStatusFail')}
-                          >
-                            <AlertCircle className='text-destructive h-4 w-4' />
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent className='max-w-sm'>
-                          {String(f.lastError) || t('feedStatusFail')}
-                          {f.consecutiveFailures
-                            ? ` · ${f.consecutiveFailures}×`
-                            : ''}
-                        </TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      <CheckCircle2
-                        className='text-muted-foreground h-4 w-4 shrink-0'
-                        aria-label={t('feedStatusOk')}
-                      />
-                    )}
-                    <span className='truncate'>
-                      {f.name} · {f.type}
-                      {f.lastFetchAt ? (
-                        <span className='text-muted-foreground text-xs'>
-                          {' '}
-                          · {f.lastFetchAt}
+          {feeds.map((f) => {
+            const fails =
+              (f.consecutiveFailures ?? 0) > 0 ||
+              (f.lastError && String(f.lastError).length > 0);
+            return (
+              <li
+                key={f.id}
+                className='flex flex-wrap items-center justify-between gap-2 text-sm'
+              >
+                <span className='flex min-w-0 flex-1 items-center gap-1'>
+                  {fails ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          className='shrink-0'
+                          aria-label={t('feedStatusFail')}
+                        >
+                          <AlertCircle className='text-destructive h-4 w-4' />
                         </span>
-                      ) : null}
-                    </span>
+                      </TooltipTrigger>
+                      <TooltipContent className='max-w-sm'>
+                        {String(f.lastError) || t('feedStatusFail')}
+                        {f.consecutiveFailures
+                          ? ` · ${f.consecutiveFailures}×`
+                          : ''}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <CheckCircle2
+                      className='text-muted-foreground h-4 w-4 shrink-0'
+                      aria-label={t('feedStatusOk')}
+                    />
+                  )}
+                  <span className='truncate'>
+                    {f.name} · {feedTypeUiLabel(t, f.type)}
+                    {f.lastFetchAt ? (
+                      <span className='text-muted-foreground text-xs'>
+                        {' '}
+                        · {f.lastFetchAt}
+                      </span>
+                    ) : null}
                   </span>
-                  <div className='flex items-center gap-1'>
-                    <Button
-                      type='button'
-                      size='sm'
-                      variant='outline'
-                      onClick={() => {
-                        if (f.id) void loadPreview(f.id);
-                      }}
-                    >
-                      {t('preview', { default: 'Preview' })}
-                    </Button>
-                    <Button
-                      type='button'
-                      size='sm'
-                      variant='ghost'
-                      onClick={() => f.id && void onDelete(f.id)}
-                    >
-                      Del
-                    </Button>
-                  </div>
-                </li>
-              );
-            }
-          )}
+                </span>
+                <div className='flex items-center gap-1'>
+                  <Button
+                    type='button'
+                    size='sm'
+                    variant='outline'
+                    onClick={() => {
+                      if (f.id) void loadPreview(f.id);
+                    }}
+                  >
+                    {t('preview', { default: 'Preview' })}
+                  </Button>
+                  <Button
+                    type='button'
+                    size='sm'
+                    variant='ghost'
+                    onClick={() => f.id && void onDelete(f.id)}
+                  >
+                    {t('feedDelete', { default: 'Delete' })}
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
         {previewId && (
           <pre className='bg-muted max-h-64 overflow-auto rounded-md p-2 text-xs'>

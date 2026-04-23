@@ -6,6 +6,7 @@
 |----------|----------|
 | **In-product help (`/{locale}/help/...`)** | [`apps/frontend/content/wiki/en/`](../../apps/frontend/content/wiki/en/) and [`apps/frontend/content/wiki/ru/`](../../apps/frontend/content/wiki/ru/) (MDX). Rendered via [`apps/frontend/lib/wiki/load-wiki-page.ts`](../../apps/frontend/lib/wiki/load-wiki-page.ts). |
 | **Developer API, webhooks, public widget (staging wiki, Markdown)** | This folder: [`en/developer-api.md`](en/developer-api.md) · [`ru/developer-api.md`](ru/developer-api.md) |
+| **Digital Signage (playlists, schedules, screen, feeds)** | [`en/digital-signage.md`](en/digital-signage.md) · [`ru/digital-signage.md`](ru/digital-signage.md) |
 
 Integration topics are maintained here in **`docs/wiki/`** as plain Markdown (EN/RU) until they are synced into the frontend MDX tree.
 

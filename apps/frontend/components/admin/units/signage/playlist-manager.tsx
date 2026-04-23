@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   DndContext,
@@ -30,10 +30,20 @@ import {
   updatePlaylistRequestSchema
 } from '@/lib/signage-zod';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  getCivilYmdInIanaTimeZone,
+  slideDateHealth,
+  type SlideDateHealth,
+  slideDateNeedsAttention
+} from '@/lib/signage-date';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, ImageIcon, Search, Video } from 'lucide-react';
+
+const emptyPlaylists: orval.ModelsPlaylist[] = [];
 
 function SortableItem(props: {
   id: string;
@@ -45,6 +55,9 @@ function SortableItem(props: {
   onValidFrom: (v: string) => void;
   onValidTo: (v: string) => void;
   dateLabels: { from: string; to: string };
+  dateHealth: SlideDateHealth;
+  healthBadge: string;
+  className?: string;
 }) {
   const {
     attributes,
@@ -63,7 +76,13 @@ function SortableItem(props: {
     <li
       ref={setNodeRef}
       style={style}
-      className='bg-card flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5'
+      className={cn(
+        'bg-card flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5',
+        props.className,
+        props.dateHealth === 'expired' && 'border-destructive/50',
+        props.dateHealth === 'upcoming' && 'border-amber-500/40',
+        props.dateHealth === 'active_expiring' && 'border-amber-500/30'
+      )}
     >
       <button
         type='button'
@@ -74,7 +93,23 @@ function SortableItem(props: {
       >
         <GripVertical className='h-4 w-4' />
       </button>
-      <span className='min-w-0 flex-1 truncate text-sm'>{props.label}</span>
+      <span className='min-w-0 flex-1 truncate text-sm'>
+        {props.label}
+        {props.dateHealth !== 'ok' && props.dateHealth !== 'open' ? (
+          <span
+            className={cn(
+              'ml-1.5 text-[10px] font-semibold uppercase',
+              props.dateHealth === 'expired' && 'text-destructive',
+              (props.dateHealth === 'upcoming' ||
+                props.dateHealth === 'active_expiring') &&
+                'text-amber-600 dark:text-amber-400'
+            )}
+            title={props.healthBadge}
+          >
+            {props.healthBadge}
+          </span>
+        ) : null}
+      </span>
       <Label className='text-muted-foreground w-20 shrink-0 text-xs'>sec</Label>
       <Input
         className='h-8 w-16'
@@ -146,6 +181,7 @@ function buildItemDateBounds(
 function PlaylistOrderPanel(props: {
   itemRows: orval.ModelsPlaylistItem[];
   materials: Material[];
+  unit: Unit;
   unitId: string;
   editId: string;
   playlist: orval.ModelsPlaylist;
@@ -157,6 +193,7 @@ function PlaylistOrderPanel(props: {
   const {
     itemRows,
     materials,
+    unit,
     unitId,
     editId,
     playlist,
@@ -165,6 +202,23 @@ function PlaylistOrderPanel(props: {
     queryClient: qc,
     t
   } = props;
+  const [showDateIssues, setShowDateIssues] = useState(false);
+  const todayYmd = useMemo(
+    () => getCivilYmdInIanaTimeZone(unit.timezone || 'UTC'),
+    [unit.timezone]
+  );
+  const healthBadge = (h: SlideDateHealth) => {
+    switch (h) {
+      case 'expired':
+        return t('slideDateBadgeExpired', { default: 'Expired' });
+      case 'upcoming':
+        return t('slideDateBadgeUpcoming', { default: 'Upcoming' });
+      case 'active_expiring':
+        return t('slideDateBadgeExpiring', { default: '≤7d' });
+      default:
+        return '';
+    }
+  };
 
   const [orderIds, setOrderIds] = useState(
     () => buildOrderFromItems(itemRows).orderIds
@@ -244,6 +298,22 @@ function PlaylistOrderPanel(props: {
             'Drag to reorder, set duration and optional slide date range, then save'
         })}
       </Label>
+      <div className='flex items-center gap-2 text-sm'>
+        <Checkbox
+          id={`signage-date-filter-${editId}`}
+          checked={showDateIssues}
+          onCheckedChange={(c) => setShowDateIssues(Boolean(c))}
+        />
+        <Label
+          htmlFor={`signage-date-filter-${editId}`}
+          className='text-muted-foreground cursor-pointer font-normal'
+        >
+          {t('showSlideDateWarningsOnly', {
+            default:
+              'Show only slides with date warnings (vs today, unit timezone)'
+          })}
+        </Label>
+      </div>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -260,9 +330,12 @@ function PlaylistOrderPanel(props: {
                 it?.materialId ??
                 (it as { material?: { id?: string } })?.material?.id;
               const b = itemDates[pid] ?? { from: '', to: '' };
+              const dh = slideDateHealth(b.from, b.to, todayYmd);
+              const hide = showDateIssues && !slideDateNeedsAttention(dh);
               return (
                 <SortableItem
                   key={pid}
+                  className={hide ? 'hidden' : undefined}
                   id={pid}
                   label={matId ? byMatId(matId) : pid}
                   duration={durations[pid] ?? 10}
@@ -281,6 +354,8 @@ function PlaylistOrderPanel(props: {
                       return { ...prev, [pid]: { ...cur, to: v } };
                     });
                   }}
+                  dateHealth={dh}
+                  healthBadge={healthBadge(dh)}
                   dateLabels={{
                     from: t('itemValidFrom', { default: 'Valid from' }),
                     to: t('itemValidTo', { default: 'Valid to' })
@@ -315,13 +390,25 @@ export function PlaylistManager({
   });
 
   const {
-    data: playlists,
+    data: playlistsRes,
     isSuccess: playlistsSuccess,
     refetch: refetchPl
   } = orval.useListSignagePlaylists(unitId);
+  const playlists: orval.ModelsPlaylist[] =
+    playlistsRes?.data ?? emptyPlaylists;
 
   const [plName, setPlName] = useState('');
   const [selIds, setSelIds] = useState<string[]>([]);
+  const [materialQuery, setMaterialQuery] = useState('');
+
+  const filteredMaterials = useMemo(() => {
+    const q = materialQuery.trim().toLowerCase();
+    if (!q) return materials;
+    return materials.filter(
+      (m) =>
+        m.filename.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
+    );
+  }, [materials, materialQuery]);
   const createPl = orval.useCreateSignagePlaylist();
   const deletePl = orval.useDeleteSignagePlaylist();
   const updatePl = orval.useUpdateSignagePlaylist();
@@ -344,22 +431,19 @@ export function PlaylistManager({
   useLegacyPlaylistMigration({
     unit,
     unitId,
-    playlists: playlists as orval.ModelsPlaylist[] | undefined,
+    playlists,
     isPlaylistsSuccess: playlistsSuccess,
     createPlaylist: (args) => createPl.mutateAsync(args),
-    patchUnitConfig: (fullConfig) => {
-      updateUnit.mutate(
-        { id: unitId, config: fullConfig as Unit['config'] },
-        {
-          onSuccess: () => {
-            void qc.invalidateQueries({
-              queryKey: getGetUnitByIDQueryKey(unitId)
-            });
-            void refetchPl();
-            toast.success(t('saved', { default: 'Saved' }));
-          }
-        }
-      );
+    patchUnitConfig: async (fullConfig) => {
+      await updateUnit.mutateAsync({
+        id: unitId,
+        config: fullConfig as Unit['config']
+      });
+      void qc.invalidateQueries({
+        queryKey: getGetUnitByIDQueryKey(unitId)
+      });
+      void refetchPl();
+      toast.success(t('saved', { default: 'Saved' }));
     },
     onDone: () => {
       void refetchPl();
@@ -402,7 +486,12 @@ export function PlaylistManager({
   };
 
   const onDeletePlaylist = async (id: string) => {
-    if (!window.confirm('Delete?')) return;
+    if (
+      !window.confirm(
+        t('confirmDeletePlaylist', { default: 'Delete this playlist?' })
+      )
+    )
+      return;
     try {
       await deletePl.mutateAsync({ unitId, playlistId: id });
       if (editId === id) setEditId('');
@@ -419,26 +508,91 @@ export function PlaylistManager({
         <Input
           value={plName}
           onChange={(e) => setPlName(e.target.value)}
-          placeholder='Name'
+          placeholder={t('newPlaylistNamePlaceholder', { default: 'Name' })}
         />
-        <div className='grid max-h-48 grid-cols-2 gap-2 overflow-y-auto'>
-          {materials.map((m: Material) => (
-            <label key={m.id} className='flex items-center gap-2 text-sm'>
-              <input
-                type='checkbox'
-                checked={selIds.includes(m.id)}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelIds((s) => [...s, m.id]);
-                  } else {
-                    setSelIds((s) => s.filter((x) => x !== m.id));
-                  }
-                }}
+        {materials.length > 0 ? (
+          <div className='space-y-2'>
+            <div className='relative'>
+              <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2' />
+              <Input
+                value={materialQuery}
+                onChange={(e) => setMaterialQuery(e.target.value)}
+                className='pl-8'
+                placeholder={t('materialSearchPlaceholder', {
+                  default: 'Search by file name…'
+                })}
               />
-              <span className='truncate'>{m.filename}</span>
-            </label>
-          ))}
-        </div>
+            </div>
+            {filteredMaterials.length === 0 ? (
+              <p className='text-muted-foreground text-sm'>
+                {t('materialSearchNoMatch', {
+                  default: 'No files match your search'
+                })}
+              </p>
+            ) : (
+              <div
+                className='max-h-64 space-y-1.5 overflow-y-auto rounded-md border p-1.5'
+                role='list'
+              >
+                {filteredMaterials.map((m: Material) => {
+                  const checked = selIds.includes(m.id);
+                  const cbId = `pl-new-mat-${m.id}`;
+                  return (
+                    <div
+                      key={m.id}
+                      className='hover:bg-muted/50 flex items-center gap-2 rounded-md p-1.5'
+                      role='listitem'
+                    >
+                      <Checkbox
+                        id={cbId}
+                        checked={checked}
+                        onCheckedChange={(c) => {
+                          const on = c === true;
+                          if (on) {
+                            setSelIds((s) =>
+                              s.includes(m.id) ? s : [...s, m.id]
+                            );
+                          } else {
+                            setSelIds((s) => s.filter((x) => x !== m.id));
+                          }
+                        }}
+                        aria-label={m.filename}
+                      />
+                      <div
+                        className='bg-muted relative h-10 w-14 shrink-0 overflow-hidden rounded border'
+                        aria-hidden
+                      >
+                        {m.type === 'image' && m.url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={m.url}
+                            alt=''
+                            className='h-full w-full object-cover'
+                          />
+                        ) : m.type === 'image' ? (
+                          <div className='text-muted-foreground flex h-full items-center justify-center'>
+                            <ImageIcon className='h-5 w-5' />
+                          </div>
+                        ) : (
+                          <div className='text-muted-foreground flex h-full items-center justify-center'>
+                            <Video className='h-5 w-5' />
+                          </div>
+                        )}
+                      </div>
+                      <label
+                        htmlFor={cbId}
+                        className='min-w-0 flex-1 cursor-pointer truncate text-sm'
+                        title={m.filename}
+                      >
+                        {m.filename}
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : null}
         <Button
           onClick={() => {
             void onCreatePlaylist();
@@ -449,7 +603,7 @@ export function PlaylistManager({
       </div>
 
       <ul className='space-y-1'>
-        {((playlists as orval.ModelsPlaylist[] | undefined) ?? []).map((p) => (
+        {playlists.map((p) => (
           <li
             key={p.id}
             className='flex items-center justify-between border-b py-1'
@@ -474,7 +628,7 @@ export function PlaylistManager({
                   void onDeletePlaylist(p.id!);
                 }}
               >
-                Delete
+                {t('playlistDelete', { default: 'Delete' })}
               </Button>
             </div>
           </li>
@@ -486,6 +640,7 @@ export function PlaylistManager({
           key={`${editId}-${itemFingerprint}`}
           itemRows={itemRows as orval.ModelsPlaylistItem[]}
           materials={materials}
+          unit={unit}
           unitId={unitId}
           editId={editId}
           playlist={playlist}

@@ -6,6 +6,7 @@ import {
   getOverlappingScheduleIds,
   type OverlapCheckRow
 } from '@/lib/signage-schedule-overlap';
+import { scheduleInCalendarForTodayYmd } from '@/lib/signage-date';
 
 const DAY_INDEX = [1, 2, 3, 4, 5, 6, 7] as const;
 
@@ -17,6 +18,9 @@ type ScheduleRow = {
   priority?: number;
   playlistId?: string;
   playlistName?: string;
+  /** YYYY-MM-DD, optional (same semantics as API) */
+  validFrom?: string;
+  validTo?: string;
 };
 
 function parseTimeToMin(s: string): number | null {
@@ -50,7 +54,14 @@ function parseDays(set: string): Set<number> {
 /**
  * 7 columns (Mon..Sun) × 24h strip. Bars show schedule windows; conflicts when two bars overlap the same day are visible.
  */
-export function ScheduleTimeline({ schedules }: { schedules: ScheduleRow[] }) {
+export function ScheduleTimeline({
+  schedules,
+  todayYmd
+}: {
+  schedules: ScheduleRow[];
+  /** Civil YYYY-MM-DD in the unit’s IANA timezone */
+  todayYmd: string;
+}) {
   const t = useTranslations('admin.signage');
 
   const byDay = useMemo(() => {
@@ -75,12 +86,26 @@ export function ScheduleTimeline({ schedules }: { schedules: ScheduleRow[] }) {
     [schedules]
   );
   const hasConflicts = overlapIds.size > 0;
+  const calHint =
+    schedules.some(
+      (s) =>
+        (s.validFrom || s.validTo) &&
+        !scheduleInCalendarForTodayYmd(s.validFrom, s.validTo, todayYmd)
+    ) && todayYmd;
 
   return (
     <div className='space-y-2'>
       <h3 className='text-sm font-medium'>
         {t('scheduleTimeline', { default: 'Weekly view' })}
       </h3>
+      {calHint ? (
+        <p className='text-xs text-amber-700 dark:text-amber-400' role='status'>
+          {t('scheduleCalendarInactive', {
+            default:
+              'Amber: schedule has date limits and is outside today’s calendar range (unit timezone).'
+          })}
+        </p>
+      ) : null}
       {hasConflicts ? (
         <p className='text-destructive text-xs' role='status'>
           {t('scheduleConflictLegend', {
@@ -129,13 +154,22 @@ export function ScheduleTimeline({ schedules }: { schedules: ScheduleRow[] }) {
                   const left = (a / (24 * 60)) * 100;
                   const width = Math.max(0.5, (w / (24 * 60)) * 100);
                   const conflict = overlapIds.has(s.id);
+                  const outCal =
+                    (s.validFrom || s.validTo) &&
+                    !scheduleInCalendarForTodayYmd(
+                      s.validFrom,
+                      s.validTo,
+                      todayYmd
+                    );
                   return (
                     <div
                       key={s.id + s.startTime + d}
                       className={
-                        conflict
-                          ? 'ring-destructive/60 border-destructive/50 bg-destructive/20 absolute h-1/2 min-h-[1.5rem] rounded border ring-2'
-                          : 'bg-primary/30 border-primary/40 absolute h-1/2 min-h-[1.5rem] rounded border'
+                        outCal
+                          ? 'absolute h-1/2 min-h-[1.5rem] rounded border border-dashed border-amber-500/40 bg-amber-500/10 ring-amber-500/50'
+                          : conflict
+                            ? 'ring-destructive/60 border-destructive/50 bg-destructive/20 absolute h-1/2 min-h-[1.5rem] rounded border ring-2'
+                            : 'bg-primary/30 border-primary/40 absolute h-1/2 min-h-[1.5rem] rounded border'
                       }
                       style={{
                         left: `${left}%`,
@@ -148,11 +182,15 @@ export function ScheduleTimeline({ schedules }: { schedules: ScheduleRow[] }) {
                         s.id,
                         `${s.startTime}–${s.endTime}`,
                         `P${s.priority ?? 0}`,
-                        conflict
-                          ? t('scheduleConflictBarTitle', {
-                              default: 'Overlap'
+                        outCal
+                          ? t('scheduleCalendarOutTitle', {
+                              default: 'Outside calendar'
                             })
-                          : ''
+                          : conflict
+                            ? t('scheduleConflictBarTitle', {
+                                default: 'Overlap'
+                              })
+                            : ''
                       ]
                         .filter(Boolean)
                         .join(' · ')}

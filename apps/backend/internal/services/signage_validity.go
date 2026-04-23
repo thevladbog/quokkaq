@@ -14,14 +14,19 @@ func ymdStringFromDatePtr(t *time.Time) string {
 	return t.UTC().Format("2006-01-02")
 }
 
-// civilYMDStringNow returns YYYY-MM-DD for the current civil date in the given IANA zone.
-func civilYMDStringNow(loc *time.Location) string {
+// civilYMDStringAt returns YYYY-MM-DD for t’s civil date in the given IANA zone.
+func civilYMDStringAt(t time.Time, loc *time.Location) string {
 	if loc == nil {
 		loc = time.UTC
 	}
-	n := time.Now().In(loc)
+	n := t.In(loc)
 	y, m, d := n.Date()
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
+}
+
+// civilYMDStringNow returns YYYY-MM-DD for the current civil date in the given IANA zone.
+func civilYMDStringNow(loc *time.Location) string {
+	return civilYMDStringAt(time.Now(), loc)
 }
 
 // scheduleInCalendarWindow returns true if the civil "today" string is within [ValidFrom, ValidTo] inclusive, when set.

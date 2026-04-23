@@ -21,6 +21,13 @@ import (
 	"gorm.io/gorm"
 )
 
+// activePlaylistNow is the wall clock for [signageService.ActivePlaylist] (tests may replace it).
+var activePlaylistNow = time.Now
+
+// ErrDuplicateDefaultPlaylistName is returned when a second playlist named "Default" is created for the same unit
+// (legacy ad-screen import should only add one; duplicate rows were possible if the client re-ran import).
+var ErrDuplicateDefaultPlaylistName = errors.New("a playlist named Default already exists for this unit")
+
 // SignageService manages digital signage playlists, schedules, external feeds, and screen announcements.
 type SignageService interface {
 	// Playlists
@@ -168,6 +175,15 @@ func (s *signageService) CreatePlaylist(unitID string, p *models.Playlist, items
 	}
 	if unit == nil {
 		return gorm.ErrRecordNotFound
+	}
+	if p.Name == "Default" {
+		n, err := s.signageRepo.CountPlaylistsByUnitWithName(unitID, "Default")
+		if err != nil {
+			return err
+		}
+		if n > 0 {
+			return ErrDuplicateDefaultPlaylistName
+		}
 	}
 	p.UnitID = unitID
 	if err := s.signageRepo.CreatePlaylist(p); err != nil {
@@ -409,8 +425,8 @@ func (s *signageService) ActivePlaylist(ctx context.Context, unitID string) (*Ac
 	if err != nil {
 		loc = time.UTC
 	}
-	now := time.Now().In(loc)
-	todayYMD := civilYMDStringNow(loc)
+	now := activePlaylistNow().In(loc)
+	todayYMD := civilYMDStringAt(now, loc)
 	curD := weekdayOneToSeven(now)
 	curMin, _ := parseHHMM(now.Format("15:04"))
 

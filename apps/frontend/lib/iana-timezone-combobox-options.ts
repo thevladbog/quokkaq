@@ -26,6 +26,11 @@ function buildLabelWithUtcOffset(timeZone: string): string {
   return off && off !== timeZone ? `${timeZone} (${off})` : timeZone;
 }
 
+/** IANA id with the current UTC offset, e.g. `Europe/Moscow (UTC+3)` (DST-aware). */
+export function formatIanaWithUtcOffset(timeZone: string): string {
+  return buildLabelWithUtcOffset(timeZone);
+}
+
 /** When Intl.supportedValuesOf is unavailable (very old runtimes). */
 const FALLBACK_IANA = [
   'UTC',

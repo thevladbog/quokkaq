@@ -1,12 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { Unit } from '@quokkaq/shared-types';
 import * as orval from '@/lib/api/generated/units';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import { safeParseSignageWithToast, signageZod } from '@/lib/signage-zod';
 import { PlaylistManager } from './signage/playlist-manager';
@@ -14,6 +22,7 @@ import { ScheduleEditor } from './signage/schedule-editor';
 import { FeedConfig } from './signage/feed-config';
 import { ScreenTemplateBuilder } from './signage/screen-template-builder';
 import { SignageHealthPanel } from './signage/signage-health-panel';
+import { ScreenFullscreenAnnouncementOverlay } from '@/components/screen/screen-fullscreen-announcement-overlay';
 
 export function SignageSettings({
   unit,
@@ -23,8 +32,10 @@ export function SignageSettings({
   unitId: string;
 }) {
   const t = useTranslations('admin.signage');
-  const { data: anns, refetch: refetchAnn } =
+  const annDisplayLabelId = useId();
+  const { data: announcementsRes, refetch: refetchAnn } =
     orval.useListSignageAnnouncements(unitId);
+  const anns: orval.ModelsScreenAnnouncement[] = announcementsRes?.data ?? [];
   const [annText, setAnnText] = useState('');
   const [annDisplay, setAnnDisplay] = useState<'banner' | 'fullscreen'>(
     'banner'
@@ -103,7 +114,10 @@ export function SignageSettings({
           <PlaylistManager unit={unit} unitId={unitId} />
         </TabsContent>
         <TabsContent value='schedules' className='space-y-3'>
-          <ScheduleEditor unitId={unitId} />
+          <ScheduleEditor
+            unitId={unitId}
+            unitTimezone={unit.timezone ?? 'UTC'}
+          />
         </TabsContent>
         <TabsContent value='feeds' className='space-y-3'>
           <FeedConfig unitId={unitId} />
@@ -112,44 +126,72 @@ export function SignageSettings({
           <ScreenTemplateBuilder unit={unit} unitId={unitId} />
         </TabsContent>
         <TabsContent value='announcements' className='space-y-2'>
-          <div className='flex flex-col gap-2 sm:flex-row sm:items-end'>
+          <div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
             <Input
               className='min-w-0 flex-1'
               value={annText}
               onChange={(e) => setAnnText(e.target.value)}
-              placeholder='Text'
+              placeholder={t('annTextPlaceholder', {
+                default: 'Announcement text'
+              })}
             />
-            <label className='text-muted-foreground flex items-center gap-1 text-sm'>
-              {t('annDisplay', { default: 'Layout' })}{' '}
-              <select
-                className='border-input bg-background rounded-md border px-1 py-1'
+            <div className='text-muted-foreground flex w-full min-w-0 items-center gap-2 sm:w-auto sm:max-w-[min(100%,20rem)] sm:shrink-0'>
+              <FieldLabel
+                className='text-muted-foreground w-auto shrink-0 pe-0 text-sm'
+                htmlFor={annDisplayLabelId}
+              >
+                {t('annDisplay', { default: 'Layout' })}
+              </FieldLabel>
+              <Select
                 value={annDisplay}
-                onChange={(e) => {
-                  setAnnDisplay(e.target.value as 'banner' | 'fullscreen');
+                onValueChange={(v) => {
+                  setAnnDisplay(v as 'banner' | 'fullscreen');
                 }}
               >
-                <option value='banner'>
-                  {t('annBanner', { default: 'Banner' })}
-                </option>
-                <option value='fullscreen'>
-                  {t('annFullscreen', { default: 'Full screen' })}
-                </option>
-              </select>
-            </label>
+                <SelectTrigger
+                  id={annDisplayLabelId}
+                  className='h-9 w-full min-w-0'
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align='start'>
+                  <SelectItem value='banner'>{t('annBanner')}</SelectItem>
+                  <SelectItem value='fullscreen'>
+                    {t('annFullscreen')}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Button
               onClick={() => {
                 void onCreateAnn();
               }}
             >
-              Add
+              {t('annAdd', { default: 'Add' })}
             </Button>
           </div>
+          {annDisplay === 'fullscreen' && annText.trim() ? (
+            <div className='space-y-1'>
+              <p className='text-muted-foreground text-xs'>
+                {t('annFullscreenPreview', {
+                  default: 'Preview (not published)'
+                })}
+              </p>
+              <ScreenFullscreenAnnouncementOverlay
+                variant='embedded'
+                items={[
+                  {
+                    id: 'preview',
+                    text: annText.trim(),
+                    style: 'info',
+                    priority: 0
+                  }
+                ]}
+              />
+            </div>
+          ) : null}
           <ul>
-            {(
-              anns as
-                | import('@/lib/api/generated/units').ModelsScreenAnnouncement[]
-                | undefined
-            )?.map((a) => (
+            {anns.map((a) => (
               <li
                 key={a.id}
                 className='flex items-start justify-between gap-2 text-sm'
@@ -168,7 +210,7 @@ export function SignageSettings({
                     void onDeleteAnn(a.id!);
                   }}
                 >
-                  Del
+                  {t('annDelete', { default: 'Delete' })}
                 </Button>
               </li>
             ))}
