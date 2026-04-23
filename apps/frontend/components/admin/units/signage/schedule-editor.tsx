@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Trash2 } from 'lucide-react';
 import {
   getCivilYmdInIanaTimeZone,
   scheduleInCalendarForTodayYmd
@@ -14,6 +15,14 @@ import {
 } from '@/lib/signage-zod';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -112,6 +121,54 @@ function WeekdayMultiSelect({
   );
 }
 
+function formatDaysOfWeekString(
+  daysOfWeek: string,
+  t: (key: string, o?: { default?: string }) => string
+): string {
+  const nums = daysOfWeek
+    .split(/[\s,]+/)
+    .map((x) => parseInt(x.trim(), 10))
+    .filter((n) => n >= 1 && n <= 7);
+  const unique = [...new Set(nums)].sort((a, b) => a - b);
+  if (unique.length === 0) {
+    return t('noDaysInSchedule', { default: '—' });
+  }
+  const labels = DOW_NAME_KEYS.map((k) => t(k));
+  const sep = t('dayListSeparator', { default: ', ' });
+  return unique.map((d) => labels[d - 1] ?? String(d)).join(sep);
+}
+
+function resolveSchedulePlaylistName(
+  s: orval.ModelsPlaylistSchedule,
+  nameById: Map<string, string>,
+  t: (key: string, o?: { default?: string }) => string
+): string {
+  const fromEmbed = s.playlist?.name?.trim();
+  if (fromEmbed) {
+    return fromEmbed;
+  }
+  if (s.playlistId) {
+    return nameById.get(s.playlistId) ?? t('unknownPlaylist');
+  }
+  return t('unknownPlaylist');
+}
+
+function buildScheduleUpdateData(
+  s: orval.ModelsPlaylistSchedule,
+  nextPriority: number
+) {
+  return {
+    playlistId: s.playlistId ?? '',
+    daysOfWeek: s.daysOfWeek ?? '',
+    startTime: s.startTime ?? '',
+    endTime: s.endTime ?? '',
+    validFrom: s.validFrom ? String(s.validFrom).slice(0, 10) : undefined,
+    validTo: s.validTo ? String(s.validTo).slice(0, 10) : undefined,
+    priority: nextPriority,
+    isActive: s.isActive
+  };
+}
+
 export function ScheduleEditor({
   unitId,
   unitTimezone
@@ -130,7 +187,8 @@ export function ScheduleEditor({
   const { data: playlistsRes } = orval.useListSignagePlaylists(unitId);
   const { data: schedulesRes, refetch: refetchSch } =
     orval.useListSignageSchedules(unitId);
-  const playlists = playlistsRes?.data ?? emptyPlaylists;
+  const rawPlaylists = playlistsRes?.data;
+  const playlists = Array.isArray(rawPlaylists) ? rawPlaylists : emptyPlaylists;
   const playlistNameById = useMemo(() => {
     const m = new Map<string, string>();
     for (const p of playlists) {
@@ -147,10 +205,16 @@ export function ScheduleEditor({
   const [scValidFrom, setScValidFrom] = useState('');
   const [scValidTo, setScValidTo] = useState('');
   const [priority, setPriority] = useState(0);
+  const [priorityDialog, setPriorityDialog] =
+    useState<orval.ModelsPlaylistSchedule | null>(null);
+  const [priorityDraft, setPriorityDraft] = useState('0');
   const createSc = orval.useCreateSignageSchedule();
   const delSc = orval.useDeleteSignageSchedule();
   const updSc = orval.useUpdateSignageSchedule();
-  const list = schedulesRes?.data ?? emptySchedules;
+  const rawList = schedulesRes?.data;
+  const list: orval.ModelsPlaylistSchedule[] = Array.isArray(rawList)
+    ? rawList
+    : emptySchedules;
 
   const onCreate = async () => {
     if (!scPl) {
@@ -213,6 +277,41 @@ export function ScheduleEditor({
     }
     try {
       await delSc.mutateAsync({ unitId, scheduleId });
+      void refetchSch();
+    } catch (e) {
+      toast.error(String(e));
+    }
+  };
+
+  const onOpenPriorityDialog = (s: orval.ModelsPlaylistSchedule) => {
+    setPriorityDialog(s);
+    setPriorityDraft(String(s.priority ?? 0));
+  };
+
+  const onSavePriorityFromDialog = async () => {
+    if (!priorityDialog?.id) {
+      return;
+    }
+    const n = parseInt(priorityDraft, 10);
+    const nextP = Number.isNaN(n) ? 0 : n;
+    const data = buildScheduleUpdateData(priorityDialog, nextP);
+    if (
+      !safeParseSignageWithToast(
+        'Schedule update',
+        updateSignageScheduleBodySchema,
+        data
+      ).success
+    ) {
+      return;
+    }
+    try {
+      await updSc.mutateAsync({
+        unitId,
+        scheduleId: priorityDialog.id,
+        data: data as orval.HandlersCreateScheduleRequest
+      });
+      toast.success(t('saved', { default: 'Saved' }));
+      setPriorityDialog(null);
       void refetchSch();
     } catch (e) {
       toast.error(String(e));
@@ -332,86 +431,141 @@ export function ScheduleEditor({
       >
         {t('create', { default: 'Create' })}
       </Button>
-      <ul className='space-y-2'>
-        {list.map((s) => (
-          <li
-            key={s.id}
-            className='flex flex-wrap items-center justify-between gap-2 border-b py-2 text-sm'
-          >
-            <span>
-              {s.startTime}–{s.endTime} · {s.daysOfWeek} · pri {s.priority ?? 0}
-              {s.validFrom || s.validTo
-                ? ` · ${(s.validFrom ?? '…').toString().slice(0, 10)}–${(s.validTo ?? '…').toString().slice(0, 10)}`
-                : ''}
-              {s.validFrom || s.validTo
-                ? !scheduleInCalendarForTodayYmd(
-                    s.validFrom ? String(s.validFrom).slice(0, 10) : undefined,
-                    s.validTo ? String(s.validTo).slice(0, 10) : undefined,
-                    todayYmd
-                  )
-                  ? ` · [${t('scheduleOutsideCalendar', { default: 'outside calendar today' })}]`
-                  : null
-                : null}
-            </span>
-            <div className='flex items-center gap-1'>
-              <Button
-                type='button'
-                size='sm'
-                variant='outline'
-                onClick={async () => {
-                  if (!s.id) return;
-                  const nextP = (s.priority ?? 0) + 1;
-                  const data = {
-                    playlistId: s.playlistId ?? '',
-                    daysOfWeek: s.daysOfWeek ?? '',
-                    startTime: s.startTime ?? '',
-                    endTime: s.endTime ?? '',
-                    validFrom: s.validFrom
-                      ? String(s.validFrom).slice(0, 10)
-                      : undefined,
-                    validTo: s.validTo
-                      ? String(s.validTo).slice(0, 10)
-                      : undefined,
-                    priority: nextP,
-                    isActive: s.isActive
-                  };
-                  if (
-                    !safeParseSignageWithToast(
-                      'Schedule update',
-                      updateSignageScheduleBodySchema,
-                      data
-                    ).success
-                  ) {
-                    return;
-                  }
-                  try {
-                    await updSc.mutateAsync({
-                      unitId,
-                      scheduleId: s.id,
-                      data: data as orval.HandlersCreateScheduleRequest
-                    });
-                    void refetchSch();
-                  } catch (e) {
-                    toast.error(String(e));
-                  }
-                }}
-              >
-                {t('bumpPriority', { default: '↑ Priority' })}
-              </Button>
-              <Button
-                type='button'
-                size='sm'
-                variant='ghost'
-                onClick={() => {
-                  void onDelete(s.id!);
-                }}
-              >
-                Del
-              </Button>
-            </div>
-          </li>
-        ))}
+      <ul className='space-y-3'>
+        {list.map((s) => {
+          const plName = resolveSchedulePlaylistName(s, playlistNameById, t);
+          const daysText = formatDaysOfWeekString(s.daysOfWeek ?? '', t);
+          const fromYmd = s.validFrom ? String(s.validFrom).slice(0, 10) : null;
+          const toYmd = s.validTo ? String(s.validTo).slice(0, 10) : null;
+          const outsideCal =
+            fromYmd || toYmd
+              ? !scheduleInCalendarForTodayYmd(
+                  fromYmd || undefined,
+                  toYmd || undefined,
+                  todayYmd
+                )
+              : false;
+          return (
+            <li
+              key={s.id}
+              className='bg-card flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-start sm:justify-between sm:p-4'
+            >
+              <div className='min-w-0 flex-1 space-y-1.5'>
+                <p className='text-base leading-snug font-semibold break-words'>
+                  {plName}
+                </p>
+                <p className='text-muted-foreground text-sm'>
+                  {s.startTime}–{s.endTime} · {daysText} ·{' '}
+                  {t('schedulePriority')} {s.priority ?? 0}
+                </p>
+                {fromYmd || toYmd ? (
+                  <p className='text-muted-foreground text-xs'>
+                    {t('scheduleListValidRange', {
+                      from: fromYmd ?? '…',
+                      to: toYmd ?? '…'
+                    })}
+                  </p>
+                ) : null}
+                {outsideCal ? (
+                  <p className='text-xs text-amber-600 dark:text-amber-500'>
+                    [
+                    {t('scheduleOutsideCalendar', {
+                      default: 'outside calendar today'
+                    })}
+                    ]
+                  </p>
+                ) : null}
+              </div>
+              <div className='flex shrink-0 items-center justify-end gap-1.5 self-stretch sm:self-start sm:pt-0.5'>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='outline'
+                  onClick={() => onOpenPriorityDialog(s)}
+                >
+                  {t('editSchedulePriority')}
+                </Button>
+                <Button
+                  type='button'
+                  size='icon'
+                  variant='destructive'
+                  className='shrink-0'
+                  aria-label={t('scheduleDeleteAria')}
+                  onClick={() => {
+                    void onDelete(s.id!);
+                  }}
+                >
+                  <Trash2 className='h-4 w-4' />
+                </Button>
+              </div>
+            </li>
+          );
+        })}
       </ul>
+
+      <Dialog
+        open={!!priorityDialog}
+        onOpenChange={(o) => {
+          if (!o) {
+            setPriorityDialog(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t('editSchedulePriority', { default: 'Set priority' })}
+            </DialogTitle>
+            <DialogDescription>
+              {t('schedulePriorityDialogDescription')}
+            </DialogDescription>
+          </DialogHeader>
+          {priorityDialog ? (
+            <div className='space-y-3'>
+              <p className='text-foreground text-sm font-medium break-words'>
+                {resolveSchedulePlaylistName(
+                  priorityDialog,
+                  playlistNameById,
+                  t
+                )}
+              </p>
+              <p className='text-muted-foreground text-sm'>
+                {priorityDialog.startTime}–{priorityDialog.endTime} ·{' '}
+                {formatDaysOfWeekString(priorityDialog.daysOfWeek ?? '', t)}
+              </p>
+              <div className='space-y-2'>
+                <Label htmlFor='schedule-priority-input'>
+                  {t('schedulePriority', { default: 'Priority' })}
+                </Label>
+                <Input
+                  id='schedule-priority-input'
+                  type='number'
+                  value={priorityDraft}
+                  onChange={(e) => setPriorityDraft(e.target.value)}
+                  min={0}
+                />
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => setPriorityDialog(null)}
+            >
+              {tCommon('cancel', { default: 'Cancel' })}
+            </Button>
+            <Button
+              type='button'
+              onClick={() => {
+                void onSavePriorityFromDialog();
+              }}
+            >
+              {tCommon('save', { default: 'Save' })}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

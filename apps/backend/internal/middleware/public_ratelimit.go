@@ -10,10 +10,13 @@ import (
 
 const publicLimiterEntryTTL = 10 * time.Minute
 
-// Public API rate: one token every publicAPIRateInterval (20/min sustained), burst publicAPIBurst.
+// Public API rate: one token every publicAPIRateInterval (sustained), burst publicAPIBurst.
+// A single screen page hits several public GETs in parallel (queue, playlist, announcements, materials);
+// the Next.js /api/* proxy to Go can share one upstream client IP, so the burst must cover those bursts
+// and occasional WebSocket-driven refetches.
 const (
-	publicAPIRateInterval = 3 * time.Second
-	publicAPIBurst        = 10
+	publicAPIRateInterval = 1 * time.Second
+	publicAPIBurst        = 32
 	maxPublicAPILimiters  = 50_000
 )
 
@@ -42,8 +45,7 @@ func init() {
 	}()
 }
 
-// PublicAPIRateLimit limits unauthenticated or low-trust public endpoints per client IP
-// (20 req/min sustained, burst publicAPIBurst).
+// PublicAPIRateLimit limits unauthenticated or low-trust public endpoints per client IP.
 func PublicAPIRateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := clientIPForRateLimit(r)

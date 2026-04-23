@@ -527,6 +527,8 @@ export const ScreenTemplateSchema = z.object({
 });
 
 /** Runtime shape for `UnitConfig.screenTemplate` (dynamic ticket screen layout). */
+export type ScreenLayoutRegion = z.infer<typeof ScreenLayoutRegionSchema>;
+export type ScreenLayout = z.infer<typeof ScreenLayoutSchema>;
 export type ScreenWidgetType = z.infer<typeof ScreenWidgetTypeSchema>;
 export type ScreenTemplate = z.infer<typeof ScreenTemplateSchema>;
 

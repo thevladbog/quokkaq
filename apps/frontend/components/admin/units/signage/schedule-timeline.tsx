@@ -82,7 +82,7 @@ export function ScheduleTimeline({
   }, [schedules]);
 
   const overlapIds = useMemo(
-    () => getOverlappingScheduleIds(schedules as OverlapCheckRow),
+    () => getOverlappingScheduleIds(schedules as OverlapCheckRow[]),
     [schedules]
   );
   const hasConflicts = overlapIds.size > 0;

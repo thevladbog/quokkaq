@@ -1,8 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { useTranslations } from 'next-intl';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { AlertCircle, CheckCircle2, Trash2 } from 'lucide-react';
+import {
+  formatAppDateTime,
+  intlLocaleFromAppLocale
+} from '@/lib/format-datetime';
 import * as orval from '@/lib/api/generated/units';
 import { unitsApi } from '@/lib/api';
 import { safeParseSignageWithToast, signageZod } from '@/lib/signage-zod';
@@ -43,6 +47,8 @@ function feedTypeUiLabel(
 
 export function FeedConfig({ unitId }: { unitId: string }) {
   const t = useTranslations('admin.signage');
+  const locale = useLocale();
+  const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
   const { data: feedsRes, refetch: refetchFeeds } =
     orval.useListSignageFeeds(unitId);
   const feeds: orval.ModelsExternalFeed[] = feedsRes?.data ?? [];
@@ -231,7 +237,8 @@ export function FeedConfig({ unitId }: { unitId: string }) {
                     {f.lastFetchAt ? (
                       <span className='text-muted-foreground text-xs'>
                         {' '}
-                        · {f.lastFetchAt}
+                        ·{' '}
+                        {formatAppDateTime(f.lastFetchAt, intlLocale, 'short')}
                       </span>
                     ) : null}
                   </span>
@@ -249,11 +256,13 @@ export function FeedConfig({ unitId }: { unitId: string }) {
                   </Button>
                   <Button
                     type='button'
-                    size='sm'
-                    variant='ghost'
+                    size='icon'
+                    variant='destructive'
+                    className='shrink-0'
+                    aria-label={t('feedDeleteAria')}
                     onClick={() => f.id && void onDelete(f.id)}
                   >
-                    {t('feedDelete', { default: 'Delete' })}
+                    <Trash2 className='h-4 w-4' />
                   </Button>
                 </div>
               </li>

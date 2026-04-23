@@ -347,9 +347,17 @@ export function ScreenTemplateBuilder({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {Object.keys(SCREEN_TEMPLATE_PRESETS).map((k) => (
+            {(
+              Object.keys(SCREEN_TEMPLATE_PRESETS) as Array<
+                keyof typeof SCREEN_TEMPLATE_PRESETS
+              >
+            ).map((k) => (
               <SelectItem key={k} value={k}>
-                {k}
+                {k === 'info-heavy'
+                  ? t('presetNameInfoHeavy')
+                  : k === 'media-focus'
+                    ? t('presetNameMediaFocus')
+                    : t('presetNameSplit3')}
               </SelectItem>
             ))}
           </SelectContent>
@@ -380,9 +388,8 @@ export function ScreenTemplateBuilder({
       <ScreenLayoutPreview
         unitId={unitId}
         locale={locale}
-        onRefreshKey={`${
-          (unit as { updatedAt?: string }).updatedAt ?? unit.id
-        }-${layoutId}`}
+        onRefreshKey={(unit as { updatedAt?: string }).updatedAt ?? unit.id}
+        schematicTemplate={SCREEN_TEMPLATE_PRESETS[layoutId]}
       />
     </div>
   );

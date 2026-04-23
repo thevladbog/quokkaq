@@ -35,7 +35,10 @@ async function proxy(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     'x-setup-token',
     'x-request-id',
     'traceparent',
-    'tracestate'
+    'tracestate',
+    /** For Go PublicAPIRateLimit: real client when TRUSTED_PROXY_CIDRS includes the Next/edge host. */
+    'x-forwarded-for',
+    'x-real-ip'
   ]) {
     const v = req.headers.get(name);
     if (v) headers.set(name, v);

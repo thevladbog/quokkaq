@@ -1000,6 +1000,29 @@
       "recent_calls_history_limit": "Last called list size (rows)",
       "recent_calls_history_limit_help": "How many rows to show in “Last called” on the ticket screen. Use 0 for no limit."
     },
+    "display": {
+      "tab": "Display",
+      "title": "Display",
+      "subtitle": "Branding, media files, and scheduled content for this unit screen.",
+      "priorityTitle": "What shows on the screen",
+      "priorityDescription": "If a schedule applies a playlist, that content is used. Otherwise, materials you select under Appearance (fallback) are used when the media column is enabled.",
+      "noAccess": "You have no access to this section.",
+      "contentAccessDenied": "You need access to the ticket screen or digital signage to manage playlists and layout.",
+      "sub": {
+        "materials": "Media library",
+        "look": "Appearance",
+        "content": "Playlists and layout"
+      },
+      "fallbackMediaTitle": "Fallback media (no active playlist)",
+      "fallbackMediaDescription": "If no schedule applies a playlist, these files are used in the content area. Upload files in the Media library tab.",
+      "openMediaLibrary": "Media library",
+      "fallbackSearchPlaceholder": "Filter by name…",
+      "noMaterialsForFallback": "Add files in the Media library tab first.",
+      "fallbackSearchNoMatch": "No files match the filter",
+      "fallbackSaveHint": "Saves with the same settings as the card above (brand and column).",
+      "addFilesToPlaylistHint": "Add image or video files in",
+      "addFilesToPlaylistLink": "Display → Media library"
+    },
     "signage": {
       "tab": "Digital Signage",
       "title": "Digital Signage",
@@ -1014,6 +1037,23 @@
       "applyLayout": "Apply layout",
       "classicLayout": "Use classic layout",
       "presets": "Screen template",
+      "presetNameInfoHeavy": "Info + sidebar: calls, time, weather, wait, stats, notices",
+      "presetNameMediaFocus": "Full-screen media with small ticket strip overlay",
+      "presetNameSplit3": "Three rows: call list, media, RSS band",
+      "schematicTitle": "Selected layout (updates when you change the template above; not saved until Apply)",
+      "schematicLiveTitle": "Live (saved) screen",
+      "schematicLiveDescription": "Always shows the public screen as stored for this unit. Use Apply to save the template you selected above.",
+      "schematicWidget": {
+        "tickets": "Call list",
+        "clock": "Time",
+        "weather": "Weather",
+        "eta": "Est. wait",
+        "queueStats": "Queue summary",
+        "announcements": "Notices",
+        "content": "Media / slides",
+        "rss": "RSS / feed",
+        "unknown": "Unknown layout: {id}"
+      },
       "tabs": {
         "status": "Status",
         "playlists": "Playlists",
@@ -1054,6 +1094,9 @@
       "editOrder": "Order",
       "saveOrder": "Save order",
       "reorderSave": "Drag to reorder, set duration, then save",
+      "playlistOrderEmpty": "This playlist has no slides yet. Use “New playlist” above to add materials, or open Display → Media library to upload files first.",
+      "playlistDetailLoading": "Loading playlist…",
+      "playlistDetailError": "Could not load this playlist.",
       "pickPlaylist": "Select a playlist",
       "playlistField": "Playlist",
       "scheduleStart": "Start",
@@ -1063,6 +1106,13 @@
       "selectAtLeastOneDay": "Select at least one day",
       "daysLabel": "Days of week",
       "bumpPriority": "Priority +1",
+      "editSchedulePriority": "Set priority",
+      "scheduleDeleteAria": "Delete schedule",
+      "unknownPlaylist": "Unknown playlist",
+      "dayListSeparator": ", ",
+      "scheduleListValidRange": "Valid: {from} – {to}",
+      "noDaysInSchedule": "—",
+      "schedulePriorityDialogDescription": "Higher number wins when several schedules match the same time slot.",
       "preview": "Preview",
       "cleared": "Cleared",
       "rssWidgetFeed": "Bottom row — RSS feed",
@@ -1103,6 +1153,7 @@
       "feedFormIncomplete": "Name and URL are required",
       "confirmDeleteFeed": "Delete this feed?",
       "feedDelete": "Delete",
+      "feedDeleteAria": "Delete feed",
       "scheduleOverlap": "This schedule overlaps another for the same day and time. Change days or the time range.",
       "scheduleConflictLegend": "Red: overlapping time slots on the same day. Higher priority still wins if both apply.",
       "scheduleConflictBarTitle": "Overlap",
@@ -2086,11 +2137,15 @@
     "ticketsLoadError": "Could not load the queue for this screen. Check the connection or try again.",
     "ticketsLoadRetry": "Try again",
     "queueLength": "In queue",
-    "estimatedWait": "Est. wait",
+    "estimatedWait": "Wait",
+    "eta": {
+      "estimate": "Wait"
+    },
     "minutes": "min.",
     "activeCounters": "Operators",
-    "scanToJoinQueue": "Scan QR to\njoin queue",
+    "scanToJoinQueue": "Scan QR to\nget a ticket",
     "serviceQueue": "{count} waiting",
+    "portraitInfoStrip": "Time, weather, and queue info",
     "templateUnknown": "Unknown layout: {id}",
     "feeds": {
       "missing": "Configure a feed in unit settings"
@@ -2103,7 +2158,7 @@
     "stats": {
       "inQueue": "In queue",
       "openWindows": "Open windows",
-      "estWait": "Est. wait",
+      "estWait": "Wait",
       "servedToday": "Served today",
       "noData": "—",
       "aria": "Queue summary"

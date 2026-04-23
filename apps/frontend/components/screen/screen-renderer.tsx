@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import type {
   ScreenLayout,
@@ -22,6 +22,7 @@ import { ScreenProgressBarWidget } from '@/components/screen/widgets/screen-prog
 import { ScreenRssFeedWidget } from '@/components/screen/widgets/screen-rss-widget';
 import { ScreenWeatherWidget } from '@/components/screen/widgets/screen-weather-widget';
 import { getUnitDisplayName } from '@/lib/unit-display';
+import { cn } from '@/lib/utils';
 import type { Ticket } from '@/lib/api';
 
 type QueueStatus = {
@@ -37,6 +38,20 @@ type Ann = {
   style: string;
   priority: number;
 };
+
+type TemplateWidget = ScreenTemplate['widgets'][number];
+
+type WidgetRenderOpts = {
+  clockTextAlign?: 'left' | 'center';
+  clockSize?: 'default' | 'compact';
+  /** `column` = icon and °C under the clock in portrait strip. */
+  weatherLayout?: 'row' | 'stacked' | 'column';
+  etaCompact?: boolean;
+  queueStatsInlineRow?: boolean;
+  announcementsStrip?: boolean;
+};
+
+type MapRegionOptions = { variant?: 'default' | 'portraitStrip' };
 
 type ScreenRendererProps = {
   unitId: string;
@@ -123,12 +138,27 @@ export function ScreenRenderer(props: ScreenRendererProps) {
     return m;
   }, [template]);
 
-  const renderWidget = (type: string, config: Record<string, unknown>) => {
+  const renderWidget = (
+    type: string,
+    config: Record<string, unknown>,
+    o?: WidgetRenderOpts
+  ) => {
     switch (type) {
       case 'clock':
-        return <ScreenClockWidget locale={locale} />;
+        return (
+          <ScreenClockWidget
+            locale={locale}
+            textAlign={o?.clockTextAlign === 'left' ? 'left' : 'center'}
+            size={o?.clockSize === 'compact' ? 'compact' : 'default'}
+          />
+        );
       case 'eta-display':
-        return <ScreenEtaWidget minutes={qs?.estimatedWaitMinutes ?? 0} />;
+        return (
+          <ScreenEtaWidget
+            minutes={qs?.estimatedWaitMinutes ?? 0}
+            compact={o?.etaCompact === true}
+          />
+        );
       case 'queue-stats':
         return (
           <ScreenQueueStatsWidget
@@ -136,10 +166,16 @@ export function ScreenRenderer(props: ScreenRendererProps) {
             activeCounters={qs == null ? null : qs.activeCounters}
             estimatedWaitMinutes={qs == null ? null : qs.estimatedWaitMinutes}
             servedToday={qs == null ? null : qs.servedToday}
+            inlineRow={o?.queueStatsInlineRow === true}
           />
         );
       case 'announcements':
-        return <ScreenAnnouncementsWidget items={announcements} />;
+        return (
+          <ScreenAnnouncementsWidget
+            items={announcements}
+            strip={o?.announcementsStrip === true}
+          />
+        );
       case 'progress-bar':
         return <ScreenProgressBarWidget ticket={firstWait} />;
       case 'content-player': {
@@ -182,7 +218,7 @@ export function ScreenRenderer(props: ScreenRendererProps) {
           />
         );
       case 'queue-ticker':
-        return <QueueTicker tickets={waitingTickets} locale={locale} />;
+        return <QueueTicker tickets={waitingTickets} />;
       case 'rss-feed': {
         const feedId = String(
           (config as { feedId?: string })?.feedId ?? ''
@@ -207,7 +243,19 @@ export function ScreenRenderer(props: ScreenRendererProps) {
             </p>
           );
         }
-        return <ScreenWeatherWidget unitId={props.unitId} feedId={feedId} />;
+        return (
+          <ScreenWeatherWidget
+            unitId={props.unitId}
+            feedId={feedId}
+            layout={
+              o?.weatherLayout === 'row'
+                ? 'row'
+                : o?.weatherLayout === 'column'
+                  ? 'column'
+                  : 'stacked'
+            }
+          />
+        );
       }
       case 'custom-html': {
         const html = String((config as { html?: string })?.html ?? '');
@@ -224,6 +272,97 @@ export function ScreenRenderer(props: ScreenRendererProps) {
     }
   };
 
+  const mapRegionWidgets = (
+    widgets: TemplateWidget[],
+    mopts?: MapRegionOptions
+  ): ReactNode[] => {
+    const strip = mopts?.variant === 'portraitStrip';
+    /** Eta is duplicated by queue-stats est. wait in the strip. */
+    const sourceWidgets: TemplateWidget[] =
+      strip && widgets.some((w) => w.type === 'queue-stats')
+        ? widgets.filter((w) => w.type !== 'eta-display')
+        : widgets;
+    const out: ReactNode[] = [];
+    let i = 0;
+    while (i < sourceWidgets.length) {
+      const a = sourceWidgets[i]!;
+      const b = sourceWidgets[i + 1];
+      if (a.type === 'clock' && b?.type === 'weather') {
+        if (strip) {
+          out.push(
+            <div
+              key={`${a.id}-clock-weather-${b.id}`}
+              data-screen-widget='clock-weather'
+              className='flex min-w-0 flex-1 items-center justify-between gap-2 sm:gap-3'
+            >
+              <div className='min-w-0 flex-shrink'>
+                {renderWidget('clock', a.config ?? {}, {
+                  clockTextAlign: 'left',
+                  clockSize: 'compact'
+                })}
+              </div>
+              <div className='shrink-0'>
+                {renderWidget('weather', b.config ?? {}, {
+                  weatherLayout: 'column'
+                })}
+              </div>
+            </div>
+          );
+        } else {
+          out.push(
+            <div
+              key={`${a.id}-clock-weather-${b.id}`}
+              data-screen-widget='clock-weather'
+              className='border-border/50 flex w-full min-w-0 flex-none items-center justify-between gap-2 border-b pb-2 sm:gap-4 sm:pb-2.5'
+            >
+              <div className='min-w-0 flex-1'>
+                {renderWidget('clock', a.config ?? {}, {
+                  clockTextAlign: 'left'
+                })}
+              </div>
+              <div className='shrink-0'>
+                {renderWidget('weather', b.config ?? {}, {
+                  weatherLayout: 'row'
+                })}
+              </div>
+            </div>
+          );
+        }
+        i += 2;
+        continue;
+      }
+      const wopts: WidgetRenderOpts | undefined = !strip
+        ? undefined
+        : a.type === 'eta-display'
+          ? { etaCompact: true }
+          : a.type === 'queue-stats'
+            ? { queueStatsInlineRow: true }
+            : a.type === 'announcements'
+              ? { announcementsStrip: true }
+              : undefined;
+      out.push(
+        <div
+          key={a.id}
+          data-screen-widget={a.type}
+          className={cn(
+            a.type === 'called-tickets' ? 'h-full min-h-0 p-1' : '',
+            strip ? 'min-w-0 flex-1 self-center' : 'w-full'
+          )}
+        >
+          {a.type === 'content-player' ? (
+            <div className='h-full min-h-[200px]'>
+              {renderWidget(a.type, a.config ?? {})}
+            </div>
+          ) : (
+            renderWidget(a.type, a.config ?? {}, wopts)
+          )}
+        </div>
+      );
+      i += 1;
+    }
+    return out;
+  };
+
   const { layout } = template;
   const regions = layout.regions;
 
@@ -233,11 +372,7 @@ export function ScreenRenderer(props: ScreenRendererProps) {
         <div className='flex min-h-0 flex-1 flex-col overflow-hidden p-2'>
           {regions[0] ? (
             <div className='relative min-h-0 flex-1'>
-              {(widgetsByRegion.get(regions[0].id) ?? []).map((w) => (
-                <div key={w.id} className='h-full min-h-0 p-1'>
-                  {renderWidget(w.type, w.config ?? {})}
-                </div>
-              ))}
+              {mapRegionWidgets(widgetsByRegion.get(regions[0].id) ?? [])}
             </div>
           ) : null}
         </div>
@@ -245,35 +380,54 @@ export function ScreenRenderer(props: ScreenRendererProps) {
     }
 
     if (layout.type === 'grid' && regions.length === 2) {
-      return (
+      const mainR = regions[0]!;
+      const sideR = regions[1]!;
+      const mainW = widgetsByRegion.get(mainR.id) ?? [];
+      const sideWidgets = widgetsByRegion.get(sideR.id) ?? [];
+      const landscapeTwoCol = (
         <div
-          className='h-full min-h-0 w-full flex-1 gap-4 overflow-hidden p-4'
+          className='h-full min-h-0 w-full flex-1 gap-2 overflow-hidden p-2 landscape:gap-4 landscape:p-4'
           style={{
             display: 'grid',
-            gridTemplateColumns: `minmax(0,${regions[0].size}) minmax(0,${regions[1].size})`,
+            gridTemplateColumns: 'minmax(0,1fr) minmax(0,min(24rem,32vw))',
             gridTemplateRows: 'minmax(0,1fr)'
           }}
         >
-          {regions.map((reg, idx) => (
-            <div key={reg.id} className={regionPanelClass(layout, reg, idx)}>
-              {(widgetsByRegion.get(reg.id) ?? []).map((w) => (
-                <div
-                  key={w.id}
-                  className={
-                    w.type === 'called-tickets' ? 'h-full min-h-0' : ''
-                  }
-                >
-                  {w.type === 'content-player' ? (
-                    <div className='h-full min-h-[200px]'>
-                      {renderWidget(w.type, w.config ?? {})}
-                    </div>
-                  ) : (
-                    renderWidget(w.type, w.config ?? {})
-                  )}
-                </div>
-              ))}
+          <div key={mainR.id} className={regionPanelClass(layout, mainR, 0)}>
+            {mapRegionWidgets(mainW)}
+          </div>
+          <div key={sideR.id} className={regionPanelClass(layout, sideR, 1)}>
+            {mapRegionWidgets(sideWidgets)}
+          </div>
+        </div>
+      );
+      const portraitMainAndStrip = (
+        <div className='flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden landscape:hidden'>
+          <div
+            className='min-h-0 flex-1 overflow-y-auto p-2'
+            data-screen-region='main'
+          >
+            {mapRegionWidgets(mainW)}
+          </div>
+          <div
+            className='border-border/50 bg-muted/20 flex max-h-32 min-h-0 w-full flex-none flex-col overflow-hidden border-t sm:max-h-36'
+            role='complementary'
+            aria-label={t('portraitInfoStrip', {
+              default: 'Time, weather, and queue info'
+            })}
+          >
+            <div className='flex min-h-0 w-full min-w-0 flex-1 flex-nowrap items-center justify-start gap-1 overflow-x-auto overflow-y-hidden px-2 py-1.5 [scrollbar-gutter:stable] sm:gap-1.5 sm:px-2.5 sm:py-2'>
+              {mapRegionWidgets(sideWidgets, { variant: 'portraitStrip' })}
             </div>
-          ))}
+          </div>
+        </div>
+      );
+      return (
+        <div className='relative h-full min-h-0 w-full flex-1'>
+          <div className='hidden h-full min-h-0 w-full landscape:block'>
+            {landscapeTwoCol}
+          </div>
+          {portraitMainAndStrip}
         </div>
       );
     }
@@ -292,17 +446,7 @@ export function ScreenRenderer(props: ScreenRendererProps) {
               key={reg.id}
               className={`${regionPanelClass(layout, reg, 0)} min-h-0`}
             >
-              {(widgetsByRegion.get(reg.id) ?? []).map((w) => (
-                <div key={w.id} className='h-full min-h-0'>
-                  {w.type === 'content-player' ? (
-                    <div className='h-full min-h-[200px]'>
-                      {renderWidget(w.type, w.config ?? {})}
-                    </div>
-                  ) : (
-                    renderWidget(w.type, w.config ?? {})
-                  )}
-                </div>
-              ))}
+              {mapRegionWidgets(widgetsByRegion.get(reg.id) ?? [])}
             </div>
           ))}
         </div>
@@ -317,9 +461,7 @@ export function ScreenRenderer(props: ScreenRendererProps) {
               key={reg.id}
               className='min-h-0 overflow-hidden rounded-lg border p-2'
             >
-              {(widgetsByRegion.get(reg.id) ?? []).map((w) => (
-                <div key={w.id}>{renderWidget(w.type, w.config ?? {})}</div>
-              ))}
+              {mapRegionWidgets(widgetsByRegion.get(reg.id) ?? [])}
             </div>
           ))}
         </div>
@@ -337,7 +479,7 @@ export function ScreenRenderer(props: ScreenRendererProps) {
     <div className='flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden'>
       <div className='min-h-0 flex-1 overflow-hidden'>{mainGrid}</div>
       <div className='shrink-0 border-t py-1'>
-        <QueueTicker tickets={waitingTickets} locale={locale} />
+        <QueueTicker tickets={waitingTickets} />
       </div>
     </div>
   );

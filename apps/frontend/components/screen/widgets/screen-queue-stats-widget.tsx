@@ -2,12 +2,40 @@
 
 import type { ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
+import { cn } from '@/lib/utils';
 
-function StatCell({ label, children }: { label: string; children: ReactNode }) {
+function StatCell({
+  label,
+  children,
+  compact
+}: {
+  label: string;
+  children: ReactNode;
+  compact?: boolean;
+}) {
   return (
-    <div className='bg-card/80 flex min-h-[5.5rem] flex-col justify-center rounded-lg border p-3 text-center shadow-sm'>
-      <div className='text-muted-foreground text-xs uppercase'>{label}</div>
-      <div className='text-3xl font-bold tabular-nums'>{children}</div>
+    <div
+      className={cn(
+        'bg-card/80 flex flex-col justify-center rounded-lg border text-center shadow-sm',
+        compact ? 'min-h-[4.25rem] p-1.5' : 'min-h-[5.5rem] p-3'
+      )}
+    >
+      <div
+        className={cn(
+          'text-muted-foreground uppercase',
+          compact ? 'text-[8px] leading-tight font-medium' : 'text-xs'
+        )}
+      >
+        {label}
+      </div>
+      <div
+        className={cn(
+          'leading-tight font-bold tabular-nums',
+          compact ? 'text-sm' : 'text-3xl'
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -38,30 +66,49 @@ export function ScreenQueueStatsWidget({
   queueLength,
   activeCounters,
   estimatedWaitMinutes,
-  servedToday
+  servedToday,
+  /** One horizontal row of four metrics (portrait bottom strip). */
+  inlineRow = false
 }: {
   queueLength?: number | null;
   activeCounters?: number | null;
   estimatedWaitMinutes?: number | null;
   servedToday?: number | null;
+  inlineRow?: boolean;
 }) {
   const t = useTranslations('screen');
+  const c = inlineRow;
   return (
     <div
-      className='grid grid-cols-2 gap-2 text-center'
+      className={cn(
+        'min-w-0 text-center',
+        inlineRow ? 'w-max shrink-0' : 'w-full',
+        inlineRow
+          ? 'grid auto-cols-[minmax(0,1fr)] grid-cols-4 gap-1'
+          : 'grid grid-cols-2 gap-1.5 sm:gap-2'
+      )}
       role='region'
       aria-label={t('stats.aria', { default: 'Queue summary' })}
     >
-      <StatCell label={t('stats.inQueue', { default: 'In queue' })}>
+      <StatCell compact={c} label={t('stats.inQueue', { default: 'In queue' })}>
         {fmt(t, queueLength)}
       </StatCell>
-      <StatCell label={t('stats.openWindows', { default: 'Open windows' })}>
+      <StatCell
+        compact={c}
+        label={t('stats.openWindows', { default: 'Open windows' })}
+      >
         {fmt(t, activeCounters)}
       </StatCell>
-      <StatCell label={t('stats.estWait', { default: 'Est. wait' })}>
+      <StatCell
+        compact={c}
+        label={t('stats.estWait', { default: 'Est. wait' })}
+      >
         {fmt(t, estimatedWaitMinutes, true)}
       </StatCell>
-      <StatCell label={t('stats.servedToday', { default: 'Served today' })}>
+      <StatCell
+        compact={c}
+        label={t('stats.servedToday', { default: 'Served today' })}
+      >
         {fmt(t, servedToday)}
       </StatCell>
     </div>

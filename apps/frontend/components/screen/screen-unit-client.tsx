@@ -211,6 +211,10 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
 
     const ticketsQueryKey = getGetUnitsUnitIdTicketsQueryKey(unitId);
     const wsDebounceRef = { t: null as ReturnType<typeof setTimeout> | null };
+    /** Batches public API refetches so rapid WS events do not stampede /units/... public routes. */
+    const signageDebounceRef = {
+      t: null as ReturnType<typeof setTimeout> | null
+    };
 
     const scheduleWsRefetch = () => {
       if (wsDebounceRef.t) {
@@ -244,16 +248,22 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     };
 
     const handleSignage = () => {
-      void queryClient.invalidateQueries({
-        queryKey: ['signage', 'active-playlist', unitId]
-      });
-      void queryClient.invalidateQueries({
-        queryKey: ['signage', 'public-ann', unitId]
-      });
-      void queryClient.invalidateQueries({
-        queryKey: getGetUnitByIDQueryKey(unitId)
-      });
-      scheduleWsRefetch();
+      if (signageDebounceRef.t) {
+        clearTimeout(signageDebounceRef.t);
+      }
+      signageDebounceRef.t = setTimeout(() => {
+        signageDebounceRef.t = null;
+        void queryClient.invalidateQueries({
+          queryKey: ['signage', 'active-playlist', unitId]
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ['signage', 'public-ann', unitId]
+        });
+        void queryClient.invalidateQueries({
+          queryKey: getGetUnitByIDQueryKey(unitId)
+        });
+        scheduleWsRefetch();
+      }, 300);
     };
 
     socketClient.onTicketCreated(handleTicketUpdate);
@@ -269,6 +279,10 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       if (wsDebounceRef.t) {
         clearTimeout(wsDebounceRef.t);
         wsDebounceRef.t = null;
+      }
+      if (signageDebounceRef.t) {
+        clearTimeout(signageDebounceRef.t);
+        signageDebounceRef.t = null;
       }
       socketClient.off('ticket.created', handleTicketUpdate);
       socketClient.off('ticket.updated', handleTicketUpdate);
@@ -386,6 +400,10 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       ? `${window.location.origin}/${locale}/queue/${unitId}`
       : `/${locale}/queue/${unitId}`;
 
+  const screenTemplateHasClock = Boolean(
+    useScreenTemplate?.widgets?.some((w) => w.type === 'clock')
+  );
+
   // Custom colors
   const isCustomColorsEnabled = adConfig?.isCustomColorsEnabled || false;
   const headerColor = isCustomColorsEnabled ? adConfig?.headerColor || '' : '';
@@ -440,10 +458,18 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
           </h1>
         </div>
         <div className='text-right'>
-          <div className='font-mono text-3xl font-bold'>
-            {formatAppTime(currentTime, intlLocale)}
-          </div>
-          <div className='text-muted-foreground text-lg'>
+          {!screenTemplateHasClock && (
+            <div className='font-mono text-3xl font-bold'>
+              {formatAppTime(currentTime, intlLocale)}
+            </div>
+          )}
+          <div
+            className={
+              screenTemplateHasClock
+                ? 'text-muted-foreground text-xl'
+                : 'text-muted-foreground text-lg'
+            }
+          >
             {formatAppDate(currentTime, intlLocale, 'full')}
           </div>
         </div>

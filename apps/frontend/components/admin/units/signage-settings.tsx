@@ -26,10 +26,13 @@ import { ScreenFullscreenAnnouncementOverlay } from '@/components/screen/screen-
 
 export function SignageSettings({
   unit,
-  unitId
+  unitId,
+  showScreenTitle = true
 }: {
   unit: Unit;
   unitId: string;
+  /** When embedded in Display settings, hide the main heading. */
+  showScreenTitle?: boolean;
 }) {
   const t = useTranslations('admin.signage');
   const annDisplayLabelId = useId();
@@ -83,9 +86,11 @@ export function SignageSettings({
 
   return (
     <div className='space-y-4'>
-      <h2 className='text-2xl font-bold'>
-        {t('title', { default: 'Digital Signage' })}
-      </h2>
+      {showScreenTitle ? (
+        <h2 className='text-2xl font-bold'>
+          {t('title', { default: 'Digital Signage' })}
+        </h2>
+      ) : null}
       <Tabs defaultValue='status'>
         <TabsList>
           <TabsTrigger value='status'>

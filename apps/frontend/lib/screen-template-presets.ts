@@ -11,7 +11,8 @@ export const SCREEN_TEMPLATE_PRESETS: Record<string, ScreenTemplate> = {
         {
           id: 'side',
           area: 'side',
-          size: '420px',
+          /** Capped with % and rem: on portrait kiosks the strip stays narrow, main list keeps width. */
+          size: 'min(30%, 16rem)',
           panelStyle: 'scrollPadded'
         }
       ]
@@ -19,7 +20,12 @@ export const SCREEN_TEMPLATE_PRESETS: Record<string, ScreenTemplate> = {
     widgets: [
       { id: 'w1', type: 'called-tickets', regionId: 'main', config: {} },
       { id: 'w2', type: 'clock', regionId: 'side', config: {} },
-      { id: 'w3', type: 'eta-display', regionId: 'side', config: {} },
+      {
+        id: 'w6-weather',
+        type: 'weather',
+        regionId: 'side',
+        config: { feedId: '' }
+      },
       { id: 'w4', type: 'queue-stats', regionId: 'side', config: {} },
       { id: 'w5', type: 'announcements', regionId: 'side', config: {} }
     ]

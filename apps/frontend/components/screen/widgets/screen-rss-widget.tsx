@@ -23,7 +23,7 @@ export function ScreenRssFeedWidget({
     const load = async () => {
       try {
         const raw = await unitsApi.getPublicFeedData(unitId, feedId);
-        setData((raw as RssPayload) ?? null);
+        setData((raw as unknown as RssPayload | undefined) ?? null);
       } catch (e) {
         logger.error('RSS widget', e);
       }

@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Link } from '@/src/i18n/navigation';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   DndContext,
   PointerSensor,
@@ -22,7 +24,10 @@ import * as orval from '@/lib/api/generated/units';
 import { unitsApi, Material } from '@/lib/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUpdateUnit } from '@/lib/hooks';
-import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
+import {
+  getGetUnitByIDQueryKey,
+  getGetUnitsUnitIdMaterialsQueryKey
+} from '@/lib/api/generated/units';
 import { useLegacyPlaylistMigration } from './use-legacy-playlist-migration';
 import {
   safeParseSignageWithToast,
@@ -290,6 +295,8 @@ function PlaylistOrderPanel(props: {
   const byMatId = (mid: string) =>
     materials.find((m) => m.id === mid)?.filename ?? mid;
 
+  const isEmpty = itemRows.length === 0;
+
   return (
     <div className='space-y-2 rounded-lg border p-3'>
       <Label>
@@ -298,11 +305,20 @@ function PlaylistOrderPanel(props: {
             'Drag to reorder, set duration and optional slide date range, then save'
         })}
       </Label>
+      {isEmpty ? (
+        <p className='text-muted-foreground text-sm'>
+          {t('playlistOrderEmpty', {
+            default:
+              'This playlist has no slides yet. Create another playlist with materials in the “New playlist” form above, or add files in Display → Media library and create a new playlist with those files.'
+          })}
+        </p>
+      ) : null}
       <div className='flex items-center gap-2 text-sm'>
         <Checkbox
           id={`signage-date-filter-${editId}`}
           checked={showDateIssues}
           onCheckedChange={(c) => setShowDateIssues(Boolean(c))}
+          disabled={isEmpty}
         />
         <Label
           htmlFor={`signage-date-filter-${editId}`}
@@ -314,59 +330,67 @@ function PlaylistOrderPanel(props: {
           })}
         </Label>
       </div>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={onDragEnd}
-      >
-        <SortableContext
-          items={orderIds}
-          strategy={verticalListSortingStrategy}
+      {isEmpty ? null : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={onDragEnd}
         >
-          <ul className='space-y-1'>
-            {orderIds.map((pid) => {
-              const it = itemRows.find((r) => r.id === pid);
-              const matId =
-                it?.materialId ??
-                (it as { material?: { id?: string } })?.material?.id;
-              const b = itemDates[pid] ?? { from: '', to: '' };
-              const dh = slideDateHealth(b.from, b.to, todayYmd);
-              const hide = showDateIssues && !slideDateNeedsAttention(dh);
-              return (
-                <SortableItem
-                  key={pid}
-                  className={hide ? 'hidden' : undefined}
-                  id={pid}
-                  label={matId ? byMatId(matId) : pid}
-                  duration={durations[pid] ?? 10}
-                  onDuration={(v) => setDurations((d) => ({ ...d, [pid]: v }))}
-                  validFrom={b.from}
-                  validTo={b.to}
-                  onValidFrom={(v) => {
-                    setItemDates((prev) => {
-                      const cur = prev[pid] ?? { from: '', to: '' };
-                      return { ...prev, [pid]: { ...cur, from: v } };
-                    });
-                  }}
-                  onValidTo={(v) => {
-                    setItemDates((prev) => {
-                      const cur = prev[pid] ?? { from: '', to: '' };
-                      return { ...prev, [pid]: { ...cur, to: v } };
-                    });
-                  }}
-                  dateHealth={dh}
-                  healthBadge={healthBadge(dh)}
-                  dateLabels={{
-                    from: t('itemValidFrom', { default: 'Valid from' }),
-                    to: t('itemValidTo', { default: 'Valid to' })
-                  }}
-                />
-              );
-            })}
-          </ul>
-        </SortableContext>
-      </DndContext>
-      <Button type='button' onClick={() => void onSaveOrder()}>
+          <SortableContext
+            items={orderIds}
+            strategy={verticalListSortingStrategy}
+          >
+            <ul className='space-y-1'>
+              {orderIds.map((pid) => {
+                const it = itemRows.find((r) => r.id === pid);
+                const matId =
+                  it?.materialId ??
+                  (it as { material?: { id?: string } })?.material?.id;
+                const b = itemDates[pid] ?? { from: '', to: '' };
+                const dh = slideDateHealth(b.from, b.to, todayYmd);
+                const hide = showDateIssues && !slideDateNeedsAttention(dh);
+                return (
+                  <SortableItem
+                    key={pid}
+                    className={hide ? 'hidden' : undefined}
+                    id={pid}
+                    label={matId ? byMatId(matId) : pid}
+                    duration={durations[pid] ?? 10}
+                    onDuration={(v) =>
+                      setDurations((d) => ({ ...d, [pid]: v }))
+                    }
+                    validFrom={b.from}
+                    validTo={b.to}
+                    onValidFrom={(v) => {
+                      setItemDates((prev) => {
+                        const cur = prev[pid] ?? { from: '', to: '' };
+                        return { ...prev, [pid]: { ...cur, from: v } };
+                      });
+                    }}
+                    onValidTo={(v) => {
+                      setItemDates((prev) => {
+                        const cur = prev[pid] ?? { from: '', to: '' };
+                        return { ...prev, [pid]: { ...cur, to: v } };
+                      });
+                    }}
+                    dateHealth={dh}
+                    healthBadge={healthBadge(dh)}
+                    dateLabels={{
+                      from: t('itemValidFrom', { default: 'Valid from' }),
+                      to: t('itemValidTo', { default: 'Valid to' })
+                    }}
+                  />
+                );
+              })}
+            </ul>
+          </SortableContext>
+        </DndContext>
+      )}
+      <Button
+        type='button'
+        onClick={() => void onSaveOrder()}
+        disabled={isEmpty}
+      >
         {t('saveOrder', { default: 'Save order' })}
       </Button>
     </div>
@@ -381,11 +405,12 @@ export function PlaylistManager({
   unitId: string;
 }) {
   const t = useTranslations('admin.signage');
+  const tDisplay = useTranslations('admin.display');
   const qc = useQueryClient();
   const updateUnit = useUpdateUnit();
 
   const { data: materials = [] } = useQuery({
-    queryKey: ['unit-materials', unitId],
+    queryKey: getGetUnitsUnitIdMaterialsQueryKey(unitId),
     queryFn: () => unitsApi.getMaterials(unitId)
   });
 
@@ -394,8 +419,10 @@ export function PlaylistManager({
     isSuccess: playlistsSuccess,
     refetch: refetchPl
   } = orval.useListSignagePlaylists(unitId);
-  const playlists: orval.ModelsPlaylist[] =
-    playlistsRes?.data ?? emptyPlaylists;
+  const rawPl = playlistsRes?.data;
+  const playlists: orval.ModelsPlaylist[] = Array.isArray(rawPl)
+    ? rawPl
+    : emptyPlaylists;
 
   const [plName, setPlName] = useState('');
   const [selIds, setSelIds] = useState<string[]>([]);
@@ -414,10 +441,17 @@ export function PlaylistManager({
   const updatePl = orval.useUpdateSignagePlaylist();
 
   const [editId, setEditId] = useState<string>('');
-  const { data: detail } = orval.useGetSignagePlaylist(unitId, editId, {
+  const {
+    data: detail,
+    isPending: playlistDetailPending,
+    isError: playlistDetailError
+  } = orval.useGetSignagePlaylist(unitId, editId, {
     query: { enabled: !!editId }
   });
-  const playlist = detail?.data as orval.ModelsPlaylist | undefined;
+  const playlist =
+    detail && 'status' in detail && detail.status === 200
+      ? detail.data
+      : undefined;
   const items = playlist?.items;
 
   const itemRows = items ?? [];
@@ -510,6 +544,20 @@ export function PlaylistManager({
           onChange={(e) => setPlName(e.target.value)}
           placeholder={t('newPlaylistNamePlaceholder', { default: 'Name' })}
         />
+        {materials.length === 0 ? (
+          <Alert>
+            <AlertDescription className='text-sm'>
+              {tDisplay('addFilesToPlaylistHint')}{' '}
+              <Link
+                href={`/settings/units/${unitId}?display=materials`}
+                className='text-primary font-medium underline underline-offset-2'
+              >
+                {tDisplay('addFilesToPlaylistLink')}
+              </Link>
+              .
+            </AlertDescription>
+          </Alert>
+        ) : null}
         {materials.length > 0 ? (
           <div className='space-y-2'>
             <div className='relative'>
@@ -635,7 +683,19 @@ export function PlaylistManager({
         ))}
       </ul>
 
-      {editId && playlist && itemRows.length > 0 && (
+      {editId && playlistDetailPending ? (
+        <p className='text-muted-foreground text-sm'>
+          {t('playlistDetailLoading', { default: 'Loading playlist…' })}
+        </p>
+      ) : null}
+      {editId && !playlistDetailPending && playlistDetailError ? (
+        <p className='text-destructive text-sm'>
+          {t('playlistDetailError', {
+            default: 'Could not load this playlist.'
+          })}
+        </p>
+      ) : null}
+      {editId && !playlistDetailPending && playlist ? (
         <PlaylistOrderPanel
           key={`${editId}-${itemFingerprint}`}
           itemRows={itemRows as orval.ModelsPlaylistItem[]}
@@ -649,7 +709,7 @@ export function PlaylistManager({
           queryClient={qc}
           t={t}
         />
-      )}
+      ) : null}
     </div>
   );
 }
