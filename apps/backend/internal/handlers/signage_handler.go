@@ -588,6 +588,7 @@ func (h *SignageHandler) PublicFeedData(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	// #nosec G705 -- CachedData is validated as JSON during feed polling (json.Unmarshal)
 	_, _ = w.Write(b)
 }
 
