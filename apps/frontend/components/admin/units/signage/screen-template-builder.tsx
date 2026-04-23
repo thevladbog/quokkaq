@@ -10,11 +10,11 @@ import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
 import {
   type HandlersCompanyMeResponse,
   useGetCompaniesMe,
-  useGetCompaniesMeScreenLayoutTemplates,
-  usePostCompaniesMeScreenLayoutTemplates,
-  usePutCompaniesMeScreenLayoutTemplatesTemplateId,
-  useDeleteCompaniesMeScreenLayoutTemplatesTemplateId,
-  getGetCompaniesMeScreenLayoutTemplatesQueryKey
+  getListScreenLayoutTemplatesQueryKey,
+  useListScreenLayoutTemplates,
+  useCreateScreenLayoutTemplate,
+  useUpdateScreenLayoutTemplate,
+  useDeleteScreenLayoutTemplate
 } from '@/lib/api/generated/auth';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -212,7 +212,7 @@ export function ScreenTemplateBuilder({
   const libraryActionsEnabled = meResolved && customLayouts;
   const meLoading = meQ.isPending || (meQ.isFetching && !meResolved);
 
-  const listQ = useGetCompaniesMeScreenLayoutTemplates({
+  const listQ = useListScreenLayoutTemplates({
     query: { enabled: libraryActionsEnabled }
   });
   const libraryRows = useMemo((): LibraryRowLite[] => {
@@ -277,12 +277,12 @@ export function ScreenTemplateBuilder({
     setPrevEditorOpen(editorOpen);
   }
 
-  const postLibrary = usePostCompaniesMeScreenLayoutTemplates(
+  const postLibrary = useCreateScreenLayoutTemplate(
     {
       mutation: {
         onSuccess: async () => {
           await qc.invalidateQueries({
-            queryKey: getGetCompaniesMeScreenLayoutTemplatesQueryKey()
+            queryKey: getListScreenLayoutTemplatesQueryKey()
           });
         }
       }
@@ -290,12 +290,12 @@ export function ScreenTemplateBuilder({
     qc
   );
 
-  const putLibrary = usePutCompaniesMeScreenLayoutTemplatesTemplateId(
+  const putLibrary = useUpdateScreenLayoutTemplate(
     {
       mutation: {
         onSuccess: async () => {
           await qc.invalidateQueries({
-            queryKey: getGetCompaniesMeScreenLayoutTemplatesQueryKey()
+            queryKey: getListScreenLayoutTemplatesQueryKey()
           });
         }
       }
@@ -303,12 +303,12 @@ export function ScreenTemplateBuilder({
     qc
   );
 
-  const deleteLibrary = useDeleteCompaniesMeScreenLayoutTemplatesTemplateId(
+  const deleteLibrary = useDeleteScreenLayoutTemplate(
     {
       mutation: {
         onSuccess: async () => {
           await qc.invalidateQueries({
-            queryKey: getGetCompaniesMeScreenLayoutTemplatesQueryKey()
+            queryKey: getListScreenLayoutTemplatesQueryKey()
           });
         }
       }
@@ -695,7 +695,7 @@ export function ScreenTemplateBuilder({
             : null;
         if (createdId) {
           await qc.invalidateQueries({
-            queryKey: getGetCompaniesMeScreenLayoutTemplatesQueryKey()
+            queryKey: getListScreenLayoutTemplatesQueryKey()
           });
           setLayoutPick(`l:${createdId}`);
         }
