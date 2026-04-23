@@ -474,7 +474,16 @@ export const KioskConfigSchema = z
     feedbackUrl: z.string().optional(),
     isPreRegistrationEnabled: z.boolean().optional(),
     showUnitInHeader: z.boolean().optional(),
-    kioskUnitLabelText: z.string().optional()
+    kioskUnitLabelText: z.string().optional(),
+    /** Seconds of inactivity on the service grid before showing the session warning. Default 45. */
+    sessionIdleBeforeWarningSec: z
+      .number()
+      .int()
+      .positive()
+      .max(3_600)
+      .optional(),
+    /** Countdown in seconds on the warning dialog before resetting to the kiosk home. Default 15. */
+    sessionIdleCountdownSec: z.number().int().positive().max(300).optional()
   })
   .passthrough();
 
@@ -784,6 +793,7 @@ export const TicketModelSchema = z.object({
   transferTrail: z.array(ClientVisitTransferEventSchema).optional(),
   queuePosition: z.number().nullable().optional(),
   estimatedWaitSeconds: z.number().nullable().optional(),
+  serviceZoneName: z.string().nullable().optional(),
   smsOptInAvailable: z.boolean().optional(),
   visitorToken: z.string().optional(),
   service: z
@@ -1009,6 +1019,14 @@ export interface KioskConfig {
   showUnitInHeader?: boolean;
   /** Custom kiosk header label; when empty, the unit name from the API is shown. */
   kioskUnitLabelText?: string;
+  /**
+   * Seconds of inactivity on the service selection flow before the session warning dialog. Defaults to 45 if unset.
+   */
+  sessionIdleBeforeWarningSec?: number;
+  /**
+   * Countdown in seconds on the warning dialog before returning to the kiosk home. Defaults to 15 if unset.
+   */
+  sessionIdleCountdownSec?: number;
 }
 
 export interface UnitConfig {

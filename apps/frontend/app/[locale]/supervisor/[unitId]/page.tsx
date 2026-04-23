@@ -22,10 +22,12 @@ import { toast } from 'sonner';
 import { PreRegistrationDetailsModal } from '@/components/staff/PreRegistrationDetailsModal';
 import { SupervisorShiftDashboard } from '@/components/supervisor/SupervisorShiftDashboard';
 import { SlaAlertBanner } from '@/components/supervisor/SlaAlertBanner';
+import { KioskPrinterAlertBanner } from '@/components/supervisor/KioskPrinterAlertBanner';
 import type { ShiftCounterRow } from '@/components/supervisor/SupervisorWorkstationMonitoring';
 import { useSyncActiveUnit } from '@/contexts/ActiveUnitContext';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { useSlaAlerts } from '@/hooks/use-sla-alerts';
+import { useKioskPrinterAlerts } from '@/hooks/use-kiosk-printer-alerts';
 import {
   socketClient,
   type UnitAnomalyAlert,
@@ -44,6 +46,11 @@ export default function ShiftDashboardPage({
   useSyncActiveUnit(unitId);
   const { activeSlaAlerts, dismissAlert, dismissAllAlerts } =
     useSlaAlerts(unitId);
+  const {
+    alerts: kioskPrinterAlerts,
+    dismiss: dismissKioskPrinter,
+    dismissAll: dismissAllKioskPrinter
+  } = useKioskPrinterAlerts(unitId);
 
   useEffect(() => {
     if (!unitId) return;
@@ -224,13 +231,22 @@ export default function ShiftDashboardPage({
 
   return (
     <>
-      {activeSlaAlerts.length > 0 && (
+      {(activeSlaAlerts.length > 0 || kioskPrinterAlerts.length > 0) && (
         <div className='container mx-auto max-w-7xl px-4 pt-4'>
-          <SlaAlertBanner
-            alerts={activeSlaAlerts}
-            onDismiss={dismissAlert}
-            onDismissAll={dismissAllAlerts}
-          />
+          {activeSlaAlerts.length > 0 && (
+            <SlaAlertBanner
+              alerts={activeSlaAlerts}
+              onDismiss={dismissAlert}
+              onDismissAll={dismissAllAlerts}
+            />
+          )}
+          {kioskPrinterAlerts.length > 0 && (
+            <KioskPrinterAlertBanner
+              alerts={kioskPrinterAlerts}
+              onDismiss={dismissKioskPrinter}
+              onDismissAll={dismissAllKioskPrinter}
+            />
+          )}
         </div>
       )}
       <SupervisorShiftDashboard

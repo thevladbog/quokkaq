@@ -100,6 +100,34 @@ func (h *TicketHandler) orm() *gorm.DB {
 	return database.DB
 }
 
+// enrichTicketQueuePositionAndZone sets queue position, estimated wait, and service zone name for API responses.
+func (h *TicketHandler) enrichTicketQueuePositionAndZone(ticket *models.Ticket) {
+	if ticket == nil {
+		return
+	}
+	if h.eta != nil && ticket.Status == "waiting" {
+		if result, etaErr := h.eta.QueuePositionAndETA(ticket); etaErr == nil && result.Position > 0 {
+			ticket.QueuePosition = &result.Position
+			if result.EstimatedWaitSec > 0 {
+				ticket.EstimatedWaitSeconds = &result.EstimatedWaitSec
+			}
+		}
+	}
+	if h.unitService == nil || ticket.ServiceZoneID == nil {
+		return
+	}
+	zid := strings.TrimSpace(*ticket.ServiceZoneID)
+	if zid == "" {
+		return
+	}
+	u, err := h.unitService.GetUnitByID(zid)
+	if err != nil || u == nil {
+		return
+	}
+	n := u.Name
+	ticket.ServiceZoneName = &n
+}
+
 func NewTicketHandler(service services.TicketService, operational *services.OperationalService) *TicketHandler {
 	return &TicketHandler{service: service, operational: operational}
 }
@@ -223,6 +251,7 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		}()
 	}
 
+	h.enrichTicketQueuePositionAndZone(ticket)
 	w.WriteHeader(http.StatusCreated)
 	RespondJSON(w, ticket)
 }
@@ -249,15 +278,7 @@ func (h *TicketHandler) GetTicketByID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	// Enrich with ETA for waiting tickets when service is available.
-	if h.eta != nil && ticket.Status == "waiting" {
-		if result, etaErr := h.eta.QueuePositionAndETA(ticket); etaErr == nil && result.Position > 0 {
-			ticket.QueuePosition = &result.Position
-			if result.EstimatedWaitSec > 0 {
-				ticket.EstimatedWaitSeconds = &result.EstimatedWaitSec
-			}
-		}
-	}
+	h.enrichTicketQueuePositionAndZone(ticket)
 
 	// Compute smsOptInAvailable: SMS must be effectively active (including env overrides) and the
 	// company must have the visitor_notifications plan feature. Guard against nil unitService which

@@ -59,6 +59,8 @@ type Ticket struct {
 	QueuePosition *int `json:"queuePosition,omitempty" gorm:"-"`
 	// EstimatedWaitSeconds is the estimated seconds until this ticket is called (computed on-the-fly).
 	EstimatedWaitSeconds *int `json:"estimatedWaitSeconds,omitempty" gorm:"-"`
+	// ServiceZoneName is the display name of the service zone unit when ServiceZoneID is set (hydrated, not stored).
+	ServiceZoneName *string `json:"serviceZoneName,omitempty" gorm:"-"`
 
 	// Relations
 	Unit    Unit     `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`

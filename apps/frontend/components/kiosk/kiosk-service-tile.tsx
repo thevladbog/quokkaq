@@ -1,10 +1,12 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
+import { ImageOff } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { getLocalizedName } from '@/lib/utils';
 import type { Service } from '@/lib/api';
+import { resolveKioskTileImageKind } from '@/lib/kiosk-tile-image';
 
 type KioskServiceTileProps = {
   service: Service;
@@ -14,6 +16,31 @@ type KioskServiceTileProps = {
 
 const cardClassName =
   'group border-kiosk-border/25 @container/kiosk-tile relative flex h-full min-h-0 w-full cursor-pointer flex-col gap-0 overflow-hidden rounded-3xl border py-0 shadow-[0_20px_25px_-5px_rgba(29,27,25,0.08),0_8px_10px_-6px_rgba(29,27,25,0.06)] transition-[transform,box-shadow] active:scale-[0.99] md:hover:shadow-[0_24px_32px_-8px_rgba(29,27,25,0.12),0_10px_14px_-8px_rgba(29,27,25,0.08)]';
+
+type TileImageProps = { imageUrl: string; title: string };
+
+function KioskServiceTileImage({ imageUrl, title }: TileImageProps) {
+  const [imageFailed, setImageFailed] = useState(false);
+  if (imageFailed) {
+    return (
+      <div
+        className='text-muted-foreground flex h-full w-full flex-col items-center justify-center gap-1 px-2'
+        aria-hidden
+      >
+        <ImageOff className='size-8 opacity-60' strokeWidth={1.5} />
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={imageUrl}
+      alt={title}
+      className='pointer-events-none h-full w-full object-cover'
+      onError={() => setImageFailed(true)}
+    />
+  );
+}
 
 export function KioskServiceTile({
   service,
@@ -50,7 +77,10 @@ export function KioskServiceTile({
   const titleClass = `kiosk-service-tile-title line-clamp-3 max-w-full font-bold tracking-tight wrap-break-word ${fg ? '' : 'text-kiosk-ink'}`;
   const descClass = `kiosk-service-tile-desc line-clamp-2 max-w-full wrap-break-word ${fg ? 'opacity-75' : 'text-neutral-500'}`;
 
-  if (!service.imageUrl) {
+  const trimmedImage = service.imageUrl?.trim() ?? '';
+  const imageKind = resolveKioskTileImageKind(service.imageUrl);
+
+  if (!trimmedImage) {
     return (
       <Card
         className={cardClassName}
@@ -79,12 +109,20 @@ export function KioskServiceTile({
     >
       <div className='flex h-full min-h-0 flex-1 flex-col gap-2 p-2 sm:p-2.5 md:gap-2.5 md:p-3 @min-[15rem]/kiosk-tile:flex-row @min-[15rem]/kiosk-tile:items-stretch @min-[15rem]/kiosk-tile:gap-3'>
         <div className='relative h-[42%] min-h-[4.5rem] w-full shrink-0 overflow-hidden rounded-2xl bg-neutral-200/35 @min-[15rem]/kiosk-tile:h-auto @min-[15rem]/kiosk-tile:min-h-0 @min-[15rem]/kiosk-tile:w-[42%] @min-[15rem]/kiosk-tile:self-stretch'>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={service.imageUrl}
-            alt={title}
-            className='pointer-events-none h-full w-full object-cover'
-          />
+          {imageKind === 'emoji' ? (
+            <div
+              className='flex h-full w-full items-center justify-center text-5xl leading-none select-none sm:text-6xl @min-[15rem]/kiosk-tile:text-5xl @min-[15rem]/kiosk-tile:sm:text-6xl'
+              aria-hidden
+            >
+              {trimmedImage}
+            </div>
+          ) : (
+            <KioskServiceTileImage
+              key={`${service.id}-${service.imageUrl}`}
+              imageUrl={trimmedImage}
+              title={title}
+            />
+          )}
         </div>
 
         <div

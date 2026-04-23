@@ -41,6 +41,7 @@ import {
 } from '@/lib/kiosk-print';
 import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import { logger } from '@/lib/logger';
+import { reportKioskPrinterTelemetry } from '@/lib/kiosk-printer-telemetry';
 import { socketClient, type UnitETASnapshot } from '@/lib/socket';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { isQuotaExceededError } from '@/lib/quota-error';
@@ -52,6 +53,8 @@ import {
   isServicePlacedOnGrid,
   serviceMatchesGridZoneScope
 } from '@/lib/service-grid';
+import { useKioskSessionIdle } from '@/hooks/use-kiosk-session-idle';
+import { useKioskPrinterPaperOutPoll } from '@/hooks/use-kiosk-printer-paper-poll';
 
 export default function UnitKioskPage() {
   const queryClient = useQueryClient();
@@ -67,6 +70,9 @@ export default function UnitKioskPage() {
     useState<NodeJS.Timeout | null>(null);
   const [countdown, setCountdown] = useState<number>(5);
   const [successEtaMinutes, setSuccessEtaMinutes] = useState<number | null>(
+    null
+  );
+  const [successPeopleAhead, setSuccessPeopleAhead] = useState<number | null>(
     null
   );
   const router = useRouter();
@@ -146,6 +152,9 @@ export default function UnitKioskPage() {
           Math.max(1, Math.round(row.estimatedWaitSeconds / 60))
         );
       }
+      if (row && row.queuePosition > 0) {
+        setSuccessPeopleAhead(Math.max(0, row.queuePosition - 1));
+      }
     };
     socketClient.onEtaUpdate(h);
     return () => {
@@ -195,17 +204,48 @@ export default function UnitKioskPage() {
         typeof window !== 'undefined' && logoForPrint
           ? `${window.location.origin}/api/kiosk-print-logo?url=${encodeURIComponent(logoForPrint)}`
           : undefined;
+      const extraBodyLines: string[] = [];
+      if (
+        typeof ticket.queuePosition === 'number' &&
+        ticket.queuePosition > 0
+      ) {
+        extraBodyLines.push(
+          t('ticket.receipt_queue_position', { n: ticket.queuePosition })
+        );
+        const ahead = Math.max(0, ticket.queuePosition - 1);
+        extraBodyLines.push(t('ticket.receipt_people_ahead', { n: ahead }));
+      }
+      if (ticket.serviceZoneName?.trim()) {
+        extraBodyLines.push(
+          t('ticket.receipt_zone', { zone: ticket.serviceZoneName.trim() })
+        );
+      }
       const bytes = await buildKioskTicketEscPos({
         kiosk: kc,
         ticket,
         serviceLabel,
         ticketPageUrl,
         unitDisplayTitle,
-        logoFetchUrl
+        logoFetchUrl,
+        extraBodyLines: extraBodyLines.length > 0 ? extraBodyLines : undefined
       });
-      await printReceiptBytesFromKioskConfig(kc, bytes);
+      const ok = await printReceiptBytesFromKioskConfig(kc, bytes);
+      if (!ok && kioskApiUnitId && isTauriKiosk()) {
+        reportKioskPrinterTelemetry(
+          kioskApiUnitId,
+          'print_error',
+          'Print not sent (missing target, label mode, or desktop print pipeline)'
+        );
+      }
     } catch (e) {
       console.error('Kiosk native print failed:', e);
+      if (kioskApiUnitId) {
+        reportKioskPrinterTelemetry(
+          kioskApiUnitId,
+          'print_error',
+          e instanceof Error ? e.message : String(e)
+        );
+      }
     }
   };
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
@@ -220,6 +260,38 @@ export default function UnitKioskPage() {
   const [phoneIdentificationError, setPhoneIdentificationError] = useState('');
   const [phoneIdentificationSessionKey, setPhoneIdentificationSessionKey] =
     useState(0);
+  const beforeIdleSec = unit?.config?.kiosk?.sessionIdleBeforeWarningSec ?? 45;
+  const idleCountdownSec = unit?.config?.kiosk?.sessionIdleCountdownSec ?? 15;
+  const sessionIdleEnabled = Boolean(
+    unit &&
+    !unitQueryError &&
+    !serverKioskFrozen &&
+    !isTicketModalOpen &&
+    !isSettingsOpen &&
+    !isLocked &&
+    !isPinModalOpen &&
+    !isRedemptionModalOpen &&
+    !isPhoneIdentificationOpen
+  );
+  const onIdleSessionEnd = useCallback(() => {
+    setSelectedServicePath([]);
+    setIsPhoneIdentificationOpen(false);
+    setPhoneIdentificationError('');
+    setPendingPhoneService(null);
+    setIsRedemptionModalOpen(false);
+    setIsPinModalOpen(false);
+    setMessage('');
+  }, []);
+  const {
+    showWarning: showIdleWarning,
+    remainingSec: idleRemainingSec,
+    continueSession: continueIdleSession
+  } = useKioskSessionIdle({
+    enabled: sessionIdleEnabled,
+    beforeWarningSec: beforeIdleSec,
+    countdownSec: idleCountdownSec,
+    onSessionEnd: onIdleSessionEnd
+  });
 
   // Custom colors from config
   const isCustomColorsEnabled =
@@ -235,6 +307,22 @@ export default function UnitKioskPage() {
     : '#f2ebe6';
 
   const kioskCfg = unit?.config?.kiosk;
+  const paperOutPollEnabled = Boolean(
+    kioskApiUnitId &&
+    !unitQueryError &&
+    !serverKioskFrozen &&
+    !isTicketModalOpen &&
+    !isSettingsOpen &&
+    !isLocked &&
+    !isPinModalOpen &&
+    !isRedemptionModalOpen &&
+    !isPhoneIdentificationOpen
+  );
+  useKioskPrinterPaperOutPoll({
+    unitId: kioskApiUnitId,
+    enabled: paperOutPollEnabled,
+    kiosk: kioskCfg
+  });
   const showTicketHeader = kioskCfg?.showHeader !== false;
   const showTicketFooter = kioskCfg?.showFooter !== false;
 
@@ -358,6 +446,11 @@ export default function UnitKioskPage() {
 
   const openTicketSuccessFlow = (ticket: Ticket, service: Service) => {
     setSuccessEtaMinutes(null);
+    if (typeof ticket.queuePosition === 'number' && ticket.queuePosition > 0) {
+      setSuccessPeopleAhead(Math.max(0, ticket.queuePosition - 1));
+    } else {
+      setSuccessPeopleAhead(null);
+    }
     setCreatedTicket(ticket);
     setIsTicketModalOpen(true);
     setSelectedServicePath([]);
@@ -808,6 +901,7 @@ export default function UnitKioskPage() {
           if (!open) {
             setCreatedTicket(null);
             setSuccessEtaMinutes(null);
+            setSuccessPeopleAhead(null);
             if (autoCloseTimerId) {
               clearInterval(autoCloseTimerId);
               setAutoCloseTimerId(null);
@@ -858,6 +952,18 @@ export default function UnitKioskPage() {
                   {t('ticket.success_eta', { minutes: successEtaMinutes })}
                 </p>
               )}
+              {successPeopleAhead != null && (
+                <p className='text-muted-foreground mb-1 text-sm'>
+                  {t('ticket.success_ahead', { n: successPeopleAhead })}
+                </p>
+              )}
+              {createdTicket.serviceZoneName?.trim() ? (
+                <p className='text-muted-foreground mb-2 text-sm'>
+                  {t('ticket.success_zone', {
+                    zone: createdTicket.serviceZoneName.trim()
+                  })}
+                </p>
+              ) : null}
 
               <Separator className='my-4 w-full' />
 
@@ -909,6 +1015,9 @@ export default function UnitKioskPage() {
         unitId={unitId!}
         unitName={unit ? getUnitDisplayName(unit, locale) : ''}
         currentConfig={unit?.config}
+        hasUnit={Boolean(unit)}
+        unitQueryError={unitQueryError}
+        unitPending={unitPending}
         onLock={() => {
           setIsSettingsOpen(false);
           setIsLocked(true);
@@ -919,6 +1028,33 @@ export default function UnitKioskPage() {
           setIsSettingsOpen(false);
         }}
       />
+
+      <Dialog
+        open={showIdleWarning}
+        onOpenChange={() => {
+          /* reset only via Continue; backdrop close calls continue */
+        }}
+      >
+        <DialogContent
+          className='w-[min(100%,22rem)]'
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>{t('settings.session_idle_title')}</DialogTitle>
+          </DialogHeader>
+          <p className='text-muted-foreground text-sm'>
+            {t('settings.session_idle_body', { seconds: idleRemainingSec })}
+          </p>
+          <Button
+            type='button'
+            className='w-full'
+            onClick={() => continueIdleSession()}
+          >
+            {t('settings.session_idle_continue')}
+          </Button>
+        </DialogContent>
+      </Dialog>
 
       {serverKioskFrozen ? (
         <div

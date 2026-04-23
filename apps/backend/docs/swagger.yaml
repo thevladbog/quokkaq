@@ -503,6 +503,13 @@ components:
                 - code
                 - message
             type: object
+        handlers.KioskPrinterTelemetryRequest:
+            properties:
+                kind:
+                    type: string
+                message:
+                    type: string
+            type: object
         handlers.LoginLinkResponse:
             properties:
                 exampleUrl:
@@ -3036,6 +3043,9 @@ components:
                     type: string
                 serviceZoneId:
                     description: 'ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool.'
+                    type: string
+                serviceZoneName:
+                    description: ServiceZoneName is the display name of the service zone unit when ServiceZoneID is set (hydrated, not stored).
                     type: string
                 status:
                     type: string
@@ -13572,6 +13582,36 @@ paths:
                                 type: string
                     description: Internal Server Error
             summary: Merge kiosk settings into unit config
+            tags:
+                - units
+    /units/{unitId}/kiosk-printer-telemetry:
+        post:
+            description: Terminal-authenticated. Emits `unit.kiosk_printer` to the unit room for supervisor dashboards. No response body.
+            parameters:
+                - description: Unit ID
+                  in: path
+                  name: unitId
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/handlers.KioskPrinterTelemetryRequest'
+                description: 'kind: print_error | agent_error | paper_out'
+                required: true
+                x-originalParamName: body
+            responses:
+                "204":
+                    description: No Content
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Bad Request
+            summary: Report a kiosk printer issue (broadcast to unit WebSocket)
             tags:
                 - units
     /units/{unitId}/materials:

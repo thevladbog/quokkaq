@@ -267,7 +267,7 @@ func run() error {
 	ssoHandler := handlers.NewSSOHandler(ssoService)
 	companySSOHTTP := handlers.NewCompanySSOHTTP(ssoService, userRepo, companyRepo)
 	tenantRBACHTTP := handlers.NewTenantRBACHTTP(tenantRBACRepo, userRepo, ssoService)
-	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService, userRepo)
+	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService, userRepo).WithWebSocketHub(hub)
 	signageHandler := handlers.NewSignageHandler(signageService, unitRepo)
 	etaService := services.NewETAServiceFull(ticketRepo, counterRepo, serviceRepo, unitRepo, statsRepo)
 	predictionService := services.NewPredictionService(database.DB, hub, etaService, unitRepo, ticketRepo)
@@ -530,6 +530,7 @@ func run() error {
 			r.Use(authmiddleware.RequireTerminalUnitMatchOrUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermAccessKiosk))
 			r.Get("/{unitId}/services", serviceHandler.GetServicesByUnit)
 			r.Get("/{unitId}/services-tree", serviceHandler.GetServicesByUnit)
+			r.Post("/{unitId}/kiosk-printer-telemetry", unitHandler.PostKioskPrinterTelemetry)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))

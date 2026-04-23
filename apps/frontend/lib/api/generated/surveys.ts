@@ -326,6 +326,8 @@ export interface ModelsTicket {
   serviceId?: string;
   /** ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool. */
   serviceZoneId?: string;
+  /** ServiceZoneName is the display name of the service zone unit when ServiceZoneID is set (hydrated, not stored). */
+  serviceZoneName?: string;
   status?: string;
   /** TransferTrail lists ticket.transferred events in chronological order (client visit APIs only). */
   transferTrail?: ModelsClientVisitTransferEvent[];
@@ -653,6 +655,11 @@ export interface HandlersInvoiceDraftUpsertBody {
 export interface HandlersInvoicePDFPrerequisiteError {
   code: string;
   message: string;
+}
+
+export interface HandlersKioskPrinterTelemetryRequest {
+  kind?: string;
+  message?: string;
 }
 
 export interface HandlersLoginLinkResponse {

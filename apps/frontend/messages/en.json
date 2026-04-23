@@ -327,6 +327,7 @@
         "allow_prebooking": "Allow Prebooking",
         "is_leaf": "Is Leaf Service (Generates Tickets)",
         "image_url": "Image URL",
+        "image_url_hint": "Use an image URL, a data-URL (e.g. SVG), or 1–4 emojis for a text icon.",
         "bg_color": "Background Color",
         "text_color": "Text Color",
         "required_field": "Field is required"
@@ -503,6 +504,7 @@
       "duration_short": "Expected (min)",
       "is_leaf_short": "Is Leaf",
       "image_url": "Image URL",
+      "image_url_hint": "Use an image URL, a data-URL (e.g. SVG), or 1–4 emojis for a text icon.",
       "background_color": "Background Color",
       "text_color": "Text Color",
       "number_sequence": "Number Sequence",
@@ -1464,7 +1466,11 @@
       "test_print_label_unsupported": "Label printer test is not available yet.",
       "printer_test_error": "Print test failed: {message}",
       "printer_ip_required": "Enter the printer IP address",
-      "system_printer_required": "Enter the system printer queue name"
+      "system_printer_required": "Enter the system printer queue name",
+      "session_idle_before_label": "Idle time before session warning (seconds)",
+      "session_idle_before_hint": "Inactivity on the service screen before a warning. Default: 45.",
+      "session_idle_countdown_label": "Countdown to home screen (seconds)",
+      "session_idle_countdown_hint": "How long the warning is shown. Default: 15."
     },
     "guest_survey": {
       "tab": "Guest surveys",
@@ -2206,7 +2212,12 @@
       "proceed": "Proceed to the counter when called",
       "newTicket": "Get Another Ticket",
       "scanQrCode": "Scan the QR code to open the ticket on your phone",
-      "success_eta": "Approx. wait: ~{minutes} min"
+      "success_eta": "Approx. wait: ~{minutes} min",
+      "success_ahead": "People ahead of you: {n}",
+      "success_zone": "Area: {zone}",
+      "receipt_queue_position": "Position in queue: {n}",
+      "receipt_people_ahead": "People ahead: {n}",
+      "receipt_zone": "Area: {zone}"
     },
     "checkIn": "Check-in with Booking Code",
     "bookingCodePlaceholder": "Enter booking code",
@@ -2285,7 +2296,24 @@
       "kiosk_unit_label_placeholder": "Default: {unitName}",
       "kiosk_unit_label_help": "Leave empty to use the unit name.",
       "printerListError": "Could not load printers: {message}",
-      "printerTestError": "Print test failed: {message}"
+      "printerTestError": "Print test failed: {message}",
+      "info_section_title": "Device info (read only)",
+      "info_version_label": "App version",
+      "info_version_web": "Web (not desktop app)",
+      "info_unit_label": "Unit",
+      "info_connection_label": "Status",
+      "connection_online": "Online",
+      "connection_offline": "Offline (no network)",
+      "connection_degraded": "Cannot reach server",
+      "connection_checking": "Checking…",
+      "session_idle_before_label": "Idle time before session warning (seconds)",
+      "session_idle_before_hint": "Inactivity on the service screen before a warning. Default: 45.",
+      "session_idle_countdown_label": "Countdown to reset (seconds)",
+      "session_idle_countdown_hint": "How long the warning is shown before returning to the home screen. Default: 15.",
+      "identification_per_service_note": "Phone number prompt is set per service in the admin, not here.",
+      "session_idle_title": "Still here?",
+      "session_idle_body": "This kiosk will return to the home screen in {seconds}s.",
+      "session_idle_continue": "Continue"
     },
     "lock_screen": {
       "kiosk_locked": "Kiosk Locked",
@@ -2467,6 +2495,7 @@
       "offer_identification": "Offer identification (kiosk phone)",
       "is_leaf": "Is Leaf Service (Generates Tickets)",
       "image_url": "Image URL",
+      "image_url_hint": "Use an image URL, a data-URL (e.g. SVG), or 1–4 emojis for a text icon.",
       "bg_color": "Background Color",
       "text_color": "Text Color",
       "required_field": "Field is required",
@@ -2802,6 +2831,12 @@
         "threshold50": "50% of SLA",
         "threshold80": "80% of SLA",
         "threshold100": "SLA breached"
+      },
+      "kiosk_printer": {
+        "title": "Kiosk printer",
+        "dismissAll": "Dismiss all kiosk printer alerts",
+        "dismissAllShort": "Clear all",
+        "dismissOne": "Dismiss this alert"
       }
     }
   },

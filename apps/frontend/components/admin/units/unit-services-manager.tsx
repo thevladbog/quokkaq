@@ -938,6 +938,9 @@ function ServiceForm({
           }
           onRemove={() => setFormValues((prev) => ({ ...prev, imageUrl: '' }))}
         />
+        <p className='text-muted-foreground text-xs'>
+          {tRoot('forms.fields.image_url_hint')}
+        </p>
       </div>
 
       <div className='grid grid-cols-2 gap-4'>

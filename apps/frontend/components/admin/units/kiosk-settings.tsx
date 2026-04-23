@@ -104,6 +104,11 @@ export function KioskSettings({
   const [serviceGridColor, setServiceGridColor] = useState(
     kioskConfig.serviceGridColor || '#ffffff'
   );
+  const [sessionIdleBeforeWarningSec, setSessionIdleBeforeWarningSec] =
+    useState(kioskConfig.sessionIdleBeforeWarningSec ?? 45);
+  const [sessionIdleCountdownSec, setSessionIdleCountdownSec] = useState(
+    kioskConfig.sessionIdleCountdownSec ?? 15
+  );
 
   // Sync state with currentConfig when it changes - REMOVED
   // We now use a key on the component to reset state when config changes.
@@ -111,6 +116,11 @@ export function KioskSettings({
 
   const handleSave = () => {
     const typedConfig = currentConfig as { kiosk?: KioskConfig };
+    const beforeSec = Math.min(
+      3600,
+      Math.max(15, sessionIdleBeforeWarningSec || 45)
+    );
+    const countSec = Math.min(300, Math.max(5, sessionIdleCountdownSec || 15));
     const newConfig = {
       ...(currentConfig || {}),
       kiosk: {
@@ -137,7 +147,9 @@ export function KioskSettings({
         isCustomColorsEnabled,
         headerColor,
         bodyColor,
-        serviceGridColor
+        serviceGridColor,
+        sessionIdleBeforeWarningSec: beforeSec,
+        sessionIdleCountdownSec: countSec
       }
     };
 
@@ -451,6 +463,51 @@ export function KioskSettings({
                 checked={isPreRegistrationEnabled}
                 onCheckedChange={setIsPreRegistrationEnabled}
               />
+            </div>
+
+            <div className='space-y-3 border-t py-2'>
+              <div className='flex flex-wrap items-start justify-between gap-2'>
+                <div>
+                  <Label htmlFor='admin-sess-warn'>
+                    {t('session_idle_before_label')}
+                  </Label>
+                  <p className='text-muted-foreground text-sm'>
+                    {t('session_idle_before_hint')}
+                  </p>
+                </div>
+                <Input
+                  id='admin-sess-warn'
+                  className='w-24'
+                  type='number'
+                  min={15}
+                  max={3600}
+                  value={sessionIdleBeforeWarningSec}
+                  onChange={(e) =>
+                    setSessionIdleBeforeWarningSec(Number(e.target.value) || 0)
+                  }
+                />
+              </div>
+              <div className='flex flex-wrap items-start justify-between gap-2'>
+                <div>
+                  <Label htmlFor='admin-sess-count'>
+                    {t('session_idle_countdown_label')}
+                  </Label>
+                  <p className='text-muted-foreground text-sm'>
+                    {t('session_idle_countdown_hint')}
+                  </p>
+                </div>
+                <Input
+                  id='admin-sess-count'
+                  className='w-24'
+                  type='number'
+                  min={5}
+                  max={300}
+                  value={sessionIdleCountdownSec}
+                  onChange={(e) =>
+                    setSessionIdleCountdownSec(Number(e.target.value) || 0)
+                  }
+                />
+              </div>
             </div>
 
             {isPrintEnabled && (

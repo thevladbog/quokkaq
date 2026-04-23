@@ -606,6 +606,19 @@ export const unitsApi = {
     return UnitModelSchema.parse(res.data);
   },
 
+  postKioskPrinterTelemetry: async (
+    unitId: string,
+    body: { kind: string; message: string }
+  ) => {
+    const res = await orvalUnits.postUnitsUnitIdKioskPrinterTelemetry(unitId, {
+      kind: body.kind,
+      message: body.message
+    });
+    if (res.status !== 204) {
+      throw new Error(`kiosk printer telemetry: HTTP ${res.status}`);
+    }
+  },
+
   createTicket: async (
     unitId: string,
     ticketData: CreateTicketRequestInput

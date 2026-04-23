@@ -353,6 +353,8 @@ export interface ModelsTicket {
   serviceId?: string;
   /** ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool. */
   serviceZoneId?: string;
+  /** ServiceZoneName is the display name of the service zone unit when ServiceZoneID is set (hydrated, not stored). */
+  serviceZoneName?: string;
   status?: string;
   /** TransferTrail lists ticket.transferred events in chronological order (client visit APIs only). */
   transferTrail?: ModelsClientVisitTransferEvent[];
@@ -680,6 +682,11 @@ export interface HandlersInvoiceDraftUpsertBody {
 export interface HandlersInvoicePDFPrerequisiteError {
   code: string;
   message: string;
+}
+
+export interface HandlersKioskPrinterTelemetryRequest {
+  kind?: string;
+  message?: string;
 }
 
 export interface HandlersLoginLinkResponse {
@@ -4468,6 +4475,98 @@ export const usePatchUnitKioskConfig = <TError = string,
         TContext
       > => {
       return useMutation(getPatchUnitKioskConfigMutationOptions(options), queryClient);
+    }
+
+/**
+ * Terminal-authenticated. Emits `unit.kiosk_printer` to the unit room for supervisor dashboards. No response body.
+ * @summary Report a kiosk printer issue (broadcast to unit WebSocket)
+ */
+export type postUnitsUnitIdKioskPrinterTelemetryResponse204 = {
+  data: void
+  status: 204
+}
+
+export type postUnitsUnitIdKioskPrinterTelemetryResponse400 = {
+  data: string
+  status: 400
+}
+
+export type postUnitsUnitIdKioskPrinterTelemetryResponseSuccess = (postUnitsUnitIdKioskPrinterTelemetryResponse204) & {
+  headers: Headers;
+};
+export type postUnitsUnitIdKioskPrinterTelemetryResponseError = (postUnitsUnitIdKioskPrinterTelemetryResponse400) & {
+  headers: Headers;
+};
+
+export type postUnitsUnitIdKioskPrinterTelemetryResponse = (postUnitsUnitIdKioskPrinterTelemetryResponseSuccess | postUnitsUnitIdKioskPrinterTelemetryResponseError)
+
+export const getPostUnitsUnitIdKioskPrinterTelemetryUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/kiosk-printer-telemetry`
+}
+
+export const postUnitsUnitIdKioskPrinterTelemetry = async (unitId: string,
+    handlersKioskPrinterTelemetryRequest: HandlersKioskPrinterTelemetryRequest, options?: RequestInit): Promise<postUnitsUnitIdKioskPrinterTelemetryResponse> => {
+
+  return orvalMutator<postUnitsUnitIdKioskPrinterTelemetryResponse>(getPostUnitsUnitIdKioskPrinterTelemetryUrl(unitId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersKioskPrinterTelemetryRequest,)
+  }
+);}
+
+
+
+
+export const getPostUnitsUnitIdKioskPrinterTelemetryMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskPrinterTelemetry>>, TError,{unitId: string;data: HandlersKioskPrinterTelemetryRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskPrinterTelemetry>>, TError,{unitId: string;data: HandlersKioskPrinterTelemetryRequest}, TContext> => {
+
+const mutationKey = ['postUnitsUnitIdKioskPrinterTelemetry'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdKioskPrinterTelemetry>>, {unitId: string;data: HandlersKioskPrinterTelemetryRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  postUnitsUnitIdKioskPrinterTelemetry(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostUnitsUnitIdKioskPrinterTelemetryMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdKioskPrinterTelemetry>>>
+    export type PostUnitsUnitIdKioskPrinterTelemetryMutationBody = HandlersKioskPrinterTelemetryRequest
+    export type PostUnitsUnitIdKioskPrinterTelemetryMutationError = string
+
+    /**
+ * @summary Report a kiosk printer issue (broadcast to unit WebSocket)
+ */
+export const usePostUnitsUnitIdKioskPrinterTelemetry = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskPrinterTelemetry>>, TError,{unitId: string;data: HandlersKioskPrinterTelemetryRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postUnitsUnitIdKioskPrinterTelemetry>>,
+        TError,
+        {unitId: string;data: HandlersKioskPrinterTelemetryRequest},
+        TContext
+      > => {
+      return useMutation(getPostUnitsUnitIdKioskPrinterTelemetryMutationOptions(options), queryClient);
     }
 
 /**

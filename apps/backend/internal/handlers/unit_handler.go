@@ -11,9 +11,11 @@ import (
 	authmiddleware "quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
 	"strings"
+	"time"
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/services"
+	"quokkaq-go-backend/internal/ws"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -34,6 +36,7 @@ type UnitHandler struct {
 	storageService services.StorageService
 	operational    *services.OperationalService
 	userRepo       repository.UserRepository
+	hub            *ws.Hub
 }
 
 func NewUnitHandler(service services.UnitService, storageService services.StorageService, operational *services.OperationalService, userRepo repository.UserRepository) *UnitHandler {
@@ -43,6 +46,12 @@ func NewUnitHandler(service services.UnitService, storageService services.Storag
 		operational:    operational,
 		userRepo:       userRepo,
 	}
+}
+
+// WithWebSocketHub enables POST /units/{unitId}/kiosk-printer-telemetry to broadcast to supervisors.
+func (h *UnitHandler) WithWebSocketHub(hub *ws.Hub) *UnitHandler {
+	h.hub = hub
+	return h
 }
 
 // CreateUnit godoc
@@ -661,4 +670,48 @@ func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	RespondJSON(w, existingUnit)
+}
+
+// KioskPrinterTelemetryRequest is the body for POST /units/{unitId}/kiosk-printer-telemetry.
+type KioskPrinterTelemetryRequest struct {
+	Kind    string `json:"kind"`
+	Message string `json:"message"`
+}
+
+// PostKioskPrinterTelemetry godoc
+// @Summary      Report a kiosk printer issue (broadcast to unit WebSocket)
+// @Description  Terminal-authenticated. Emits `unit.kiosk_printer` to the unit room for supervisor dashboards. No response body.
+// @Tags         units
+// @Accept       json
+// @Param        unitId path  string  true  "Unit ID"
+// @Param        body  body  KioskPrinterTelemetryRequest  true  "kind: print_error | agent_error | paper_out"
+// @Success      204
+// @Failure      400  {string}  string "Bad Request"
+// @Router       /units/{unitId}/kiosk-printer-telemetry [post]
+func (h *UnitHandler) PostKioskPrinterTelemetry(w http.ResponseWriter, r *http.Request) {
+	unitID := strings.TrimSpace(chi.URLParam(r, "unitId"))
+	if unitID == "" {
+		http.Error(w, "unitId required", http.StatusBadRequest)
+		return
+	}
+	var body KioskPrinterTelemetryRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	kind := strings.TrimSpace(body.Kind)
+	msg := strings.TrimSpace(body.Message)
+	if kind == "" {
+		http.Error(w, "kind is required", http.StatusBadRequest)
+		return
+	}
+	if h.hub != nil {
+		h.hub.BroadcastEvent("unit.kiosk_printer", map[string]interface{}{
+			"unitId":  unitID,
+			"kind":    kind,
+			"message": msg,
+			"at":      time.Now().UTC().Format(time.RFC3339),
+		}, unitID)
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

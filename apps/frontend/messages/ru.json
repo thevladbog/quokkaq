@@ -327,6 +327,7 @@
         "allow_prebooking": "Разрешить предварительную запись",
         "is_leaf": "Конечная услуга (Генерирует талоны)",
         "image_url": "Фоновое изображение",
+        "image_url_hint": "URL картинки, data-URL (например SVG) или 1–4 эмодзи как текстовая иконка.",
         "bg_color": "Цвет фона",
         "text_color": "Цвет текста",
         "required_field": "Поле обязательно для заполнения"
@@ -503,6 +504,7 @@
       "duration_short": "Ожид., мин",
       "is_leaf_short": "Конечная",
       "image_url": "Фон услуги",
+      "image_url_hint": "URL картинки, data-URL (например SVG) или 1–4 эмодзи как текстовая иконка.",
       "background_color": "Цвет фона",
       "text_color": "Цвет текста",
       "number_sequence": "Последовательность номеров",
@@ -1464,7 +1466,11 @@
       "test_print_label_unsupported": "Пробная печать для принтера этикеток пока недоступна.",
       "printer_test_error": "Пробная печать не удалась: {message}",
       "printer_ip_required": "Укажите IP-адрес принтера",
-      "system_printer_required": "Укажите имя очереди системного принтера"
+      "system_printer_required": "Укажите имя очереди системного принтера",
+      "session_idle_before_label": "Пауза до предупреждения (сек.)",
+      "session_idle_before_hint": "Бездействие на экране выбора услуги до предупреждения. По умолчанию: 45.",
+      "session_idle_countdown_label": "Отсчёт до главного экрана (сек.)",
+      "session_idle_countdown_hint": "Сколько секунд показывается предупреждение. По умолчанию: 15."
     },
     "guest_survey": {
       "tab": "Гостевые опросы",
@@ -2206,7 +2212,12 @@
       "proceed": "Подойдите к стойке при вызове",
       "newTicket": "Получить другой талон",
       "scanQrCode": "Отсканируйте QR‑код, чтобы открыть талон на телефоне",
-      "success_eta": "Примерное ожидание: ~{minutes} мин"
+      "success_eta": "Примерное ожидание: ~{minutes} мин",
+      "success_ahead": "Перед вами в очереди: {n}",
+      "success_zone": "Зона: {zone}",
+      "receipt_queue_position": "Позиция в очереди: {n}",
+      "receipt_people_ahead": "Перед вами: {n}",
+      "receipt_zone": "Зона: {zone}"
     },
     "checkIn": "Регистрация по коду бронирования",
     "bookingCodePlaceholder": "Введите код бронирования",
@@ -2285,7 +2296,24 @@
       "kiosk_unit_label_placeholder": "По умолчанию: {unitName}",
       "kiosk_unit_label_help": "Пустое поле — подставляется название подразделения.",
       "printerListError": "Не удалось загрузить список принтеров: {message}",
-      "printerTestError": "Тестовая печать не удалась: {message}"
+      "printerTestError": "Тестовая печать не удалась: {message}",
+      "info_section_title": "Сведения (только чтение)",
+      "info_version_label": "Версия приложения",
+      "info_version_web": "Веб (не десктоп)",
+      "info_unit_label": "Точка",
+      "info_connection_label": "Состояние",
+      "connection_online": "Онлайн",
+      "connection_offline": "Оффлайн (нет сети)",
+      "connection_degraded": "Сервер недоступен",
+      "connection_checking": "Проверка…",
+      "session_idle_before_label": "Пауза до предупреждения (сек.)",
+      "session_idle_before_hint": "Бездействие на экране выбора услуги до предупреждения. По умолчанию: 45.",
+      "session_idle_countdown_label": "Отсчёт до сброса (сек.)",
+      "session_idle_countdown_hint": "Сколько секунд показывается предупреждение до возврата на главный экран. По умолчанию: 15.",
+      "identification_per_service_note": "Запрос телефона настраивается в админке для услуг, а не в этом переключателе.",
+      "session_idle_title": "Вы ещё здесь?",
+      "session_idle_body": "Киоск вернётся на главный экран через {seconds} с.",
+      "session_idle_continue": "Продолжить"
     },
     "lock_screen": {
       "kiosk_locked": "Киоск заблокирован",
@@ -2467,6 +2495,7 @@
       "offer_identification": "Предлагать идентификацию (телефон в киоске)",
       "is_leaf": "Конечная услуга (генерирует талоны)",
       "image_url": "Фон услуги",
+      "image_url_hint": "URL картинки, data-URL (например SVG) или 1–4 эмодзи как текстовая иконка.",
       "bg_color": "Цвет фона",
       "text_color": "Цвет текста",
       "required_field": "Поле обязательно",
@@ -2802,6 +2831,12 @@
         "threshold50": "50% от SLA",
         "threshold80": "80% от SLA",
         "threshold100": "SLA нарушен"
+      },
+      "kiosk_printer": {
+        "title": "Принтер киоска",
+        "dismissAll": "Снять все оповещения о принтере",
+        "dismissAllShort": "Снять все",
+        "dismissOne": "Снять оповещение"
       }
     }
   },
