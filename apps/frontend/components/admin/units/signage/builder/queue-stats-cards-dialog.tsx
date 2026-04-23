@@ -46,7 +46,7 @@ type SortableCardProps = {
   card: QueueStatCardConfig;
   index: number;
   canEdit: boolean;
-  t: (key: string, values?: Record<string, unknown>) => string;
+  t: (key: string, values?: Record<string, string | number | Date>) => string;
   onUpdate: (index: number, updated: QueueStatCardConfig) => void;
 };
 

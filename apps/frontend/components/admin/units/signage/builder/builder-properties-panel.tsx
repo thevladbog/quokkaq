@@ -39,6 +39,7 @@ import { QueueStatsCardsDialog } from './queue-stats-cards-dialog';
 
 const PROP_LABEL = 'text-xs';
 const FIELD_WRAPPER = 'flex flex-col gap-1.5';
+const SECTION_GAP = 'space-y-3';
 
 type GridWidget = ScreenCellGridWidget;
 

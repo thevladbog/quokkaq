@@ -24,11 +24,6 @@ func civilYMDStringAt(t time.Time, loc *time.Location) string {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
 }
 
-// civilYMDStringNow returns YYYY-MM-DD for the current civil date in the given IANA zone.
-func civilYMDStringNow(loc *time.Location) string {
-	return civilYMDStringAt(time.Now(), loc)
-}
-
 // scheduleInCalendarWindow returns true if the civil "today" string is within [ValidFrom, ValidTo] inclusive, when set.
 func scheduleInCalendarWindow(sc *models.PlaylistSchedule, todayYMD string) bool {
 	if sc == nil {

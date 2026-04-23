@@ -37,7 +37,7 @@ describe('useScreenBuilderStore', () => {
   it('addWidget inserts in both orientations and marks dirty', () => {
     const before =
       useScreenBuilderStore.getState().template.portrait.widgets.length;
-    useScreenBuilderStore.getState().addWidget('rss-feed', 'main', 0);
+    useScreenBuilderStore.getState().addWidget('rss-feed');
     const s = useScreenBuilderStore.getState();
     expect(s.template.portrait.widgets.length).toBe(before + 1);
     expect(s.template.landscape.widgets.length).toBe(before + 1);
@@ -60,7 +60,7 @@ describe('useScreenBuilderStore', () => {
   it('undo and redo', () => {
     const before =
       useScreenBuilderStore.getState().template.portrait.widgets.length;
-    useScreenBuilderStore.getState().addWidget('clock', 'main', 0);
+    useScreenBuilderStore.getState().addWidget('clock');
     expect(
       useScreenBuilderStore.getState().template.portrait.widgets.length
     ).toBe(before + 1);
@@ -82,7 +82,7 @@ describe('useScreenBuilderStore', () => {
   });
 
   it('markSaved resets history', () => {
-    useScreenBuilderStore.getState().addWidget('clock', 'main', 0);
+    useScreenBuilderStore.getState().addWidget('clock');
     const tpl = { ...useScreenBuilderStore.getState().template };
     useScreenBuilderStore.getState().markSaved(tpl);
     expect(useScreenBuilderStore.getState().isDirty).toBe(false);

@@ -104,7 +104,7 @@ function deriveLayoutPick(unit: Unit, libraryRows: LibraryRowLite[]): string {
       const d = row.definition
         ? ScreenTemplateSchema.safeParse(row.definition)
         : null;
-      if (d.success && d.data.id === tid) return `l:${rid}`;
+      if (d && d.success && d.data && d.data.id === tid) return `l:${rid}`;
     }
     if ((PRESET_KEYS as readonly string[]).includes(tid)) {
       return `p:${tid}`;
