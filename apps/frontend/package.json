@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
+    "test:a11y": "vitest run lib/kiosk-wcag-contrast.test.ts",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "format:fix": "prettier --write .",

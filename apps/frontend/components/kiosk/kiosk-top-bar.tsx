@@ -2,6 +2,7 @@
 
 import type { KeyboardEvent, ReactNode } from 'react';
 import { formatAppDate, formatAppTime } from '@/lib/format-datetime';
+import { cn } from '@/lib/utils';
 
 type KioskTopBarProps = {
   intlLocale: string;
@@ -9,6 +10,8 @@ type KioskTopBarProps = {
   currentTime: Date | null;
   onClockClick?: () => void;
   headerColor: string;
+  /** When true, clock and labels use light text (high-contrast dark header). */
+  useLightHeaderText?: boolean;
   /** Left cluster: e.g. logo + optional unit title. */
   leading?: ReactNode;
   /** Right cluster before the clock: e.g. “I have a code”, language. Order: first item is leftmost of this group. */
@@ -20,6 +23,7 @@ export function KioskTopBar({
   currentTime,
   onClockClick,
   headerColor,
+  useLightHeaderText = false,
   leading,
   beforeClock
 }: KioskTopBarProps) {
@@ -33,22 +37,31 @@ export function KioskTopBar({
         }
       : undefined;
 
+  const tCls = useLightHeaderText ? 'text-white' : 'text-kiosk-ink';
+  const mCls = useLightHeaderText ? 'text-white/80' : 'text-kiosk-ink-muted';
+
   const timeBlock = (
     <div
-      className={
+      className={cn(
         onClockClick
-          ? 'cursor-pointer text-right select-none'
-          : 'text-right select-none'
-      }
+          ? 'kiosk-touch-min flex cursor-pointer flex-col items-end justify-end rounded-lg px-2 py-1 text-right select-none'
+          : 'kiosk-touch-min text-right select-none',
+        tCls
+      )}
       onClick={onClockClick}
       onKeyDown={onTimeKeyDown}
       role={onClockClick ? 'button' : undefined}
       tabIndex={onClockClick ? 0 : undefined}
     >
-      <div className='text-kiosk-ink text-xl font-bold tracking-tight sm:text-2xl md:text-3xl'>
+      <div
+        className={cn(
+          'text-xl font-bold tracking-tight sm:text-2xl md:text-3xl',
+          tCls
+        )}
+      >
         {formatAppTime(currentTime, intlLocale)}
       </div>
-      <div className='text-kiosk-ink-muted mt-0.5 text-xs sm:text-sm'>
+      <div className={cn('mt-0.5 text-xs sm:text-sm', mCls)}>
         {formatAppDate(currentTime, intlLocale, 'full', '')}
       </div>
     </div>
@@ -60,7 +73,7 @@ export function KioskTopBar({
       style={{ backgroundColor: headerColor }}
     >
       <div className='flex min-w-0 flex-1 items-center gap-3'>{leading}</div>
-      <div className='flex shrink-0 items-center gap-3 sm:gap-4 md:gap-6'>
+      <div className='flex max-w-full min-w-0 shrink-0 items-center justify-end gap-2 sm:gap-3 md:gap-4'>
         {beforeClock}
         {timeBlock}
       </div>

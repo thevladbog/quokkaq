@@ -7,8 +7,9 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use base64::Engine;
+use cpal::traits::{DeviceTrait, HostTrait};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, Url};
+use tauri::{AppHandle, Emitter, Manager, Url};
 use tauri::webview::PageLoadEvent;
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
@@ -361,6 +362,54 @@ fn print_receipt(
     Ok(())
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct KioskAudioOutputState {
+    /// Human-readable name of the default system output (may be empty on headless/CI).
+    default_output_name: String,
+    /// Heuristic: likely headphones, headset, earphones, or AirPods based on the device name.
+    is_likely_headphones: bool,
+    source: String,
+}
+
+fn classify_headphone_like_output(name: &str) -> bool {
+    let l = name.to_lowercase();
+    l.contains("headphone")
+        || l.contains("headset")
+        || l.contains("earphone")
+        || l.contains("ear piece")
+        || l.contains("airpods")
+        || l.contains("earpods")
+        || l.contains("hearing")
+        || l.contains("momentum") // e.g. Sennheiser Momentum
+        || (l.contains("bluetooth") && l.contains("audio") && l.contains("head"))
+}
+
+/// Default playback device name and headphone heuristic (for kiosk TTS / privacy). Uses cpal.
+fn kiosk_audio_output_state_inner() -> KioskAudioOutputState {
+    let host = cpal::default_host();
+    let Some(dev) = host.default_output_device() else {
+        return KioskAudioOutputState {
+            default_output_name: String::new(),
+            is_likely_headphones: false,
+            source: "tauri".to_string(),
+        };
+    };
+    let name = dev.name().unwrap_or_default();
+    let is = classify_headphone_like_output(&name);
+    KioskAudioOutputState {
+        default_output_name: name,
+        is_likely_headphones: is,
+        source: "tauri".to_string(),
+    }
+}
+
+/// Poll default audio output (e.g. after plugging headphones) for WebView a11y.
+#[tauri::command]
+fn kiosk_get_audio_output_state() -> Result<KioskAudioOutputState, String> {
+    Ok(kiosk_audio_output_state_inner())
+}
+
 /// JSON string: `{ "printers": [...], "error"?: string }` from the local agent.
 #[tauri::command]
 fn list_printers() -> Result<String, String> {
@@ -496,10 +545,26 @@ pub fn run() {
             print_receipt,
             list_printers,
             pair_terminal,
-            reset_desktop_pairing
+            reset_desktop_pairing,
+            kiosk_get_audio_output_state
         ])
         .setup(|app| {
             let handle = app.handle().clone();
+            let audio_emit = handle.clone();
+            std::thread::Builder::new()
+                .name("quokkaq-audio-poll".to_string())
+                .spawn(move || {
+                    let mut last = String::new();
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_millis(2000));
+                        let st = kiosk_audio_output_state_inner();
+                        if st.default_output_name != last {
+                            last = st.default_output_name.clone();
+                            let _ = audio_emit.emit("kiosk-audio-output", &st);
+                        }
+                    }
+                })
+                .ok();
             spawn_print_agent(handle.clone());
 
             if let Some(win) = app.get_webview_window("main") {

@@ -2313,11 +2313,37 @@
       "identification_per_service_note": "Phone number prompt is set per service in the admin, not here.",
       "session_idle_title": "Still here?",
       "session_idle_body": "This kiosk will return to the home screen in {seconds}s.",
-      "session_idle_continue": "Continue"
+      "session_idle_continue": "Continue",
+      "contrast_legend": "Each surface is checked for the standard kiosk text color. Body (normal) needs 4.5:1; large/heading text needs 3:1. Save stays disabled until all three surfaces pass 4.5:1 for body text.",
+      "contrast_server_invalid": "The saved color combination does not meet 4.5:1. Adjust all three until valid before saving.",
+      "contrast_body_ok": "{label}: {ratio} — body text OK (≥ {min}:1).",
+      "contrast_body_fail": "{label}: {ratio} — needs ≥ {min}:1 for body text.",
+      "contrast_large_ok": "Large/heading: OK (≥ {minLarge}:1 on this color).",
+      "contrast_large_headings_only": "Large/heading only: {ratio} — meets ≥ {minLarge}:1, not small body text.",
+      "contrast_large_fail": "Also below ≥ {minLarge}:1 for large/heading text.",
+      "contrast_label_header": "Header",
+      "contrast_label_body": "Page",
+      "contrast_label_grid": "Service area"
+    },
+    "a11y": {
+      "group_label": "Accessibility",
+      "font_size": "Text size, level {level} of 3",
+      "high_contrast_toggle": "High contrast",
+      "high_contrast_hint": "Stronger contrast. Brand color fills in the main areas are replaced for readability. Logo is unchanged in its frame.",
+      "tts_toggle": "Text-to-speech",
+      "speak_aloud_label": "Read aloud in public",
+      "speak_aloud_toggle": "Read guidance through speakers. If off, voice only plays with headphones (when the device reports them) or in private read-aloud mode.",
+      "headphone_state": "Audio output: {label}",
+      "screen_welcome": "Services. {title}.",
+      "screen_drill": "Service category. {title}.",
+      "screen_phone": "Phone number step. You can use the number pad, then continue or skip.",
+      "success_ticket": "Your ticket number is {number}.",
+      "success_live": "Your ticket number is {number}."
     },
     "lock_screen": {
       "kiosk_locked": "Kiosk Locked",
-      "contact_admin": "This kiosk is currently locked. Please contact an administrator."
+      "contact_admin": "This kiosk is currently locked. Please contact an administrator.",
+      "unlock_hint": "Tap the lock several times to enter unlock"
     },
     "pre_registration": {
       "button": "I have a code",

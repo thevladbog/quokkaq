@@ -115,7 +115,7 @@ export function PreRegRedemptionModal({
               <Button
                 key={digit}
                 variant='outline'
-                className='h-[3.25rem] text-2xl font-bold sm:h-16 sm:text-3xl'
+                className='kiosk-touch-min h-[3.25rem] min-h-12 text-2xl font-bold sm:h-16 sm:text-3xl'
                 onClick={() => handleDigitClick(digit.toString())}
               >
                 {digit}
@@ -123,14 +123,14 @@ export function PreRegRedemptionModal({
             ))}
             <Button
               variant='outline'
-              className='h-[3.25rem] text-2xl font-bold sm:h-16 sm:text-3xl'
+              className='kiosk-touch-min h-[3.25rem] min-h-12 text-2xl font-bold sm:h-16 sm:text-3xl'
               onClick={() => setCode('')}
             >
               C
             </Button>
             <Button
               variant='outline'
-              className='h-[3.25rem] text-2xl font-bold sm:h-16 sm:text-3xl'
+              className='kiosk-touch-min h-[3.25rem] min-h-12 text-2xl font-bold sm:h-16 sm:text-3xl'
               onClick={() => handleDigitClick('0')}
             >
               0
@@ -138,7 +138,7 @@ export function PreRegRedemptionModal({
             <Button
               type='button'
               variant='outline'
-              className='h-[3.25rem] sm:h-16'
+              className='kiosk-touch-min h-[3.25rem] min-h-12 sm:h-16'
               onClick={handleBackspace}
               aria-label={t('backspace', {
                 defaultValue: 'Delete last digit'
@@ -151,18 +151,18 @@ export function PreRegRedemptionModal({
           <div className='flex gap-2 sm:gap-3'>
             <Button
               variant='outline'
-              className='h-12 flex-1 text-base sm:h-14 sm:text-lg'
+              className='kiosk-touch-min h-12 min-h-12 flex-1 text-base sm:h-14 sm:text-lg'
               onClick={onClose}
             >
               {t('cancel', { defaultValue: 'Cancel' })}
             </Button>
             <Button
-              className='h-12 flex-1 text-base sm:h-14 sm:text-lg'
+              className='kiosk-touch-min h-12 min-h-12 flex-1 text-base sm:h-14 sm:text-lg'
               onClick={handleSubmit}
               disabled={code.length === 0 || redeemMutation.isPending}
             >
               {redeemMutation.isPending ? (
-                <Loader2 className='size-6 animate-spin sm:size-7' />
+                <Loader2 className='kiosk-a11y-respect-motion size-6 animate-spin sm:size-7' />
               ) : (
                 t('submit', { defaultValue: 'Submit' })
               )}

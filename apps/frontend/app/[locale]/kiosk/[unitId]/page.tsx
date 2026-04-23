@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useUnitServicesTree, useCreateTicketInUnit } from '@/lib/hooks';
@@ -21,7 +21,12 @@ import { Separator } from '@/components/ui/separator';
 import { useParams } from 'next/navigation';
 import { useRouter } from '@/src/i18n/navigation';
 import { useLocale } from 'next-intl';
-import { getLocalizedName } from '@/lib/utils';
+import { getLocalizedName, cn } from '@/lib/utils';
+import { KIOSK_FORCED_HIGH_CONTRAST } from '@/lib/kiosk-hc-palette';
+import { KioskAccessibilityToolbar } from '@/components/kiosk/kiosk-accessibility-toolbar';
+import { useKioskA11y } from '@/contexts/kiosk-accessibility-context';
+import { useKioskA11yAudio } from '@/hooks/use-kiosk-a11y-audio';
+import { useKioskSpeech } from '@/hooks/use-kiosk-speech';
 import KioskLanguageSwitcher from '@/components/KioskLanguageSwitcher';
 import { useUnit } from '@/lib/hooks';
 import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
@@ -79,6 +84,11 @@ export default function UnitKioskPage() {
   const locale = useLocale();
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
   const t = useTranslations('kiosk');
+  const tA11y = useTranslations('kiosk.a11y');
+  const a11y = useKioskA11y();
+  const kioskAudio = useKioskA11yAudio({ ttsEnabled: a11y.ttsEnabled });
+  const tts = useKioskSpeech(kioskAudio);
+  const ttsKeyRef = useRef('');
   const [baseAppUrl] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.location.origin;
@@ -293,18 +303,25 @@ export default function UnitKioskPage() {
     onSessionEnd: onIdleSessionEnd
   });
 
-  // Custom colors from config
   const isCustomColorsEnabled =
     unit?.config?.kiosk?.isCustomColorsEnabled || false;
-  const headerColor = isCustomColorsEnabled
-    ? unit?.config?.kiosk?.headerColor || '#fff9f4'
-    : '#fff9f4';
-  const bodyColor = isCustomColorsEnabled
-    ? unit?.config?.kiosk?.bodyColor || '#fef8f3'
-    : '#fef8f3';
-  const serviceGridColor = isCustomColorsEnabled
-    ? unit?.config?.kiosk?.serviceGridColor || '#f2ebe6'
-    : '#f2ebe6';
+  const kcKiosk = unit?.config?.kiosk;
+  const useHcSurfaces = a11y.highContrast;
+  const headerColor = useHcSurfaces
+    ? KIOSK_FORCED_HIGH_CONTRAST.headerBackground
+    : isCustomColorsEnabled
+      ? kcKiosk?.headerColor || '#fff9f4'
+      : '#fff9f4';
+  const bodyColor = useHcSurfaces
+    ? KIOSK_FORCED_HIGH_CONTRAST.bodyBackground
+    : isCustomColorsEnabled
+      ? kcKiosk?.bodyColor || '#fef8f3'
+      : '#fef8f3';
+  const serviceGridColor = useHcSurfaces
+    ? KIOSK_FORCED_HIGH_CONTRAST.serviceGridBackground
+    : isCustomColorsEnabled
+      ? kcKiosk?.serviceGridColor || '#f2ebe6'
+      : '#f2ebe6';
 
   const kioskCfg = unit?.config?.kiosk;
   const paperOutPollEnabled = Boolean(
@@ -333,13 +350,24 @@ export default function UnitKioskPage() {
     (unit ? getUnitDisplayName(unit, locale) : '').trim() ||
     t('kioskTitle');
 
-  const switcherClass =
-    'text-kiosk-ink h-11 min-w-[3.25rem] rounded-full border-0 bg-[#f2ede8] px-4 text-base font-semibold shadow-sm hover:bg-[#ebe4de] md:h-12 md:min-w-[3.5rem]';
+  const switcherClass = cn(
+    'kiosk-touch-min text-kiosk-ink h-12 min-w-[3.5rem] rounded-full border-0 bg-[#f2ede8] px-4 text-base font-semibold shadow-sm hover:bg-[#ebe4de]'
+  );
 
   const topBarLeading = (
     <>
       {kioskCfg?.logoUrl ? (
-        <div className='relative h-10 w-auto shrink-0 md:h-14'>
+        <div
+          className={cn(
+            'relative h-10 w-auto shrink-0 md:h-14',
+            useHcSurfaces && 'rounded-lg p-1'
+          )}
+          style={
+            useHcSurfaces
+              ? { backgroundColor: KIOSK_FORCED_HIGH_CONTRAST.logoSurround }
+              : undefined
+          }
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={kioskCfg.logoUrl}
@@ -349,7 +377,12 @@ export default function UnitKioskPage() {
         </div>
       ) : null}
       {showUnitInHeader ? (
-        <p className='text-kiosk-ink min-w-0 truncate text-lg font-bold tracking-tight sm:text-xl md:text-2xl'>
+        <p
+          className={cn(
+            'min-w-0 truncate text-lg font-bold tracking-tight sm:text-xl md:text-2xl',
+            useHcSurfaces ? 'text-white' : 'text-kiosk-ink'
+          )}
+        >
           {resolvedHeaderUnitTitle}
         </p>
       ) : null}
@@ -358,10 +391,11 @@ export default function UnitKioskPage() {
 
   const topBarBeforeClock = (
     <>
+      <KioskAccessibilityToolbar audio={kioskAudio} />
       {kioskCfg?.isPreRegistrationEnabled ? (
         <Button
           variant='secondary'
-          className='text-kiosk-ink h-11 shrink-0 rounded-full px-4 text-base font-semibold shadow-sm md:h-12'
+          className='text-kiosk-ink kiosk-touch-min h-12 shrink-0 rounded-full px-4 text-base font-semibold shadow-sm'
           onClick={() => setIsRedemptionModalOpen(true)}
         >
           {t('pre_registration.button', { defaultValue: 'I have a code' })}
@@ -386,6 +420,79 @@ export default function UnitKioskPage() {
   const heroSubtitle = isServiceRoot
     ? kioskCfg?.welcomeSubtitle?.trim() || t('welcome_default_subtitle')
     : undefined;
+
+  useEffect(() => {
+    if (!tts.canSpeak) {
+      ttsKeyRef.current = '';
+      tts.cancel();
+    }
+  }, [tts]);
+
+  const handleA11yTileVocalize = useCallback(
+    (s: Service) => {
+      if (!tts.canSpeak) {
+        return;
+      }
+      tts.speak(
+        getLocalizedName(s.name, s.nameRu || '', s.nameEn || '', locale)
+      );
+    },
+    [locale, tts]
+  );
+
+  useEffect(() => {
+    if (!unit || !tts.canSpeak) {
+      return;
+    }
+    const key = [
+      isTicketModalOpen,
+      createdTicket?.id,
+      isServiceRoot,
+      pathLeaf?.id ?? 'root',
+      successEtaMinutes ?? 'x',
+      successPeopleAhead ?? 'x',
+      isPhoneIdentificationOpen
+    ].join(':');
+    if (key === ttsKeyRef.current) {
+      return;
+    }
+    ttsKeyRef.current = key;
+    if (isPhoneIdentificationOpen) {
+      tts.speak(tA11y('screen_phone'));
+      return;
+    }
+    if (isTicketModalOpen && createdTicket) {
+      const parts = [
+        tA11y('success_ticket', { number: String(createdTicket.queueNumber) })
+      ];
+      if (successEtaMinutes != null) {
+        parts.push(t('ticket.success_eta', { minutes: successEtaMinutes }));
+      }
+      if (successPeopleAhead != null) {
+        parts.push(t('ticket.success_ahead', { n: successPeopleAhead }));
+      }
+      tts.speak(parts.join(' '));
+      return;
+    }
+    if (isServiceRoot) {
+      tts.speak(tA11y('screen_welcome', { title: heroTitle }));
+    } else {
+      tts.speak(tA11y('screen_drill', { title: heroTitle }));
+    }
+  }, [
+    unit,
+    tts,
+    t,
+    isTicketModalOpen,
+    createdTicket,
+    isServiceRoot,
+    pathLeaf?.id,
+    successEtaMinutes,
+    successPeopleAhead,
+    heroTitle,
+    tA11y,
+    isPhoneIdentificationOpen
+  ]);
 
   const handleClockClick = () => {
     setClockClicks((prev) => {
@@ -588,7 +695,13 @@ export default function UnitKioskPage() {
 
   return (
     <div
-      className='text-kiosk-ink flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4'
+      className={cn(
+        'kiosk-motion-root kiosk-a11y-root flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4',
+        useHcSurfaces ? 'text-zinc-100' : 'text-kiosk-ink',
+        useHcSurfaces && 'kiosk-hc'
+      )}
+      data-kiosk-font-step={a11y.fontStep}
+      data-kiosk-hc={useHcSurfaces ? 'true' : 'false'}
       style={{ backgroundColor: bodyColor }}
     >
       <KioskTopBar
@@ -596,6 +709,7 @@ export default function UnitKioskPage() {
         currentTime={currentTime}
         onClockClick={handleClockClick}
         headerColor={headerColor}
+        useLightHeaderText={useHcSurfaces}
         leading={topBarLeading}
         beforeClock={topBarBeforeClock}
       />
@@ -637,7 +751,7 @@ export default function UnitKioskPage() {
       ) : unitPending && !unit ? (
         <div className='flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden px-4'>
           <div className='text-center'>
-            <div className='border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
+            <div className='kiosk-a11y-respect-motion border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
             <p className='text-kiosk-ink-muted'>{t('loading')}</p>
             {unitSlowLoad ? (
               <>
@@ -698,7 +812,7 @@ export default function UnitKioskPage() {
       ) : servicesLoading ? (
         <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
           <div className='text-center'>
-            <div className='border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
+            <div className='kiosk-a11y-respect-motion border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
             <p className='text-kiosk-ink-muted'>{t('loading')}</p>
           </div>
         </div>
@@ -762,14 +876,32 @@ export default function UnitKioskPage() {
         </div>
       ) : (
         <>
-          <KioskWelcomeHero title={heroTitle} subtitle={heroSubtitle} />
+          <KioskWelcomeHero
+            title={heroTitle}
+            subtitle={heroSubtitle}
+            highContrast={useHcSurfaces}
+          />
 
           {/* Navigation breadcrumbs and buttons */}
-          <div className='border-kiosk-border/50 mb-2 flex shrink-0 items-center justify-between rounded-xl border bg-white/40 px-3 py-2 sm:mb-3 sm:px-4'>
-            <div className='text-kiosk-ink-muted flex min-w-0 items-center overflow-x-auto text-sm font-medium'>
+          <div
+            className={cn(
+              'mb-2 flex shrink-0 items-center justify-between rounded-xl border px-3 py-2 sm:mb-3 sm:px-4',
+              useHcSurfaces
+                ? 'border-white/20 bg-zinc-800/80'
+                : 'border-kiosk-border/50 bg-white/40'
+            )}
+          >
+            <div
+              className={cn(
+                'flex min-w-0 items-center overflow-x-auto text-sm font-medium',
+                useHcSurfaces ? 'text-zinc-300' : 'text-kiosk-ink-muted'
+              )}
+            >
               <span className='mr-2 shrink-0 opacity-70'>#</span>
               {selectedServicePath.length === 0 ? (
-                <span>{t('services', { defaultValue: 'Services' })}</span>
+                <span className={useHcSurfaces ? 'text-zinc-200' : undefined}>
+                  {t('services', { defaultValue: 'Services' })}
+                </span>
               ) : (
                 selectedServicePath.map((service, index) => (
                   <div key={index} className='flex items-center'>
@@ -779,7 +911,12 @@ export default function UnitKioskPage() {
                         className='bg-kiosk-border mx-2 h-4'
                       />
                     )}
-                    <span className='text-kiosk-ink whitespace-nowrap'>
+                    <span
+                      className={cn(
+                        'whitespace-nowrap',
+                        useHcSurfaces ? 'text-white' : 'text-kiosk-ink'
+                      )}
+                    >
                       {getLocalizedName(
                         service.name,
                         service.nameRu,
@@ -797,10 +934,10 @@ export default function UnitKioskPage() {
                 <Button
                   variant='outline'
                   size='sm'
-                  className='border-kiosk-border/60 rounded-full'
+                  className='kiosk-touch-min h-12 min-w-12 gap-2 rounded-full sm:px-4'
                   onClick={() => setSelectedServicePath([])}
                 >
-                  <Home className='mr-2 h-4 w-4' />
+                  <Home className='size-5 shrink-0' />
                   {t('home', { defaultValue: 'Home' })}
                 </Button>
               )}
@@ -808,10 +945,10 @@ export default function UnitKioskPage() {
                 <Button
                   variant='outline'
                   size='sm'
-                  className='border-kiosk-border/60 rounded-full'
+                  className='kiosk-touch-min h-12 min-w-12 gap-2 rounded-full sm:px-4'
                   onClick={handleGoBack}
                 >
-                  <ArrowLeft className='mr-2 h-4 w-4' />
+                  <ArrowLeft className='size-5 shrink-0' />
                   {t('back', { defaultValue: 'Back' })}
                 </Button>
               )}
@@ -847,6 +984,7 @@ export default function UnitKioskPage() {
                     service={service}
                     locale={locale}
                     onSelect={handleServiceSelection}
+                    onA11yFocus={handleA11yTileVocalize}
                   />
                 </div>
               );
@@ -911,6 +1049,11 @@ export default function UnitKioskPage() {
       >
         {createdTicket && (
           <DialogContent className='flex w-[320px] flex-col items-center sm:w-[420px]'>
+            <div className='sr-only' aria-live='polite' aria-atomic>
+              {tA11y('success_live', {
+                number: String(createdTicket.queueNumber)
+              })}
+            </div>
             {/* Logo (top) */}
             {unit?.config?.kiosk?.logoUrl && (
               <div className='mb-4 h-16 w-auto'>

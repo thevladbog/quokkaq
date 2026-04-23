@@ -192,6 +192,90 @@
     line-height: 1.35;
     font-size: clamp(1rem, min(2.75vmin, 2.4vw), 1.35rem);
   }
+
+  .kiosk-touch-min {
+    min-height: 3rem;
+    min-width: 3rem;
+  }
+
+  .kiosk-tile-a11y:focus-visible {
+    outline: 3px solid var(--color-amber-400, #fbbf24);
+    outline-offset: 3px;
+  }
+
+  .kiosk-hc .kiosk-tile-a11y:focus-visible {
+    outline-color: #fde047;
+  }
+}
+
+/* Kiosk: session font steps 1 and 2 */
+@layer components {
+  .kiosk-a11y-root[data-kiosk-font-step='1'] .kiosk-welcome-title {
+    font-size: calc(
+      1.12 * clamp(1.5rem, min(5.5vmin, 3.8vw), 2.85rem)
+    ) !important;
+  }
+  .kiosk-a11y-root[data-kiosk-font-step='2'] .kiosk-welcome-title {
+    font-size: calc(
+      1.22 * clamp(1.5rem, min(5.5vmin, 3.8vw), 2.85rem)
+    ) !important;
+  }
+  .kiosk-a11y-root[data-kiosk-font-step='1'] .kiosk-welcome-subtitle {
+    font-size: calc(
+      1.12 * clamp(1rem, min(2.75vmin, 2.4vw), 1.35rem)
+    ) !important;
+  }
+  .kiosk-a11y-root[data-kiosk-font-step='2'] .kiosk-welcome-subtitle {
+    font-size: calc(
+      1.22 * clamp(1rem, min(2.75vmin, 2.4vw), 1.35rem)
+    ) !important;
+  }
+  .kiosk-a11y-root[data-kiosk-font-step='1'] .kiosk-service-tile-title {
+    font-size: calc(
+      1.12 * clamp(1.125rem, calc(4.2cqw + 1.15vmin), 2.5rem)
+    ) !important;
+  }
+  .kiosk-a11y-root[data-kiosk-font-step='2'] .kiosk-service-tile-title {
+    font-size: calc(
+      1.22 * clamp(1.125rem, calc(4.2cqw + 1.15vmin), 2.5rem)
+    ) !important;
+  }
+  .kiosk-a11y-root[data-kiosk-font-step='1'] .kiosk-service-tile-desc {
+    font-size: calc(
+      1.1 * clamp(0.8125rem, calc(2.45cqw + 0.65vmin), 1.125rem)
+    ) !important;
+  }
+  .kiosk-a11y-root[data-kiosk-font-step='2'] .kiosk-service-tile-desc {
+    font-size: calc(
+      1.18 * clamp(0.8125rem, calc(2.45cqw + 0.65vmin), 1.125rem)
+    ) !important;
+  }
+}
+
+@layer utilities {
+  @media (prefers-reduced-motion: reduce) {
+    .kiosk-motion-root *,
+    .kiosk-motion-root *::before,
+    .kiosk-motion-root *::after {
+      animation-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+
+    .kiosk-motion-root * {
+      transition: none !important;
+    }
+
+    .kiosk-tile-a11y,
+    [class*='active:scale'] {
+      transform: none !important;
+    }
+
+    /* Portals / elements outside .kiosk-motion-root (e.g. sheet, loading) */
+    .kiosk-a11y-respect-motion,
+    .kiosk-a11y-respect-motion.animate-spin {
+      animation: none !important;
+    }
+  }
 }
 
 @layer base {

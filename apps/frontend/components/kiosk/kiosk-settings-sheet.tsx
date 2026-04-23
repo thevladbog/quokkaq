@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,9 +29,100 @@ import {
 } from '@/lib/kiosk-print';
 import { useKioskHeaderFields } from '@/hooks/use-kiosk-header-fields';
 import type { KioskConfig } from '@quokkaq/shared-types';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  evaluateKioskConfigSurfaces,
+  type KioskColorContrastCheck,
+  WCAG
+} from '@/lib/kiosk-wcag-contrast';
 
 const DEFAULT_IDLE_WARNING_SEC = 45;
 const DEFAULT_IDLE_COUNTDOWN_SEC = 15;
+
+function KioskSettingsColorColumn({
+  inputId,
+  color,
+  onColorChange,
+  label,
+  textPlaceholder,
+  check,
+  surfaceName,
+  t
+}: {
+  inputId: string;
+  color: string;
+  onColorChange: (v: string) => void;
+  label: string;
+  textPlaceholder: string;
+  check: KioskColorContrastCheck;
+  surfaceName: string;
+  t: (
+    key: string,
+    values?: Record<string, string | number | boolean>
+  ) => string;
+}) {
+  const r = check.ratio == null ? '—' : check.ratio.toFixed(2);
+  const minN = String(WCAG.AA_NORMAL);
+  const minL = String(WCAG.AA_LARGE);
+  return (
+    <div className='space-y-2'>
+      <Label htmlFor={inputId}>{label}</Label>
+      <div className='flex items-center gap-2'>
+        <Input
+          id={inputId}
+          type='color'
+          value={color}
+          onChange={(e) => onColorChange(e.target.value)}
+          className='h-10 w-12 cursor-pointer p-1'
+        />
+        <Input
+          type='text'
+          value={color}
+          onChange={(e) => onColorChange(e.target.value)}
+          className='flex-1'
+          placeholder={textPlaceholder}
+        />
+      </div>
+      <p
+        className={
+          check.passNormal
+            ? 'text-muted-foreground text-xs'
+            : 'text-destructive text-xs font-medium'
+        }
+      >
+        {check.passNormal
+          ? t('contrast_body_ok', {
+              label: surfaceName,
+              ratio: r,
+              min: minN
+            })
+          : t('contrast_body_fail', {
+              label: surfaceName,
+              ratio: r,
+              min: minN
+            })}
+      </p>
+      <p
+        className={
+          check.passLarge
+            ? check.passNormal
+              ? 'text-muted-foreground text-xs'
+              : 'text-xs font-medium text-amber-600 dark:text-amber-500'
+            : 'text-destructive text-xs font-medium'
+        }
+      >
+        {check.passLarge
+          ? check.passNormal
+            ? t('contrast_large_ok', { minLarge: minL })
+            : t('contrast_large_headings_only', {
+                ratio: r,
+                minLarge: minL
+              })
+          : t('contrast_large_fail', { minLarge: minL })}
+      </p>
+    </div>
+  );
+}
 
 interface KioskSettingsSheetProps {
   isOpen: boolean;
@@ -280,7 +371,28 @@ function KioskSettingsForm({
     return 'connection_degraded' as const;
   })();
 
+  const colorA11y = useMemo(
+    () =>
+      evaluateKioskConfigSurfaces({
+        headerBackground: headerColor,
+        bodyBackground: bodyColor,
+        gridBackground: serviceGridColor
+      }),
+    [headerColor, bodyColor, serviceGridColor]
+  );
+
+  const canSaveKioskColors = !isCustomColorsEnabled || colorA11y.canSave;
+
   const handleSave = () => {
+    if (isCustomColorsEnabled && !colorA11y.canSave) {
+      toast.error(
+        t('contrast_server_invalid', {
+          defaultValue:
+            'The selected colors do not meet 4.5:1. Adjust all three before saving.'
+        })
+      );
+      return;
+    }
     const beforeSec = Math.min(
       3600,
       Math.max(15, sessionIdleBeforeWarningSec || DEFAULT_IDLE_WARNING_SEC)
@@ -521,66 +633,51 @@ function KioskSettingsForm({
             />
           </div>
           {isCustomColorsEnabled && (
+            <>
+              <p className='text-muted-foreground text-xs'>
+                {t('contrast_legend')}
+              </p>
+              {!colorA11y.canSave ? (
+                <Alert variant='destructive'>
+                  <AlertDescription>
+                    {t('contrast_server_invalid')}
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+            </>
+          )}
+          {isCustomColorsEnabled && (
             <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
-              <div className='space-y-2'>
-                <Label htmlFor='sheet-header-color'>
-                  {tAdmin('header_color')}
-                </Label>
-                <div className='flex items-center gap-2'>
-                  <Input
-                    id='sheet-header-color'
-                    type='color'
-                    value={headerColor}
-                    onChange={(e) => setHeaderColor(e.target.value)}
-                    className='h-10 w-12 cursor-pointer p-1'
-                  />
-                  <Input
-                    type='text'
-                    value={headerColor}
-                    onChange={(e) => setHeaderColor(e.target.value)}
-                    className='flex-1'
-                    placeholder={tAdmin('color_placeholder')}
-                  />
-                </div>
-              </div>
-              <div className='space-y-2'>
-                <Label htmlFor='sheet-body-color'>{tAdmin('body_color')}</Label>
-                <div className='flex items-center gap-2'>
-                  <Input
-                    id='sheet-body-color'
-                    type='color'
-                    value={bodyColor}
-                    onChange={(e) => setBodyColor(e.target.value)}
-                    className='h-10 w-12 cursor-pointer p-1'
-                  />
-                  <Input
-                    type='text'
-                    value={bodyColor}
-                    onChange={(e) => setBodyColor(e.target.value)}
-                    className='flex-1'
-                    placeholder={tAdmin('color_placeholder')}
-                  />
-                </div>
-              </div>
-              <div className='space-y-2'>
-                <Label htmlFor='sheet-grid-color'>{tAdmin('grid_color')}</Label>
-                <div className='flex items-center gap-2'>
-                  <Input
-                    id='sheet-grid-color'
-                    type='color'
-                    value={serviceGridColor}
-                    onChange={(e) => setServiceGridColor(e.target.value)}
-                    className='h-10 w-12 cursor-pointer p-1'
-                  />
-                  <Input
-                    type='text'
-                    value={serviceGridColor}
-                    onChange={(e) => setServiceGridColor(e.target.value)}
-                    className='flex-1'
-                    placeholder={tAdmin('color_placeholder')}
-                  />
-                </div>
-              </div>
+              <KioskSettingsColorColumn
+                inputId='sheet-header-color'
+                label={tAdmin('header_color')}
+                textPlaceholder={tAdmin('color_placeholder')}
+                color={headerColor}
+                onColorChange={setHeaderColor}
+                check={colorA11y.checks.find((c) => c.label === 'header')!}
+                surfaceName={t('contrast_label_header')}
+                t={t}
+              />
+              <KioskSettingsColorColumn
+                inputId='sheet-body-color'
+                label={tAdmin('body_color')}
+                textPlaceholder={tAdmin('color_placeholder')}
+                color={bodyColor}
+                onColorChange={setBodyColor}
+                check={colorA11y.checks.find((c) => c.label === 'body')!}
+                surfaceName={t('contrast_label_body')}
+                t={t}
+              />
+              <KioskSettingsColorColumn
+                inputId='sheet-grid-color'
+                label={tAdmin('grid_color')}
+                textPlaceholder={tAdmin('color_placeholder')}
+                color={serviceGridColor}
+                onColorChange={setServiceGridColor}
+                check={colorA11y.checks.find((c) => c.label === 'grid')!}
+                surfaceName={t('contrast_label_grid')}
+                t={t}
+              />
             </div>
           )}
         </div>
@@ -851,12 +948,15 @@ function KioskSettingsForm({
                     type='button'
                     variant='outline'
                     size='icon'
+                    className='kiosk-touch-min h-12 min-w-12 shrink-0'
                     onClick={() => void refreshPrinters()}
                     disabled={loadingPrinters}
                     title={t('refresh_printers')}
                   >
                     <RefreshCw
-                      className={`size-4 ${loadingPrinters ? 'animate-spin' : ''}`}
+                      className={`kiosk-a11y-respect-motion size-4 ${
+                        loadingPrinters ? 'animate-spin' : ''
+                      }`}
                     />
                   </Button>
                 </div>
@@ -906,7 +1006,7 @@ function KioskSettingsForm({
           {isLocked ? (
             <Button
               variant='default'
-              className='flex w-full items-center gap-2'
+              className='kiosk-touch-min flex min-h-12 w-full items-center gap-2'
               onClick={onUnlock}
             >
               <Lock className='h-4 w-4' />
@@ -915,7 +1015,7 @@ function KioskSettingsForm({
           ) : (
             <Button
               variant='destructive'
-              className='flex w-full items-center gap-2'
+              className='kiosk-touch-min flex min-h-12 w-full items-center gap-2'
               onClick={onLock}
             >
               <Lock className='h-4 w-4' />
@@ -927,9 +1027,9 @@ function KioskSettingsForm({
 
       <SheetFooter>
         <Button
-          className='w-full'
+          className='kiosk-touch-min min-h-12 w-full'
           onClick={handleSave}
-          disabled={patchKioskMutation.isPending}
+          disabled={patchKioskMutation.isPending || !canSaveKioskColors}
         >
           {patchKioskMutation.isPending ? t('saving') : t('save_changes')}
         </Button>

@@ -30,12 +30,14 @@ export function LockScreen({ isLocked, onUnlockRequest }: LockScreenProps) {
 
   return (
     <div className='bg-background/95 fixed inset-0 z-50 flex flex-col items-center justify-center p-4 text-center backdrop-blur-sm'>
-      <div
-        className='bg-card mb-6 cursor-pointer rounded-full p-8 shadow-lg'
+      <button
+        type='button'
+        className='kiosk-touch-min bg-card mb-6 flex min-h-14 min-w-14 cursor-pointer items-center justify-center rounded-full p-8 shadow-lg'
         onClick={handleUnlockClick}
+        aria-label={t('unlock_hint')}
       >
-        <Lock className='text-primary h-16 w-16' />
-      </div>
+        <Lock className='text-primary h-16 w-16' aria-hidden />
+      </button>
       <h1 className='mb-2 text-3xl font-bold'>
         {t('kiosk_locked', { defaultValue: 'Kiosk Locked' })}
       </h1>

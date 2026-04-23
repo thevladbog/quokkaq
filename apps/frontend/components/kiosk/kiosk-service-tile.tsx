@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type CSSProperties } from 'react';
+import { useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { ImageOff } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
@@ -12,10 +12,12 @@ type KioskServiceTileProps = {
   service: Service;
   locale: string;
   onSelect: (service: Service) => void;
+  /** Optional: e.g. speak service title when the tile is focused (keyboard a11y + TTS). */
+  onA11yFocus?: (service: Service) => void;
 };
 
-const cardClassName =
-  'group border-kiosk-border/25 @container/kiosk-tile relative flex h-full min-h-0 w-full cursor-pointer flex-col gap-0 overflow-hidden rounded-3xl border py-0 shadow-[0_20px_25px_-5px_rgba(29,27,25,0.08),0_8px_10px_-6px_rgba(29,27,25,0.06)] transition-[transform,box-shadow] active:scale-[0.99] md:hover:shadow-[0_24px_32px_-8px_rgba(29,27,25,0.12),0_10px_14px_-8px_rgba(29,27,25,0.08)]';
+const cardClassBase =
+  'group border-kiosk-border/25 @container/kiosk-tile relative flex h-full min-h-0 w-full cursor-pointer flex-col gap-0 overflow-hidden rounded-3xl border py-0 shadow-[0_20px_25px_-5px_rgba(29,27,25,0.08),0_8px_10px_-6px_rgba(29,27,25,0.06)] transition-[transform,box-shadow] active:scale-[0.99] md:hover:shadow-[0_24px_32px_-8px_rgba(29,27,25,0.12),0_10px_14px_-8px_rgba(29,27,25,0.08)] kiosk-tile-a11y';
 
 type TileImageProps = { imageUrl: string; title: string };
 
@@ -45,7 +47,8 @@ function KioskServiceTileImage({ imageUrl, title }: TileImageProps) {
 export function KioskServiceTile({
   service,
   locale,
-  onSelect
+  onSelect,
+  onA11yFocus
 }: KioskServiceTileProps) {
   const title = getLocalizedName(
     service.name,
@@ -80,11 +83,23 @@ export function KioskServiceTile({
   const trimmedImage = service.imageUrl?.trim() ?? '';
   const imageKind = resolveKioskTileImageKind(service.imageUrl);
 
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onSelect(service);
+    }
+  };
+
   if (!trimmedImage) {
     return (
       <Card
-        className={cardClassName}
+        className={cardClassBase}
+        role='button'
+        tabIndex={0}
+        aria-label={title}
         onClick={() => onSelect(service)}
+        onKeyDown={onKeyDown}
+        onFocus={() => onA11yFocus?.(service)}
         style={cardStyle}
       >
         <div
@@ -103,8 +118,13 @@ export function KioskServiceTile({
 
   return (
     <Card
-      className={cardClassName}
+      className={cardClassBase}
+      role='button'
+      tabIndex={0}
+      aria-label={title}
       onClick={() => onSelect(service)}
+      onKeyDown={onKeyDown}
+      onFocus={() => onA11yFocus?.(service)}
       style={cardStyle}
     >
       <div className='flex h-full min-h-0 flex-1 flex-col gap-2 p-2 sm:p-2.5 md:gap-2.5 md:p-3 @min-[15rem]/kiosk-tile:flex-row @min-[15rem]/kiosk-tile:items-stretch @min-[15rem]/kiosk-tile:gap-3'>
