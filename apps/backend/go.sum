@@ -270,10 +270,10 @@ github.com/ugorji/go/codec v1.2.7 h1:YPXUKf7fYbp/y8xloBqZOw2qaVggbfwMlI8WM3wZUJ0
 github.com/ugorji/go/codec v1.2.7/go.mod h1:WGN1fab3R1fzQlVQTkfxVtIBhWDRqOviHU95kRgeqEY=
 github.com/woodsbury/decimal128 v1.3.0 h1:8pffMNWIlC0O5vbyHWFZAt5yWvWcrHA+3ovIIjVWss0=
 github.com/woodsbury/decimal128 v1.3.0/go.mod h1:C5UTmyTjW3JftjUFzOVhC20BEQa2a4ZKOB5I6Zjb+ds=
-github.com/yandex-cloud/go-genproto v0.72.0 h1:qY6TlloTRpezNJFltYyi4GP9EaeTVU75gKar1KUXd7w=
-github.com/yandex-cloud/go-genproto v0.72.0/go.mod h1:0LDD/IZLIUIV4iPH+YcF+jysO3jkSvADFGm4dCAuwQo=
-github.com/yandex-cloud/go-sdk/v2 v2.90.0 h1:X1NltjOIFwNArujqKhZTLhqMOVYYeb44sXvNpK29nSM=
-github.com/yandex-cloud/go-sdk/v2 v2.90.0/go.mod h1:nzHjWdSpSnsqNgPFKcQhvijcvcR6kaJPy+8Sn2q2tYs=
+github.com/yandex-cloud/go-genproto v0.74.0 h1:3zG7irGeOGmS/MVFZs6262hXTNPGoU9Vh7N4UgtWJjA=
+github.com/yandex-cloud/go-genproto v0.74.0/go.mod h1:0LDD/IZLIUIV4iPH+YcF+jysO3jkSvADFGm4dCAuwQo=
+github.com/yandex-cloud/go-sdk/v2 v2.94.0 h1:9FWNOZgXW8utl7wbyKKbIgLA4kDsUWTbuctykQeI6Vk=
+github.com/yandex-cloud/go-sdk/v2 v2.94.0/go.mod h1:gZItPU0TOePFTO8OiFS8ItVZptvOQwGjyAp4L6jEOsQ=
 github.com/yuin/gopher-lua v1.1.1 h1:kYKnWBjvbNP4XLT3+bPEwAXJx262OhaHDWDVOPjL46M=
 github.com/yuin/gopher-lua v1.1.1/go.mod h1:GBR0iDaNXjAgGg9zfCvksxSRnQx76gclCIb7kdAd1Pw=
 github.com/zeebo/xxh3 v1.0.2 h1:xZmwmqxHZA8AI603jOQ0tMqmBr9lPeFwGg6d+xy9DC0=

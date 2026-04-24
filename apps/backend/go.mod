@@ -33,7 +33,7 @@ require (
 	github.com/stripe/stripe-go/v76 v76.25.0
 	github.com/swaggo/swag v1.16.6
 	github.com/tidwall/gjson v1.17.1
-	github.com/yandex-cloud/go-sdk/v2 v2.90.0
+	github.com/yandex-cloud/go-sdk/v2 v2.94.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0
@@ -96,7 +96,7 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/woodsbury/decimal128 v1.3.0 // indirect
-	github.com/yandex-cloud/go-genproto v0.72.0 // indirect
+	github.com/yandex-cloud/go-genproto v0.74.0 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0 // indirect
