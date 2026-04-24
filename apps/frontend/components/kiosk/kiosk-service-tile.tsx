@@ -6,6 +6,7 @@ import { ChevronRight, ImageOff, Ticket } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { getLocalizedName } from '@/lib/utils';
 import type { Service } from '@/lib/api';
+import { relativeLuminanceFromCssColor } from '@/lib/kiosk-wcag-contrast';
 import { resolveKioskTileImageKind } from '@/lib/kiosk-tile-image';
 
 type KioskServiceTileProps = {
@@ -23,17 +24,48 @@ type KioskServiceTileProps = {
 const cardClassBase =
   'group border-kiosk-border/25 @container/kiosk-tile relative flex h-full min-h-0 w-full cursor-pointer flex-col gap-0 overflow-hidden rounded-3xl border py-0 shadow-[0_20px_25px_-5px_rgba(29,27,25,0.08),0_8px_10px_-6px_rgba(29,27,25,0.06)] transition-[transform,box-shadow,filter] active:scale-[0.96] active:brightness-[0.93] motion-reduce:active:scale-100 motion-reduce:active:brightness-100 md:hover:shadow-[0_24px_32px_-8px_rgba(29,27,25,0.12),0_10px_14px_-8px_rgba(29,27,25,0.08)] kiosk-tile-a11y';
 
+/** Luminance below ~mid-gray: treat surface as dark for default (no textColor) tiles. */
+const DARK_TILE_BG_LUMA = 0.45;
+
+/**
+ * Lucide uses stroke=currentColor: match the tile title (custom `textColor`) or pick light/dark ink
+ * for default typography on custom backgrounds.
+ */
+function kioskTileKindIconClass(
+  textColor: string | undefined,
+  backgroundColor: string | undefined,
+  highContrast: boolean | undefined
+): string {
+  if (highContrast) {
+    return 'text-white/50';
+  }
+  if (textColor?.trim()) {
+    return 'text-current/50';
+  }
+  if (backgroundColor?.trim()) {
+    const lum = relativeLuminanceFromCssColor(backgroundColor);
+    if (lum != null && lum < DARK_TILE_BG_LUMA) {
+      return 'text-white/55';
+    }
+  }
+  return 'text-kiosk-ink/40';
+}
+
 function KioskTileKindIndicator({
   tileKind,
-  highContrast
+  highContrast,
+  textColor,
+  backgroundColor
 }: {
   tileKind?: 'leaf' | 'branch';
   highContrast?: boolean;
+  textColor?: string;
+  backgroundColor?: string;
 }) {
   if (!tileKind) {
     return null;
   }
-  const tone = highContrast ? 'text-white/50' : 'text-kiosk-ink/40';
+  const tone = kioskTileKindIconClass(textColor, backgroundColor, highContrast);
   return (
     <span
       className={`pointer-events-none absolute right-2 bottom-2 z-20 flex items-center justify-center sm:right-3 sm:bottom-3 ${tone}`}
@@ -148,6 +180,8 @@ export function KioskServiceTile({
         <KioskTileKindIndicator
           tileKind={tileKind}
           highContrast={highContrast}
+          textColor={fg}
+          backgroundColor={bg}
         />
       </Card>
     );
@@ -198,7 +232,12 @@ export function KioskServiceTile({
           </div>
         </div>
       </div>
-      <KioskTileKindIndicator tileKind={tileKind} highContrast={highContrast} />
+      <KioskTileKindIndicator
+        tileKind={tileKind}
+        highContrast={highContrast}
+        textColor={fg}
+        backgroundColor={bg}
+      />
     </Card>
   );
 }

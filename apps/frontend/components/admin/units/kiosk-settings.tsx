@@ -20,6 +20,7 @@ import { LogoUpload } from '@/components/ui/logo-upload';
 import type { KioskConfig } from '@quokkaq/shared-types';
 import { useKioskHeaderFields } from '@/hooks/use-kiosk-header-fields';
 import { isTauriKiosk, printKioskJob, testPrintLines } from '@/lib/kiosk-print';
+import { KIOSK_FEEDBACK_URL_EXAMPLE } from '@/lib/kiosk-feedback-url';
 
 interface KioskSettingsProps {
   unitId: string;
@@ -81,6 +82,9 @@ export function KioskSettings({
   );
   const [isPrintEnabled, setIsPrintEnabled] = useState(
     kioskConfig.isPrintEnabled ?? true
+  );
+  const [isAlwaysPrintTicket, setIsAlwaysPrintTicket] = useState(
+    kioskConfig.isAlwaysPrintTicket !== false
   );
   const [logoUrl, setLogoUrl] = useState(kioskConfig.logoUrl || '');
   const [printerLogoUrl, setPrinterLogoUrl] = useState(
@@ -154,6 +158,7 @@ export function KioskSettings({
         printerPort,
         printerType,
         isPrintEnabled,
+        isAlwaysPrintTicket,
         logoUrl,
         printerLogoUrl: printerLogoUrl.trim() || undefined,
         ...headerKioskSaveFields(),
@@ -453,7 +458,7 @@ export function KioskSettings({
               id='feedback-url'
               value={feedbackUrl}
               onChange={(e) => setFeedbackUrl(e.target.value)}
-              placeholder='https://example.com/survey?ticket={{ticketId}}'
+              placeholder={KIOSK_FEEDBACK_URL_EXAMPLE}
             />
             <p className='text-muted-foreground text-xs'>
               {t('feedback_url_help')}
@@ -469,6 +474,26 @@ export function KioskSettings({
                 onCheckedChange={setIsPrintEnabled}
               />
             </div>
+
+            {isPrintEnabled && printerType === 'receipt' && (
+              <div className='space-y-1 border-t border-dashed py-2'>
+                <div className='flex items-center justify-between'>
+                  <div>
+                    <Label htmlFor='admin-always-print-ticket'>
+                      {t('always_print_ticket')}
+                    </Label>
+                    <p className='text-muted-foreground text-xs'>
+                      {t('always_print_ticket_hint')}
+                    </p>
+                  </div>
+                  <Switch
+                    id='admin-always-print-ticket'
+                    checked={isAlwaysPrintTicket}
+                    onCheckedChange={setIsAlwaysPrintTicket}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className='flex items-center justify-between'>
               <Label htmlFor='enable-pre-registration'>

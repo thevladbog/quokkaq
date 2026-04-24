@@ -476,6 +476,12 @@ export const KioskConfigSchema = z
     printerLogoUrl: z.string().optional(),
     printerType: z.string().optional(),
     isPrintEnabled: z.boolean().optional(),
+    /**
+     * When true (default) and a receipt print target is configured, print the ticket
+     * automatically on success. When false, show a manual "Print" control on the success
+     * screen instead (QuokkaQ Kiosk / Tauri with a target only).
+     */
+    isAlwaysPrintTicket: z.boolean().optional(),
     feedbackUrl: z.string().optional(),
     isPreRegistrationEnabled: z.boolean().optional(),
     /**
@@ -1059,6 +1065,11 @@ export interface KioskConfig {
   printerLogoUrl?: string;
   printerType?: string;
   isPrintEnabled?: boolean;
+  /**
+   * When not false, issue ticket receipt after creation automatically if a print target
+   * exists. When false, the kiosk shows a manual print action on the success screen.
+   */
+  isAlwaysPrintTicket?: boolean;
   feedbackUrl?: string;
   isPreRegistrationEnabled?: boolean;
   isAppointmentCheckinEnabled?: boolean;

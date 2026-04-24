@@ -4,10 +4,15 @@ import {
   contrastRatio,
   ENHANCED_CONTRAST,
   evaluateKioskConfigSurfaces,
-  KIOSK_INK_CONTRAST_HEX
+  KIOSK_INK_CONTRAST_HEX,
+  relativeLuminanceFromCssColor
 } from './kiosk-wcag-contrast';
 
 describe('kiosk-wcag-contrast', () => {
+  it('relativeLuminanceFromCssColor matches hex path for #000', () => {
+    expect(relativeLuminanceFromCssColor('#000000')).toBeCloseTo(0, 2);
+  });
+
   it('contrast is 1:1 for identical colors', () => {
     expect(contrastRatio('#000000', '#000000')).toBeCloseTo(1, 5);
   });

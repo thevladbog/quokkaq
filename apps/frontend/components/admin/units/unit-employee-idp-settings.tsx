@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { Loader2 } from 'lucide-react';
+import { useAuthContext } from '@/contexts/AuthContext';
+import { isApiHttpError } from '@/lib/api-errors';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,7 +31,10 @@ import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import PermissionGuard from '@/components/auth/permission-guard';
-import { PermUnitEmployeeIdpManage } from '@/lib/permission-variants';
+import {
+  PermUnitEmployeeIdpManage,
+  userUnitPermissionMatches
+} from '@/lib/permission-variants';
 
 const DEFAULT_BODY = `{"raw":"{{.Raw}}","login":"{{.Login}}","kind":"{{.Kind}}","ts":{{.Ts}}}`;
 
@@ -42,6 +47,28 @@ type Props = { unitId: string };
 export function UnitEmployeeIdpSettings({ unitId }: Props) {
   const t = useTranslations('admin.units.employee_idp');
   const qc = useQueryClient();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext();
+
+  const canManageEmployeeIdp = useMemo(() => {
+    if (authLoading) {
+      return null as boolean | null;
+    }
+    if (!isAuthenticated || !user) {
+      return false;
+    }
+    if (user.isPlatformAdmin === true) {
+      return true;
+    }
+    if (user.isTenantAdmin === true) {
+      return true;
+    }
+    if (!unitId) {
+      return false;
+    }
+    const perms = user.permissions?.[unitId] ?? [];
+    return userUnitPermissionMatches(perms, PermUnitEmployeeIdpManage);
+  }, [authLoading, isAuthenticated, user, unitId]);
+
   const companyMeQ = useQuery({
     queryKey: ['company-me'],
     queryFn: () => companiesApiExt.getMe()
@@ -51,7 +78,7 @@ export function UnitEmployeeIdpSettings({ unitId }: Props) {
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['unit-employee-idp', unitId],
     queryFn: () => unitsApi.getUnitEmployeeIdp(unitId),
-    enabled: !!unitId && planOk
+    enabled: !!unitId && planOk && canManageEmployeeIdp === true
   });
 
   const [enabled, setEnabled] = useState(false);
@@ -169,6 +196,14 @@ export function UnitEmployeeIdpSettings({ unitId }: Props) {
     );
   }
 
+  if (authLoading || canManageEmployeeIdp === null) {
+    return null;
+  }
+
+  if (canManageEmployeeIdp === false) {
+    return null;
+  }
+
   if (isLoading) {
     return (
       <div className='text-muted-foreground flex items-center gap-2 text-sm'>
@@ -179,6 +214,12 @@ export function UnitEmployeeIdpSettings({ unitId }: Props) {
   }
 
   if (isError) {
+    if (
+      isApiHttpError(error) &&
+      (error.status === 403 || error.status === 404)
+    ) {
+      return null;
+    }
     return (
       <Alert variant='destructive'>
         <AlertTitle>{t('load_error')}</AlertTitle>

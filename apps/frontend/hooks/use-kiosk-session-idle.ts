@@ -10,6 +10,12 @@ const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = [
 type UseKioskSessionIdleOptions = {
   /** When false, timers are cleared and the warning is closed. */
   enabled: boolean;
+  /**
+   * When true, the idle clock does not start until the user has interacted
+   * (scroll/touch/keys) at least once, so a blank "home" screen will not
+   * show the warning after the delay from initial load alone.
+   */
+  requireFirstUserActivity?: boolean;
   /** Seconds of inactivity before the warning dialog. */
   beforeWarningSec: number;
   /** Warning countdown in seconds before `onSessionEnd`. */
@@ -21,9 +27,12 @@ type UseKioskSessionIdleOptions = {
 /**
  * Kiosk inactivity: after `beforeWarningSec` show a dialog with a countdown; on expiry call `onSessionEnd`.
  * Activity resets the idle timer. While `enabled` is false, no timers run.
+ * When `requireFirstUserActivity` is set, the initial arm does not start until a real user
+ * event has fired (so the first timer is not started from page load alone).
  */
 export function useKioskSessionIdle({
   enabled,
+  requireFirstUserActivity = false,
   beforeWarningSec,
   countdownSec,
   onSessionEnd
@@ -106,6 +115,9 @@ export function useKioskSessionIdle({
     if (showWarning) {
       return;
     }
+    if (requireFirstUserActivity) {
+      return;
+    }
     scheduleWarning();
     return () => {
       clearTimers();
@@ -115,6 +127,7 @@ export function useKioskSessionIdle({
     clearTimers,
     countdownSec,
     enabled,
+    requireFirstUserActivity,
     scheduleWarning,
     showWarning
   ]);

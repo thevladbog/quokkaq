@@ -15,13 +15,11 @@ import {
   DialogContent,
   DialogFooter,
   DialogHeader,
-  DialogTitle,
-  DialogClose
+  DialogTitle
 } from '@/components/ui/dialog';
 import { ArrowLeft, Home } from 'lucide-react';
-import dynamic from 'next/dynamic';
-const QRCode = dynamic(() => import('react-qr-code'), { ssr: false });
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -44,8 +42,10 @@ import { KioskPhoneIdentificationModal } from '@/components/kiosk/kiosk-phone-id
 import { KioskTopBar } from '@/components/kiosk/kiosk-top-bar';
 import { KioskWelcomeHero } from '@/components/kiosk/kiosk-welcome-hero';
 import { KioskServiceTile } from '@/components/kiosk/kiosk-service-tile';
+import { KioskTicketSuccessOverlay } from '@/components/kiosk/kiosk-ticket-success-overlay';
 import {
   buildKioskTicketEscPos,
+  hasKioskPrintTarget,
   isTauriKiosk,
   printReceiptBytesFromKioskConfig,
   resetDesktopPairingViaTauri
@@ -86,6 +86,7 @@ export default function UnitKioskPage() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const createTicketMutation = useCreateTicketInUnit();
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null);
+  const [ticketManualPrintBusy, setTicketManualPrintBusy] = useState(false);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [autoCloseTimerId, setAutoCloseTimerId] =
     useState<NodeJS.Timeout | null>(null);
@@ -115,6 +116,8 @@ export default function UnitKioskPage() {
   const a11y = useKioskA11y();
   const kioskAudio = useKioskA11yAudio({ ttsEnabled: a11y.ttsEnabled });
   const tts = useKioskSpeech(kioskAudio);
+  const { resetA11yToDefaults } = a11y;
+  const { cancel: cancelKioskTts } = tts;
   const ttsKeyRef = useRef('');
   const [baseAppUrl] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -253,10 +256,13 @@ export default function UnitKioskPage() {
     return () => cancelAnimationFrame(id);
   }, [kioskGridZoneScope]);
 
-  const tryPrintTicket = async (ticket: Ticket, serviceLabel: string) => {
+  const tryPrintTicket = async (
+    ticket: Ticket,
+    serviceLabel: string
+  ): Promise<boolean> => {
     const kc = unit?.config?.kiosk;
     if (!kc || kc.isPrintEnabled === false) {
-      return;
+      return false;
     }
     try {
       const ticketPageUrl = `${baseAppUrl}/${locale}/ticket/${ticket.id}`;
@@ -304,6 +310,7 @@ export default function UnitKioskPage() {
           'Print not sent (missing target, label mode, or desktop print pipeline)'
         );
       }
+      return ok;
     } catch (e) {
       console.error('Kiosk native print failed:', e);
       if (kioskApiUnitId) {
@@ -313,6 +320,7 @@ export default function UnitKioskPage() {
           e instanceof Error ? e.message : String(e)
         );
       }
+      return false;
     }
   };
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
@@ -378,6 +386,7 @@ export default function UnitKioskPage() {
     continueSession: continueIdleSession
   } = useKioskSessionIdle({
     enabled: sessionIdleEnabled,
+    requireFirstUserActivity: true,
     beforeWarningSec: beforeIdleSec,
     countdownSec: idleCountdownSec,
     onSessionEnd: onIdleSessionEnd
@@ -404,6 +413,25 @@ export default function UnitKioskPage() {
       : '#f2ebe6';
 
   const kioskCfg = unit?.config?.kiosk;
+
+  const successTicketServiceLabel = useMemo(() => {
+    if (!createdTicket) {
+      return '';
+    }
+    const s = unitServicesTree?.find((x) => x.id === createdTicket.serviceId);
+    if (!s) {
+      return '';
+    }
+    return getLocalizedName(s.name, s.nameRu || '', s.nameEn || '', locale);
+  }, [createdTicket, unitServicesTree, locale]);
+
+  const kioskCanPrint = useMemo(
+    () => hasKioskPrintTarget(kioskCfg),
+    [kioskCfg]
+  );
+  const showTicketManualPrintAction =
+    isTauriKiosk() && kioskCanPrint && kioskCfg?.isAlwaysPrintTicket === false;
+
   const ticketSuccessAutoCloseSec = useMemo(
     () => Math.min(120, Math.max(1, kioskCfg?.ticketSuccessAutoCloseSec ?? 12)),
     [kioskCfg?.ticketSuccessAutoCloseSec]
@@ -486,8 +514,11 @@ export default function UnitKioskPage() {
     (unit ? getUnitDisplayName(unit, locale) : '').trim() ||
     t('kioskTitle');
 
-  const switcherClass = cn(
-    'kiosk-touch-min text-kiosk-ink h-12 min-w-[3.5rem] rounded-full border-0 bg-[#f2ede8] px-4 text-base font-semibold shadow-sm hover:bg-[#ebe4de]'
+  const kioskHeaderPillClass = cn(
+    'kiosk-touch-min h-12 min-w-[3.5rem] rounded-full border-0 px-4 text-base font-semibold shadow-sm',
+    useHcSurfaces
+      ? 'bg-white/12 text-white hover:bg-white/20'
+      : 'bg-kiosk-border/40 text-kiosk-ink hover:bg-kiosk-border/55'
   );
 
   const showKioskIdOcr = Boolean(
@@ -534,7 +565,6 @@ export default function UnitKioskPage() {
 
   const topBarBeforeClock = (
     <>
-      <KioskAccessibilityToolbar audio={kioskAudio} />
       {showOfflineShell ? (
         <span
           className={cn(
@@ -553,7 +583,7 @@ export default function UnitKioskPage() {
         <Button
           type='button'
           variant='secondary'
-          className='text-kiosk-ink kiosk-touch-min h-12 shrink-0 rounded-full px-4 text-base font-semibold shadow-sm'
+          className={kioskHeaderPillClass}
           onClick={() => setIdOcrOpen(true)}
         >
           {t('id_ocr.action', { defaultValue: 'Scan document' })}
@@ -562,7 +592,7 @@ export default function UnitKioskPage() {
       {appointmentCheckinEnabled ? (
         <Button
           variant='secondary'
-          className='text-kiosk-ink kiosk-touch-min h-12 shrink-0 rounded-full px-4 text-base font-semibold shadow-sm'
+          className={kioskHeaderPillClass}
           onClick={() => {
             setDeeplinkPrCode(undefined);
             setRedeemAutoFromDeeplink(false);
@@ -575,7 +605,7 @@ export default function UnitKioskPage() {
           })}
         </Button>
       ) : null}
-      <KioskLanguageSwitcher className={switcherClass} />
+      <KioskLanguageSwitcher className={kioskHeaderPillClass} />
     </>
   );
 
@@ -713,6 +743,30 @@ export default function UnitKioskPage() {
     };
   }, [autoCloseTimerId]);
 
+  const closeTicketSuccessModal = useCallback(() => {
+    resetA11yToDefaults();
+    ttsKeyRef.current = '';
+    cancelKioskTts();
+    setIsTicketModalOpen(false);
+    setCreatedTicket(null);
+    setSuccessEtaMinutes(null);
+    setSuccessPeopleAhead(null);
+    setKioskSmsBlocking(false);
+    setKioskSmsAgreed(false);
+    setKioskSmsDigits('');
+    setKioskSmsError(null);
+    setTicketManualPrintBusy(false);
+    if (autoCloseTimerId) {
+      clearInterval(autoCloseTimerId);
+      setAutoCloseTimerId(null);
+    }
+  }, [resetA11yToDefaults, cancelKioskTts, autoCloseTimerId]);
+
+  const closeTicketSuccessModalRef = useRef(closeTicketSuccessModal);
+  useEffect(() => {
+    closeTicketSuccessModalRef.current = closeTicketSuccessModal;
+  }, [closeTicketSuccessModal]);
+
   const scheduleTicketModalAutoClose = useCallback(() => {
     setKioskSmsBlocking(false);
     setCountdown(ticketSuccessAutoCloseSec);
@@ -722,12 +776,10 @@ export default function UnitKioskPage() {
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          setIsTicketModalOpen(false);
-          setCreatedTicket(null);
-          setKioskSmsAgreed(false);
-          setKioskSmsDigits('');
-          setKioskSmsError(null);
           clearInterval(timer);
+          queueMicrotask(() => {
+            closeTicketSuccessModalRef.current();
+          });
           return 0;
         }
         return prev - 1;
@@ -735,6 +787,27 @@ export default function UnitKioskPage() {
     }, 1000);
     setAutoCloseTimerId(timer);
   }, [autoCloseTimerId, ticketSuccessAutoCloseSec]);
+
+  const onTicketManualPrint = async () => {
+    if (!createdTicket) {
+      return;
+    }
+    if (!successTicketServiceLabel) {
+      toast.error(t('ticket.print_failed'));
+      return;
+    }
+    setTicketManualPrintBusy(true);
+    try {
+      const ok = await tryPrintTicket(createdTicket, successTicketServiceLabel);
+      if (ok) {
+        toast.success(t('ticket.print_ok'));
+      } else {
+        toast.error(t('ticket.print_failed'));
+      }
+    } finally {
+      setTicketManualPrintBusy(false);
+    }
+  };
 
   // Visible services for the current breadcrumb level (recomputed only when tree or path changes)
   const visibleServices = useMemo(() => {
@@ -792,7 +865,12 @@ export default function UnitKioskPage() {
       service.nameEn || '',
       locale
     );
-    void tryPrintTicket(ticket, serviceLabel);
+    const canPrint = hasKioskPrintTarget(unit?.config?.kiosk);
+    const printAutomatically =
+      canPrint && unit?.config?.kiosk?.isAlwaysPrintTicket !== false;
+    if (printAutomatically) {
+      void tryPrintTicket(ticket, serviceLabel);
+    }
     setMessage(
       t('ticketCreated', {
         defaultValue: 'Ticket created successfully!',
@@ -1185,6 +1263,7 @@ export default function UnitKioskPage() {
             title={heroTitle}
             subtitle={heroSubtitle}
             highContrast={useHcSurfaces}
+            accessory={<KioskAccessibilityToolbar audio={kioskAudio} />}
           />
 
           {/* Navigation breadcrumbs and buttons */}
@@ -1338,253 +1417,184 @@ export default function UnitKioskPage() {
         </>
       )}
 
-      {/* Ticket modal */}
-      <Dialog
-        open={isTicketModalOpen}
-        onOpenChange={(open) => {
-          setIsTicketModalOpen(open);
-          if (!open) {
-            setCreatedTicket(null);
-            setSuccessEtaMinutes(null);
-            setSuccessPeopleAhead(null);
-            setKioskSmsBlocking(false);
-            setKioskSmsAgreed(false);
-            setKioskSmsDigits('');
-            setKioskSmsError(null);
-            if (autoCloseTimerId) {
-              clearInterval(autoCloseTimerId);
-              setAutoCloseTimerId(null);
-            }
+      {createdTicket ? (
+        <KioskTicketSuccessOverlay
+          open={isTicketModalOpen}
+          onClose={closeTicketSuccessModal}
+          a11yLive={tA11y('success_live', {
+            number: String(createdTicket.queueNumber)
+          })}
+          logoUrl={unit?.config?.kiosk?.logoUrl}
+          showTicketHeader={showTicketHeader}
+          headerText={kioskCfg?.headerText}
+          serviceName={getLocalizedName(
+            unitServicesTree?.find((s) => s.id === createdTicket.serviceId)
+              ?.name || '',
+            unitServicesTree?.find((s) => s.id === createdTicket.serviceId)
+              ?.nameRu || '',
+            unitServicesTree?.find((s) => s.id === createdTicket.serviceId)
+              ?.nameEn || '',
+            locale
+          )}
+          queueNumber={String(createdTicket.queueNumber)}
+          successEtaMinutes={successEtaMinutes}
+          successPeopleAhead={successPeopleAhead}
+          serviceZoneName={
+            createdTicket.serviceZoneName?.trim()
+              ? createdTicket.serviceZoneName.trim()
+              : null
           }
-        }}
-      >
-        {createdTicket && (
-          <DialogContent className='flex w-[320px] flex-col items-center sm:w-[420px]'>
-            <div className='sr-only' aria-live='polite' aria-atomic>
-              {tA11y('success_live', {
-                number: String(createdTicket.queueNumber)
-              })}
-            </div>
-            {/* Logo (top) */}
-            {unit?.config?.kiosk?.logoUrl && (
-              <div className='mb-4 h-16 w-auto'>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={unit.config.kiosk.logoUrl} alt='Logo' />
-              </div>
-            )}
-
-            {showTicketHeader && kioskCfg?.headerText ? (
-              <div className='mb-2 text-center text-lg font-medium'>
-                {kioskCfg.headerText}
-              </div>
-            ) : null}
-
-            <DialogHeader>
-              <DialogTitle className='text-center text-xl'>
-                {getLocalizedName(
-                  // If the service name might be in the ticket or use current selection fallback
-                  unitServicesTree?.find(
-                    (s) => s.id === createdTicket.serviceId
-                  )?.name || '',
-                  unitServicesTree?.find(
-                    (s) => s.id === createdTicket.serviceId
-                  )?.nameRu || '',
-                  unitServicesTree?.find(
-                    (s) => s.id === createdTicket.serviceId
-                  )?.nameEn || '',
-                  locale
+          showTicketFooter={showTicketFooter}
+          footerText={kioskCfg?.footerText}
+          qrValue={`${baseAppUrl}/${locale}/ticket/${createdTicket.id}`}
+          highContrast={useHcSurfaces}
+          bodyBackground={bodyColor}
+          smsBlocking={kioskSmsBlocking}
+          closeButtonLabel={
+            kioskSmsBlocking
+              ? `${t('close')} (…)`
+              : `${t('close')} (${countdown})`
+          }
+          showPrintTicketButton={showTicketManualPrintAction}
+          onPrintTicket={() => {
+            void onTicketManualPrint();
+          }}
+          printTicketPending={ticketManualPrintBusy}
+        >
+          {kioskSmsBlocking && createdTicket ? (
+            <div
+              className={cn(
+                'border-t pt-4',
+                useHcSurfaces ? 'border-white/20' : 'border-t-border'
+              )}
+              data-testid='kiosk-sms-capture'
+            >
+              <p className='mb-2 text-center text-sm font-medium'>
+                {t('sms_post_ticket.title')}
+              </p>
+              <p
+                className={cn(
+                  'mb-3 text-center text-xs sm:text-sm',
+                  useHcSurfaces ? 'text-zinc-400' : 'text-muted-foreground'
                 )}
-              </DialogTitle>
-            </DialogHeader>
-
-            <div className='flex w-full flex-col items-center text-center'>
-              <div className='mb-4 text-8xl leading-none font-bold tracking-tight sm:text-9xl'>
-                {createdTicket.queueNumber}
-              </div>
-              {successEtaMinutes != null && (
-                <p className='text-muted-foreground mb-2 text-sm'>
-                  {t('ticket.success_eta', { minutes: successEtaMinutes })}
-                </p>
-              )}
-              {successPeopleAhead != null && (
-                <p className='text-muted-foreground mb-1 text-sm'>
-                  {t('ticket.success_ahead', { n: successPeopleAhead })}
-                </p>
-              )}
-              {createdTicket.serviceZoneName?.trim() ? (
-                <p className='text-muted-foreground mb-2 text-sm'>
-                  {t('ticket.success_zone', {
-                    zone: createdTicket.serviceZoneName.trim()
-                  })}
-                </p>
-              ) : null}
-
-              <Separator className='my-4 w-full' />
-
-              <div className='text-muted-foreground mb-4 text-sm'>
-                {t('ticket.scanQrCode')}
-              </div>
-
-              <div className='mb-4 rounded-lg bg-white p-2'>
-                {/* QR code component will be dynamically imported to avoid SSR issues */}
-                <QRCode
-                  value={`${baseAppUrl}/${locale}/ticket/${createdTicket.id}`}
-                  size={200}
+              >
+                {t('sms_post_ticket.subtitle')}
+              </p>
+              <div className='mb-3 flex items-start gap-2'>
+                <Checkbox
+                  id='kiosk-sms-consent'
+                  checked={kioskSmsAgreed}
+                  onCheckedChange={(c) => {
+                    setKioskSmsAgreed(c === true);
+                    setKioskSmsError(null);
+                  }}
+                  className='mt-1'
                 />
-              </div>
-
-              {showTicketFooter && kioskCfg?.footerText ? (
-                <>
-                  <Separator className='my-4 w-full' />
-                  <div className='text-muted-foreground text-center text-sm'>
-                    {kioskCfg.footerText}
-                  </div>
-                </>
-              ) : null}
-
-              {kioskSmsBlocking && createdTicket ? (
-                <div
-                  className='border-t-border mt-4 w-full max-w-sm border-t pt-4'
-                  data-testid='kiosk-sms-capture'
+                <label
+                  htmlFor='kiosk-sms-consent'
+                  className={cn(
+                    'text-left text-xs sm:text-sm',
+                    useHcSurfaces ? 'text-zinc-300' : 'text-muted-foreground'
+                  )}
                 >
-                  <p className='mb-2 text-center text-sm font-medium'>
-                    {t('sms_post_ticket.title')}
-                  </p>
-                  <p className='text-muted-foreground mb-3 text-center text-xs sm:text-sm'>
-                    {t('sms_post_ticket.subtitle')}
-                  </p>
-                  <div className='mb-3 flex items-start gap-2'>
-                    <Checkbox
-                      id='kiosk-sms-consent'
-                      checked={kioskSmsAgreed}
-                      onCheckedChange={(c) => {
-                        setKioskSmsAgreed(c === true);
-                        setKioskSmsError(null);
-                      }}
-                      className='mt-1'
-                    />
-                    <label
-                      htmlFor='kiosk-sms-consent'
-                      className='text-muted-foreground text-left text-xs sm:text-sm'
-                    >
-                      {t('sms_post_ticket.consent_label')}
-                    </label>
-                  </div>
-                  <div
-                    className='border-input bg-background mb-3 flex w-full items-center justify-center rounded-md border px-2 font-mono text-2xl font-bold select-none sm:text-3xl'
-                    style={{ minHeight: '3.5rem' }}
-                    role='status'
-                    aria-live='polite'
-                    aria-label={
-                      kioskSmsDigits.length > 0
-                        ? tA11y('sms_phone_entry', { n: `+${kioskSmsDigits}` })
-                        : tA11y('sms_phone_entry_empty')
-                    }
-                  >
-                    {kioskSmsDigits.length > 0 ? `+${kioskSmsDigits}` : '+'}
-                  </div>
-                  {kioskSmsError ? (
-                    <p className='text-destructive mb-2 text-center text-xs sm:text-sm'>
-                      {kioskSmsError}
-                    </p>
-                  ) : null}
-                  <div className='mb-3 grid max-w-sm grid-cols-3 gap-2 sm:gap-3'>
-                    {[
-                      '1',
-                      '2',
-                      '3',
-                      '4',
-                      '5',
-                      '6',
-                      '7',
-                      '8',
-                      '9',
-                      '',
-                      '0',
-                      '⌫'
-                    ].map((d, i) => (
-                      <span key={i} className='min-h-0 min-w-0 [contain:size]'>
-                        {d ? (
-                          <Button
-                            type='button'
-                            variant='outline'
-                            className='h-[4.5rem] w-full min-w-0 px-0 text-xl font-bold sm:h-[5rem] sm:text-2xl'
-                            disabled={kioskSmsBusy}
-                            aria-label={
-                              d === '⌫'
-                                ? tA11y('sms_numpad_backspace')
-                                : tA11y('sms_numpad_digit', { d })
-                            }
-                            onClick={() => {
-                              if (d === '⌫') {
-                                setKioskSmsDigits((prev) => prev.slice(0, -1));
-                                return;
-                              }
-                              setKioskSmsDigits((prev) =>
-                                prev.length >= KIOSK_SMS_MAX ? prev : prev + d
-                              );
-                            }}
-                          >
-                            {d}
-                          </Button>
-                        ) : (
-                          <span className='block' />
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                  <div className='grid w-full gap-2 sm:grid-cols-2'>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      className='w-full'
-                      disabled={kioskSmsBusy}
-                      onClick={() => void handleKioskSmsDecline()}
-                    >
-                      {t('sms_post_ticket.not_now')}
-                    </Button>
-                    <Button
-                      type='button'
-                      className='w-full'
-                      disabled={
-                        kioskSmsBusy ||
-                        !kioskSmsAgreed ||
-                        kioskSmsDigits.length < 5
-                      }
-                      onClick={() => void handleKioskSmsConfirm()}
-                    >
-                      {kioskSmsBusy
-                        ? t('sms_post_ticket.sending')
-                        : t('sms_post_ticket.send')}
-                    </Button>
-                  </div>
-                </div>
+                  {t('sms_post_ticket.consent_label')}
+                </label>
+              </div>
+              <div
+                className={cn(
+                  'mb-3 flex w-full items-center justify-center rounded-md border px-2 font-mono text-2xl font-bold select-none sm:text-3xl',
+                  useHcSurfaces
+                    ? 'border-white/20 bg-white/5'
+                    : 'border-input bg-background'
+                )}
+                style={{ minHeight: '3.5rem' }}
+                role='status'
+                aria-live='polite'
+                aria-label={
+                  kioskSmsDigits.length > 0
+                    ? tA11y('sms_phone_entry', { n: `+${kioskSmsDigits}` })
+                    : tA11y('sms_phone_entry_empty')
+                }
+              >
+                {kioskSmsDigits.length > 0 ? `+${kioskSmsDigits}` : '+'}
+              </div>
+              {kioskSmsError ? (
+                <p className='text-destructive mb-2 text-center text-xs sm:text-sm'>
+                  {kioskSmsError}
+                </p>
               ) : null}
-            </div>
-            <DialogFooter className='w-full sm:justify-center'>
-              {kioskSmsBlocking ? (
+              <div className='mb-3 grid w-full max-w-sm grid-cols-3 gap-2 sm:gap-3'>
+                {[
+                  '1',
+                  '2',
+                  '3',
+                  '4',
+                  '5',
+                  '6',
+                  '7',
+                  '8',
+                  '9',
+                  '',
+                  '0',
+                  '⌫'
+                ].map((d, i) => (
+                  <span key={i} className='min-h-0 min-w-0 [contain:size]'>
+                    {d ? (
+                      <Button
+                        type='button'
+                        variant='outline'
+                        className='h-[4.5rem] w-full min-w-0 px-0 text-xl font-bold sm:h-[5rem] sm:text-2xl'
+                        disabled={kioskSmsBusy}
+                        aria-label={
+                          d === '⌫'
+                            ? tA11y('sms_numpad_backspace')
+                            : tA11y('sms_numpad_digit', { d })
+                        }
+                        onClick={() => {
+                          if (d === '⌫') {
+                            setKioskSmsDigits((prev) => prev.slice(0, -1));
+                            return;
+                          }
+                          setKioskSmsDigits((prev) =>
+                            prev.length >= KIOSK_SMS_MAX ? prev : prev + d
+                          );
+                        }}
+                      >
+                        {d}
+                      </Button>
+                    ) : (
+                      <span className='block' />
+                    )}
+                  </span>
+                ))}
+              </div>
+              <div className='grid w-full gap-2 sm:grid-cols-2'>
                 <Button
                   type='button'
-                  variant='secondary'
-                  className='w-full min-w-[120px] sm:w-auto'
-                  disabled
+                  variant='outline'
+                  className='w-full'
+                  disabled={kioskSmsBusy}
+                  onClick={() => void handleKioskSmsDecline()}
                 >
-                  {t('close')} (…)
+                  {t('sms_post_ticket.not_now')}
                 </Button>
-              ) : (
-                <DialogClose asChild>
-                  <Button
-                    variant='secondary'
-                    className='w-full min-w-[120px] sm:w-auto'
-                  >
-                    {t('close')} ({countdown})
-                  </Button>
-                </DialogClose>
-              )}
-            </DialogFooter>
-          </DialogContent>
-        )}
-      </Dialog>
+                <Button
+                  type='button'
+                  className='w-full'
+                  disabled={
+                    kioskSmsBusy || !kioskSmsAgreed || kioskSmsDigits.length < 5
+                  }
+                  onClick={() => void handleKioskSmsConfirm()}
+                >
+                  {kioskSmsBusy
+                    ? t('sms_post_ticket.sending')
+                    : t('sms_post_ticket.send')}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </KioskTicketSuccessOverlay>
+      ) : null}
 
       <PinCodeModal
         isOpen={isPinModalOpen}
@@ -1620,19 +1630,36 @@ export default function UnitKioskPage() {
         }}
       >
         <DialogContent
-          className='w-[min(100%,22rem)]'
+          className='max-w-[min(100vw-2rem,40rem)] gap-6 p-6 sm:max-w-2xl sm:p-10'
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
-          <DialogHeader>
-            <DialogTitle>{t('settings.session_idle_title')}</DialogTitle>
+          <DialogHeader className='gap-3 text-left'>
+            <DialogTitle className='text-2xl font-bold tracking-tight sm:text-3xl sm:leading-tight'>
+              {t('settings.session_idle_title')}
+            </DialogTitle>
           </DialogHeader>
-          <p className='text-muted-foreground text-sm'>
-            {t('settings.session_idle_body', { seconds: idleRemainingSec })}
+          <p className='text-foreground/90 text-lg leading-relaxed sm:text-xl'>
+            {t('settings.session_idle_body')}
           </p>
+          <div className='flex flex-col items-center gap-2'>
+            <span
+              className='text-foreground w-full text-center text-5xl font-bold tabular-nums sm:text-6xl'
+              aria-label={t('settings.session_idle_body_aria', {
+                seconds: idleRemainingSec
+              })}
+            >
+              {idleRemainingSec}
+            </span>
+            <Progress
+              className='h-3.5 w-full sm:h-4'
+              value={(idleRemainingSec / Math.max(1, idleCountdownSec)) * 100}
+              indicatorClassName='bg-foreground'
+            />
+          </div>
           <Button
             type='button'
-            className='w-full'
+            className='kiosk-touch-min mt-1 min-h-14 w-full text-lg font-semibold sm:min-h-16 sm:text-xl'
             onClick={() => continueIdleSession()}
           >
             {t('settings.session_idle_continue')}
@@ -1678,7 +1705,7 @@ export default function UnitKioskPage() {
         }}
       >
         <DialogContent
-          className='max-w-lg'
+          className='flex max-w-[min(100vw-1.5rem,64rem)] flex-col overflow-hidden sm:max-w-5xl'
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >

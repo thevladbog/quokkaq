@@ -4,6 +4,7 @@ import { useLocale } from 'next-intl';
 import { useRouter, usePathname } from '@/src/i18n/navigation';
 
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface KioskLanguageSwitcherProps {
   className?: string;
@@ -27,9 +28,9 @@ export default function KioskLanguageSwitcher({
 
   return (
     <Button
-      variant={'default'}
+      variant='secondary'
       onClick={() => switchLanguage(locale === 'en' ? 'ru' : 'en')}
-      className={`font-bold ${className}`}
+      className={cn('font-bold', className)}
     >
       {locale === 'en' ? 'RU' : 'EN'}
     </Button>

@@ -147,6 +147,14 @@ describe('KioskConfigSchema', () => {
     expect(r.success).toBe(true);
   });
 
+  it('accepts isAlwaysPrintTicket for kiosk', () => {
+    const r = KioskConfigSchema.safeParse({ isAlwaysPrintTicket: false });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.isAlwaysPrintTicket).toBe(false);
+    }
+  });
+
   it('accepts ticketSuccessAutoCloseSec in range', () => {
     const r = KioskConfigSchema.safeParse({ ticketSuccessAutoCloseSec: 20 });
     expect(r.success).toBe(true);

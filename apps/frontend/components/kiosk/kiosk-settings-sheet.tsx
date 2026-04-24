@@ -20,6 +20,7 @@ import { usePatchKioskConfig } from '@/lib/hooks';
 import { toast } from 'sonner';
 import { LogoUpload } from '@/components/ui/logo-upload';
 import { preRegistrationsApi, type UnitConfig } from '@/lib/api';
+import { KIOSK_FEEDBACK_URL_EXAMPLE } from '@/lib/kiosk-feedback-url';
 import {
   listKioskSerialPorts,
   testKioskSerialPort
@@ -257,6 +258,10 @@ function KioskSettingsForm({
   );
   const [isPrintEnabled, setIsPrintEnabled] = useState(
     currentConfig?.kiosk?.isPrintEnabled !== false
+  );
+  const [isAlwaysPrintTicket, setIsAlwaysPrintTicket] = useState(
+    (currentConfig?.kiosk as KioskConfig | undefined)?.isAlwaysPrintTicket !==
+      false
   );
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
@@ -514,6 +519,7 @@ function KioskSettingsForm({
         printerPort,
         printerType,
         isPrintEnabled,
+        isAlwaysPrintTicket,
         logoUrl,
         printerLogoUrl: printerLogoUrl.trim() || undefined
       } as KioskConfig & Record<string, unknown>
@@ -836,7 +842,7 @@ function KioskSettingsForm({
             id='sheet-feedback'
             value={feedbackUrl}
             onChange={(e) => setFeedbackUrl(e.target.value)}
-            placeholder={tAdmin('feedback_url_placeholder')}
+            placeholder={KIOSK_FEEDBACK_URL_EXAMPLE}
           />
           <p className='text-muted-foreground text-xs'>
             {tAdmin('feedback_url_help')}
@@ -1195,6 +1201,27 @@ function KioskSettingsForm({
 
         {isPrintEnabled && (
           <>
+            {printerType === 'receipt' && (
+              <div className='space-y-1 border-b border-dashed pb-4'>
+                <div className='flex items-center justify-between gap-2'>
+                  <div className='min-w-0'>
+                    <Label htmlFor='sheet-always-print' className='block'>
+                      {t('always_print_ticket')}
+                    </Label>
+                    <p className='text-muted-foreground text-sm'>
+                      {t('always_print_ticket_hint')}
+                    </p>
+                  </div>
+                  <Switch
+                    id='sheet-always-print'
+                    className='shrink-0'
+                    checked={isAlwaysPrintTicket}
+                    onCheckedChange={setIsAlwaysPrintTicket}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className='space-y-2 border-b pb-4'>
               <LogoUpload
                 label={t('printer_logo_upload')}

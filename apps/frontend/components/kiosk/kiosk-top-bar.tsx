@@ -16,6 +16,8 @@ type KioskTopBarProps = {
   leading?: ReactNode;
   /** Right cluster before the clock: e.g. “I have a code”, language. Order: first item is leftmost of this group. */
   beforeClock?: ReactNode;
+  /** e.g. accessibility control; rendered below the time+date, right-aligned. */
+  underClock?: ReactNode;
 };
 
 export function KioskTopBar({
@@ -25,7 +27,8 @@ export function KioskTopBar({
   headerColor,
   useLightHeaderText = false,
   leading,
-  beforeClock
+  beforeClock,
+  underClock
 }: KioskTopBarProps) {
   const onTimeKeyDown =
     onClockClick !== undefined
@@ -75,7 +78,10 @@ export function KioskTopBar({
       <div className='flex min-w-0 flex-1 items-center gap-3'>{leading}</div>
       <div className='flex max-w-full min-w-0 shrink-0 items-center justify-end gap-2 sm:gap-3 md:gap-4'>
         {beforeClock}
-        {timeBlock}
+        <div className='flex min-w-0 flex-col items-end justify-center gap-1.5 sm:gap-2'>
+          {timeBlock}
+          {underClock}
+        </div>
       </div>
     </header>
   );
