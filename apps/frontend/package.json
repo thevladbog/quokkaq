@@ -24,7 +24,7 @@
     "@formatjs/intl-localematcher": "^0.8.3",
     "@hookform/resolvers": "^5.2.2",
     "@lexical/rich-text": "^0.35.0",
-    "@mdxeditor/editor": "^3.54.1",
+    "@mdxeditor/editor": "^3.55.0",
     "@mdxeditor/gurx": "^1.2.4",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/core": "^2.7.0",
