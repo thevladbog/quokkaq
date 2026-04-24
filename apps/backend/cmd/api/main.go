@@ -592,6 +592,7 @@ func run() error {
 
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/materials", unitHandler.GetMaterials)
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/active-playlist", signageHandler.ActivePlaylistPublic)
+		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/playlists/{playlistId}/public", signageHandler.GetPlaylistPublic)
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/public-screen-announcements", signageHandler.ListAnnouncementsPublic)
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/feeds/{feedId}/data", signageHandler.PublicFeedData)
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/queue-status", ticketHandler.GetUnitQueueStatus)

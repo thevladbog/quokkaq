@@ -9,6 +9,7 @@ import {
   type ReactNode
 } from 'react';
 import {
+  DEFAULT_STATE,
   type KioskA11yFontStep,
   type KioskA11yPersisted,
   readKioskA11yFromStorage,
@@ -22,6 +23,8 @@ export type KioskAccessibilityContextValue = KioskA11yPersisted & {
   toggleHighContrast: () => void;
   setTtsEnabled: (v: boolean) => void;
   setTtsSpeakAloud: (v: boolean) => void;
+  /** Reset font, high contrast, and TTS to defaults (e.g. after a ticket, next user). */
+  resetA11yToDefaults: () => void;
 };
 
 const KioskAccessibilityContext = createContext<
@@ -86,6 +89,14 @@ export function KioskAccessibilityProvider({
     });
   }, []);
 
+  const resetA11yToDefaults = useCallback(() => {
+    setState(() => {
+      const next = { ...DEFAULT_STATE };
+      writeKioskA11yToStorage(next);
+      return next;
+    });
+  }, []);
+
   const value = useMemo<KioskAccessibilityContextValue>(
     () => ({
       ...state,
@@ -94,7 +105,8 @@ export function KioskAccessibilityProvider({
       setHighContrast,
       toggleHighContrast,
       setTtsEnabled,
-      setTtsSpeakAloud
+      setTtsSpeakAloud,
+      resetA11yToDefaults
     }),
     [
       state,
@@ -103,7 +115,8 @@ export function KioskAccessibilityProvider({
       setHighContrast,
       toggleHighContrast,
       setTtsEnabled,
-      setTtsSpeakAloud
+      setTtsSpeakAloud,
+      resetA11yToDefaults
     ]
   );
 

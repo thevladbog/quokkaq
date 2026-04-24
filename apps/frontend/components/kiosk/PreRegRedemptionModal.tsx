@@ -470,12 +470,12 @@ export function PreRegRedemptionModal({
 
         {(!showPhoneTab || tab === 'code') && (
           <div className='bg-muted/50 shrink-0 border-t px-4 pt-3 pb-4 sm:px-5 sm:pb-5'>
-            <div className='mb-3 grid grid-cols-3 gap-2 sm:mb-4 sm:gap-2.5'>
+            <div className='mb-3 grid grid-cols-3 gap-2 sm:mb-4 sm:gap-3'>
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => (
                 <Button
                   key={digit}
                   variant='outline'
-                  className='kiosk-touch-min h-[3.25rem] min-h-12 text-2xl font-bold sm:h-16 sm:text-3xl'
+                  className='kiosk-touch-min h-[4.5rem] min-h-12 text-3xl font-bold sm:h-[5rem] sm:text-4xl'
                   onClick={() => handleDigitClick(digit.toString())}
                 >
                   {digit}
@@ -483,14 +483,14 @@ export function PreRegRedemptionModal({
               ))}
               <Button
                 variant='outline'
-                className='kiosk-touch-min h-[3.25rem] min-h-12 text-2xl font-bold sm:h-16 sm:text-3xl'
+                className='kiosk-touch-min h-[4.5rem] min-h-12 text-3xl font-bold sm:h-[5rem] sm:text-4xl'
                 onClick={() => setCode('')}
               >
                 C
               </Button>
               <Button
                 variant='outline'
-                className='kiosk-touch-min h-[3.25rem] min-h-12 text-2xl font-bold sm:h-16 sm:text-3xl'
+                className='kiosk-touch-min h-[4.5rem] min-h-12 text-3xl font-bold sm:h-[5rem] sm:text-4xl'
                 onClick={() => handleDigitClick('0')}
               >
                 0
@@ -498,7 +498,7 @@ export function PreRegRedemptionModal({
               <Button
                 type='button'
                 variant='outline'
-                className='kiosk-touch-min h-[3.25rem] min-h-12 sm:h-16'
+                className='kiosk-touch-min h-[4.5rem] min-h-12 sm:h-[5rem]'
                 onClick={handleBackspace}
                 aria-label={t('backspace', {
                   defaultValue: 'Delete last digit'

@@ -146,6 +146,62 @@ describe('KioskConfigSchema', () => {
     });
     expect(r.success).toBe(true);
   });
+
+  it('accepts isAlwaysPrintTicket for kiosk', () => {
+    const r = KioskConfigSchema.safeParse({ isAlwaysPrintTicket: false });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.isAlwaysPrintTicket).toBe(false);
+    }
+  });
+
+  it('accepts ticketSuccessAutoCloseSec in range', () => {
+    const r = KioskConfigSchema.safeParse({ ticketSuccessAutoCloseSec: 20 });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.ticketSuccessAutoCloseSec).toBe(20);
+    }
+    expect(
+      KioskConfigSchema.safeParse({ ticketSuccessAutoCloseSec: 0 }).success
+    ).toBe(false);
+    expect(
+      KioskConfigSchema.safeParse({ ticketSuccessAutoCloseSec: 200 }).success
+    ).toBe(false);
+  });
+
+  it('accepts kiosk attract / idle config fields', () => {
+    const r = KioskConfigSchema.safeParse({
+      kioskAttractInactivityMode: 'attract_only',
+      showAttractAfterSessionEnd: true,
+      attractIdleSec: 60,
+      showQueueDepthOnAttract: false
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.kioskAttractInactivityMode).toBe('attract_only');
+      expect(r.data.attractIdleSec).toBe(60);
+    }
+    expect(KioskConfigSchema.safeParse({ attractIdleSec: 1 }).success).toBe(
+      false
+    );
+    expect(KioskConfigSchema.safeParse({ attractIdleSec: 9 }).success).toBe(
+      false
+    );
+  });
+
+  it('accepts kiosk attract signage override fields', () => {
+    const r = KioskConfigSchema.safeParse({
+      kioskAttractSignageMode: 'playlist',
+      kioskAttractPlaylistId: 'pl-1',
+      kioskAttractActiveMaterialIds: ['m1', 'm2'],
+      kioskAttractSlideDurationSec: 8
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.kioskAttractSignageMode).toBe('playlist');
+      expect(r.data.kioskAttractSlideDurationSec).toBe(8);
+    }
+  });
 });
 
 describe('UserModelSchema', () => {

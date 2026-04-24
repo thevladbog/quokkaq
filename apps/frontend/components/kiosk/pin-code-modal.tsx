@@ -103,13 +103,13 @@ function PinCodeForm({
 
       {error && <p className='text-destructive text-sm'>{t('invalid_pin')}</p>}
 
-      <div className='grid w-full grid-cols-3 gap-2'>
+      <div className='grid w-full grid-cols-3 gap-2 sm:gap-3'>
         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
           <Button
             key={num}
             type='button'
             variant='outline'
-            className='h-12 text-lg font-bold'
+            className='h-[4.5rem] text-xl font-bold sm:h-[5rem] sm:text-2xl'
             onClick={() => handleNumberClick(num.toString())}
           >
             {num}
@@ -119,7 +119,7 @@ function PinCodeForm({
         <Button
           type='button'
           variant='outline'
-          className='h-12 text-lg font-bold'
+          className='h-[4.5rem] text-xl font-bold sm:h-[5rem] sm:text-2xl'
           onClick={() => handleNumberClick('0')}
         >
           0
@@ -127,25 +127,25 @@ function PinCodeForm({
         <Button
           type='button'
           variant='ghost'
-          className='h-12'
+          className='h-[4.5rem] sm:h-[5rem]'
           onClick={handleDelete}
         >
-          <Delete className='h-6 w-6' />
+          <Delete className='h-7 w-7 sm:h-8 sm:w-8' />
         </Button>
       </div>
 
-      <div className='flex w-full gap-2'>
+      <div className='flex w-full gap-2 sm:gap-3'>
         <Button
           type='button'
           variant='outline'
-          className='kiosk-touch-min min-h-12 flex-1'
+          className='kiosk-touch-min h-[4.5rem] min-h-12 flex-1 sm:h-[5rem]'
           onClick={onClose}
         >
           {t('cancel')}
         </Button>
         <Button
           type='button'
-          className='kiosk-touch-min min-h-12 flex-1'
+          className='kiosk-touch-min h-[4.5rem] min-h-12 flex-1 sm:h-[5rem]'
           onClick={handleSubmit}
         >
           {t('submit')}

@@ -3,6 +3,8 @@
  * @see https://www.w3.org/WAI/GL/wiki/Relative_luminance
  */
 
+import { resolveCssColorToRgb } from '@/lib/resolve-css-color';
+
 const SRGB_CUTOFF = 0.04045;
 const SRGB_A = 0.055;
 const SRGB_D = 12.92;
@@ -54,6 +56,36 @@ export function relativeLuminance(hex: string): number | null {
     srgbToLinear(rgb[1]!),
     srgbToLinear(rgb[2]!)
   ];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * Relative luminance for any CSS color the browser can resolve (hex, rgb(), oklch(), etc.).
+ * SSR/Node: only hex forms supported; returns null otherwise.
+ */
+export function relativeLuminanceFromCssColor(css: string): number | null {
+  const t = css.trim();
+  if (!t) {
+    return null;
+  }
+  if (t.startsWith('#') || /^[0-9a-fA-F]{3,8}$/i.test(t)) {
+    return relativeLuminance(t.startsWith('#') ? t : `#${t}`);
+  }
+  if (typeof document === 'undefined') {
+    return null;
+  }
+  const rgbStr = resolveCssColorToRgb(t);
+  const comma = rgbStr.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  const space = !comma
+    ? rgbStr.match(/rgba?\(\s*(\d+)\s+(\d+)\s+(\d+)(?:\s*\/\s*[\d.%]+)?\s*\)/)
+    : null;
+  const m = comma || space;
+  if (!m) {
+    return null;
+  }
+  const r = srgbToLinear(parseInt(m[1]!, 10) / 255);
+  const g = srgbToLinear(parseInt(m[2]!, 10) / 255);
+  const b = srgbToLinear(parseInt(m[3]!, 10) / 255);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 

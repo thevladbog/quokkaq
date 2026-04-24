@@ -11,6 +11,7 @@ import { logger } from '@/lib/logger';
 import { useTickets, useUnit } from '@/lib/hooks';
 import { socketClient, type UnitETASnapshot } from '@/lib/socket';
 import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
+import { deriveContentSlidesFromSignage } from '@/lib/signage-content-slides';
 
 const EMPTY_TICKET_LIST: Ticket[] = [];
 
@@ -140,36 +141,10 @@ export function useScreenRendererLiveData(unitId: string) {
     refetchInterval: 120_000
   });
 
-  const contentSlides: ContentSlide[] = useMemo(() => {
-    const pl = activePlData as
-      | {
-          source?: string;
-          playlist?: {
-            items?: Array<{
-              id: string;
-              duration?: number;
-              material?: { type?: string; url?: string };
-            }>;
-          };
-        }
-      | undefined;
-    if (pl?.source && pl.source !== 'none' && pl.playlist?.items?.length) {
-      return pl.playlist.items
-        .filter((it) => it.material?.url)
-        .map((it) => ({
-          id: it.id,
-          type: it.material?.type || 'image',
-          url: it.material!.url!,
-          durationSec: it.duration ?? 0
-        }));
-    }
-    return materials.map((m) => ({
-      id: m.id,
-      type: m.type,
-      url: m.url,
-      durationSec: 0
-    }));
-  }, [activePlData, materials]);
+  const contentSlides: ContentSlide[] = useMemo(
+    () => deriveContentSlidesFromSignage(activePlData, materials),
+    [activePlData, materials]
+  );
 
   const [queueStatus, setQueueStatus] = useState<QueueStatusState | null>(null);
 

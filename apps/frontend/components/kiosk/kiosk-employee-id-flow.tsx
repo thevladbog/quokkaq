@@ -63,38 +63,42 @@ export function KioskEmployeeIdFlow({
 
   if (mode === 'login') {
     return (
-      <div className='flex min-h-[320px] flex-col gap-4 p-2'>
-        <p className='text-muted-foreground text-center text-sm'>
+      <div className='flex min-h-[320px] w-full min-w-0 flex-col gap-4 overflow-x-hidden p-1 sm:p-2'>
+        <p className='text-muted-foreground text-center text-sm sm:text-base'>
           {t('login_hint')}
         </p>
-        <div className='border-foreground/20 min-h-14 w-full max-w-2xl rounded border-2 p-3 text-2xl'>
+        <div className='border-foreground/20 min-h-14 w-full min-w-0 rounded border-2 p-3 text-2xl break-words'>
           {login}
         </div>
         <KioskTouchKeyboard
           onKey={(ch) => setLogin((x) => x + ch)}
           onBackspace={() => setLogin((x) => x.slice(0, -1))}
         />
-        <div className='mt-auto flex flex-wrap justify-center gap-2'>
-          <Button
-            type='button'
-            variant='outline'
-            onClick={onBack}
-            disabled={busy}
-          >
-            {t('back')}
-          </Button>
-          <Button
-            type='button'
-            onClick={() => {
-              if (!login.trim()) {
-                return;
-              }
-              void resolve('login', login.trim());
-            }}
-            disabled={busy || !login.trim()}
-          >
-            {t('continue')}
-          </Button>
+        <div className='border-border/60 bg-muted/40 mt-auto w-full min-w-0 border-t pt-3 sm:pt-4'>
+          <div className='flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:gap-3'>
+            <Button
+              type='button'
+              variant='outline'
+              className='kiosk-touch-min h-12 min-h-12 flex-1 text-base sm:h-14 sm:text-base'
+              onClick={onBack}
+              disabled={busy}
+            >
+              {t('back')}
+            </Button>
+            <Button
+              type='button'
+              className='kiosk-touch-min h-12 min-h-12 flex-1 text-base sm:h-14 sm:text-base'
+              onClick={() => {
+                if (!login.trim()) {
+                  return;
+                }
+                void resolve('login', login.trim());
+              }}
+              disabled={busy || !login.trim()}
+            >
+              {t('continue')}
+            </Button>
+          </div>
         </div>
         {err ? (
           <p className='text-destructive text-center text-sm'>{err}</p>
@@ -133,15 +137,18 @@ function KioskTouchKeyboard({
   onKey: (c: string) => void;
   onBackspace: () => void;
 }) {
-  const row1 = '1234567890-'.split('');
+  /** Digits + common email / login symbols (@ . _ -) */
+  const row1 = '1234567890@._-'.split('');
   const row2 = 'QWERTYUIOP'.split('');
   const row3 = 'ASDFGHJKL'.split('');
   const row4 = 'ZXCVBNM'.split('');
+  const keyClass =
+    'kiosk-touch-min h-14 min-w-11 shrink-0 px-0 text-lg font-semibold sm:min-w-12 sm:text-xl';
   const Key = (ch: string) => (
     <Button
       key={ch}
       type='button'
-      className='min-h-14 min-w-12 text-xl'
+      className={keyClass}
       variant='outline'
       onClick={() => onKey(ch)}
     >
@@ -149,34 +156,42 @@ function KioskTouchKeyboard({
     </Button>
   );
   return (
-    <div className='mx-auto flex max-w-3xl flex-col gap-2 p-1'>
-      <div className='flex flex-wrap justify-center gap-1.5'>
-        {row1.map((c) => Key(c))}
-        <Button
-          type='button'
-          className='min-h-14 min-w-20'
-          variant='secondary'
-          onClick={onBackspace}
-        >
-          ⌫
-        </Button>
+    <div className='flex w-full max-w-full min-w-0 flex-col space-y-2 sm:space-y-2.5'>
+      <div className='w-full overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+        <div className='mx-auto flex min-w-min flex-nowrap justify-center gap-1.5 sm:gap-2'>
+          {row1.map((c) => Key(c))}
+          <Button
+            type='button'
+            className='kiosk-touch-min h-14 min-w-[4.5rem] shrink-0 text-lg sm:min-w-20 sm:text-xl'
+            variant='secondary'
+            onClick={onBackspace}
+          >
+            ⌫
+          </Button>
+        </div>
       </div>
-      <div className='flex flex-wrap justify-center gap-1.5'>
-        {row2.map((c) => Key(c))}
+      <div className='w-full overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+        <div className='mx-auto flex min-w-min flex-nowrap justify-center gap-1.5 sm:gap-2'>
+          {row2.map((c) => Key(c))}
+        </div>
       </div>
-      <div className='flex flex-wrap justify-center gap-1.5 pl-4'>
-        {row3.map((c) => Key(c))}
+      <div className='w-full overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+        <div className='mx-auto flex min-w-min flex-nowrap justify-center gap-1.5 pl-3 sm:gap-2 sm:pl-6 md:pl-10'>
+          {row3.map((c) => Key(c))}
+        </div>
       </div>
-      <div className='flex flex-wrap justify-center gap-1.5 pl-8'>
-        {row4.map((c) => Key(c))}
-        <Button
-          type='button'
-          className='min-h-14 min-w-12 text-xl'
-          variant='outline'
-          onClick={() => onKey(' ')}
-        >
-          __
-        </Button>
+      <div className='w-full overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+        <div className='mx-auto flex min-w-min flex-nowrap justify-center gap-1.5 pl-6 sm:gap-2 sm:pl-12 md:pl-20'>
+          {row4.map((c) => Key(c))}
+          <Button
+            type='button'
+            className={keyClass}
+            variant='outline'
+            onClick={() => onKey(' ')}
+          >
+            __
+          </Button>
+        </div>
       </div>
     </div>
   );

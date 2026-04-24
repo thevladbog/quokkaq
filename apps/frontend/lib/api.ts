@@ -777,6 +777,27 @@ export const unitsApi = {
     return res.data;
   },
 
+  /**
+   * Unauthenticated read of a branch playlist (used by the kiosk for attract when a fixed playlist is chosen).
+   * Same JSON as the admin [orval getSignagePlaylist] success body.
+   */
+  getSignagePlaylistPublic: async (
+    unitId: string,
+    playlistId: string
+  ): Promise<orvalUnits.ModelsPlaylist | null> => {
+    const res = await fetch(
+      `${API_BASE_URL}/units/${encodeURIComponent(unitId)}/playlists/${encodeURIComponent(playlistId)}/public`,
+      { cache: 'no-store' }
+    );
+    if (res.status === 404) {
+      return null;
+    }
+    if (!res.ok) {
+      throw new Error(`Get playlist (public) failed: ${res.status}`);
+    }
+    return (await res.json()) as orvalUnits.ModelsPlaylist;
+  },
+
   getPublicScreenAnnouncements: async (unitId: string) => {
     const res = await orvalUnits.listSignageAnnouncementsPublic(unitId);
     return (res.data ?? []) as Array<{

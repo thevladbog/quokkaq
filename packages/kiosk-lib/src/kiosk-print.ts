@@ -107,6 +107,19 @@ function resolvePrintTarget(kiosk: KioskPrinterConfig): {
 }
 
 /**
+ * True when kiosk config has a resolvable receipt print target (network or system)
+ * and printing is allowed (not disabled, not label mode).
+ */
+export function hasKioskPrintTarget(
+  kiosk: KioskPrinterConfig | null | undefined
+): boolean {
+  if (!kiosk) {
+    return false;
+  }
+  return resolvePrintTarget(kiosk) !== null;
+}
+
+/**
  * Send raw ESC/POS bytes via Tauri → agent (`tcp` or `system` queue).
  * Returns false if not in Tauri or missing target.
  */
