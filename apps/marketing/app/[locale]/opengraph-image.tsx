@@ -19,6 +19,10 @@ export default async function Image({
 
   const t = messages[raw].home;
   const brand = raw === 'ru' ? 'КвоккаКю' : 'QuokkaQ';
+  const tagline =
+    raw === 'ru'
+      ? 'Управление очередями для сетей и филиалов'
+      : 'Queue management for multi-branch teams';
 
   return new ImageResponse(
     <div
@@ -62,7 +66,18 @@ export default async function Image({
       </div>
       <div
         style={{
-          marginTop: 44,
+          marginTop: 36,
+          fontSize: 20,
+          fontWeight: 600,
+          color: '#404040',
+          letterSpacing: '-0.01em'
+        }}
+      >
+        {tagline}
+      </div>
+      <div
+        style={{
+          marginTop: 20,
           fontSize: 22,
           fontWeight: 700,
           color: '#0a0a0a',

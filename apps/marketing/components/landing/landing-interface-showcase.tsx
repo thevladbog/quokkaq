@@ -1,11 +1,17 @@
 import Image from 'next/image';
+
+import { InterfaceWalkthroughTrigger } from '@/components/landing/interface-walkthrough-trigger';
 import type { HomeMessages } from '@/src/messages';
 
 type Props = {
   copy: HomeMessages;
+  walkthroughVideoEmbedSrc?: string | null;
 };
 
-export function LandingInterfaceShowcase({ copy }: Props) {
+export function LandingInterfaceShowcase({
+  copy,
+  walkthroughVideoEmbedSrc
+}: Props) {
   return (
     <section
       id='interface-showcase'
@@ -33,15 +39,25 @@ export function LandingInterfaceShowcase({ copy }: Props) {
               <div className='absolute top-0 right-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full bg-gradient-to-br from-[color:var(--color-primary)]/20 to-[color:var(--color-secondary)]/10 blur-2xl transition group-hover:scale-150' />
 
               <div className='relative z-10'>
-                <div className='relative aspect-[16/10] overflow-hidden rounded-t-2xl border-b border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)]'>
-                  <Image
-                    src={item.image}
-                    alt={item.imageAlt}
-                    fill
-                    className='object-cover object-top transition duration-300 group-hover:scale-105'
-                    sizes='(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 600px'
+                {index === 0 &&
+                walkthroughVideoEmbedSrc &&
+                walkthroughVideoEmbedSrc.trim() !== '' ? (
+                  <InterfaceWalkthroughTrigger
+                    item={item}
+                    walkthroughCopy={copy.interfaceWalkthrough}
+                    videoEmbedSrc={walkthroughVideoEmbedSrc.trim()}
                   />
-                </div>
+                ) : (
+                  <div className='relative aspect-[16/10] overflow-hidden rounded-t-2xl border-b border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)]'>
+                    <Image
+                      src={item.image}
+                      alt={item.imageAlt}
+                      fill
+                      className='object-cover object-top transition duration-300 group-hover:scale-105'
+                      sizes='(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 600px'
+                    />
+                  </div>
+                )}
 
                 <div className='p-6'>
                   <h3 className='font-display mb-3 text-xl font-semibold text-[color:var(--color-text)]'>

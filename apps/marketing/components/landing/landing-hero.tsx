@@ -8,6 +8,7 @@ import type { AppLocale, HomeMessages } from '@/src/messages';
 
 import { LeadRequestCta } from '@/components/landing/lead-request-cta';
 import { pushMarketingEvent } from '@/lib/marketing-analytics';
+import { LandingCtaAssurances } from '@/components/landing/landing-cta-assurances';
 import { FriendlySmileIcon } from './friendly-smile-icon';
 import { LandingTicketsAnimation } from './landing-tickets-animation';
 
@@ -130,6 +131,7 @@ export function LandingHero({ locale, copy, appBaseUrl }: Props) {
               </a>
             )}
           </div>
+          <LandingCtaAssurances copy={copy} variant='hero' />
         </div>
       </div>
 
@@ -138,18 +140,36 @@ export function LandingHero({ locale, copy, appBaseUrl }: Props) {
         aria-hidden
       >
         <div className='relative flex w-full max-w-[min(100%,20rem)] items-center justify-center sm:max-w-[24rem] lg:max-w-[min(100%,28rem)] xl:max-w-[32rem]'>
-          <div className='pointer-events-none absolute inset-[-22%] rounded-full bg-gradient-to-br from-[color:var(--color-primary)]/18 via-[color:var(--color-secondary)]/12 to-transparent blur-3xl' />
-          <Image
-            src='/quokka-logo.svg'
-            alt=''
-            width={480}
-            height={480}
-            className='relative h-auto w-full max-w-[min(100%,260px)] object-contain drop-shadow-md sm:max-w-[min(100%,320px)] lg:max-w-[min(100%,400px)] xl:max-w-[min(100%,460px)]'
-            unoptimized
-            priority
-          />
+          {/*
+            Warm glow pulled slightly past the art on the right so the asset’s flat matte is less
+            obvious. No surface-colored scrim — it read as a dark vertical bar on the mascot and
+            never matched the hero’s warm radial background.
+          */}
+          <div className='pointer-events-none absolute -inset-[26%] -right-[18%] left-[-10%] rounded-[45%] bg-gradient-to-br from-[color:var(--color-primary)]/16 via-[color:var(--color-secondary)]/11 to-transparent blur-3xl' />
+          {/*
+            Narrow alpha fade on the far right only: hides the raster’s hard edge without
+            touching the character. (Wide masks and backdrop-blur both harmed the mascot.)
+          */}
+          <div
+            className='relative w-full [-webkit-mask-image:linear-gradient(to_left,transparent_0%,black_min(9%,3.25rem))] [-webkit-mask-repeat:no-repeat] [-webkit-mask-size:100%_100%] [mask-image:linear-gradient(to_left,transparent_0%,black_min(9%,3.25rem))] [mask-repeat:no-repeat] [mask-size:100%_100%]'
+          >
+            <Image
+              src='/quokka-logo.svg'
+              alt=''
+              width={480}
+              height={480}
+              className='relative h-auto w-full max-w-[min(100%,260px)] object-contain sm:max-w-[min(100%,320px)] lg:max-w-[min(100%,400px)] xl:max-w-[min(100%,460px)]'
+              unoptimized
+              priority
+            />
+          </div>
         </div>
       </div>
+      <div
+        id='landing-hero-sticky-sentinel'
+        className='col-span-full h-px w-full shrink-0'
+        aria-hidden
+      />
     </section>
   );
 }

@@ -15,15 +15,16 @@ export function TextLogoImg({
   locale,
   className = 'h-8 w-auto',
   heightClass,
-  alt = 'QuokkaQ'
+  alt
 }: Props) {
+  const resolvedAlt = alt ?? (locale === 'ru' ? 'КвоккаКю' : 'QuokkaQ');
   const src = locale === 'ru' ? '/logo-text-ru.svg' : '/logo-text.svg';
   const imageClassName = [className, heightClass].filter(Boolean).join(' ');
 
   return (
     <Image
       src={src}
-      alt={alt}
+      alt={resolvedAlt}
       width={160}
       height={40}
       className={imageClassName}

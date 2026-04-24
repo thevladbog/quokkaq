@@ -302,6 +302,7 @@ func run() error {
 	authHandler := handlers.NewAuthHandlerWithSubscription(authService, userService, userRepo, tenantRBACRepo, leadIssueService, subscriptionRepo)
 	integrationsHandler := handlers.NewIntegrationsHandler(deploymentSaaSSettingsService)
 	leadHandler := handlers.NewLeadHandler(leadIssueService)
+	marketingStatsHandler := handlers.NewMarketingStatsHandler(database.DB)
 	ssoHandler := handlers.NewSSOHandler(ssoService)
 	companySSOHTTP := handlers.NewCompanySSOHTTP(ssoService, userRepo, companyRepo)
 	tenantRBACHTTP := handlers.NewTenantRBACHTTP(tenantRBACRepo, userRepo, ssoService)
@@ -474,6 +475,7 @@ func run() error {
 	r.Route("/public", func(r chi.Router) {
 		r.Use(authmiddleware.SSOPublicRateLimit)
 		r.Get("/tenants/{slug}", ssoHandler.PublicTenant)
+		r.Get("/marketing-stats", marketingStatsHandler.GetPublicMarketingStats)
 		r.Post("/leads/request", leadHandler.PostPublicLeadRequest)
 	})
 

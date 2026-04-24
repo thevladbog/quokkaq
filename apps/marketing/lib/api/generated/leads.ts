@@ -1008,6 +1008,11 @@ export interface HandlersPublicLeadRequestBody {
   source?: string;
 }
 
+export interface HandlersPublicMarketingStatsResponse {
+  activeCompanies?: number;
+  activeHumanUsers?: number;
+}
+
 /**
  * Error is always "quota_exceeded".
  */

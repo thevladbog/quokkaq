@@ -13,6 +13,15 @@ export type UseCaseSegment =
   | 'services'
   | 'education';
 
+/** Stable keys for integration logos + carousel (labels are localized). */
+export type LandingIntegrationId =
+  | 'googleCalendar'
+  | 'twilio'
+  | 'smsRu'
+  | 'caldav'
+  | 'oidcSaml'
+  | 'yooKassa';
+
 export function isAppLocale(value: string): value is AppLocale {
   return (locales as readonly string[]).includes(value);
 }
@@ -37,8 +46,18 @@ export type HomeMessages = {
   /** Short aria-label for the asterisk link to the footnote. */
   heroEyebrowNoteAriaLabel: string;
   secondaryCta: string;
+  /** Short risk reducers under primary trial CTAs (hero + footer). */
+  ctaAssurances: {
+    freeTrial: string;
+    noCreditCard: string;
+    cancelAnytime: string;
+  };
+  /** Accessible name for the ctaAssurances list. */
+  ctaAssurancesAriaLabel: string;
   /** Sticky header anchor labels + primary CTA. */
   topNav: {
+    /** Landmark label for header navigation (visible + overflow). */
+    navAriaLabel: string;
     features: string;
     howItWorks: string;
     benefits: string;
@@ -46,7 +65,12 @@ export type HomeMessages = {
     useCases: string;
     pricing: string;
     faq: string;
+    bookDemo: string;
     primaryCta: string;
+    /** Compact header: overflow items behind this control. */
+    moreNav: string;
+    /** `aria-label` for the overflow dropdown listbox. */
+    moreNavMenuAriaLabel: string;
     openMenu: string;
     closeMenu: string;
   };
@@ -58,10 +82,19 @@ export type HomeMessages = {
   };
   stats: {
     heading: string;
-    industries: Array<{
+    /** Four default product facts; first may be replaced by live org count from API. */
+    facts: Array<{
       label: string;
-      icon: 'healthcare' | 'publicSector' | 'retail' | 'services';
+      icon: 'clock' | 'plug' | 'globe' | 'calendarDays';
     }>;
+    /** `{count}` is replaced with active company count when above the public threshold. */
+    liveOrganizationsLabel: string;
+  };
+  integrations: {
+    heading: string;
+    /** One line clarifying what is a product integration vs protocol/standard. */
+    subheading: string;
+    items: Array<{ id: LandingIntegrationId; label: string }>;
   };
   howItWorks: {
     heading: string;
@@ -83,6 +116,12 @@ export type HomeMessages = {
       imageAlt: string;
     }>;
   };
+  /** Optional product walkthrough video (first showcase card). */
+  interfaceWalkthrough: {
+    playLabel: string;
+    dialogTitle: string;
+    closeLabel: string;
+  };
   useCases: {
     heading: string;
     subheading: string;
@@ -92,6 +131,24 @@ export type HomeMessages = {
       industry: string;
       segment: UseCaseSegment;
     }>;
+  };
+  comparison: {
+    /** Full title for accessibility (e.g. aria-label on the H2). */
+    heading: string;
+    /** Visible text before the wordmark in the section H2. */
+    headingPrefix: string;
+    subheading: string;
+    beforeColumn: string;
+    afterColumn: string;
+    rows: Array<{ before: string; after: string }>;
+  };
+  bookDemo: {
+    heading: string;
+    body: string;
+    embedTitle: string;
+    openInNewTab: string;
+    /** Shown when Cal.com embed URL is not configured. */
+    embedFallback: string;
   };
   pricing: {
     heading: string;
@@ -165,9 +222,18 @@ export type HomeMessages = {
     error: string;
     close: string;
   };
+  trust: {
+    heading: string;
+    items: Array<{ title: string }>;
+  };
   faq: {
     heading: string;
     items: Array<{ question: string; answer: string }>;
+  };
+  /** Fixed bottom CTA on small screens (shown after scrolling past hero). */
+  stickyMobileCta: {
+    label: string;
+    ariaLabel: string;
   };
   footer: {
     title: string;
@@ -216,7 +282,14 @@ export const messages: Record<
         'Subjective opinion of the QuokkaQ team, based on how we design the product and UX—not the outcome of independent consumer research or a market-wide benchmark.',
       heroEyebrowNoteAriaLabel: 'Read disclaimer about this marketing claim',
       secondaryCta: 'Book a Demo',
+      ctaAssurances: {
+        freeTrial: '14-day trial',
+        noCreditCard: 'No credit card',
+        cancelAnytime: 'Cancel anytime'
+      },
+      ctaAssurancesAriaLabel: 'Trial terms',
       topNav: {
+        navAriaLabel: 'Main navigation',
         features: 'Features',
         howItWorks: 'How it works',
         benefits: 'Benefits',
@@ -224,32 +297,49 @@ export const messages: Record<
         interfaceShowcase: 'Interface',
         useCases: 'Use cases',
         faq: 'FAQ',
+        bookDemo: 'Book demo',
         primaryCta: 'Start free trial',
+        moreNav: 'More',
+        moreNavMenuAriaLabel: 'Additional sections',
         openMenu: 'Open menu',
         closeMenu: 'Close menu'
       },
-      pillarsHeading: 'Why QuokkaQ for daily operations',
+      pillarsHeading: 'Why day-to-day work is easier with QuokkaQ',
       pillars: {
         one: {
-          title: 'Built for busy service floors',
-          body: 'Consistent layouts and clear states so frontline staff and supervisors spend less time guessing—so guests spend less time waiting.'
+          title: 'Less guesswork on the floor',
+          body: "The same clear steps on counter and kiosk—so staff move faster and visitors always know what's happening and how long to wait."
         },
         two: {
-          title: 'Accessible on every device',
-          body: 'Keyboard-first flows, visible focus, and strong contrast in light and dark mode—on counters, kiosks, and public displays.'
+          title: 'One experience on every screen',
+          body: 'Touch-friendly targets, solid contrast in light and dark, keyboard support where it matters—desks, kiosks, and public displays.'
         },
         three: {
-          title: 'Ready to grow with you',
-          body: 'Add locations, queues, and staff roles with one admin model: shared rules and reports across sites, and releases you can plan for.'
+          title: 'Multi-site without a second universe',
+          body: 'Add branches, queues, and roles under one admin model: shared rules, network-wide reporting, and releases you can plan around.'
         }
       },
       stats: {
-        heading: 'Common deployment scenarios',
-        industries: [
-          { label: 'Healthcare', icon: 'healthcare' },
-          { label: 'Public Sector', icon: 'publicSector' },
-          { label: 'Retail', icon: 'retail' },
-          { label: 'Services', icon: 'services' }
+        heading: 'Why teams choose QuokkaQ',
+        facts: [
+          { label: 'Go live in 2–3 hours', icon: 'clock' },
+          { label: '10+ ready integrations', icon: 'plug' },
+          { label: '2 interface languages', icon: 'globe' },
+          { label: '14-day free trial', icon: 'calendarDays' }
+        ],
+        liveOrganizationsLabel: '{count}+ organizations on the platform'
+      },
+      integrations: {
+        heading: 'Integrations and open protocols',
+        subheading:
+          'CalDAV and OIDC / SAML are industry-standard ways to plug in calendars and sign-in; the rest are packaged connections to common external services.',
+        items: [
+          { id: 'caldav', label: 'CalDAV' },
+          { id: 'oidcSaml', label: 'OIDC / SAML 2.0' },
+          { id: 'googleCalendar', label: 'Google Calendar' },
+          { id: 'twilio', label: 'Twilio' },
+          { id: 'smsRu', label: 'SMS.ru' },
+          { id: 'yooKassa', label: 'YooKassa' }
         ]
       },
       howItWorks: {
@@ -310,7 +400,7 @@ export const messages: Record<
             title: 'Check-in Kiosk',
             description:
               'Self-service ticket kiosk with large touch-friendly buttons, clear service categories, and instant ticket printing. Multilingual interface accessible for all ages and abilities. Perfect for high-traffic environments like government offices, healthcare facilities, and retail locations.',
-            image: '/kiosk.png',
+            image: '/kiosk.webp',
             imageAlt:
               'QuokkaQ self-service kiosk interface showing service selection screen with large buttons for taking tickets and arranging services'
           },
@@ -318,7 +408,7 @@ export const messages: Record<
             title: 'Public Display',
             description:
               'High-contrast digital queue display board visible from distance. Shows currently serving ticket numbers, wait time estimates, and real-time queue status. Optimized for TV screens and digital signage in waiting areas.',
-            image: '/public_screen.png',
+            image: '/public_screen.webp',
             imageAlt:
               'QuokkaQ public display screen showing currently serving tickets with numbers, status, and queue information on a large digital board'
           },
@@ -326,7 +416,7 @@ export const messages: Record<
             title: 'Staff Dashboard',
             description:
               'Efficient employee workstation interface with keyboard shortcuts for calling tickets, transferring between counters, and managing queue flow. Dense information layout designed for speed and productivity during peak hours.',
-            image: '/desk.png',
+            image: '/desk.webp',
             imageAlt:
               'QuokkaQ staff dashboard interface showing ticket queue management, call controls, and visitor service workflow for employees'
           },
@@ -334,11 +424,16 @@ export const messages: Record<
             title: 'Supervisor Panel',
             description:
               'Real-time monitoring and analytics dashboard for queue supervisors. View active workstations, service metrics, wait times, and staff performance. Configure services, manage multiple locations, and access detailed reporting.',
-            image: '/supervisor.png',
+            image: '/supervisor.webp',
             imageAlt:
               'QuokkaQ supervisor panel showing real-time queue analytics, workstation monitoring, and management dashboard for administrators'
           }
         ]
+      },
+      interfaceWalkthrough: {
+        playLabel: 'Watch overview',
+        dialogTitle: 'Product walkthrough',
+        closeLabel: 'Close'
       },
       useCases: {
         heading: 'Solutions for every industry',
@@ -382,13 +477,50 @@ export const messages: Record<
           }
         ]
       },
+      comparison: {
+        heading: 'The usual approach vs. QuokkaQ',
+        headingPrefix: 'The usual approach vs.',
+        subheading: 'Clear contrast with how queues are run today',
+        beforeColumn: 'Traditional approach',
+        afterColumn: 'With QuokkaQ',
+        rows: [
+          {
+            before: 'Paper tickets and manual tracking',
+            after: 'Digital kiosk and automatic ticket accounting'
+          },
+          {
+            before: 'No visibility into wait times',
+            after: 'Live analytics and SLA-aware monitoring'
+          },
+          {
+            before: 'Guests guess when they will be called',
+            after: 'Displays, SMS options, and clearer expectations'
+          },
+          {
+            before: 'Rollouts that take days or weeks',
+            after: 'Most teams go live in 2–3 hours'
+          },
+          {
+            before: 'Different tools per branch',
+            after: 'One platform for the whole network'
+          }
+        ]
+      },
+      bookDemo: {
+        heading: 'Book a live walkthrough',
+        body: 'We will tailor the tour to your use case—about 30 minutes, no obligation.',
+        embedTitle: 'Cal.com scheduling',
+        openInNewTab: 'Open booking in a new tab',
+        embedFallback:
+          'Scheduling is not embedded on this preview build. Use Contact us or open the booking page when your team configures Cal.com.'
+      },
       pricing: {
         heading: 'Simple, transparent pricing',
         subheading: 'Choose the plan that fits your operation',
         plans: [
           {
             name: 'Starter',
-            price: '$49',
+            price: '₽2 900',
             period: 'per location/month',
             description:
               'Perfect for single-location businesses starting with queue management',
@@ -403,7 +535,7 @@ export const messages: Record<
           },
           {
             name: 'Professional',
-            price: '$149',
+            price: '₽9 900',
             period: 'per location/month',
             description: 'Full-featured solution for growing businesses',
             features: [
@@ -481,6 +613,29 @@ export const messages: Record<
         error: 'Something went wrong. Please try again or email us.',
         close: 'Close'
       },
+      trust: {
+        heading: 'Security & data',
+        items: [
+          {
+            title:
+              'We follow GDPR expectations when they actually apply to your rollout'
+          },
+          {
+            title:
+              'Most teams run on infrastructure hosted in Russia—familiar for local ops'
+          },
+          {
+            title:
+              'For Russian organizations, our processes line up with what 152-FZ asks for'
+          },
+          { title: 'Enterprise plans can include up to 99.9% availability in the SLA' },
+          { title: 'Traffic is encrypted in transit; stored data is handled with care' }
+        ]
+      },
+      stickyMobileCta: {
+        label: 'Start free',
+        ariaLabel: 'Open product signup to start a free trial'
+      },
       faq: {
         heading: 'Frequently asked questions',
         items: [
@@ -522,7 +677,27 @@ export const messages: Record<
           {
             question: 'Can we integrate with existing systems?',
             answer:
-              'Professional and Enterprise plans include API access for integration with scheduling systems, CRMs, and other business tools. Far from every possible integration is supported today—submit a request (contact form or sales) so we can discuss your systems, what is already feasible, and what would need a custom rollout.'
+              'API access and deeper integrations with scheduling, CRMs, and other tools are offered by arrangement—not every scenario ships out of the box, and scope is not guaranteed by a single catalog tier alone. Send a request (site contact form or sales) and we will review what is already feasible and what would need a custom rollout.'
+          },
+          {
+            question: 'Is the product GDPR and 152-FZ compliant?',
+            answer:
+              'We design QuokkaQ for strong privacy and regional requirements. Typical deployments store data in Russia with processes aligned to 152-FZ. EU customers can discuss EU-region hosting and GDPR-aligned setups with our team. Details are in the Privacy Policy.'
+          },
+          {
+            question: 'Can we export our data?',
+            answer:
+              'Yes—analytics, reports, and ticket history can be exported to CSV and PDF when your plan includes exports. After a subscription ends, data remains accessible for a grace period (see your agreement); contact support for retention specifics.'
+          },
+          {
+            question: 'Do you help migrate from another system?',
+            answer:
+              'Yes—data import, configuration aligned with your process, and team onboarding are offered by arrangement, not as a fixed package. Scope and timing depend on your current stack; describe it in your request and we will propose options and next steps.'
+          },
+          {
+            question: 'Which interface languages are supported?',
+            answer:
+              'Kiosks and staff tools are available in Russian and English today. Additional languages can be discussed as a custom rollout.'
           }
         ]
       },
@@ -564,7 +739,14 @@ export const messages: Record<
         'Субъективное мнение команды КвоккаКю о том, как мы проектируем продукт и интерфейс; это не результат независимых исследований потребителей и не сравнение со всем рынком.',
       heroEyebrowNoteAriaLabel: 'Уточнение по этой маркетинговой формулировке',
       secondaryCta: 'Заказать демо',
+      ctaAssurances: {
+        freeTrial: '14 дней бесплатно',
+        noCreditCard: 'Без банковской карты',
+        cancelAnytime: 'Отмена в любой момент'
+      },
+      ctaAssurancesAriaLabel: 'Условия пробного периода',
       topNav: {
+        navAriaLabel: 'Основная навигация',
         features: 'Возможности',
         howItWorks: 'Как это работает',
         benefits: 'Преимущества',
@@ -572,32 +754,49 @@ export const messages: Record<
         interfaceShowcase: 'Интерфейс',
         useCases: 'Сценарии',
         faq: 'FAQ',
+        bookDemo: 'Запись на демо',
         primaryCta: 'Начать пробный период',
+        moreNav: 'Ещё',
+        moreNavMenuAriaLabel: 'Дополнительные разделы',
         openMenu: 'Открыть меню',
         closeMenu: 'Закрыть меню'
       },
-      pillarsHeading: 'Почему QuokkaQ в ежедневной работе',
+      pillarsHeading: 'Почему с КвоккаКю проще в повседневной работе',
       pillars: {
         one: {
-          title: 'Интерфейс для плотного потока',
-          body: 'Понятные экраны и согласованные состояния, чтобы сотрудники на линии и супервайзеры тратили меньше сил — а гостю было проще дождаться своей очереди.'
+          title: 'Меньше догадок на линии',
+          body: 'Один и тот же понятный сценарий на стойке и киоске: сотруднику проще не ошибиться, гостю — сразу видно, что происходит и сколько ждать.'
         },
         two: {
-          title: 'Доступно на разных устройствах',
-          body: 'Клавиатура, focus-visible и стабильный контраст в светлой и тёмной теме: на стойке, киоске и публичном табло.'
+          title: 'Один опыт на всех экранах',
+          body: 'Крупные зоны нажатия, устойчивый контраст в светлой и тёмной теме, удобная работа с клавиатуры там, где это нужно: стойка, киоск, публичное табло.'
         },
         three: {
-          title: 'Растёте вместе с сетью',
-          body: 'Новые точки, очереди и роли в одной модели администрирования: общие правила и отчёты, предсказуемые релизы, к которым можно готовиться.'
+          title: 'Сеть без второй «вселенной»',
+          body: 'Новые точки, очереди и роли в одной админке: общие правила, отчёты по сети и обновления с понятным графиком — без лишнего шума при росте.'
         }
       },
       stats: {
-        heading: 'Типовые сценарии, где продукт полезен',
-        industries: [
-          { label: 'Здравоохранение', icon: 'healthcare' },
-          { label: 'Госсектор', icon: 'publicSector' },
-          { label: 'Розница', icon: 'retail' },
-          { label: 'Услуги', icon: 'services' }
+        heading: 'Почему команды выбирают КвоккаКю',
+        facts: [
+          { label: 'Запуск за 2–3 часа', icon: 'clock' },
+          { label: '10+ готовых интеграций', icon: 'plug' },
+          { label: '2 языка интерфейса', icon: 'globe' },
+          { label: '14 дней бесплатно', icon: 'calendarDays' }
+        ],
+        liveOrganizationsLabel: 'Более {count} организаций на платформе'
+      },
+      integrations: {
+        heading: 'Интеграции и открытые протоколы',
+        subheading:
+          'CalDAV и OIDC / SAML — общепринятые способы подключить календари и единый вход; остальное — готовые связки с распространёнными внешними сервисами.',
+        items: [
+          { id: 'caldav', label: 'CalDAV' },
+          { id: 'oidcSaml', label: 'OIDC / SAML 2.0' },
+          { id: 'googleCalendar', label: 'Google Calendar' },
+          { id: 'twilio', label: 'Twilio' },
+          { id: 'smsRu', label: 'SMS.ru' },
+          { id: 'yooKassa', label: 'ЮKassa' }
         ]
       },
       howItWorks: {
@@ -657,35 +856,40 @@ export const messages: Record<
             title: 'Киоск регистрации',
             description:
               'Киоск самообслуживания с крупными сенсорными кнопками, чёткими категориями услуг и мгновенной печатью талонов. Мультиязычный интерфейс доступен для всех возрастов и уровней подготовки. Идеально подходит для мест с высоким трафиком: государственных учреждений, медицинских центров и точек обслуживания клиентов.',
-            image: '/kiosk.png',
+            image: '/kiosk.webp',
             imageAlt:
-              'Интерфейс киоска самообслуживания QuokkaQ с экраном выбора услуг и крупными кнопками для получения талонов'
+              'Интерфейс киоска самообслуживания КвоккаКю с экраном выбора услуг и крупными кнопками для получения талонов'
           },
           {
             title: 'Публичное табло',
             description:
               'Высококонтрастное цифровое табло очередей, видимое издалека. Показывает номера обслуживаемых талонов, оценку времени ожидания и статус очереди в реальном времени. Оптимизировано для телевизоров и цифровых вывесок в зонах ожидания.',
-            image: '/public_screen.png',
+            image: '/public_screen.webp',
             imageAlt:
-              'Публичное табло QuokkaQ, показывающее текущие обслуживаемые талоны с номерами, статусом и информацией об очереди на большом экране'
+              'Публичное табло КвоккаКю, показывающее текущие обслуживаемые талоны с номерами, статусом и информацией об очереди на большом экране'
           },
           {
             title: 'Панель персонала',
             description:
               'Эффективный интерфейс рабочего места сотрудника с клавиатурными сокращениями для вызова талонов, перевода между окнами и управления потоком очереди. Плотная компоновка информации для скорости и продуктивности в часы пик.',
-            image: '/desk.png',
+            image: '/desk.webp',
             imageAlt:
-              'Рабочая панель персонала QuokkaQ с управлением очередью талонов, элементами вызова и процессом обслуживания посетителей'
+              'Рабочая панель персонала КвоккаКю с управлением очередью талонов, элементами вызова и процессом обслуживания посетителей'
           },
           {
             title: 'Панель супервайзера',
             description:
               'Дашборд мониторинга и аналитики очередей для супервайзеров в реальном времени. Просмотр активных рабочих мест, метрик обслуживания, времени ожидания и эффективности персонала. Настройка услуг, управление несколькими точками и доступ к детальным отчётам.',
-            image: '/supervisor.png',
+            image: '/supervisor.webp',
             imageAlt:
-              'Панель супервайзера QuokkaQ с аналитикой очередей в реальном времени, мониторингом рабочих мест и административной панелью'
+              'Панель супервайзера КвоккаКю с аналитикой очередей в реальном времени, мониторингом рабочих мест и административной панелью'
           }
         ]
+      },
+      interfaceWalkthrough: {
+        playLabel: 'Смотреть обзор',
+        dialogTitle: 'Обзор продукта',
+        closeLabel: 'Закрыть'
       },
       useCases: {
         heading: 'Решения для каждой отрасли',
@@ -730,13 +934,50 @@ export const messages: Record<
           }
         ]
       },
+      comparison: {
+        heading: 'Привычный подход и КвоккаКю',
+        headingPrefix: 'Привычный подход и',
+        subheading: 'Наглядное сравнение с привычным способом вести очередь',
+        beforeColumn: 'Традиционный подход',
+        afterColumn: 'С КвоккаКю',
+        rows: [
+          {
+            before: 'Бумажные талоны и ручной учёт',
+            after: 'Цифровой киоск и автоматический учёт талонов'
+          },
+          {
+            before: 'Нет данных о времени ожидания',
+            after: 'Аналитика в реальном времени и контроль SLA'
+          },
+          {
+            before: 'Клиент не знает, когда его вызовут',
+            after: 'Табло, SMS по запросу и понятные ожидания'
+          },
+          {
+            before: 'Настройка занимает дни или недели',
+            after: 'Запуск за 2–3 часа у большинства команд'
+          },
+          {
+            before: 'Разные инструменты в разных филиалах',
+            after: 'Единая платформа для всей сети'
+          }
+        ]
+      },
+      bookDemo: {
+        heading: 'Запишитесь на живую демонстрацию',
+        body: 'Покажем систему под ваши задачи — около 30 минут, без обязательств.',
+        embedTitle: 'Запись через Cal.com',
+        openInNewTab: 'Открыть запись в новой вкладке',
+        embedFallback:
+          'Встроенное расписание не настроено на этом стенде. Напишите через форму контакта или откройте страницу записи, когда команда подключит Cal.com.'
+      },
       pricing: {
         heading: 'Простое, прозрачное ценообразование',
         subheading: 'Выберите план, подходящий вашим операциям',
         plans: [
           {
             name: 'Стартовый',
-            price: '$49',
+            price: '₽2 900',
             period: 'за точку/месяц',
             description:
               'Идеально для бизнеса с одной точкой, начинающего управление очередями',
@@ -751,7 +992,7 @@ export const messages: Record<
           },
           {
             name: 'Профессиональный',
-            price: '$149',
+            price: '₽9 900',
             period: 'за точку/месяц',
             description: 'Полнофункциональное решение для растущего бизнеса',
             features: [
@@ -829,6 +1070,35 @@ export const messages: Record<
           'Не удалось отправить. Попробуйте ещё раз или напишите нам на почту.',
         close: 'Закрыть'
       },
+      trust: {
+        heading: 'Безопасность и данные',
+        items: [
+          {
+            title:
+              'С GDPR разбираемся там, где он реально касается вашего проекта'
+          },
+          {
+            title:
+              'В типовых сценариях сервис крутится на инфраструктуре в России — привычно для локальных команд'
+          },
+          {
+            title:
+              'Для российских организаций в процессах заложено то, что от вас ждёт 152-ФЗ'
+          },
+          {
+            title:
+              'На тарифе Enterprise в договоре можно зафиксировать до 99,9% доступности'
+          },
+          {
+            title:
+              'Данные идут по защищённым каналам, а храним их так, чтобы спать спокойнее'
+          }
+        ]
+      },
+      stickyMobileCta: {
+        label: 'Начать бесплатно',
+        ariaLabel: 'Открыть регистрацию для пробного периода'
+      },
       faq: {
         heading: 'Часто задаваемые вопросы',
         items: [
@@ -870,7 +1140,27 @@ export const messages: Record<
           {
             question: 'Можем ли мы интегрироваться с существующими системами?',
             answer:
-              'У тарифов Professional и Enterprise есть API-доступ для интеграции с системами записи, CRM и другими бизнес-инструментами. Сейчас поддержаны далеко не все возможные сценарии — оставьте заявку через контакты на сайте или с менеджером, чтобы обсудить вашу задачу, что уже доступно и что потребует отдельной проработки.'
+              'API и более глубокие связки с системами записи, CRM и другими инструментами — по договорённости, без привязки к конкретному тарифу на сайте; далеко не каждый сценарий доступен «из коробки». Оставьте заявку через контакты на сайте или с менеджером — разберём, что уже можно подключить, а что потребует отдельной проработки.'
+          },
+          {
+            question: 'Соответствует ли продукт GDPR и 152-ФЗ?',
+            answer:
+              'Мы проектируем КвоккаКю с учётом приватности и региональных требований. В типовых развёртываниях данные обрабатываются на инфраструктуре в России с процессами под 152-ФЗ. Для клиентов из ЕС возможны варианты хостинга и настроек под GDPR — обсудите с командой. Подробности — в Политике конфиденциальности.'
+          },
+          {
+            question: 'Можно ли экспортировать данные?',
+            answer:
+              'Да — аналитика, отчёты и история талонов доступны для экспорта в CSV и PDF там, где это предусмотрено тарифом. После завершения подписки данные доступны в течение оговорённого периода; уточните детали у поддержки.'
+          },
+          {
+            question: 'Есть ли помощь с переходом с другой системы?',
+            answer:
+              'Да: импорт данных, настройка под ваши процессы и обучение команды — по договорённости, не как фиксированный пакет в тарифе. Объём и сроки зависят от того, что у вас уже стоит; опишите это в заявке — предложим вариант и шаги.'
+          },
+          {
+            question: 'Какие языки интерфейса поддерживаются?',
+            answer:
+              'Киоск и рабочие панели доступны на русском и английском. Дополнительные языки — по запросу и согласованию.'
           }
         ]
       },

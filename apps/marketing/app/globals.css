@@ -70,6 +70,30 @@
   }
 }
 
+@keyframes landing-integrations-marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.landing-integrations-marquee-track {
+  display: flex;
+  width: max-content;
+  align-items: center;
+  animation: landing-integrations-marquee 48s linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-integrations-marquee-track {
+    animation: none;
+  }
+}
+
 @keyframes landing-pricing-popular-shimmer-sweep {
   0% {
     left: -82%;

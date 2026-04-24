@@ -14,7 +14,7 @@ export function LandingFaq({ copy }: Props) {
   return (
     <section
       id='faq'
-      className='relative z-10 border-t border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)] py-20 sm:py-28'
+      className='relative z-10 bg-[color:var(--color-surface)] py-20 sm:py-28'
     >
       <div className='mx-auto max-w-3xl px-4 sm:px-6 lg:px-8'>
         <h2 className='font-display mb-12 text-center text-3xl font-bold tracking-tight text-[color:var(--color-text)] sm:mb-16 sm:text-4xl lg:text-5xl'>
