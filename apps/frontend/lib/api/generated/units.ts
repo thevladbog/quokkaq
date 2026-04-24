@@ -6897,6 +6897,135 @@ export const useUpdateSignagePlaylist = <TError = unknown,
       return useMutation(getUpdateSignagePlaylistMutationOptions(options), queryClient);
     }
 
+/**
+ * Unauthenticated read; same JSON as the authenticated [SignageHandler.GetPlaylist] when the playlist belongs to the path unit. Used to resolve a fixed attract playlist.
+ * @summary Get a playlist (public, for kiosk and display clients)
+ */
+export type getSignagePlaylistPublicResponse200 = {
+  data: ModelsPlaylist
+  status: 200
+}
+
+export type getSignagePlaylistPublicResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getSignagePlaylistPublicResponseSuccess = (getSignagePlaylistPublicResponse200) & {
+  headers: Headers;
+};
+export type getSignagePlaylistPublicResponseError = (getSignagePlaylistPublicResponse404) & {
+  headers: Headers;
+};
+
+export type getSignagePlaylistPublicResponse = (getSignagePlaylistPublicResponseSuccess | getSignagePlaylistPublicResponseError)
+
+export const getGetSignagePlaylistPublicUrl = (unitId: string,
+    playlistId: string,) => {
+
+
+
+
+  return `/units/${unitId}/playlists/${playlistId}/public`
+}
+
+export const getSignagePlaylistPublic = async (unitId: string,
+    playlistId: string, options?: RequestInit): Promise<getSignagePlaylistPublicResponse> => {
+
+  return orvalMutator<getSignagePlaylistPublicResponse>(getGetSignagePlaylistPublicUrl(unitId,playlistId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSignagePlaylistPublicQueryKey = (unitId: string,
+    playlistId: string,) => {
+    return [
+    `/units/${unitId}/playlists/${playlistId}/public`
+    ] as const;
+    }
+
+
+export const getGetSignagePlaylistPublicQueryOptions = <TData = Awaited<ReturnType<typeof getSignagePlaylistPublic>>, TError = string>(unitId: string,
+    playlistId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignagePlaylistPublic>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSignagePlaylistPublicQueryKey(unitId,playlistId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSignagePlaylistPublic>>> = ({ signal }) => getSignagePlaylistPublic(unitId,playlistId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId && playlistId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSignagePlaylistPublic>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetSignagePlaylistPublicQueryResult = NonNullable<Awaited<ReturnType<typeof getSignagePlaylistPublic>>>
+export type GetSignagePlaylistPublicQueryError = string
+
+
+export function useGetSignagePlaylistPublic<TData = Awaited<ReturnType<typeof getSignagePlaylistPublic>>, TError = string>(
+ unitId: string,
+    playlistId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignagePlaylistPublic>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSignagePlaylistPublic>>,
+          TError,
+          Awaited<ReturnType<typeof getSignagePlaylistPublic>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSignagePlaylistPublic<TData = Awaited<ReturnType<typeof getSignagePlaylistPublic>>, TError = string>(
+ unitId: string,
+    playlistId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignagePlaylistPublic>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSignagePlaylistPublic>>,
+          TError,
+          Awaited<ReturnType<typeof getSignagePlaylistPublic>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSignagePlaylistPublic<TData = Awaited<ReturnType<typeof getSignagePlaylistPublic>>, TError = string>(
+ unitId: string,
+    playlistId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignagePlaylistPublic>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get a playlist (public, for kiosk and display clients)
+ */
+
+export function useGetSignagePlaylistPublic<TData = Awaited<ReturnType<typeof getSignagePlaylistPublic>>, TError = string>(
+ unitId: string,
+    playlistId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignagePlaylistPublic>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetSignagePlaylistPublicQueryOptions(unitId,playlistId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export type listSignageAnnouncementsPublicResponse200 = {
   data: ModelsScreenAnnouncement[]
   status: 200
