@@ -29,7 +29,8 @@
       "@lexical/utils": "0.43.0"
     },
     "patchedDependencies": {
-      "next-themes@0.4.6": "patches/next-themes@0.4.6.patch"
+      "next-themes@0.4.6": "patches/next-themes@0.4.6.patch",
+      "eslint-plugin-react@7.37.5": "patches/eslint-plugin-react@7.37.5.patch"
     }
   },
   "scripts": {
@@ -38,7 +39,9 @@
   },
   "private": true,
   "sherif": {
-    "ignoreRule": ["packages-without-package-json"]
+    "ignoreRule": [
+      "packages-without-package-json"
+    ]
   },
   "devDependencies": {
     "@nx/js": "22.6.5",

@@ -69,7 +69,6 @@ export default function UnitPage({ params }: UnitPageProps) {
   useEffect(() => {
     const d = searchParams.get('display');
     if (d === 'materials' || d === 'look' || d === 'content') {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- URL should open the Display settings tab
       setActiveTab('display');
     }
   }, [searchParams]);
@@ -87,7 +86,7 @@ export default function UnitPage({ params }: UnitPageProps) {
   useEffect(() => {
     if (!unit) return;
     // Sync local form state when the loaded unit payload changes (e.g. refetch).
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset from server
+
     setUnitName(unit.name);
     setUnitNameEn(unit.nameEn ?? '');
     setUnitCode(unit.code);

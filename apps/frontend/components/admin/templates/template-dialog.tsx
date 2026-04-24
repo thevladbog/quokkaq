@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,13 @@ export default function TemplateDialog({
   const [isDefault, setIsDefault] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const resetForm = useCallback(() => {
+    setName('');
+    setSubject('');
+    setContent('');
+    setIsDefault(false);
+  }, []);
+
   useEffect(() => {
     if (template) {
       setName(template.name);
@@ -55,7 +62,7 @@ export default function TemplateDialog({
     } else {
       resetForm();
     }
-  }, [template, open]);
+  }, [template, open, resetForm]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,13 +108,6 @@ export default function TemplateDialog({
     } finally {
       setLoading(false);
     }
-  };
-
-  const resetForm = () => {
-    setName('');
-    setSubject('');
-    setContent('');
-    setIsDefault(false);
   };
 
   return (
