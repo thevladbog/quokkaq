@@ -16,7 +16,7 @@ export type BlogPostMeta = {
 
 export type BlogPost = BlogPostMeta & { body: string };
 
-const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function listSlugsForLocale(locale: AppLocale): string[] {
   const dir = join(BLOG_ROOT, locale);
@@ -25,7 +25,7 @@ function listSlugsForLocale(locale: AppLocale): string[] {
   }
   return readdirSync(dir)
     .filter((f) => f.endsWith('.md'))
-    .map((f) => f.replace(/\.md$/i, ''))
+    .map((f) => f.replace(/\.md$/, '').toLowerCase())
     .filter((slug) => SLUG_RE.test(slug));
 }
 
@@ -34,10 +34,11 @@ export function getBlogSlugs(locale: AppLocale): string[] {
 }
 
 export function getBlogPost(locale: AppLocale, slug: string): BlogPost | null {
-  if (!SLUG_RE.test(slug)) {
+  const slugNorm = slug.toLowerCase();
+  if (!SLUG_RE.test(slugNorm)) {
     return null;
   }
-  const file = join(BLOG_ROOT, locale, `${slug}.md`);
+  const file = join(BLOG_ROOT, locale, `${slugNorm}.md`);
   if (!existsSync(file)) {
     return null;
   }
@@ -51,7 +52,7 @@ export function getBlogPost(locale: AppLocale, slug: string): BlogPost | null {
     return null;
   }
   return {
-    slug,
+    slug: slugNorm,
     title: data.title,
     description: data.description,
     date: data.date,
@@ -74,5 +75,11 @@ export function getBlogPostsMeta(locale: AppLocale): BlogPostMeta[] {
       };
     })
     .filter((p): p is BlogPostMeta => p != null)
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    .sort((a, b) => {
+      const ta = Date.parse(a.date);
+      const tb = Date.parse(b.date);
+      const na = Number.isNaN(ta) ? 0 : ta;
+      const nb = Number.isNaN(tb) ? 0 : tb;
+      return nb - na;
+    });
 }

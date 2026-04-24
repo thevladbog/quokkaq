@@ -29,7 +29,7 @@
 
 **Ключевой факт:** экран — браузер, не Tauri. Sherpa-onnx нельзя запустить в браузере напрямую.
 Единственный способ получить хорошее качество голоса на экране — генерировать аудио на **бэкенде**
-и доставлять URL в WebSocket-событии `ticket.called`.
+и доставлять готовый URL на экран отдельным WebSocket-событием после генерации (см. контракт ниже).
 
 ---
 
@@ -37,26 +37,31 @@
 
 ### Основной путь — бэкенд-генерация (sherpa-onnx в Go)
 
-```
-ticket.called (бэкенд)
+```text
+ticket.called (бэкенд, сразу после смены статуса)
     │
-    ├─→ tts_service.go реализует:
-    │     1. prepareText("А-047", "окно 3") → "А ноль сорок семь, пройдите к окну три"
-    │     2. sherpa-onnx (CGO или subprocess) генерирует WAV
-    │     3. Upload в MinIO → URL = tts-{ticketId}.mp3
-    │     4. Запись в ticket.TTSUrl
+    ├─→ UI экрана обновляет талон (ttsUrl в payload может отсутствовать)
     │
-    └─→ WebSocket ticket.called payload включает ttsUrl: string
-            │
-            └─→ Экран (браузер) получает событие
-                    new Audio(ttsUrl).play()  ← тот же паттерн, что use-sla-alerts.ts
+    └─→ параллельно tts_service.go:
+          1. prepareText("А-047", "окно 3") → "А ноль сорок семь, пройдите к окну три"
+          2. sherpa-onnx (CGO или subprocess) генерирует WAV
+          3. Upload в MinIO → URL = tts-{ticketId}.mp3
+          4. Запись в ticket.TTSUrl
+          5. WebSocket ticket.tts_ready { ticketId, ttsUrl } (или эквивалентный payload)
+
+Экран (браузер) на ticket.tts_ready:
+    new Audio(ttsUrl).play()  ← тот же паттерн, что use-sla-alerts.ts
 ```
+
+**Контракт (зафиксировано в плане):** не блокировать вызов талона ожиданием TTS. Событие `ticket.called`
+отправляется сразу; когда аудио готово и `ticket.TTSUrl` записан — отдельное событие **`ticket.tts_ready`**
+с `ttsUrl` (и идентификатором талона). Экран подписывается на оба: отображение по `ticket.called`, воспроизведение по `ticket.tts_ready`. Если TTS отключён или не удался — `ticket.tts_ready` не шлём (или шлём с пустым `ttsUrl`), экран использует Web Speech API fallback.
 
 **Почему этот путь:**
 - `tts_service.go` и `TTSUrl` уже созданы — нужна только реализация
 - Единый источник истины: один качественный движок для всех экранов
 - Работает на любом устройстве с браузером (умный телевизор, планшет, ПК)
-- Аудио уже готово к воспроизведению к моменту вывода на экран (нет заметной задержки)
+- Вызов талона остаётся быстрым; задержка TTS переносится на `ticket.tts_ready` без блокировки UI
 
 **Go + sherpa-onnx:**
 - Go-биндинг: `github.com/k2-fsa/sherpa-onnx/go/sherpa_onnx` (официальный, Apache 2.0)
@@ -67,7 +72,7 @@ ticket.called (бэкенд)
 ### Резервный путь — Web Speech API на экране
 
 Для сред без настроенного TTS-сервиса на бэкенде (dev-среда, SaaS с отключённым TTS):
-- Если `ttsUrl` в событии пуст → экран пробует `window.speechSynthesis`
+- Если `ticket.tts_ready` не пришло или `ttsUrl` пуст → экран пробует `window.speechSynthesis`
 - Фильтрует `voice.lang === 'ru-RU' && voice.localService === true`
 - Если голоса нет — беззвучно (не блокирует отображение талона)
 
@@ -108,17 +113,16 @@ ticket.called (бэкенд)
 - Если `TTS_ENABLED=false` — silent mode (текущее поведение заглушки, без ошибок)
 - Генерировать WAV → конвертировать в MP3 (через `ffmpeg` subprocess или Go-библиотеку) → upload MinIO
 
-**3. Интеграция с ticket.called**
-- При вызове талона оператором (`PATCH /tickets/{id}/call`) — вызвать TTS async
-- URL записывается в `ticket.TTSUrl`, включается в WebSocket-payload `ticket.called`
+**3. Интеграция с WebSocket**
+- При вызове талона (`PATCH /tickets/{id}/call` / существующий путь `CallNext` и т.п.) — сразу broadcast `ticket.called` (как сейчас)
+- Параллельно запустить генерацию TTS; по завершении — запись `ticket.TTSUrl` и broadcast **`ticket.tts_ready`** с `ttsUrl` (не ждать TTS в HTTP-обработчике)
 
 ### Фронтенд (`apps/frontend/`)
 
 **4. Хук `useTicketAnnouncement`**
 - Файл: `hooks/use-ticket-announcement.ts`
-- Подписка на `onTicketCalled` из kiosk-lib socket
-- Если `event.ttsUrl` → `new Audio(ttsUrl).play()` (паттерн из `use-sla-alerts.ts`)
-- Fallback: если ttsUrl пуст → попытка `speechSynthesis` с `ru-RU` + `localService: true`
+- Подписка на `onTicketTtsReady` (новый) из kiosk-lib socket; при `ttsUrl` → `new Audio(ttsUrl).play()` (паттерн из `use-sla-alerts.ts`)
+- Опционально: при `ticket.called` без аудио — не играть; fallback на `speechSynthesis` только если за таймаут не пришёл `ticket.tts_ready` или `ttsUrl` пуст
 - Экспортирует `isAudioEnabled: boolean` для опционального UI-индикатора
 
 **5. Подключение к экрану**
@@ -142,7 +146,7 @@ ticket.called (бэкенд)
 | Web Speech API fallback (фронт) | Низкая | Независим, даёт быстрый результат |
 | `tts_service.go` с sherpa-onnx | Высокая | Требует CGO или subprocess setup |
 | `useTicketAnnouncement` хук | Низкая | Блокируется шагом 3 для primary path |
-| Обновление WebSocket payload | Низкая | Нужен для primary path |
+| Событие `ticket.tts_ready` + клиент | Низкая | Нужен для primary path (не блокировать `ticket.called`) |
 | Docker + скрипт модели | Средняя | Нужен для деплоя |
 
 **Быстрый старт (без sherpa-onnx):** шаги 2 + 4 + 5 дают Web Speech API fallback за ~2 часа.  

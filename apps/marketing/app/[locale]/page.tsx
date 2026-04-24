@@ -107,6 +107,7 @@ export default async function HomePage({ params }: PageProps) {
         />
         <LandingUseCases copy={t.home} />
         <LandingTestimonials
+          locale={raw}
           items={marketingTestimonialItems}
           heading={t.home.testimonials.heading}
         />

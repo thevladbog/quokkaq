@@ -44,7 +44,7 @@
 | Сравнение подходов | До vs QuokkaQ | Готово |
 | Book a Demo + Cal.com | Embed | Готово; при деплое с жёстким CSP см. README (`frame-src`) |
 | Fallback цен RUB | Согласованность с API | Готово |
-| OG preview | 1200×630 | В работа: кламп длины description в `opengraph-image` |
+| OG preview | 1200×630 | В работе: кламп длины description в `opengraph-image` |
 | WebP/AVIF, LCP | Оптимизация изображений | Готово для showcase; периодический аудит Lighthouse |
 | Блог / ресурсы | SEO, nurture | Готово (инфра + стартовые посты); наполнение — итеративно |
 | ROI-калькулятор | Оценка эффекта для B2B | Готово (`/roi`, дисклеймер) |

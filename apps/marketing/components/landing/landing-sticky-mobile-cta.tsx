@@ -75,28 +75,30 @@ export function LandingStickyMobileCta({ locale, copy, appBaseUrl }: Props) {
       }`}
       aria-hidden={!visible}
     >
-      <div className='mx-auto max-w-md rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]/95 p-2 shadow-lg backdrop-blur-md'>
-        {signupHref ? (
-          <a
-            href={signupHref}
-            target='_blank'
-            rel='noopener noreferrer'
-            className={ctaClass}
-            aria-label={copy.stickyMobileCta.ariaLabel}
-          >
-            {copy.stickyMobileCta.label}
-          </a>
-        ) : (
-          <Link
-            href={`${localeHomePath(locale)}#pricing`}
-            prefetch={false}
-            className={ctaClass}
-            aria-label={copy.stickyMobileCta.ariaLabel}
-          >
-            {copy.stickyMobileCta.label}
-          </Link>
-        )}
-      </div>
+      {visible ? (
+        <div className='mx-auto max-w-md rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]/95 p-2 shadow-lg backdrop-blur-md'>
+          {signupHref ? (
+            <a
+              href={signupHref}
+              target='_blank'
+              rel='noopener noreferrer'
+              className={ctaClass}
+              aria-label={copy.stickyMobileCta.ariaLabel}
+            >
+              {copy.stickyMobileCta.label}
+            </a>
+          ) : (
+            <Link
+              href={`${localeHomePath(locale)}#pricing`}
+              prefetch={false}
+              className={ctaClass}
+              aria-label={copy.stickyMobileCta.ariaLabel}
+            >
+              {copy.stickyMobileCta.label}
+            </Link>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,7 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
-
 import { LeadRequestCta } from '@/components/landing/lead-request-cta';
 import type { AppLocale, HomeMessages } from '@/src/messages';
 
@@ -37,7 +35,7 @@ function resolveCalEmbedSrc(): string | null {
 }
 
 export function LandingBookDemo({ locale, copy, appBaseUrl }: Props) {
-  const embedSrc = useMemo(() => resolveCalEmbedSrc(), []);
+  const embedSrc = resolveCalEmbedSrc();
   const bd = copy.bookDemo;
 
   return (
@@ -63,8 +61,10 @@ export function LandingBookDemo({ locale, copy, appBaseUrl }: Props) {
               <iframe
                 title={bd.embedTitle}
                 src={embedSrc}
+                loading='lazy'
+                referrerPolicy='strict-origin-when-cross-origin'
                 className='block min-h-[38rem] w-full rounded-xl bg-white sm:min-h-[40rem]'
-                allow='camera; microphone; fullscreen; payment'
+                allow='camera; microphone; fullscreen'
               />
             </div>
             <p className='text-center'>

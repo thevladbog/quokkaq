@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	"quokkaq-go-backend/internal/models"
@@ -11,8 +12,10 @@ import (
 
 // PublicMarketingStatsResponse is JSON for GET /public/marketing-stats.
 type PublicMarketingStatsResponse struct {
-	ActiveCompanies  int64 `json:"activeCompanies"`
-	ActiveHumanUsers int64 `json:"activeHumanUsers"`
+	// ActiveCompanies counts tenant companies excluding the SaaS operator row (snapshot at request time).
+	ActiveCompanies int64 `json:"activeCompanies" binding:"required" minimum:"0" example:"42" format:"int64"`
+	// ActiveHumanUsers counts active human user accounts across tenants (snapshot at request time).
+	ActiveHumanUsers int64 `json:"activeHumanUsers" binding:"required" minimum:"0" example:"12" format:"int64"`
 }
 
 // MarketingStatsHandler exposes coarse public counts for the marketing site.
@@ -29,9 +32,10 @@ func NewMarketingStatsHandler(db *gorm.DB) *MarketingStatsHandler {
 // @ID           getPublicMarketingStats
 // @Summary      Public marketing aggregate counts
 // @Description  Returns non-sensitive counts for the public marketing landing (tenant companies excluding the SaaS operator row, and active human users). Cached briefly via HTTP headers.
-// @Tags         subscriptions
+// @Tags         marketing
 // @Produce      json
 // @Success      200  {object}  PublicMarketingStatsResponse
+// @Header       200  {string}  Cache-Control  "Short-lived public cache for this JSON response (e.g. `public, max-age=300`)."
 // @Failure      500  {string}  string  "Internal server error"
 // @Router       /public/marketing-stats [get]
 func (h *MarketingStatsHandler) GetPublicMarketingStats(w http.ResponseWriter, r *http.Request) {
@@ -66,6 +70,6 @@ func (h *MarketingStatsHandler) GetPublicMarketingStats(w http.ResponseWriter, r
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(true)
 	if err := enc.Encode(resp); err != nil {
-		_ = err
+		slog.Error("GetPublicMarketingStats: failed to encode JSON response", "err", err)
 	}
 }

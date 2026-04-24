@@ -86,6 +86,8 @@ export default async function BlogPostPage({ params }: PageProps) {
     month: 'long',
     day: 'numeric'
   });
+  const publishedAt = new Date(post.date);
+  const dateOk = !Number.isNaN(publishedAt.getTime());
 
   return (
     <div className='landing-page flex min-h-dvh flex-col'>
@@ -102,9 +104,11 @@ export default async function BlogPostPage({ params }: PageProps) {
           <header className='mt-8'>
             <p className='text-xs font-medium tracking-wide text-[color:var(--color-text-muted)] uppercase'>
               {t.blog.publishedPrefix}{' '}
-              <time dateTime={post.date}>
-                {dateFmt.format(new Date(post.date))}
-              </time>
+              {dateOk ? (
+                <time dateTime={post.date}>{dateFmt.format(publishedAt)}</time>
+              ) : (
+                <span>{t.blog.postDateUnavailable}</span>
+              )}
             </p>
             <h1 className='font-display mt-3 text-4xl font-bold tracking-tight text-[color:var(--color-text)]'>
               {post.title}

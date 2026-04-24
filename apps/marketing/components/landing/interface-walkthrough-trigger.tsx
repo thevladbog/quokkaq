@@ -59,7 +59,7 @@ export function InterfaceWalkthroughTrigger({
     const focusables = () =>
       Array.from(
         panel.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), iframe[tabindex="0"]'
+          'button:not([disabled]), iframe[tabindex="0"], [data-walkthrough-focus-loop-end]'
         )
       );
     const onKeyDown = (e: KeyboardEvent) => {
@@ -151,6 +151,17 @@ export function InterfaceWalkthroughTrigger({
                 className='aspect-video h-auto min-h-[12rem] w-full sm:min-h-[20rem]'
                 allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen'
                 allowFullScreen
+              />
+              {/* Tab from cross-origin iframe does not bubble here — sentinel returns focus to the dialog. */}
+              <div
+                tabIndex={0}
+                data-walkthrough-focus-loop-end
+                className='h-px w-px overflow-hidden opacity-0'
+                aria-hidden
+                onFocus={(e) => {
+                  e.preventDefault();
+                  closeBtnRef.current?.focus();
+                }}
               />
             </div>
           </div>

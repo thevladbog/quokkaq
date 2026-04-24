@@ -29,7 +29,8 @@ export function localeBlogPostPath(
   locale: AppLocale,
   slug: string
 ): `/en/blog/${string}` | `/ru/blog/${string}` {
-  return locale === 'ru' ? `/ru/blog/${slug}` : `/en/blog/${slug}`;
+  const enc = encodeURIComponent(slug);
+  return locale === 'ru' ? `/ru/blog/${enc}` : `/en/blog/${enc}`;
 }
 
 export function localeRoiPath(locale: AppLocale): '/en/roi' | '/ru/roi' {

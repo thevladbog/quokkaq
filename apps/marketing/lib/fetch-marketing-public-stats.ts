@@ -19,7 +19,11 @@ export async function fetchMarketingPublicStats(): Promise<HandlersPublicMarketi
       return null;
     }
     return res.data;
-  } catch {
+  } catch (err: unknown) {
+    const name = err instanceof Error ? err.name : '';
+    if (name !== 'AbortError') {
+      console.warn('[fetchMarketingPublicStats] request failed', err);
+    }
     return null;
   }
 }

@@ -1047,9 +1047,20 @@ components:
         handlers.PublicMarketingStatsResponse:
             properties:
                 activeCompanies:
+                    description: ActiveCompanies counts tenant companies excluding the SaaS operator row (snapshot at request time).
+                    example: 42
+                    format: int64
+                    minimum: 0
                     type: integer
                 activeHumanUsers:
+                    description: ActiveHumanUsers counts active human user accounts across tenants (snapshot at request time).
+                    example: 12
+                    format: int64
+                    minimum: 0
                     type: integer
+            required:
+                - activeCompanies
+                - activeHumanUsers
             type: object
         handlers.QuotaExceededError:
             properties:
@@ -10393,6 +10404,11 @@ paths:
                             schema:
                                 $ref: '#/components/schemas/handlers.PublicMarketingStatsResponse'
                     description: OK
+                    headers:
+                        Cache-Control:
+                            description: Short-lived public cache for this JSON response (e.g. `public, max-age=300`).
+                            schema:
+                                type: string
                 "500":
                     content:
                         application/json:
@@ -10401,7 +10417,7 @@ paths:
                     description: Internal server error
             summary: Public marketing aggregate counts
             tags:
-                - subscriptions
+                - marketing
     /public/tenants/{slug}:
         get:
             operationId: publicTenantBySlug

@@ -2,7 +2,7 @@
 
 import { X } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { parseConsentFromRawCookieHeader } from '@/lib/cookie-consent';
 import { localeHomePath } from '@/lib/locale-paths';
@@ -26,6 +26,8 @@ export function LandingExitIntent({ locale, copy }: Props) {
   const gtmId = getGtmId();
   const titleId = useId();
   const [open, setOpen] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -57,9 +59,6 @@ export function LandingExitIntent({ locale, copy }: Props) {
         return;
       }
       try {
-        if (sessionStorage.getItem(SESSION_KEY)) {
-          return;
-        }
         sessionStorage.setItem(SESSION_KEY, '1');
       } catch {
         return;
@@ -87,6 +86,55 @@ export function LandingExitIntent({ locale, copy }: Props) {
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const dialog = dialogRef.current;
+    if (!dialog) {
+      return;
+    }
+
+    const focusables = () =>
+      Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => !el.hasAttribute('disabled'));
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+        return;
+      }
+      if (e.key !== 'Tab') {
+        return;
+      }
+      const list = focusables();
+      if (list.length === 0) {
+        return;
+      }
+      const first = list[0];
+      const last = list[list.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown, true);
+    const id = requestAnimationFrame(() => closeBtnRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(id);
+      document.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, [open, close]);
+
   if (!open) {
     return null;
   }
@@ -101,6 +149,7 @@ export function LandingExitIntent({ locale, copy }: Props) {
       onClick={close}
     >
       <div
+        ref={dialogRef}
         role='dialog'
         aria-modal
         aria-labelledby={titleId}
@@ -108,6 +157,7 @@ export function LandingExitIntent({ locale, copy }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <button
+          ref={closeBtnRef}
           type='button'
           onClick={close}
           aria-label={copy.closeAriaLabel}

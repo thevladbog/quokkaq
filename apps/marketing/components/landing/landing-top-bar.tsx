@@ -169,7 +169,7 @@ function TopBarCompactNav({
     if (!moreOpen) {
       return;
     }
-    const onDoc = (e: MouseEvent) => {
+    const onDoc = (e: Event) => {
       const t = e.target as Node;
       if (panelRef.current?.contains(t) || moreWrapRef.current?.contains(t)) {
         return;
@@ -177,7 +177,11 @@ function TopBarCompactNav({
       setMoreOpen(false);
     };
     document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    document.addEventListener('pointerdown', onDoc);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('pointerdown', onDoc);
+    };
   }, [moreOpen]);
 
   useEffect(() => {
@@ -213,7 +217,7 @@ function TopBarCompactNav({
         className='flex min-h-10 w-full max-w-full min-w-0 flex-1 justify-end'
       >
         <div
-          className='pointer-events-none fixed top-0 left-0 -z-10 flex gap-2 opacity-0'
+          className='pointer-events-none fixed top-0 inset-inline-start-0 -z-10 flex w-max max-w-none gap-2 whitespace-nowrap opacity-0'
           aria-hidden
         >
           {items.map((item, i) => (

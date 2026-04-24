@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { Fragment } from 'react';
 
 import { localeHomePath } from '@/lib/locale-paths';
 import type { AppLocale, HomeMessages } from '@/src/messages';
@@ -31,6 +32,7 @@ export function LandingHero({ locale, copy, appBaseUrl }: Props) {
     ? `${normalizedAppBase}/${locale}/signup`
     : null;
   return (
+    <Fragment>
     <section className='relative z-10 mx-auto grid max-w-7xl grid-cols-1 content-center gap-8 px-4 py-8 sm:gap-10 sm:px-6 sm:py-10 lg:min-h-[calc(100dvh-5.25rem)] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-center lg:gap-12 lg:px-8 lg:py-6'>
       <LandingTicketsAnimation locale={locale} />
 
@@ -163,11 +165,12 @@ export function LandingHero({ locale, copy, appBaseUrl }: Props) {
           </div>
         </div>
       </div>
-      <div
-        id='landing-hero-sticky-sentinel'
-        className='col-span-full h-px w-full shrink-0'
-        aria-hidden
-      />
     </section>
+    <div
+      id='landing-hero-sticky-sentinel'
+      className='mx-auto h-px w-full max-w-7xl shrink-0 px-4 sm:px-6 lg:px-8'
+      aria-hidden
+    />
+    </Fragment>
   );
 }

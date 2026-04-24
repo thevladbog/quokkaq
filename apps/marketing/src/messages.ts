@@ -71,8 +71,6 @@ export type HomeMessages = {
     moreNav: string;
     /** `aria-label` for the overflow dropdown listbox. */
     moreNavMenuAriaLabel: string;
-    openMenu: string;
-    closeMenu: string;
   };
   pillarsHeading: string;
   pillars: {
@@ -284,6 +282,8 @@ export type BlogMessages = {
   publishedPrefix: string;
   listEmpty: string;
   postBackToBlog: string;
+  /** Shown when post frontmatter date is missing or not parseable. */
+  postDateUnavailable: string;
   postNotFoundTitle: string;
   postNotFoundBody: string;
 };
@@ -365,9 +365,7 @@ export const messages: Record<
         bookDemo: 'Book demo',
         primaryCta: 'Start free trial',
         moreNav: 'More',
-        moreNavMenuAriaLabel: 'Additional sections',
-        openMenu: 'Open menu',
-        closeMenu: 'Close menu'
+        moreNavMenuAriaLabel: 'Additional sections'
       },
       pillarsHeading: 'Why day-to-day work is easier with QuokkaQ',
       pillars: {
@@ -805,6 +803,7 @@ export const messages: Record<
       publishedPrefix: 'Published',
       listEmpty: 'No articles yet.',
       postBackToBlog: 'Back to blog',
+      postDateUnavailable: 'Date unavailable',
       postNotFoundTitle: 'Article not found',
       postNotFoundBody: 'This slug does not exist or was removed.'
     },
@@ -887,9 +886,7 @@ export const messages: Record<
         bookDemo: 'Запись на демо',
         primaryCta: 'Начать пробный период',
         moreNav: 'Ещё',
-        moreNavMenuAriaLabel: 'Дополнительные разделы',
-        openMenu: 'Открыть меню',
-        closeMenu: 'Закрыть меню'
+        moreNavMenuAriaLabel: 'Дополнительные разделы'
       },
       pillarsHeading: 'Почему с КвоккаКю проще в повседневной работе',
       pillars: {
@@ -1327,6 +1324,7 @@ export const messages: Record<
       publishedPrefix: 'Опубликовано',
       listEmpty: 'Пока нет статей.',
       postBackToBlog: 'К списку статей',
+      postDateUnavailable: 'Дата недоступна',
       postNotFoundTitle: 'Статья не найдена',
       postNotFoundBody: 'Такого адреса нет или материал снят с публикации.'
     },

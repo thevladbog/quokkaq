@@ -29,8 +29,8 @@ export function LandingCtaAssurances({ copy, variant }: Props) {
 
   return (
     <ul
-      className={`mt-4 flex flex-wrap items-center justify-start gap-x-4 gap-y-2 sm:mt-5 sm:gap-x-6 ${
-        variant === 'footer' ? 'justify-center md:justify-center' : ''
+      className={`mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 sm:mt-5 sm:gap-x-6 ${
+        variant === 'footer' ? 'justify-center' : 'justify-start'
       }`}
       aria-label={copy.ctaAssurancesAriaLabel}
     >

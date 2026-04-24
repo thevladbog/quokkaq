@@ -19,7 +19,7 @@ export default defineConfig({
       target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
-        tags: ['subscriptions']
+        tags: ['subscriptions', 'marketing']
       }
     },
     output: {
