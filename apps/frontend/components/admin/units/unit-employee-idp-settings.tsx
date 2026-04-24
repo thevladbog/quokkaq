@@ -76,7 +76,7 @@ export function UnitEmployeeIdpSettings({ unitId }: Props) {
     if (!data) {
       return;
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync form from server IdP DTO on load/refetch
+
     setEnabled(data.enabled);
     setHttpMethod(data.httpMethod || 'POST');
     setUpstreamUrl(data.upstreamUrl || '');

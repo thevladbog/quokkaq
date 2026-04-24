@@ -237,6 +237,33 @@ export default function TicketPage() {
     }
   };
 
+  const displayEtaSecondsForProgress =
+    ticket != null
+      ? (liveEta?.seconds ?? ticket.estimatedWaitSeconds ?? null)
+      : null;
+
+  const [etaProgressPct, setEtaProgressPct] = useState(0);
+
+  useEffect(() => {
+    if (
+      !ticket ||
+      ticket.status !== 'waiting' ||
+      displayEtaSecondsForProgress == null ||
+      displayEtaSecondsForProgress <= 0
+    ) {
+      setEtaProgressPct(0);
+      return;
+    }
+    const max = Math.max(
+      etaMaxRef.current ?? 0,
+      displayEtaSecondsForProgress,
+      60
+    );
+    setEtaProgressPct(
+      Math.min(100, Math.round((displayEtaSecondsForProgress / max) * 100))
+    );
+  }, [ticket, displayEtaSecondsForProgress]);
+
   if (error) {
     return (
       <div className='flex min-h-screen items-center justify-center'>
@@ -270,15 +297,6 @@ export default function TicketPage() {
   const displayPosition = liveEta?.position ?? ticket.queuePosition;
   const displayEtaSeconds =
     liveEta?.seconds ?? ticket.estimatedWaitSeconds ?? null;
-  const etaProgressPct =
-    ticket.status === 'waiting' &&
-    displayEtaSeconds != null &&
-    displayEtaSeconds > 0
-      ? (() => {
-          const max = Math.max(etaMaxRef.current ?? 0, displayEtaSeconds, 60);
-          return Math.min(100, Math.round((displayEtaSeconds / max) * 100));
-        })()
-      : 0;
 
   return (
     <div className='bg-background flex min-h-screen items-center justify-center p-4'>

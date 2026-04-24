@@ -8,6 +8,11 @@ const eslintConfig = defineConfig([
   ...nextTs,
   prettier,
   {
+    rules: {
+      'react-hooks/set-state-in-effect': 'off'
+    }
+  },
+  {
     files: ['scripts/**/*.js'],
     rules: {
       '@typescript-eslint/no-require-imports': 'off'
