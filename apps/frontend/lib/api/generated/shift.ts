@@ -1028,8 +1028,16 @@ export interface HandlersPublicLeadRequestBody {
 }
 
 export interface HandlersPublicMarketingStatsResponse {
-  activeCompanies?: number;
-  activeHumanUsers?: number;
+  /**
+     * ActiveCompanies counts tenant companies excluding the SaaS operator row (snapshot at request time).
+     * @minimum 0
+     */
+  activeCompanies: number;
+  /**
+     * ActiveHumanUsers counts active human user accounts across tenants (snapshot at request time).
+     * @minimum 0
+     */
+  activeHumanUsers: number;
 }
 
 /**

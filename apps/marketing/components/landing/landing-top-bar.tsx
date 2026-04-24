@@ -217,7 +217,7 @@ function TopBarCompactNav({
         className='flex min-h-10 w-full max-w-full min-w-0 flex-1 justify-end'
       >
         <div
-          className='pointer-events-none fixed top-0 inset-inline-start-0 -z-10 flex w-max max-w-none gap-2 whitespace-nowrap opacity-0'
+          className='inset-inline-start-0 pointer-events-none fixed top-0 -z-10 flex w-max max-w-none gap-2 whitespace-nowrap opacity-0'
           aria-hidden
         >
           {items.map((item, i) => (

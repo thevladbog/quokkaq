@@ -68,11 +68,11 @@ export function LandingComparison({ copy, locale }: Props) {
               </div>
             </div>
             <ul className='divide-y divide-[color:var(--color-border)]'>
-            {copy.rows.map((row, idx) => (
-              <li
-                key={`comparison-row-${idx}`}
-                className='grid grid-cols-1 md:grid-cols-2 md:divide-x md:divide-[color:var(--color-border)]'
-              >
+              {copy.rows.map((row, idx) => (
+                <li
+                  key={`comparison-row-${idx}`}
+                  className='grid grid-cols-1 md:grid-cols-2 md:divide-x md:divide-[color:var(--color-border)]'
+                >
                   <div className='bg-[color:var(--color-surface)]/90 px-5 py-5 text-[15px] leading-relaxed text-[color:var(--color-text-muted)] sm:px-7 sm:text-base dark:bg-[color:var(--color-surface)]/70'>
                     {row.before}
                   </div>

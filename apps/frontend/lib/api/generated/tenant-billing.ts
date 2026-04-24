@@ -1028,8 +1028,16 @@ export interface HandlersPublicLeadRequestBody {
 }
 
 export interface HandlersPublicMarketingStatsResponse {
-  activeCompanies?: number;
-  activeHumanUsers?: number;
+  /**
+     * ActiveCompanies counts tenant companies excluding the SaaS operator row (snapshot at request time).
+     * @minimum 0
+     */
+  activeCompanies: number;
+  /**
+     * ActiveHumanUsers counts active human user accounts across tenants (snapshot at request time).
+     * @minimum 0
+     */
+  activeHumanUsers: number;
 }
 
 /**
@@ -3743,127 +3751,6 @@ export const usePostInvoicesIdYookassaPaymentLink = <TError = string,
       > => {
       return useMutation(getPostInvoicesIdYookassaPaymentLinkMutationOptions(options), queryClient);
     }
-
-/**
- * Returns non-sensitive counts for the public marketing landing (tenant companies excluding the SaaS operator row, and active human users). Cached briefly via HTTP headers.
- * @summary Public marketing aggregate counts
- */
-export type getPublicMarketingStatsResponse200 = {
-  data: HandlersPublicMarketingStatsResponse
-  status: 200
-}
-
-export type getPublicMarketingStatsResponse500 = {
-  data: string
-  status: 500
-}
-
-export type getPublicMarketingStatsResponseSuccess = (getPublicMarketingStatsResponse200) & {
-  headers: Headers;
-};
-export type getPublicMarketingStatsResponseError = (getPublicMarketingStatsResponse500) & {
-  headers: Headers;
-};
-
-export type getPublicMarketingStatsResponse = (getPublicMarketingStatsResponseSuccess | getPublicMarketingStatsResponseError)
-
-export const getGetPublicMarketingStatsUrl = () => {
-
-
-
-
-  return `/public/marketing-stats`
-}
-
-export const getPublicMarketingStats = async ( options?: RequestInit): Promise<getPublicMarketingStatsResponse> => {
-
-  return orvalMutator<getPublicMarketingStatsResponse>(getGetPublicMarketingStatsUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetPublicMarketingStatsQueryKey = () => {
-    return [
-    `/public/marketing-stats`
-    ] as const;
-    }
-
-
-export const getGetPublicMarketingStatsQueryOptions = <TData = Awaited<ReturnType<typeof getPublicMarketingStats>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPublicMarketingStats>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetPublicMarketingStatsQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicMarketingStats>>> = ({ signal }) => getPublicMarketingStats({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicMarketingStats>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetPublicMarketingStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicMarketingStats>>>
-export type GetPublicMarketingStatsQueryError = string
-
-
-export function useGetPublicMarketingStats<TData = Awaited<ReturnType<typeof getPublicMarketingStats>>, TError = string>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPublicMarketingStats>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getPublicMarketingStats>>,
-          TError,
-          Awaited<ReturnType<typeof getPublicMarketingStats>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPublicMarketingStats<TData = Awaited<ReturnType<typeof getPublicMarketingStats>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPublicMarketingStats>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getPublicMarketingStats>>,
-          TError,
-          Awaited<ReturnType<typeof getPublicMarketingStats>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPublicMarketingStats<TData = Awaited<ReturnType<typeof getPublicMarketingStats>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPublicMarketingStats>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Public marketing aggregate counts
- */
-
-export function useGetPublicMarketingStats<TData = Awaited<ReturnType<typeof getPublicMarketingStats>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPublicMarketingStats>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetPublicMarketingStatsQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
 
 /**
  * Creates a checkout session for subscription upgrade
