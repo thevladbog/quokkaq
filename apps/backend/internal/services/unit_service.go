@@ -133,6 +133,46 @@ func (s *unitService) validateHierarchy(unitID, companyID string, parentID *stri
 	return nil
 }
 
+// mergeDefaultKioskServiceGridLayoutAuto sets config.kiosk.serviceGridLayout to "auto" when missing
+// so new units get automatic kiosk layout unless the client explicitly set another value.
+func mergeDefaultKioskServiceGridLayoutAuto(config json.RawMessage) json.RawMessage {
+	if len(config) == 0 {
+		return json.RawMessage(`{"kiosk":{"serviceGridLayout":"auto"}}`)
+	}
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(config, &m); err != nil {
+		return config
+	}
+	rawK, hasK := m["kiosk"]
+	if !hasK || len(rawK) == 0 || string(rawK) == "null" {
+		m["kiosk"] = json.RawMessage(`{"serviceGridLayout":"auto"}`)
+		out, err := json.Marshal(m)
+		if err != nil {
+			return config
+		}
+		return out
+	}
+	var k map[string]interface{}
+	if err := json.Unmarshal(rawK, &k); err != nil {
+		return config
+	}
+	if k == nil {
+		m["kiosk"] = json.RawMessage(`{"serviceGridLayout":"auto"}`)
+	} else if _, ok := k["serviceGridLayout"]; !ok {
+		k["serviceGridLayout"] = "auto"
+		kb, err := json.Marshal(k)
+		if err != nil {
+			return config
+		}
+		m["kiosk"] = json.RawMessage(kb)
+	}
+	out, err := json.Marshal(m)
+	if err != nil {
+		return config
+	}
+	return out
+}
+
 func (s *unitService) CreateUnit(unit *models.Unit) error {
 	if unit.CompanyID == "" {
 		count, err := s.repo.Count()
@@ -163,6 +203,8 @@ func (s *unitService) CreateUnit(unit *models.Unit) error {
 	if err := s.validateHierarchy("", unit.CompanyID, unit.ParentID); err != nil {
 		return err
 	}
+
+	unit.Config = mergeDefaultKioskServiceGridLayoutAuto(unit.Config)
 
 	// Enforce quota limits when quota service is available.
 	if s.quota != nil {

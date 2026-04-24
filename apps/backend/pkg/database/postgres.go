@@ -2724,6 +2724,28 @@ WHERE code = 'starter' AND (features->>'kiosk_employee_idp') IS NULL;`).Error; e
 		return fmt.Errorf("failed to run v1.8.12_employee_idp_and_identification_mode migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.8.13_services_sort_order", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE services
+			ADD COLUMN IF NOT EXISTS sort_order integer NOT NULL DEFAULT 0;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.AutoMigrate(&dbmodels.Service{}); err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			CREATE INDEX IF NOT EXISTS idx_services_unit_sort
+			ON services (unit_id, sort_order, name);
+		`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.13_services_sort_order migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

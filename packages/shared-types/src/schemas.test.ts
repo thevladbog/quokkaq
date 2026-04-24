@@ -5,6 +5,7 @@ import {
   DesktopTerminalSchema,
   effectiveDesktopTerminalKind,
   KioskConfigSchema,
+  KioskTauriLocalDeviceV1Schema,
   TicketModelSchema,
   UnitKindSchema,
   UserModelSchema
@@ -147,11 +148,26 @@ describe('KioskConfigSchema', () => {
     expect(r.success).toBe(true);
   });
 
-  it('accepts isAlwaysPrintTicket for kiosk', () => {
-    const r = KioskConfigSchema.safeParse({ isAlwaysPrintTicket: false });
+  it('passthrough keeps legacy print keys in parsed kiosk (migration)', () => {
+    const r = KioskConfigSchema.safeParse({ printerIp: '192.168.0.1' });
     expect(r.success).toBe(true);
     if (r.success) {
-      expect(r.data.isAlwaysPrintTicket).toBe(false);
+      expect((r.data as { printerIp?: string }).printerIp).toBe('192.168.0.1');
+    }
+  });
+
+  it('parses KioskTauriLocalDeviceV1', () => {
+    const r = KioskTauriLocalDeviceV1Schema.safeParse({
+      v: 1,
+      unitId: 'u1',
+      printerIp: '10.0.0.1',
+      isPrintEnabled: true
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.v).toBe(1);
+      expect(r.data.unitId).toBe('u1');
+      expect(r.data.printerIp).toBe('10.0.0.1');
     }
   });
 
@@ -201,6 +217,20 @@ describe('KioskConfigSchema', () => {
       expect(r.data.kioskAttractSignageMode).toBe('playlist');
       expect(r.data.kioskAttractSlideDurationSec).toBe(8);
     }
+  });
+
+  it('accepts serviceGridLayout manual | auto', () => {
+    expect(
+      KioskConfigSchema.safeParse({ serviceGridLayout: 'manual' }).success
+    ).toBe(true);
+    const r = KioskConfigSchema.safeParse({ serviceGridLayout: 'auto' });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.serviceGridLayout).toBe('auto');
+    }
+    expect(
+      KioskConfigSchema.safeParse({ serviceGridLayout: 'grid' }).success
+    ).toBe(false);
   });
 });
 

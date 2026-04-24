@@ -601,6 +601,7 @@ function buildInitialFormValues(
       restrictedServiceZoneId: editingService.restrictedServiceZoneId ?? null,
       calendarSlotKey: editingService.calendarSlotKey ?? '',
       numberSequence: editingService.numberSequence ?? undefined,
+      sortOrder: editingService.sortOrder ?? 0,
       gridRow: editingService.gridRow ?? undefined,
       gridCol: editingService.gridCol ?? undefined,
       gridRowSpan: editingService.gridRowSpan ?? undefined,
@@ -655,7 +656,8 @@ function snapshotServiceFormValues(v: Partial<Service>): string {
     isLeaf: !!v.isLeaf,
     parentId: v.parentId ?? '',
     restrictedServiceZoneId: v.restrictedServiceZoneId ?? null,
-    calendarSlotKey: v.calendarSlotKey ?? ''
+    calendarSlotKey: v.calendarSlotKey ?? '',
+    sortOrder: v.sortOrder ?? 0
   });
 }
 
@@ -807,14 +809,17 @@ function ServiceForm({
         await updateServiceMutation.mutateAsync({
           id: editingService.id,
           ...payloadBase,
+          sortOrder: formValues.sortOrder ?? 0,
           prebook: formValues.prebook ?? editingService.prebook ?? false,
           identificationMode: idMode,
           offerIdentification: offerIdent,
           isLeaf: formValues.isLeaf ?? editingService.isLeaf ?? false
         });
       } else {
+        const { sortOrder: _omitSort, ...createPayload } = payloadBase;
+        void _omitSort;
         await createServiceMutation.mutateAsync({
-          ...payloadBase,
+          ...createPayload,
           unitId: selectedUnitId
         });
       }
@@ -1406,6 +1411,35 @@ function ServiceForm({
           </Label>
         </div>
       </div>
+
+      {editingService ? (
+        <div className='space-y-2'>
+          <Label htmlFor='service-sort-order'>
+            {tServices('sort_order', { defaultValue: 'Display order' })}
+          </Label>
+          <Input
+            id='service-sort-order'
+            name='sortOrder'
+            type='number'
+            min={0}
+            className='max-w-[12rem]'
+            value={formValues.sortOrder ?? 0}
+            onChange={(e) => {
+              const n = parseInt(e.target.value, 10);
+              setFormValues((prev) => ({
+                ...prev,
+                sortOrder: Number.isNaN(n) ? 0 : n
+              }));
+            }}
+          />
+          <p className='text-muted-foreground text-xs'>
+            {tServices('sort_order_help', {
+              defaultValue:
+                'Lower numbers appear first in lists and on the automatic kiosk layout. New services are appended to the end.'
+            })}
+          </p>
+        </div>
+      ) : null}
 
       <div className='flex space-x-2 pt-4'>
         <Button

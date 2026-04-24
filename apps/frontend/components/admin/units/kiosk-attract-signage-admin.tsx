@@ -128,7 +128,7 @@ export function KioskAttractSignageAdminBlock(props: {
         </div>
 
         {value.mode === 'inherit' ? (
-          <p className='text-muted-foreground text-sm'>
+          <p className='text-muted-foreground text-sm leading-relaxed'>
             {t('attract_signage_inherit_hint')}{' '}
             <Link
               className='text-foreground font-medium underline underline-offset-2'
@@ -165,7 +165,7 @@ export function KioskAttractSignageAdminBlock(props: {
                 </SelectContent>
               </Select>
             ) : (
-              <p className='text-muted-foreground text-sm'>
+              <p className='text-muted-foreground text-sm leading-normal'>
                 {t('attract_signage_no_playlists')}{' '}
                 <Link
                   className='text-foreground font-medium underline underline-offset-2'
@@ -175,7 +175,7 @@ export function KioskAttractSignageAdminBlock(props: {
                 </Link>
               </p>
             )}
-            <p className='text-muted-foreground text-xs'>
+            <p className='text-muted-foreground text-sm leading-normal'>
               {t('attract_signage_playlist_help')}
             </p>
           </div>
@@ -186,7 +186,7 @@ export function KioskAttractSignageAdminBlock(props: {
             <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
               <div>
                 <Label>{t('attract_signage_materials_label')}</Label>
-                <p className='text-muted-foreground text-xs'>
+                <p className='text-muted-foreground text-sm leading-normal'>
                   {t('attract_signage_materials_desc')}
                 </p>
               </div>
@@ -207,12 +207,12 @@ export function KioskAttractSignageAdminBlock(props: {
                 />
               </div>
             ) : (
-              <p className='text-muted-foreground text-sm'>
+              <p className='text-muted-foreground text-sm leading-normal'>
                 {t('attract_signage_no_materials_branch')}
               </p>
             )}
             {materials.length > 0 && filtered.length === 0 ? (
-              <p className='text-muted-foreground text-sm'>
+              <p className='text-muted-foreground text-sm leading-normal'>
                 {tDisplay('fallbackSearchNoMatch')}
               </p>
             ) : null}
@@ -296,7 +296,7 @@ export function KioskAttractSignageAdminBlock(props: {
             }}
             placeholder='5'
           />
-          <p className='text-muted-foreground text-xs'>
+          <p className='text-muted-foreground text-sm leading-normal'>
             {t('attract_signage_duration_help')}
           </p>
         </div>

@@ -1,6 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useCallback,
+  useRef
+} from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useUnitServicesTree, useCreateTicketInUnit } from '@/lib/hooks';
@@ -17,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
-import { ArrowLeft, Home } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -36,7 +43,16 @@ import {
   getGetUnitByIDQueryKey,
   getGetUnitsUnitIdMaterialsQueryKey
 } from '@/lib/api/generated/units';
-import type { KioskConfig } from '@quokkaq/shared-types';
+import {
+  type KioskConfig,
+  type KioskConfigForDeviceRuntime,
+  mergeKioskWithTauriLocalDevice
+} from '@quokkaq/shared-types';
+import {
+  ensureKioskTauriLocalMigrated,
+  KIOSK_TAURI_DEVICE_CHANGED_EVENT,
+  readKioskTauriLocalDevice
+} from '@/lib/kiosk-tauri-device-config';
 import { PinCodeModal } from '@/components/kiosk/pin-code-modal';
 import { KioskSettingsSheet } from '@/components/kiosk/kiosk-settings-sheet';
 import { LockScreen } from '@/components/kiosk/lock-screen';
@@ -67,6 +83,15 @@ import { getUnitDisplayName } from '@/lib/unit-display';
 import { isQuotaExceededError } from '@/lib/quota-error';
 import { getServiceIdentificationMode } from '@/lib/kiosk-service-identification';
 import { KioskEmployeeIdFlow } from '@/components/kiosk/kiosk-employee-id-flow';
+import {
+  buildAutolayoutPageSlots,
+  clampAutolayoutPageIndex,
+  getAutolayoutGridDimensions,
+  getAutolayoutPageCount,
+  getAutolayoutPageSlice,
+  isKioskServiceGridAuto,
+  sortServicesForKioskAutolayout
+} from '@/lib/service-grid-autolayout';
 import {
   GRID_ZONE_SCOPE_NONE,
   SERVICE_GRID_CELL_COUNT,
@@ -107,6 +132,7 @@ export default function UnitKioskPage() {
   const unitId = params.unitId;
   const searchParams = useSearchParams();
   const [selectedServicePath, setSelectedServicePath] = useState<Service[]>([]);
+  const [kioskAutolayoutPage, setKioskAutolayoutPage] = useState(0);
   const [, setMessage] = useState('');
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const createTicketMutation = useCreateTicketInUnit();
@@ -174,6 +200,33 @@ export default function UnitKioskPage() {
   });
 
   const serverKioskFrozen = Boolean(unit?.operations?.kioskFrozen);
+  const serverK = unit?.config?.kiosk;
+  const [kioskTauriDeviceBump, setKioskTauriDeviceBump] = useState(0);
+  useLayoutEffect(() => {
+    if (!isTauriKiosk() || !unitId) {
+      return;
+    }
+    ensureKioskTauriLocalMigrated(unitId, serverK);
+    setKioskTauriDeviceBump((b) => b + 1);
+  }, [unitId, serverK]);
+  useEffect(() => {
+    const f = () => setKioskTauriDeviceBump((b) => b + 1);
+    window.addEventListener(KIOSK_TAURI_DEVICE_CHANGED_EVENT, f);
+    return () => {
+      window.removeEventListener(KIOSK_TAURI_DEVICE_CHANGED_EVENT, f);
+    };
+  }, []);
+  const kioskCfg = useMemo((): KioskConfigForDeviceRuntime | undefined => {
+    // Re-merge when Tauri local device config changes (bump) or server kiosk updates.
+    void kioskTauriDeviceBump;
+    if (!isTauriKiosk()) {
+      return (serverK ?? undefined) as KioskConfigForDeviceRuntime | undefined;
+    }
+    return mergeKioskWithTauriLocalDevice(
+      serverK,
+      readKioskTauriLocalDevice(unitId ?? '')
+    ) as KioskConfigForDeviceRuntime;
+  }, [serverK, unitId, kioskTauriDeviceBump]);
 
   useEffect(() => {
     const up = () => setBrowserOnline(true);
@@ -353,7 +406,7 @@ export default function UnitKioskPage() {
     ticket: Ticket,
     serviceLabel: string
   ): Promise<boolean> => {
-    const kc = unit?.config?.kiosk;
+    const kc = kioskCfg;
     if (!kc || kc.isPrintEnabled === false) {
       return false;
     }
@@ -444,7 +497,7 @@ export default function UnitKioskPage() {
   );
   const [employeeCreateTicketError, setEmployeeCreateTicketError] =
     useState('');
-  const kioskCfg = unit?.config?.kiosk;
+  const useAutoKioskLayout = isKioskServiceGridAuto(kioskCfg);
   const attractMode = getKioskAttractMode(kioskCfg);
   const beforeIdleSec = kioskCfg?.sessionIdleBeforeWarningSec ?? 45;
   const idleCountdownSec = kioskCfg?.sessionIdleCountdownSec ?? 15;
@@ -952,6 +1005,11 @@ export default function UnitKioskPage() {
     }
   };
 
+  const autolayoutPathKey = useMemo(
+    () => selectedServicePath.map((s) => s.id).join('>') || 'root',
+    [selectedServicePath]
+  );
+
   // Visible services for the current breadcrumb level (recomputed only when tree or path changes)
   const visibleServices = useMemo(() => {
     if (!unitServicesTree) {
@@ -966,7 +1024,7 @@ export default function UnitKioskPage() {
               selectedServicePath[selectedServicePath.length - 1].id
           );
     return atLevel.filter((service) => {
-      if (!isServicePlacedOnGrid(service)) {
+      if (!useAutoKioskLayout && !isServicePlacedOnGrid(service)) {
         return false;
       }
       if (unit?.kind === 'subdivision') {
@@ -974,7 +1032,61 @@ export default function UnitKioskPage() {
       }
       return serviceMatchesGridZoneScope(service, kioskGridZoneScope);
     });
-  }, [unitServicesTree, selectedServicePath, kioskGridZoneScope, unit?.kind]);
+  }, [
+    unitServicesTree,
+    selectedServicePath,
+    kioskGridZoneScope,
+    unit?.kind,
+    useAutoKioskLayout
+  ]);
+
+  const autolayoutSorted = useMemo(
+    () =>
+      useAutoKioskLayout
+        ? sortServicesForKioskAutolayout(visibleServices)
+        : visibleServices,
+    [useAutoKioskLayout, visibleServices]
+  );
+
+  const autolayoutPageTotal = autolayoutSorted.length;
+  const autolayoutPageClamped = clampAutolayoutPageIndex(
+    kioskAutolayoutPage,
+    autolayoutPageTotal
+  );
+  const autolayoutPageSlice = useAutoKioskLayout
+    ? getAutolayoutPageSlice(autolayoutSorted, autolayoutPageClamped)
+    : autolayoutSorted;
+  const autolayoutPageCount = useAutoKioskLayout
+    ? getAutolayoutPageCount(autolayoutPageTotal)
+    : 1;
+  const autolayoutGridDims = useAutoKioskLayout
+    ? getAutolayoutGridDimensions(
+        autolayoutPageSlice.length,
+        autolayoutPageTotal
+      )
+    : { rows: 0, cols: 0 };
+  const autolayoutSlots = useAutoKioskLayout
+    ? buildAutolayoutPageSlots(autolayoutPageSlice, autolayoutPageTotal)
+    : [];
+
+  const autolayoutPathKeyRef = useRef(autolayoutPathKey);
+  useEffect(() => {
+    if (!useAutoKioskLayout) {
+      return;
+    }
+    if (autolayoutPathKeyRef.current !== autolayoutPathKey) {
+      autolayoutPathKeyRef.current = autolayoutPathKey;
+      setKioskAutolayoutPage(0);
+    }
+  }, [autolayoutPathKey, useAutoKioskLayout]);
+  useEffect(() => {
+    if (!useAutoKioskLayout) {
+      return;
+    }
+    setKioskAutolayoutPage((p) =>
+      clampAutolayoutPageIndex(p, autolayoutPageTotal)
+    );
+  }, [useAutoKioskLayout, autolayoutPageTotal]);
 
   const openTicketSuccessFlow = (ticket: Ticket, service: Service) => {
     setSuccessEtaMinutes(null);
@@ -1008,9 +1120,9 @@ export default function UnitKioskPage() {
       service.nameEn || '',
       locale
     );
-    const canPrint = hasKioskPrintTarget(unit?.config?.kiosk);
+    const canPrint = hasKioskPrintTarget(kioskCfg);
     const printAutomatically =
-      canPrint && unit?.config?.kiosk?.isAlwaysPrintTicket !== false;
+      canPrint && kioskCfg?.isAlwaysPrintTicket !== false;
     if (printAutomatically) {
       void tryPrintTicket(ticket, serviceLabel);
     }
@@ -1483,80 +1595,244 @@ export default function UnitKioskPage() {
           </div>
 
           {/* Services grid — fills remaining viewport height; no page scroll */}
-          <div
-            className='grid min-h-0 w-full min-w-0 flex-1 gap-1.5 overflow-hidden rounded-2xl p-2 sm:gap-2 sm:p-3 md:gap-3 md:p-4'
-            style={{
-              backgroundColor: serviceGridColor,
-              gridTemplateColumns: `repeat(${SERVICE_GRID_COLS}, minmax(0, 1fr))`,
-              gridTemplateRows: `repeat(${SERVICE_GRID_ROWS}, minmax(0, 1fr))`
-            }}
-          >
-            {/* Render services with their exact grid positions */}
-            {visibleServices.map((service) => {
-              const startRow = (service.gridRow ?? 0) + 1;
-              const startCol = (service.gridCol ?? 0) + 1;
-              const rowSpan = service.gridRowSpan || 1;
-              const colSpan = service.gridColSpan || 1;
-
-              return (
+          {useAutoKioskLayout ? (
+            <div
+              className='flex min-h-0 w-full min-w-0 flex-1 flex-col gap-2 overflow-hidden rounded-2xl p-2 sm:gap-3 sm:p-3 md:p-4'
+              style={{ backgroundColor: serviceGridColor }}
+            >
+              {autolayoutPageCount > 1 ? (
                 <div
-                  key={service.id}
-                  className='h-full min-h-0 w-full min-w-0'
+                  className='flex w-full shrink-0 flex-col items-center justify-center gap-2'
+                  role='navigation'
+                  aria-label={t('autolayout_pagination_aria', {
+                    defaultValue: 'Service pages'
+                  })}
+                >
+                  <div className='flex w-full items-center justify-center gap-2 sm:gap-4'>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      className='kiosk-touch-min h-12 min-w-12 gap-1 rounded-full px-4 sm:px-5'
+                      disabled={autolayoutPageClamped <= 0}
+                      onClick={() =>
+                        setKioskAutolayoutPage((p) => Math.max(0, p - 1))
+                      }
+                      aria-label={t('autolayout_prev_aria', {
+                        defaultValue: 'Previous page'
+                      })}
+                    >
+                      <ChevronLeft className='size-5 shrink-0' aria-hidden />
+                      <span className='hidden min-[400px]:inline'>
+                        {t('autolayout_prev', { defaultValue: 'Previous' })}
+                      </span>
+                    </Button>
+                    <span
+                      className={cn(
+                        'text-sm font-medium tabular-nums sm:text-base',
+                        useHcSurfaces ? 'text-zinc-200' : 'text-kiosk-ink'
+                      )}
+                    >
+                      {t('autolayout_page_status', {
+                        current: autolayoutPageClamped + 1,
+                        total: autolayoutPageCount
+                      })}
+                    </span>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      className='kiosk-touch-min h-12 min-w-12 gap-1 rounded-full px-4 sm:px-5'
+                      disabled={
+                        autolayoutPageClamped >= autolayoutPageCount - 1
+                      }
+                      onClick={() =>
+                        setKioskAutolayoutPage((p) =>
+                          Math.min(autolayoutPageCount - 1, p + 1)
+                        )
+                      }
+                      aria-label={t('autolayout_next_aria', {
+                        defaultValue: 'Next page'
+                      })}
+                    >
+                      <span className='hidden min-[400px]:inline'>
+                        {t('autolayout_next', { defaultValue: 'Next' })}
+                      </span>
+                      <ChevronRight className='size-5 shrink-0' aria-hidden />
+                    </Button>
+                  </div>
+                  <div
+                    className='flex max-w-full flex-wrap items-center justify-center gap-2 sm:gap-2.5'
+                    role='group'
+                    aria-label={t('autolayout_page_dots_group_aria', {
+                      defaultValue: 'Jump to page'
+                    })}
+                  >
+                    {Array.from(
+                      { length: autolayoutPageCount },
+                      (_, pageIndex) => (
+                        <button
+                          key={pageIndex}
+                          type='button'
+                          className={cn(
+                            'flex h-12 w-12 shrink-0 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+                            useHcSurfaces
+                              ? 'focus-visible:ring-amber-400 focus-visible:ring-offset-zinc-900'
+                              : 'focus-visible:ring-kiosk-ink focus-visible:ring-offset-amber-50/80'
+                          )}
+                          aria-label={t('autolayout_page_dot_aria', {
+                            page: pageIndex + 1
+                          })}
+                          aria-current={
+                            pageIndex === autolayoutPageClamped
+                              ? 'page'
+                              : undefined
+                          }
+                          onClick={() => setKioskAutolayoutPage(pageIndex)}
+                        >
+                          <span
+                            className={cn(
+                              'block h-2.5 w-2.5 rounded-full',
+                              pageIndex === autolayoutPageClamped
+                                ? useHcSurfaces
+                                  ? 'bg-amber-300'
+                                  : 'bg-kiosk-ink'
+                                : useHcSurfaces
+                                  ? 'border border-zinc-500 bg-transparent'
+                                  : 'border-kiosk-ink/35 border bg-transparent'
+                            )}
+                            aria-hidden
+                          />
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              ) : null}
+              {autolayoutGridDims.rows > 0 && autolayoutGridDims.cols > 0 ? (
+                <div
+                  className='grid min-h-0 w-full min-w-0 flex-1 gap-1.5 overflow-hidden sm:gap-2 md:gap-3'
                   style={{
-                    gridRow: `${startRow} / span ${rowSpan}`,
-                    gridColumn: `${startCol} / span ${colSpan}`
+                    gridTemplateColumns: `repeat(${autolayoutGridDims.cols}, minmax(0, 1fr))`,
+                    gridTemplateRows: `repeat(${autolayoutGridDims.rows}, minmax(0, 1fr))`
                   }}
                 >
-                  <KioskServiceTile
-                    service={service}
-                    locale={locale}
-                    tileKind={service.isLeaf ? 'leaf' : 'branch'}
-                    highContrast={useHcSurfaces}
-                    onSelect={handleServiceSelection}
-                    onA11yFocus={handleA11yTileVocalize}
-                  />
+                  {autolayoutSlots.map((slot) => {
+                    if (slot.type === 'empty') {
+                      return (
+                        <div
+                          key={`empty-${slot.row}-${slot.col}`}
+                          aria-hidden
+                          className='h-full min-h-0 w-full min-w-0'
+                          style={{
+                            gridRow: slot.row + 1,
+                            gridColumn: slot.col + 1
+                          }}
+                        />
+                      );
+                    }
+                    const { service } = slot;
+                    return (
+                      <div
+                        key={service.id}
+                        className='h-full min-h-0 w-full min-w-0'
+                        style={{
+                          gridRow: slot.row + 1,
+                          gridColumn: slot.col + 1
+                        }}
+                      >
+                        <KioskServiceTile
+                          service={service}
+                          locale={locale}
+                          tileKind={service.isLeaf ? 'leaf' : 'branch'}
+                          highContrast={useHcSurfaces}
+                          onSelect={handleServiceSelection}
+                          onA11yFocus={handleA11yTileVocalize}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              ) : null}
+            </div>
+          ) : (
+            <div
+              className='grid min-h-0 w-full min-w-0 flex-1 gap-1.5 overflow-hidden rounded-2xl p-2 sm:gap-2 sm:p-3 md:gap-3 md:p-4'
+              style={{
+                backgroundColor: serviceGridColor,
+                gridTemplateColumns: `repeat(${SERVICE_GRID_COLS}, minmax(0, 1fr))`,
+                gridTemplateRows: `repeat(${SERVICE_GRID_ROWS}, minmax(0, 1fr))`
+              }}
+            >
+              {/* Render services with their exact grid positions */}
+              {visibleServices.map((service) => {
+                const startRow = (service.gridRow ?? 0) + 1;
+                const startCol = (service.gridCol ?? 0) + 1;
+                const rowSpan = service.gridRowSpan || 1;
+                const colSpan = service.gridColSpan || 1;
 
-            {/* Add empty cells to fill up the grid structure where no services are positioned */}
-            {Array.from({ length: SERVICE_GRID_CELL_COUNT }).map((_, index) => {
-              const row = Math.floor(index / SERVICE_GRID_COLS);
-              const col = index % SERVICE_GRID_COLS;
-
-              // Check if this cell is already occupied by a service
-              const isOccupied = visibleServices.some((service) => {
-                if (!isServicePlacedOnGrid(service)) {
-                  return false;
-                }
-
-                // Check if this cell falls within the service's grid position
-                return (
-                  row >= (service.gridRow as number) &&
-                  row <
-                    (service.gridRow as number) + (service.gridRowSpan || 1) &&
-                  col >= (service.gridCol as number) &&
-                  col < (service.gridCol as number) + (service.gridColSpan || 1)
-                );
-              });
-
-              // Only render empty cell if not occupied
-              if (!isOccupied) {
                 return (
                   <div
-                    key={`empty-${row}-${col}`}
-                    className='border-0 opacity-0'
+                    key={service.id}
+                    className='h-full min-h-0 w-full min-w-0'
                     style={{
-                      gridRow: `${row + 1}`,
-                      gridColumn: `${col + 1}`
+                      gridRow: `${startRow} / span ${rowSpan}`,
+                      gridColumn: `${startCol} / span ${colSpan}`
                     }}
-                  />
+                  >
+                    <KioskServiceTile
+                      service={service}
+                      locale={locale}
+                      tileKind={service.isLeaf ? 'leaf' : 'branch'}
+                      highContrast={useHcSurfaces}
+                      onSelect={handleServiceSelection}
+                      onA11yFocus={handleA11yTileVocalize}
+                    />
+                  </div>
                 );
-              }
+              })}
 
-              return null;
-            })}
-          </div>
+              {/* Add empty cells to fill up the grid structure where no services are positioned */}
+              {Array.from({ length: SERVICE_GRID_CELL_COUNT }).map(
+                (_, index) => {
+                  const row = Math.floor(index / SERVICE_GRID_COLS);
+                  const col = index % SERVICE_GRID_COLS;
+
+                  // Check if this cell is already occupied by a service
+                  const isOccupied = visibleServices.some((service) => {
+                    if (!isServicePlacedOnGrid(service)) {
+                      return false;
+                    }
+
+                    // Check if this cell falls within the service's grid position
+                    return (
+                      row >= (service.gridRow as number) &&
+                      row <
+                        (service.gridRow as number) +
+                          (service.gridRowSpan || 1) &&
+                      col >= (service.gridCol as number) &&
+                      col <
+                        (service.gridCol as number) + (service.gridColSpan || 1)
+                    );
+                  });
+
+                  // Only render empty cell if not occupied
+                  if (!isOccupied) {
+                    return (
+                      <div
+                        key={`empty-${row}-${col}`}
+                        className='border-0 opacity-0'
+                        style={{
+                          gridRow: `${row + 1}`,
+                          gridColumn: `${col + 1}`
+                        }}
+                      />
+                    );
+                  }
+
+                  return null;
+                }
+              )}
+            </div>
+          )}
         </>
       )}
 
@@ -1900,10 +2176,11 @@ export default function UnitKioskPage() {
         </DialogContent>
       </Dialog>
 
-      {showKioskIdOcr ? (
+      {showKioskIdOcr && unitId ? (
         <KioskIdOcrDialog
           open={idOcrOpen}
           onOpenChange={setIdOcrOpen}
+          unitId={unitId}
           preferNative={kioskCfg?.idOcrPreferNative !== false}
           wedgeMrz={kioskCfg?.idOcrWedgeMrz !== false}
           wedgeRu={kioskCfg?.idOcrWedgeRuDriverLicense !== false}

@@ -1,6 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useMemo
+} from 'react';
 import { useTranslations, type _Translator } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,7 +33,6 @@ import { usePatchKioskConfig } from '@/lib/hooks';
 import { toast } from 'sonner';
 import { LogoUpload } from '@/components/ui/logo-upload';
 import { preRegistrationsApi, type UnitConfig } from '@/lib/api';
-import { KIOSK_FEEDBACK_URL_EXAMPLE } from '@/lib/kiosk-feedback-url';
 import {
   listKioskSerialPorts,
   testKioskSerialPort
@@ -45,12 +50,24 @@ import type {
   KioskAttractInactivityMode,
   KioskConfig
 } from '@quokkaq/shared-types';
+import {
+  ensureKioskTauriLocalMigrated,
+  patchKioskTauriLocalDevice,
+  readKioskTauriLocalDevice,
+  writeKioskTauriLocalDevice
+} from '@/lib/kiosk-tauri-device-config';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   evaluateKioskConfigSurfaces,
   type KioskColorContrastCheck,
   WCAG
 } from '@/lib/kiosk-wcag-contrast';
+import {
+  Status,
+  StatusIndicator,
+  StatusLabel,
+  type KiboStatusVariant
+} from '@/components/kibo-ui/status';
 
 const DEFAULT_IDLE_WARNING_SEC = 45;
 const DEFAULT_IDLE_COUNTDOWN_SEC = 15;
@@ -238,47 +255,19 @@ function KioskSettingsForm({
   const [showFooter, setShowFooter] = useState(
     currentConfig?.kiosk?.showFooter !== false
   );
-  const inferPrinterConnection = (): 'network' | 'system' => {
-    const k = currentConfig?.kiosk;
-    if (
-      k?.printerConnection === 'system' ||
-      k?.printerConnection === 'network'
-    ) {
-      return k.printerConnection;
-    }
-    if (k?.systemPrinterName?.trim()) {
-      return 'system';
-    }
-    return 'network';
-  };
   const [printerConnection, setPrinterConnection] = useState<
     'network' | 'system'
-  >(inferPrinterConnection);
-  const [systemPrinterName, setSystemPrinterName] = useState(
-    currentConfig?.kiosk?.systemPrinterName || ''
-  );
-  const [printerIp, setPrinterIp] = useState(
-    currentConfig?.kiosk?.printerIp || ''
-  );
-  const [printerPort, setPrinterPort] = useState(
-    currentConfig?.kiosk?.printerPort || '9100'
-  );
-  const [printerType, setPrinterType] = useState(
-    currentConfig?.kiosk?.printerType || 'receipt'
-  );
-  const [isPrintEnabled, setIsPrintEnabled] = useState(
-    currentConfig?.kiosk?.isPrintEnabled !== false
-  );
-  const [isAlwaysPrintTicket, setIsAlwaysPrintTicket] = useState(
-    (currentConfig?.kiosk as KioskConfig | undefined)?.isAlwaysPrintTicket !==
-      false
-  );
+  >('network');
+  const [systemPrinterName, setSystemPrinterName] = useState('');
+  const [printerIp, setPrinterIp] = useState('');
+  const [printerPort, setPrinterPort] = useState('9100');
+  const [printerType, setPrinterType] = useState('receipt');
+  const [isPrintEnabled, setIsPrintEnabled] = useState(true);
+  const [isAlwaysPrintTicket, setIsAlwaysPrintTicket] = useState(true);
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const [logoUrl, setLogoUrl] = useState(currentConfig?.kiosk?.logoUrl || '');
-  const [printerLogoUrl, setPrinterLogoUrl] = useState(
-    currentConfig?.kiosk?.printerLogoUrl || ''
-  );
+  const [printerLogoUrl, setPrinterLogoUrl] = useState('');
   const {
     showUnitInHeader,
     setShowUnitInHeader,
@@ -298,9 +287,6 @@ function KioskSettingsForm({
   );
   const [footerText, setFooterText] = useState(
     (k0 as KioskConfig | undefined)?.footerText || ''
-  );
-  const [feedbackUrl, setFeedbackUrl] = useState(
-    (k0 as KioskConfig | undefined)?.feedbackUrl || ''
   );
   const [isPreRegistrationEnabled, setIsPreRegistrationEnabled] = useState(
     (k0 as KioskConfig | undefined)?.isPreRegistrationEnabled ?? false
@@ -392,6 +378,76 @@ function KioskSettingsForm({
     typeof navigator === 'undefined' ? true : navigator.onLine
   );
 
+  useLayoutEffect(() => {
+    if (!isOpen || !unitId) {
+      return;
+    }
+    if (isTauriKiosk()) {
+      ensureKioskTauriLocalMigrated(unitId, k0);
+      const d = readKioskTauriLocalDevice(unitId);
+      if (d) {
+        if (
+          d.printerConnection === 'network' ||
+          d.printerConnection === 'system'
+        ) {
+          setPrinterConnection(d.printerConnection);
+        } else {
+          setPrinterConnection(
+            d.systemPrinterName?.trim() ? 'system' : 'network'
+          );
+        }
+        setSystemPrinterName(d.systemPrinterName || '');
+        setPrinterIp(d.printerIp || '');
+        setPrinterPort((d.printerPort || '9100').trim() || '9100');
+        setPrinterType((d.printerType || 'receipt').trim() || 'receipt');
+        setIsPrintEnabled(d.isPrintEnabled !== false);
+        setIsAlwaysPrintTicket(d.isAlwaysPrintTicket !== false);
+        setPrinterLogoUrl(d.printerLogoUrl || '');
+        setSerialPath((d.serialPath || '').trim());
+        setSerialBaud(d.serialBaud && d.serialBaud > 0 ? d.serialBaud : 9600);
+      } else {
+        setPrinterConnection('network');
+        setSystemPrinterName('');
+        setPrinterIp('');
+        setPrinterPort('9100');
+        setPrinterType('receipt');
+        setIsPrintEnabled(true);
+        setIsAlwaysPrintTicket(true);
+        setPrinterLogoUrl('');
+        setSerialPath('');
+        setSerialBaud(9600);
+      }
+    } else {
+      const w = (k0 ?? {}) as {
+        printerConnection?: 'network' | 'system';
+        systemPrinterName?: string;
+        printerIp?: string;
+        printerPort?: string;
+        printerType?: string;
+        isPrintEnabled?: boolean;
+        isAlwaysPrintTicket?: boolean;
+        printerLogoUrl?: string;
+      };
+      if (
+        w.printerConnection === 'network' ||
+        w.printerConnection === 'system'
+      ) {
+        setPrinterConnection(w.printerConnection);
+      } else {
+        setPrinterConnection(
+          w.systemPrinterName?.trim() ? 'system' : 'network'
+        );
+      }
+      setSystemPrinterName(w.systemPrinterName || '');
+      setPrinterIp(w.printerIp || '');
+      setPrinterPort(w.printerPort || '9100');
+      setPrinterType(w.printerType || 'receipt');
+      setIsPrintEnabled(w.isPrintEnabled !== false);
+      setIsAlwaysPrintTicket(w.isAlwaysPrintTicket !== false);
+      setPrinterLogoUrl(w.printerLogoUrl || '');
+    }
+  }, [isOpen, unitId, k0]);
+
   const refreshOnline = useCallback(() => {
     setBrowserOnline(
       typeof navigator === 'undefined' ? true : navigator.onLine
@@ -438,10 +494,6 @@ function KioskSettingsForm({
     if (!isOpen || !isTauriKiosk()) {
       return;
     }
-    const p = localStorage.getItem('kioskSerialPath') || '';
-    const b = Number(localStorage.getItem('kioskSerialBaud') || '9600') || 9600;
-    setSerialPath(p);
-    setSerialBaud(b);
     void listKioskSerialPorts()
       .then((r) =>
         setSerialList(
@@ -470,6 +522,14 @@ function KioskSettingsForm({
     }
     return 'connection_degraded' as const;
   })();
+  const connectionKibo: KiboStatusVariant =
+    connectionKey === 'connection_online'
+      ? 'online'
+      : connectionKey === 'connection_offline'
+        ? 'offline'
+        : connectionKey === 'connection_checking'
+          ? 'loading'
+          : 'degraded';
 
   const colorA11y = useMemo(
     () =>
@@ -509,13 +569,25 @@ function KioskSettingsForm({
         ticketSuccessAutoCloseSec || DEFAULT_TICKET_SUCCESS_AUTOCLOSE_SEC
       )
     );
-    if (isTauriKiosk()) {
-      if (serialPath.trim()) {
-        localStorage.setItem('kioskSerialPath', serialPath.trim());
-      } else {
-        localStorage.removeItem('kioskSerialPath');
-      }
-      localStorage.setItem('kioskSerialBaud', String(serialBaud));
+    if (isTauriKiosk() && unitId) {
+      writeKioskTauriLocalDevice(
+        patchKioskTauriLocalDevice(unitId, {
+          isPrintEnabled,
+          isAlwaysPrintTicket,
+          printerConnection,
+          systemPrinterName:
+            printerConnection === 'system'
+              ? systemPrinterName.trim() || undefined
+              : undefined,
+          printerIp: printerConnection === 'network' ? printerIp : undefined,
+          printerPort:
+            printerConnection === 'network' ? printerPort : undefined,
+          printerType,
+          printerLogoUrl: printerLogoUrl.trim() || undefined,
+          serialPath: serialPath.trim() || undefined,
+          serialBaud
+        })
+      );
     }
     const newConfig = {
       ...currentConfig,
@@ -528,7 +600,6 @@ function KioskSettingsForm({
         welcomeSubtitle: welcomeSubtitle.trim() || undefined,
         headerText,
         footerText,
-        feedbackUrl: feedbackUrl.trim() || undefined,
         isPreRegistrationEnabled,
         isAppointmentCheckinEnabled,
         isAppointmentPhoneLookupEnabled,
@@ -549,18 +620,7 @@ function KioskSettingsForm({
         idOcrWedgeMrz: idOcrWedgeMrz,
         idOcrWedgeRuDriverLicense: idOcrWedgeRuDriverLicense,
         offlineModeEnabled: offlineModeEnabled,
-        printerConnection,
-        systemPrinterName:
-          printerConnection === 'system'
-            ? systemPrinterName.trim() || undefined
-            : undefined,
-        printerIp,
-        printerPort,
-        printerType,
-        isPrintEnabled,
-        isAlwaysPrintTicket,
-        logoUrl,
-        printerLogoUrl: printerLogoUrl.trim() || undefined
+        logoUrl
       } as KioskConfig & Record<string, unknown>
     };
 
@@ -692,11 +752,19 @@ function KioskSettingsForm({
               </span>
               {unitName ? `${unitName} ` : ''}({unitId})
             </p>
-            <p>
+            <p className='flex flex-wrap items-center gap-2'>
               <span className='text-foreground font-medium'>
-                {t('info_connection_label')}:{' '}
+                {t('info_connection_label')}:
               </span>
-              {t(connectionKey)}
+              <Status
+                status={connectionKibo}
+                className='pointer-events-none max-w-full !gap-1.5'
+              >
+                <StatusIndicator />
+                <StatusLabel className='text-foreground text-xs font-normal'>
+                  {t(connectionKey)}
+                </StatusLabel>
+              </Status>
             </p>
           </div>
         </div>
@@ -873,19 +941,6 @@ function KioskSettingsForm({
               placeholder={tAdmin('footer_placeholder')}
             />
           </div>
-        </div>
-
-        <div className='space-y-2'>
-          <Label htmlFor='sheet-feedback'>{tAdmin('feedback_url')}</Label>
-          <Input
-            id='sheet-feedback'
-            value={feedbackUrl}
-            onChange={(e) => setFeedbackUrl(e.target.value)}
-            placeholder={KIOSK_FEEDBACK_URL_EXAMPLE}
-          />
-          <p className='text-muted-foreground text-xs'>
-            {tAdmin('feedback_url_help')}
-          </p>
         </div>
 
         <div className='space-y-0 border-t pt-4'>
@@ -1349,6 +1404,14 @@ function KioskSettingsForm({
           </div>
         </div>
 
+        {isTauriKiosk() ? (
+          <p className='text-muted-foreground border-b pb-3 text-sm leading-relaxed'>
+            {t('printer_stored_on_device_only', {
+              defaultValue:
+                'Printer and serial settings are stored only on this device, not in branch web admin.'
+            })}
+          </p>
+        ) : null}
         <div className='flex items-center justify-between'>
           <div>
             <Label htmlFor='sheet-print'>{t('enable_printing')}</Label>

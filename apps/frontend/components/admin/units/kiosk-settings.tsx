@@ -29,8 +29,6 @@ import type {
   KioskConfig
 } from '@quokkaq/shared-types';
 import { useKioskHeaderFields } from '@/hooks/use-kiosk-header-fields';
-import { isTauriKiosk, printKioskJob, testPrintLines } from '@/lib/kiosk-print';
-import { KIOSK_FEEDBACK_URL_EXAMPLE } from '@/lib/kiosk-feedback-url';
 import { KioskAttractSignageAdminBlock } from '@/components/admin/units/kiosk-attract-signage-admin';
 import { Link } from '@/src/i18n/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -82,6 +80,12 @@ function attractSignageInit(k: KioskConfig): {
   };
 }
 
+/** Unified typography: labels use default `Label` (text-sm font-medium); these match helpers and group titles. */
+const ksHint = 'text-muted-foreground text-sm leading-normal' as const;
+const ksProse = 'text-muted-foreground text-sm leading-relaxed' as const;
+const ksGroup = 'text-foreground text-sm font-medium' as const;
+const ksSectionH = 'text-foreground text-sm font-medium leading-tight' as const;
+
 export function KioskSettings({
   unitId,
   unitName,
@@ -111,40 +115,7 @@ export function KioskSettings({
   );
   const [headerText, setHeaderText] = useState(kioskConfig.headerText || '');
   const [footerText, setFooterText] = useState(kioskConfig.footerText || '');
-  const inferConn = (): 'network' | 'system' => {
-    if (
-      kioskConfig.printerConnection === 'system' ||
-      kioskConfig.printerConnection === 'network'
-    ) {
-      return kioskConfig.printerConnection;
-    }
-    if (kioskConfig.systemPrinterName?.trim()) {
-      return 'system';
-    }
-    return 'network';
-  };
-  const [printerConnection, setPrinterConnection] = useState(inferConn);
-  const [systemPrinterName, setSystemPrinterName] = useState(
-    kioskConfig.systemPrinterName || ''
-  );
-  const [printerIp, setPrinterIp] = useState(kioskConfig.printerIp || '');
-  const [printerPort, setPrinterPort] = useState(
-    kioskConfig.printerPort || '9100'
-  );
-  const [printerType, setPrinterType] = useState(
-    kioskConfig.printerType || 'receipt'
-  );
-  const [isPrintEnabled, setIsPrintEnabled] = useState(
-    kioskConfig.isPrintEnabled ?? true
-  );
-  const [isAlwaysPrintTicket, setIsAlwaysPrintTicket] = useState(
-    kioskConfig.isAlwaysPrintTicket !== false
-  );
   const [logoUrl, setLogoUrl] = useState(kioskConfig.logoUrl || '');
-  const [printerLogoUrl, setPrinterLogoUrl] = useState(
-    kioskConfig.printerLogoUrl || ''
-  );
-  const [feedbackUrl, setFeedbackUrl] = useState(kioskConfig.feedbackUrl || '');
   const [isPreRegistrationEnabled, setIsPreRegistrationEnabled] = useState(
     kioskConfig.isPreRegistrationEnabled ?? false
   );
@@ -169,6 +140,9 @@ export function KioskSettings({
   ); // Default gray-100
   const [serviceGridColor, setServiceGridColor] = useState(
     kioskConfig.serviceGridColor || '#ffffff'
+  );
+  const [serviceGridLayout, setServiceGridLayout] = useState<'manual' | 'auto'>(
+    kioskConfig.serviceGridLayout === 'auto' ? 'auto' : 'manual'
   );
   const [sessionIdleBeforeWarningSec, setSessionIdleBeforeWarningSec] =
     useState(kioskConfig.sessionIdleBeforeWarningSec ?? 45);
@@ -227,20 +201,8 @@ export function KioskSettings({
         welcomeSubtitle: welcomeSubtitle.trim() || undefined,
         headerText,
         footerText,
-        printerConnection,
-        systemPrinterName:
-          printerConnection === 'system'
-            ? systemPrinterName.trim() || undefined
-            : undefined,
-        printerIp,
-        printerPort,
-        printerType,
-        isPrintEnabled,
-        isAlwaysPrintTicket,
         logoUrl,
-        printerLogoUrl: printerLogoUrl.trim() || undefined,
         ...headerKioskSaveFields(),
-        feedbackUrl,
         isPreRegistrationEnabled,
         isAppointmentCheckinEnabled,
         isAppointmentPhoneLookupEnabled,
@@ -248,6 +210,7 @@ export function KioskSettings({
         headerColor,
         bodyColor,
         serviceGridColor,
+        serviceGridLayout,
         sessionIdleBeforeWarningSec: beforeSec,
         sessionIdleCountdownSec: countSec,
         kioskAttractInactivityMode,
@@ -282,52 +245,6 @@ export function KioskSettings({
         }
       }
     );
-  };
-
-  const handleTestPrint = async () => {
-    if (!isTauriKiosk()) {
-      return;
-    }
-    if (printerType === 'label') {
-      toast.info(t('test_print_label_unsupported'));
-      return;
-    }
-    try {
-      let native = false;
-      if (printerConnection === 'system') {
-        if (!systemPrinterName.trim()) {
-          toast.error(t('system_printer_required'));
-          return;
-        }
-        native = await printKioskJob(
-          'system',
-          systemPrinterName.trim(),
-          testPrintLines()
-        );
-      } else {
-        if (!printerIp.trim()) {
-          toast.error(t('printer_ip_required'));
-          return;
-        }
-        native = await printKioskJob(
-          'tcp',
-          `${printerIp.trim()}:${printerPort.trim() || '9100'}`,
-          testPrintLines()
-        );
-      }
-      if (native) {
-        toast.success(t('test_print_sent'));
-      } else {
-        toast.error(
-          t('printer_test_error', {
-            message: t('test_print_target_missing')
-          })
-        );
-      }
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      toast.error(t('printer_test_error', { message }));
-    }
   };
 
   return (
@@ -377,9 +294,7 @@ export function KioskSettings({
                 <Label htmlFor='admin-show-unit'>
                   {t('show_unit_in_header')}
                 </Label>
-                <p className='text-muted-foreground text-sm'>
-                  {t('show_unit_in_header_desc')}
-                </p>
+                <p className={ksHint}>{t('show_unit_in_header_desc')}</p>
               </div>
               <Switch
                 id='admin-show-unit'
@@ -400,15 +315,13 @@ export function KioskSettings({
                     unitName: unitName.trim() || '—'
                   })}
                 />
-                <p className='text-muted-foreground text-xs'>
-                  {t('kiosk_unit_label_help')}
-                </p>
+                <p className={ksHint}>{t('kiosk_unit_label_help')}</p>
               </div>
             ) : null}
           </div>
 
-          {/* Color Settings Section */}
-          <div className='space-y-4 border-b pt-2 pb-4'>
+          {/* Color Settings Section (divider below is the full-bleed “Service grid” band) */}
+          <div className='space-y-4 pt-2 pb-4'>
             <div className='flex items-center justify-between'>
               <Label htmlFor='custom-colors'>
                 {t('use_custom_colors', { defaultValue: 'Use custom colors' })}
@@ -497,6 +410,49 @@ export function KioskSettings({
             )}
           </div>
 
+          <section
+            className='border-border -mx-6 space-y-3 border-t border-b px-6 py-4'
+            aria-labelledby='kiosk-service-grid-heading'
+          >
+            <div className='w-full min-w-0 space-y-1.5'>
+              <h3 id='kiosk-service-grid-heading' className={ksSectionH}>
+                {t('service_grid_layout_label')}
+              </h3>
+              <p className={`w-full min-w-0 ${ksProse}`}>
+                {t('service_grid_layout_caption')}
+              </p>
+            </div>
+            <div className='max-w-md'>
+              <Label className='sr-only' htmlFor='kiosk-service-grid-layout'>
+                {t('service_grid_layout_label')}
+              </Label>
+              <Select
+                value={serviceGridLayout}
+                onValueChange={(v) =>
+                  setServiceGridLayout(v as 'manual' | 'auto')
+                }
+              >
+                <SelectTrigger
+                  className='w-full'
+                  id='kiosk-service-grid-layout'
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='manual'>
+                    {t('service_grid_layout_manual')}
+                  </SelectItem>
+                  <SelectItem value='auto'>
+                    {t('service_grid_layout_auto')}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className={`w-full min-w-0 ${ksProse}`}>
+              {t('service_grid_layout_help')}
+            </p>
+          </section>
+
           <div className='space-y-2'>
             <Label htmlFor='kiosk-pin'>{t('pin_code')}</Label>
             <Input
@@ -507,13 +463,11 @@ export function KioskSettings({
               placeholder={t('pin_code_placeholder', { defaultValue: '1234' })}
               maxLength={6}
             />
-            <p className='text-muted-foreground text-xs'>{t('pin_help')}</p>
+            <p className={ksHint}>{t('pin_help')}</p>
           </div>
 
           <div className='space-y-4 border-t pt-4'>
-            <p className='text-muted-foreground text-sm'>
-              {t('welcome_section_desc')}
-            </p>
+            <p className={ksProse}>{t('welcome_section_desc')}</p>
             <div className='space-y-2'>
               <Label htmlFor='welcome-title'>{t('welcome_title')}</Label>
               <Input
@@ -522,9 +476,7 @@ export function KioskSettings({
                 onChange={(e) => setWelcomeTitle(e.target.value)}
                 placeholder={t('welcome_title_placeholder')}
               />
-              <p className='text-muted-foreground text-xs'>
-                {t('welcome_title_help')}
-              </p>
+              <p className={ksHint}>{t('welcome_title_help')}</p>
             </div>
             <div className='space-y-2'>
               <Label htmlFor='welcome-subtitle'>{t('welcome_subtitle')}</Label>
@@ -535,16 +487,12 @@ export function KioskSettings({
                 placeholder={t('welcome_subtitle_placeholder')}
                 rows={2}
               />
-              <p className='text-muted-foreground text-xs'>
-                {t('welcome_subtitle_help')}
-              </p>
+              <p className={ksHint}>{t('welcome_subtitle_help')}</p>
             </div>
           </div>
 
           <div className='space-y-4 border-t pt-4'>
-            <p className='text-muted-foreground text-sm'>
-              {t('ticket_text_section_desc')}
-            </p>
+            <p className={ksProse}>{t('ticket_text_section_desc')}</p>
             <div className='space-y-2'>
               <Label htmlFor='ticket-header'>{t('ticket_header')}</Label>
               <Textarea
@@ -566,49 +514,7 @@ export function KioskSettings({
             </div>
           </div>
 
-          <div className='space-y-2'>
-            <Label htmlFor='feedback-url'>{t('feedback_url')}</Label>
-            <Input
-              id='feedback-url'
-              value={feedbackUrl}
-              onChange={(e) => setFeedbackUrl(e.target.value)}
-              placeholder={KIOSK_FEEDBACK_URL_EXAMPLE}
-            />
-            <p className='text-muted-foreground text-xs'>
-              {t('feedback_url_help')}
-            </p>
-          </div>
-
           <div className='space-y-4 border-t pt-4'>
-            <div className='flex items-center justify-between'>
-              <Label htmlFor='enable-printing'>{t('enable_printing')}</Label>
-              <Switch
-                id='enable-printing'
-                checked={isPrintEnabled}
-                onCheckedChange={setIsPrintEnabled}
-              />
-            </div>
-
-            {isPrintEnabled && printerType === 'receipt' && (
-              <div className='space-y-1 border-t border-dashed py-2'>
-                <div className='flex items-center justify-between'>
-                  <div>
-                    <Label htmlFor='admin-always-print-ticket'>
-                      {t('always_print_ticket')}
-                    </Label>
-                    <p className='text-muted-foreground text-xs'>
-                      {t('always_print_ticket_hint')}
-                    </p>
-                  </div>
-                  <Switch
-                    id='admin-always-print-ticket'
-                    checked={isAlwaysPrintTicket}
-                    onCheckedChange={setIsAlwaysPrintTicket}
-                  />
-                </div>
-              </div>
-            )}
-
             <div className='flex items-center justify-between'>
               <Label htmlFor='enable-pre-registration'>
                 {t('enable_pre_registration', {
@@ -628,7 +534,7 @@ export function KioskSettings({
                   <Label htmlFor='admin-appointment-checkin'>
                     {t('enable_appointment_checkin')}
                   </Label>
-                  <p className='text-muted-foreground text-xs'>
+                  <p className={ksHint}>
                     {t('enable_appointment_checkin_hint')}
                   </p>
                 </div>
@@ -643,7 +549,7 @@ export function KioskSettings({
                   <Label htmlFor='admin-appointment-phone-lookup'>
                     {t('enable_appointment_phone_lookup')}
                   </Label>
-                  <p className='text-muted-foreground text-xs'>
+                  <p className={ksHint}>
                     {t('enable_appointment_phone_lookup_hint')}
                   </p>
                 </div>
@@ -661,24 +567,17 @@ export function KioskSettings({
 
             <div className='space-y-0 border-t py-2'>
               <div className='border-b pb-3'>
-                <p className='text-foreground text-sm font-medium'>
-                  {t('session_and_timing_group_label')}
-                </p>
-                <p className='text-muted-foreground mt-2 text-sm leading-relaxed'>
+                <p className={ksGroup}>{t('session_and_timing_group_label')}</p>
+                <p className={`mt-2 ${ksProse}`}>
                   {t('session_and_timing_explain')}
                 </p>
               </div>
               <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
                 <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
-                  <Label
-                    htmlFor='admin-sess-warn'
-                    className='text-sm font-medium'
-                  >
+                  <Label htmlFor='admin-sess-warn'>
                     {t('session_idle_before_label')}
                   </Label>
-                  <p className='text-muted-foreground text-sm leading-snug'>
-                    {t('session_idle_before_hint')}
-                  </p>
+                  <p className={ksHint}>{t('session_idle_before_hint')}</p>
                 </div>
                 <div className='flex w-full max-w-48 min-w-0 justify-end sm:shrink-0 sm:pt-0.5'>
                   <Input
@@ -698,15 +597,10 @@ export function KioskSettings({
               </div>
               <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
                 <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
-                  <Label
-                    htmlFor='admin-sess-count'
-                    className='text-sm font-medium'
-                  >
+                  <Label htmlFor='admin-sess-count'>
                     {t('session_idle_countdown_label')}
                   </Label>
-                  <p className='text-muted-foreground text-sm leading-snug'>
-                    {t('session_idle_countdown_hint')}
-                  </p>
+                  <p className={ksHint}>{t('session_idle_countdown_hint')}</p>
                 </div>
                 <div className='flex w-full max-w-48 min-w-0 justify-end sm:shrink-0 sm:pt-0.5'>
                   <Input
@@ -722,18 +616,15 @@ export function KioskSettings({
                   />
                 </div>
               </div>
-              <p className='text-muted-foreground border-b py-3 text-sm font-medium'>
+              <p className={`border-b py-3 ${ksGroup}`}>
                 {t('attract_section_label')}
               </p>
               <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
                 <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
-                  <Label
-                    htmlFor='kiosk-attract-mode'
-                    className='text-sm font-medium'
-                  >
+                  <Label htmlFor='kiosk-attract-mode'>
                     {t('kiosk_attract_inactivity_mode_label')}
                   </Label>
-                  <p className='text-muted-foreground text-sm leading-snug'>
+                  <p className={ksHint}>
                     {t('kiosk_attract_inactivity_mode_hint')}
                   </p>
                 </div>
@@ -768,13 +659,10 @@ export function KioskSettings({
               </div>
               <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
                 <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
-                  <Label
-                    htmlFor='kiosk-show-attract-after-session'
-                    className='text-sm font-medium'
-                  >
+                  <Label htmlFor='kiosk-show-attract-after-session'>
                     {t('show_attract_after_session_end_label')}
                   </Label>
-                  <p className='text-muted-foreground text-sm leading-snug'>
+                  <p className={ksHint}>
                     {t('show_attract_after_session_end_hint')}
                   </p>
                 </div>
@@ -791,15 +679,10 @@ export function KioskSettings({
               </div>
               <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
                 <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
-                  <Label
-                    htmlFor='kiosk-attract-idle-sec'
-                    className='text-sm font-medium'
-                  >
+                  <Label htmlFor='kiosk-attract-idle-sec'>
                     {t('attract_idle_sec_label')}
                   </Label>
-                  <p className='text-muted-foreground text-sm leading-snug'>
-                    {t('attract_idle_sec_hint')}
-                  </p>
+                  <p className={ksHint}>{t('attract_idle_sec_hint')}</p>
                 </div>
                 <div className='flex w-full max-w-48 min-w-0 justify-end sm:shrink-0 sm:pt-0.5'>
                   <Input
@@ -818,13 +701,10 @@ export function KioskSettings({
               </div>
               <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
                 <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
-                  <Label
-                    htmlFor='kiosk-show-queue-on-attract'
-                    className='text-sm font-medium'
-                  >
+                  <Label htmlFor='kiosk-show-queue-on-attract'>
                     {t('show_queue_depth_on_attract_label')}
                   </Label>
-                  <p className='text-muted-foreground text-sm leading-snug'>
+                  <p className={ksHint}>
                     {t('show_queue_depth_on_attract_hint')}
                   </p>
                 </div>
@@ -838,13 +718,10 @@ export function KioskSettings({
               </div>
               <div className='grid grid-cols-1 gap-x-4 gap-y-1 py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
                 <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
-                  <Label
-                    htmlFor='admin-ticket-success-close'
-                    className='text-sm font-medium'
-                  >
+                  <Label htmlFor='admin-ticket-success-close'>
                     {t('ticket_success_auto_close_label')}
                   </Label>
-                  <p className='text-muted-foreground text-sm leading-snug'>
+                  <p className={ksHint}>
                     {t('ticket_success_auto_close_hint')}
                   </p>
                 </div>
@@ -863,131 +740,6 @@ export function KioskSettings({
                 </div>
               </div>
             </div>
-
-            {isPrintEnabled && (
-              <>
-                <div className='space-y-2 border-b pb-4'>
-                  <LogoUpload
-                    label={t('printer_logo_upload')}
-                    hint={t('printer_logo_upload_hint')}
-                    currentLogoUrl={printerLogoUrl}
-                    onLogoUploaded={async (url) => {
-                      setPrinterLogoUrl(url);
-                    }}
-                    onLogoRemoved={async () => {
-                      setPrinterLogoUrl('');
-                    }}
-                    uploadTarget='printer'
-                    allowBmpByExtension
-                    accept='image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,image/bmp,.bmp,.dib'
-                  />
-                </div>
-
-                <div className='space-y-2'>
-                  <Label>{t('printer_connection')}</Label>
-                  <div className='grid w-full grid-cols-2 gap-2'>
-                    <Button
-                      type='button'
-                      variant={
-                        printerConnection === 'network' ? 'default' : 'outline'
-                      }
-                      onClick={() => setPrinterConnection('network')}
-                      className='min-w-0 break-words whitespace-normal'
-                    >
-                      {t('printer_connection_network')}
-                    </Button>
-                    <Button
-                      type='button'
-                      variant={
-                        printerConnection === 'system' ? 'default' : 'outline'
-                      }
-                      onClick={() => setPrinterConnection('system')}
-                      className='min-w-0 break-words whitespace-normal'
-                    >
-                      {t('printer_connection_system')}
-                    </Button>
-                  </div>
-                  <p className='text-muted-foreground text-sm'>
-                    {t('printer_connection_admin_hint')}
-                  </p>
-                </div>
-
-                {printerConnection === 'network' ? (
-                  <div className='grid grid-cols-1 gap-4 sm:grid-cols-3'>
-                    <div className='space-y-2 sm:col-span-2'>
-                      <Label htmlFor='printer-ip'>{t('printer_ip')}</Label>
-                      <Input
-                        id='printer-ip'
-                        value={printerIp}
-                        onChange={(e) => setPrinterIp(e.target.value)}
-                        placeholder={t('printer_ip_placeholder', {
-                          defaultValue: '192.168.1.100'
-                        })}
-                      />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='printer-port'>{t('printer_port')}</Label>
-                      <Input
-                        id='printer-port'
-                        value={printerPort}
-                        onChange={(e) => setPrinterPort(e.target.value)}
-                        placeholder={t('printer_port_placeholder', {
-                          defaultValue: '9100'
-                        })}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className='space-y-2'>
-                    <Label htmlFor='system-printer-name'>
-                      {t('system_printer')}
-                    </Label>
-                    <Input
-                      id='system-printer-name'
-                      value={systemPrinterName}
-                      onChange={(e) => setSystemPrinterName(e.target.value)}
-                      placeholder={t('system_printer_placeholder')}
-                    />
-                  </div>
-                )}
-
-                <div className='space-y-2'>
-                  <Label>{t('printer_type')}</Label>
-                  <div className='grid w-full grid-cols-2 gap-2'>
-                    <Button
-                      variant={
-                        printerType === 'receipt' ? 'default' : 'outline'
-                      }
-                      onClick={() => setPrinterType('receipt')}
-                      className='min-w-0 break-words whitespace-normal'
-                      type='button'
-                    >
-                      {t('printer_type_receipt')}
-                    </Button>
-                    <Button
-                      variant={printerType === 'label' ? 'default' : 'outline'}
-                      onClick={() => setPrinterType('label')}
-                      className='min-w-0 break-words whitespace-normal'
-                      type='button'
-                    >
-                      {t('printer_type_label')}
-                    </Button>
-                  </div>
-                </div>
-
-                {isTauriKiosk() ? (
-                  <Button
-                    type='button'
-                    variant='outline'
-                    className='w-full'
-                    onClick={() => void handleTestPrint()}
-                    disabled={printerType === 'label'}
-                  >
-                    {t('test_print')}
-                  </Button>
-                ) : null}
-              </>
-            )}
           </div>
 
           <Button

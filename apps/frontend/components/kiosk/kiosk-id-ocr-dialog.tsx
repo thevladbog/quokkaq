@@ -27,6 +27,8 @@ import { cn } from '@/lib/utils';
 type KioskIdOcrDialogProps = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  /** Kiosk unit route id — serial scanner settings are per unit in Tauri. */
+  unitId: string;
   /** When true and the shell is Tauri, call native tesseract. */
   preferNative: boolean;
   onUseText: (text: string) => void;
@@ -66,6 +68,7 @@ function buildMrzText(raw: string): string {
 export function KioskIdOcrDialog({
   open,
   onOpenChange,
+  unitId,
   preferNative,
   onUseText,
   wedgeMrz = true,
@@ -126,8 +129,8 @@ export function KioskIdOcrDialog({
   const ruActive = open && wedgeRu && subTab === 'ru';
   useKioskBarcodeWedge(mrzActive, applyMrzRaw, { mode: 'mrz' });
   useKioskBarcodeWedge(ruActive, applyRuRaw, { mode: 'longText' });
-  useKioskSerialScannerStream(mrzActive, applyMrzRaw);
-  useKioskSerialScannerStream(ruActive, applyRuRaw);
+  useKioskSerialScannerStream(mrzActive, applyMrzRaw, unitId);
+  useKioskSerialScannerStream(ruActive, applyRuRaw, unitId);
 
   useEffect(() => {
     if (!open) {

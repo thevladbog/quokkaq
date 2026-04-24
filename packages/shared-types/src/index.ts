@@ -114,6 +114,8 @@ export type ServiceModel = {
   /** Kiosk identification step: none | phone | qr | login | badge */
   identificationMode?: 'none' | 'phone' | 'qr' | 'login' | 'badge';
   isLeaf?: boolean;
+  /** Order within the unit for kiosk and lists; lower = earlier. */
+  sortOrder?: number;
   gridRow?: number | null;
   gridCol?: number | null;
   gridRowSpan?: number | null;
@@ -152,6 +154,7 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
     .enum(['none', 'phone', 'qr', 'login', 'badge'])
     .optional(),
   isLeaf: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
   gridRow: z.number().nullable().optional(),
   gridCol: z.number().nullable().optional(),
   gridRowSpan: z.number().nullable().optional(),
@@ -464,6 +467,104 @@ export type KioskAttractInactivityMode = z.infer<
   typeof KioskAttractInactivityModeField
 >;
 
+/**
+ * Printer + local hardware stored only in Tauri (localStorage), keyed by `unitId`.
+ * Not part of `KioskConfig` (server) — use {@link mergeKioskWithTauriLocalDevice} on the kiosk.
+ */
+export const KioskTauriLocalDeviceV1Schema = z.object({
+  v: z.literal(1),
+  unitId: z.string().min(1),
+  isPrintEnabled: z.boolean().optional(),
+  isAlwaysPrintTicket: z.boolean().optional(),
+  printerConnection: z.enum(['network', 'system']).optional(),
+  systemPrinterName: z.string().optional(),
+  printerIp: z.string().optional(),
+  printerPort: z.string().optional(),
+  printerType: z.string().optional(),
+  printerLogoUrl: z.string().optional(),
+  serialPath: z.string().optional(),
+  serialBaud: z.number().int().positive().optional()
+});
+
+export type KioskTauriLocalDeviceV1 = z.infer<
+  typeof KioskTauriLocalDeviceV1Schema
+>;
+
+/**
+ * Merged config for kiosk **runtime** (Tauri + browser): server `KioskConfig` with device-only overlay
+ * (printer, serial) applied. Used for printing, receipt QR, and paper-out polling.
+ */
+export type KioskConfigForDeviceRuntime = KioskConfig & {
+  isPrintEnabled?: boolean;
+  isAlwaysPrintTicket?: boolean;
+  printerConnection?: 'network' | 'system';
+  systemPrinterName?: string;
+  printerIp?: string;
+  printerPort?: string;
+  printerType?: string;
+  printerLogoUrl?: string;
+  /** Tauri: serial ID scanner, from `KioskTauriLocalDeviceV1` only. */
+  serialPath?: string;
+  serialBaud?: number;
+};
+
+/**
+ * Merges API `KioskConfig` with Tauri-local device state. `v` / `unitId` on local are not merged into kiosk.
+ */
+export function mergeKioskWithTauriLocalDevice(
+  server: KioskConfig | undefined,
+  local: KioskTauriLocalDeviceV1 | null
+): KioskConfigForDeviceRuntime {
+  const s = { ...(server ?? {}) } as KioskConfig;
+  if (!local) {
+    return s as KioskConfigForDeviceRuntime;
+  }
+  const { v, unitId, ...fromLocal } = local;
+  return { ...s, ...fromLocal } as KioskConfigForDeviceRuntime;
+}
+
+/**
+ * If no local device config yet, copy print-related fields from legacy `config.kiosk` (API may still return old keys).
+ * Does not set `serialPath` (never on server). Caller persists the result.
+ */
+export function migrateKioskTauriLocalFromServerKiosk(
+  unitId: string,
+  legacy: KioskConfigForDeviceRuntime
+): KioskTauriLocalDeviceV1 {
+  return {
+    v: 1,
+    unitId,
+    isPrintEnabled: legacy.isPrintEnabled,
+    isAlwaysPrintTicket: legacy.isAlwaysPrintTicket,
+    printerConnection: legacy.printerConnection,
+    systemPrinterName: legacy.systemPrinterName,
+    printerIp: legacy.printerIp,
+    printerPort: legacy.printerPort,
+    printerType: legacy.printerType,
+    printerLogoUrl: legacy.printerLogoUrl
+  };
+}
+
+/** @internal Whether legacy (API `config.kiosk` with passthrough / old data) has print fields to import into Tauri. */
+export function hasLegacyKioskPrintFields(
+  legacy: KioskConfig | undefined | null
+): boolean {
+  if (!legacy) {
+    return false;
+  }
+  const k = legacy as KioskConfigForDeviceRuntime;
+  return (
+    k.isPrintEnabled !== undefined ||
+    k.isAlwaysPrintTicket !== undefined ||
+    k.printerConnection !== undefined ||
+    (k.systemPrinterName?.trim() ?? '') !== '' ||
+    (k.printerIp?.trim() ?? '') !== '' ||
+    (k.printerPort?.trim() ?? '') !== '' ||
+    (k.printerType?.trim() ?? '') !== '' ||
+    (k.printerLogoUrl?.trim() ?? '') !== ''
+  );
+}
+
 /** Runtime shape for `UnitConfig.kiosk` (matches {@link KioskConfig}). */
 export const KioskConfigSchema = z
   .object({
@@ -472,27 +573,18 @@ export const KioskConfigSchema = z
     welcomeSubtitle: z.string().optional(),
     headerText: z.string().optional(),
     footerText: z.string().optional(),
-    printerConnection: z.enum(['network', 'system']).optional(),
-    systemPrinterName: z.string().optional(),
-    printerIp: z.string().optional(),
-    printerPort: z.string().optional(),
     showHeader: z.boolean().optional(),
     showFooter: z.boolean().optional(),
     isCustomColorsEnabled: z.boolean().optional(),
     headerColor: z.string().optional(),
     bodyColor: z.string().optional(),
     serviceGridColor: z.string().optional(),
-    logoUrl: z.string().optional(),
-    printerLogoUrl: z.string().optional(),
-    printerType: z.string().optional(),
-    isPrintEnabled: z.boolean().optional(),
     /**
-     * When true (default) and a receipt print target is configured, print the ticket
-     * automatically on success. When false, show a manual "Print" control on the success
-     * screen instead (QuokkaQ Kiosk / Tauri with a target only).
+     * Kiosk service grid: `manual` = positions from `Service.gridRow` / `gridCol` (8×8); `auto` = client lays out
+     * from sorted services without requiring manual placement. Default: `manual` when unset.
      */
-    isAlwaysPrintTicket: z.boolean().optional(),
-    feedbackUrl: z.string().optional(),
+    serviceGridLayout: z.enum(['manual', 'auto']).optional(),
+    logoUrl: z.string().optional(),
     isPreRegistrationEnabled: z.boolean().optional(),
     /**
      * When true, kiosk shows the “I have an appointment / check-in” path (code, phone, scan).
@@ -1090,31 +1182,19 @@ export interface KioskConfig {
   welcomeSubtitle?: string;
   headerText?: string;
   footerText?: string;
-  printerConnection?: 'network' | 'system';
-  systemPrinterName?: string;
-  printerIp?: string;
-  printerPort?: string;
   showHeader?: boolean;
   showFooter?: boolean;
   isCustomColorsEnabled?: boolean;
   headerColor?: string;
   bodyColor?: string;
   serviceGridColor?: string;
+  /**
+   * `manual` = 8×8 from service grid fields (default). `auto` = client lays out from the sorted service list
+   * without requiring manual cell placement.
+   */
+  serviceGridLayout?: 'manual' | 'auto';
   /** Logo in the kiosk UI (color is fine). */
   logoUrl?: string;
-  /**
-   * Optional logo raster for thermal receipts only. Prefer high-contrast black-and-white (PNG, JPEG, BMP, SVG, WebP).
-   * When empty, `logoUrl` is used for printing as well.
-   */
-  printerLogoUrl?: string;
-  printerType?: string;
-  isPrintEnabled?: boolean;
-  /**
-   * When not false, issue ticket receipt after creation automatically if a print target
-   * exists. When false, the kiosk shows a manual print action on the success screen.
-   */
-  isAlwaysPrintTicket?: boolean;
-  feedbackUrl?: string;
   isPreRegistrationEnabled?: boolean;
   isAppointmentCheckinEnabled?: boolean;
   isAppointmentPhoneLookupEnabled?: boolean;

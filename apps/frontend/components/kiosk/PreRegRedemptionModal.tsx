@@ -157,7 +157,7 @@ export function PreRegRedemptionModal({
 
   const scanActive = isOpen && tab === 'code' && !redeemMutation.isPending;
   useKioskBarcodeWedge(scanActive, applyScanned);
-  useKioskSerialScannerStream(scanActive, applyScanned);
+  useKioskSerialScannerStream(scanActive, applyScanned, unitId);
 
   const startCameraScan = async () => {
     // BarcodeDetector is Chromium-only; not in all TypeScript DOM libs.

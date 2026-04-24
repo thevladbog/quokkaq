@@ -30,6 +30,8 @@ type Service struct {
 	IsLeaf             bool   `gorm:"default:false" json:"isLeaf"`
 	// RestrictedServiceZoneID: when set, this leaf service is only offered in that service_zone's waiting pool (child of UnitID subdivision).
 	RestrictedServiceZoneID *string `json:"restrictedServiceZoneId,omitempty" gorm:"column:restricted_service_zone_id"`
+	// Display order within the unit (kiosk and lists). Lower = earlier. Independent of `units.sort_order`.
+	SortOrder int `gorm:"not null;default:0;column:sort_order" json:"sortOrder"`
 
 	// Grid configuration
 	GridRow     *int `json:"gridRow,omitempty"`

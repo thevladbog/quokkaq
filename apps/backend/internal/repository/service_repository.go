@@ -25,6 +25,8 @@ func isCalendarSlotKeyUniqueViolation(err error) bool {
 
 type ServiceRepository interface {
 	Create(service *models.Service) error
+	// NextSortOrderForUnit returns max(sort_order)+1 for the unit (0 if no rows).
+	NextSortOrderForUnit(unitID string) (int, error)
 	FindAllByUnit(unitID string) ([]models.Service, error)
 	// FindAllByUnitSubtree returns services for rootUnitID and all descendant units (single recursive CTE).
 	FindAllByUnitSubtree(rootUnitID string) ([]models.Service, error)
@@ -50,6 +52,20 @@ func NewServiceRepository() ServiceRepository {
 	return &serviceRepository{db: database.DB}
 }
 
+func (r *serviceRepository) NextSortOrderForUnit(unitID string) (int, error) {
+	if unitID == "" {
+		return 0, nil
+	}
+	var m int
+	if err := r.db.Raw(
+		`SELECT COALESCE(MAX(sort_order), -1) FROM services WHERE unit_id = ?`,
+		unitID,
+	).Scan(&m).Error; err != nil {
+		return 0, err
+	}
+	return m + 1, nil
+}
+
 func (r *serviceRepository) Create(service *models.Service) error {
 	err := r.db.Create(service).Error
 	if err != nil && isCalendarSlotKeyUniqueViolation(err) {
@@ -60,7 +76,9 @@ func (r *serviceRepository) Create(service *models.Service) error {
 
 func (r *serviceRepository) FindAllByUnit(unitID string) ([]models.Service, error) {
 	var services []models.Service
-	err := r.db.Where("unit_id = ?", unitID).Find(&services).Error
+	err := r.db.Where("unit_id = ?", unitID).
+		Order("sort_order ASC, name ASC").
+		Find(&services).Error
 	return services, err
 }
 
@@ -80,7 +98,8 @@ WITH RECURSIVE subtree AS (
 	INNER JOIN subtree s ON u.parent_id = s.id
 )
 SELECT services.* FROM services
-WHERE services.unit_id IN (SELECT id FROM subtree)`
+WHERE services.unit_id IN (SELECT id FROM subtree)
+ORDER BY services.sort_order ASC, services.name ASC`
 	err := r.db.Raw(q, rootUnitID).Scan(&services).Error
 	return services, err
 }
@@ -207,6 +226,7 @@ var updatableServiceColumns = []string{
 	"grid_col",
 	"grid_row_span",
 	"grid_col_span",
+	"sort_order",
 }
 
 func (r *serviceRepository) Update(service *models.Service) error {

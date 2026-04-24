@@ -507,25 +507,6 @@ export default function TicketPage() {
               </div>
             </>
           )}
-
-          {/* Feedback */}
-          {unit?.config?.kiosk?.feedbackUrl && isTerminal && (
-            <>
-              <Separator className='my-4 w-full' />
-              <Button variant='outline' className='w-full' asChild>
-                <a
-                  href={unit.config.kiosk.feedbackUrl.replace(
-                    '{{ticketId}}',
-                    ticket.id
-                  )}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                >
-                  {t('rate_visit')}
-                </a>
-              </Button>
-            </>
-          )}
         </CardContent>
       </Card>
     </div>

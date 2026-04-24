@@ -189,7 +189,9 @@ export function LogoUpload({
               </>
             )}
           </Button>
-          <p className='text-muted-foreground text-xs'>{hint ?? t('hint')}</p>
+          <p className='text-muted-foreground text-sm leading-normal'>
+            {hint ?? t('hint')}
+          </p>
         </div>
       </div>
     </div>

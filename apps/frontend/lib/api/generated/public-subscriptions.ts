@@ -148,6 +148,8 @@ export interface ModelsService {
   prefix?: string;
   /** RestrictedServiceZoneID: when set, this leaf service is only offered in that service_zone's waiting pool (child of UnitID subdivision). */
   restrictedServiceZoneId?: string;
+  /** Display order within the unit (kiosk and lists). Lower = earlier. Independent of `units.sort_order`. */
+  sortOrder?: number;
   textColor?: string;
   unitId?: string;
 }

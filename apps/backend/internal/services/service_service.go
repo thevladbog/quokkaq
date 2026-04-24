@@ -114,6 +114,11 @@ func (s *serviceService) CreateService(service *models.Service) error {
 			return ErrServiceQuotaExceeded
 		}
 	}
+	next, err := s.repo.NextSortOrderForUnit(service.UnitID)
+	if err != nil {
+		return err
+	}
+	service.SortOrder = next
 	if err := s.repo.Create(service); err != nil {
 		if errors.Is(err, repository.ErrDuplicateCalendarSlotKey) {
 			return ErrDuplicateCalendarSlotKey

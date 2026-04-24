@@ -173,6 +173,10 @@ func MergeServiceJSONPatch(dst *models.Service, raw map[string]json.RawMessage) 
 				return fmt.Errorf("gridColSpan: %w", err)
 			}
 			dst.GridColSpan = p
+		case "sortOrder":
+			if err := json.Unmarshal(v, &dst.SortOrder); err != nil {
+				return fmt.Errorf("sortOrder: %w", err)
+			}
 		default:
 			// Ignore unknown keys so generated clients can add read-only metadata without breaking updates.
 			continue
