@@ -33,12 +33,9 @@ export function useKioskTelemetryPing(
         const t1 =
           typeof performance !== 'undefined' ? performance.now() : Date.now();
         const roundtripMs = Math.max(0, Math.round(t1 - t0));
-        await postUnitsUnitIdKioskTelemetry({
-          unitId: id,
-          data: {
-            kind: 'api_ping',
-            meta: { roundtripMs } as Record<string, unknown>
-          }
+        await postUnitsUnitIdKioskTelemetry(id, {
+          kind: 'api_ping',
+          meta: { roundtripMs } as Record<string, unknown>
         });
       } catch (e) {
         logger.warn('kiosk api_ping telemetry failed', { unitId: id, e });
@@ -53,9 +50,9 @@ export function useKioskTelemetryPing(
     const onOnline = () => {
       void (async () => {
         try {
-          await postUnitsUnitIdKioskTelemetry({
-            unitId,
-            data: { kind: 'heartbeat', meta: { online: true } }
+          await postUnitsUnitIdKioskTelemetry(unitId, {
+            kind: 'heartbeat',
+            meta: { online: true } as Record<string, unknown>
           });
         } catch (e) {
           logger.warn('kiosk online heartbeat failed', { unitId, e });
@@ -66,9 +63,9 @@ export function useKioskTelemetryPing(
     const onOffline = () => {
       void (async () => {
         try {
-          await postUnitsUnitIdKioskTelemetry({
-            unitId,
-            data: { kind: 'heartbeat', meta: { online: false } }
+          await postUnitsUnitIdKioskTelemetry(unitId, {
+            kind: 'heartbeat',
+            meta: { online: false } as Record<string, unknown>
           });
         } catch {
           // ignore when offline

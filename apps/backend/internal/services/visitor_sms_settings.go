@@ -31,9 +31,7 @@ func MergeVisitorSMSSectionIntoCompanySettings(existing json.RawMessage, s Compa
 	if err != nil {
 		return nil, err
 	}
-	var raw json.RawMessage
-	raw = enc
-	root["visitorSms"] = raw
+	root["visitorSms"] = json.RawMessage(enc)
 	return json.Marshal(root)
 }
 

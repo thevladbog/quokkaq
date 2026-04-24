@@ -324,7 +324,7 @@ jobs:
         with:
           tool: cargo-nextest
 
-      - name: '🪟 Install Tauri / GTK system dependencies (Linux)'
+      - name: '🪟 Install Tauri / GTK / ALSA system dependencies (Linux)'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -341,6 +341,7 @@ jobs:
             librsvg2-dev \
             libxdo-dev \
             libudev-dev \
+            libasound2-dev \
             patchelf
 
       - name: '📥 Install dependencies'

@@ -633,7 +633,8 @@ export const unitsApi = {
       }
     );
     if (!res.ok) {
-      await throwApiHttpErrorFromBody(res);
+      const errText = await res.text();
+      throwApiHttpErrorFromBody(res.status, errText || '{}');
     }
     return (await res.json()) as {
       matchStatus: string;
@@ -648,7 +649,8 @@ export const unitsApi = {
       `${API_BASE_URL}/units/${unitId}/employee-idp`
     );
     if (!res.ok) {
-      await throwApiHttpErrorFromBody(res);
+      const errText = await res.text();
+      throwApiHttpErrorFromBody(res.status, errText || '{}');
     }
     return (await res.json()) as {
       unitId: string;
@@ -688,7 +690,8 @@ export const unitsApi = {
       }
     );
     if (!res.ok) {
-      await throwApiHttpErrorFromBody(res);
+      const errText = await res.text();
+      throwApiHttpErrorFromBody(res.status, errText || '{}');
     }
     return (await res.json()) as {
       unitId: string;
@@ -714,7 +717,7 @@ export const unitsApi = {
       body = {
         serviceId: normalized.serviceId,
         kioskIdentifiedUserId: normalized.kioskIdentifiedUserId
-      };
+      } as orvalTc.HandlersCreateTicketRequest;
     } else if (normalized.visitorPhone && normalized.visitorLocale) {
       body = {
         serviceId: normalized.serviceId,

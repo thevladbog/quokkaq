@@ -772,7 +772,9 @@ export const UnitConfigSchema = z
 export const UnitOperationsPublicSchema = z.object({
   kioskFrozen: z.boolean().optional(),
   counterLoginBlocked: z.boolean().optional(),
-  phase: z.string().optional()
+  phase: z.string().optional(),
+  kioskIdOcr: z.boolean().optional(),
+  kioskOfflineMode: z.boolean().optional()
 });
 
 export const UnitModelSchema = z.object({

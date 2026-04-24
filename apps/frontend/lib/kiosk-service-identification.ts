@@ -8,7 +8,7 @@ export type KioskIdentificationMode =
   | 'badge';
 
 export function getServiceIdentificationMode(
-  s: Service
+  s: Pick<Service, 'identificationMode' | 'offerIdentification'>
 ): KioskIdentificationMode {
   const m = s.identificationMode;
   if (

@@ -192,7 +192,8 @@ export function PreRegRedemptionModal({
         }
         const codes = await det.detect(v);
         if (codes.length) {
-          const r = codes[0]?.rawValue;
+          const first = codes[0] as { rawValue?: string } | undefined;
+          const r = first?.rawValue;
           if (r) {
             applyScanned(r);
             stopCamera();

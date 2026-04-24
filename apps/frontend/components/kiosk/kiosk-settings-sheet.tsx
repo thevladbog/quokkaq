@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, type _Translator } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -61,10 +61,8 @@ function KioskSettingsColorColumn({
   textPlaceholder: string;
   check: KioskColorContrastCheck;
   surfaceName: string;
-  t: (
-    key: string,
-    values?: Record<string, string | number | boolean>
-  ) => string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- use-intl `IntlMessages` is `Record<string, any>` without strict locale types
+  t: _Translator<Record<string, any>, 'kiosk.settings'>;
 }) {
   const r = check.ratio == null ? '—' : check.ratio.toFixed(2);
   const minN = String(WCAG.AA_NORMAL);

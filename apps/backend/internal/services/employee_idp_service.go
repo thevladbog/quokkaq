@@ -232,7 +232,11 @@ func (s *EmployeeIdpService) callUpstream(ctx context.Context, set *models.UnitE
 	if err != nil {
 		return "", "", fmt.Errorf("%w: %v", ErrEmployeeIdpUpstream, err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if cErr := res.Body.Close(); cErr != nil && err == nil {
+			err = fmt.Errorf("%w: %v", ErrEmployeeIdpUpstream, cErr)
+		}
+	}()
 	b, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		return "", "", fmt.Errorf("%w: status %d", ErrEmployeeIdpUpstream, res.StatusCode)

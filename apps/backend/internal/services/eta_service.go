@@ -548,8 +548,9 @@ func (s *ETAService) applyKioskSmartETABlend(unitID string, ticket *models.Ticke
 		}
 	}
 	lt := now.In(loc)
-	dow := int16(lt.Weekday()) // Go: Sunday=0 — align SQL EXTRACT DOW: PG Sunday=0
-	hr := int16(lt.Hour())
+	// Go: Sunday=0 — align SQL EXTRACT DOW: PG Sunday=0. time.Weekday and Hour are 0-6 and 0-23.
+	dow := int16(lt.Weekday()) // #nosec G115
+	hr := int16(lt.Hour())     // #nosec G115
 	var p50, p90, p95, n int
 	er := s.db.Raw(`
 SELECT p50_wait_sec, p90_wait_sec, p95_wait_sec, sample_n FROM kiosk_eta_slot_calibration

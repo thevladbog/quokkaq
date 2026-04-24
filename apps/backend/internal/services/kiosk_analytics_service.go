@@ -75,7 +75,7 @@ type KioskTelemetryAgg struct {
 var ErrKioskPlanFeature = errors.New("plan does not include kiosk_operations_analytics")
 
 // GetKioskAnalytics runs aggregate queries. Caller must enforce auth (statistics scope).
-func (s *KioskAnalyticsService) GetKioskAnalytics(companyID, unitID string, from, to time.Time) (*KioskAnalyticsResult, error) {
+func (s *KioskAnalyticsService) GetKioskAnalytics(companyID, unitID string, from, to time.Time) (out *KioskAnalyticsResult, err error) {
 	if companyID == "" {
 		if err := s.db.Raw(`SELECT company_id FROM units WHERE id = ?`, unitID).Scan(&companyID).Error; err != nil || companyID == "" {
 			return nil, err
@@ -100,12 +100,12 @@ func (s *KioskAnalyticsService) GetKioskAnalytics(companyID, unitID string, from
 	if strings.TrimSpace(tz) == "" {
 		tz = "UTC"
 	}
-	loc, err := time.LoadLocation(tz)
-	if err != nil {
+	loc, lerr := time.LoadLocation(tz)
+	if lerr != nil {
 		loc = time.UTC
 	}
 
-	out := &KioskAnalyticsResult{
+	out = &KioskAnalyticsResult{
 		FromUTC:    from.UTC(),
 		ToUTC:      to.UTC(),
 		ComputedAt: time.Now().UTC(),
@@ -129,7 +129,11 @@ func (s *KioskAnalyticsService) GetKioskAnalytics(companyID, unitID string, from
 
 	rows, qerr := s.db.Raw(`SELECT service_id, count(*)::bigint as c FROM tickets WHERE unit_id = $1 AND created_at >= $2 AND created_at < $3 GROUP BY service_id ORDER BY c DESC`, unitID, from, to).Rows()
 	if qerr == nil {
-		defer rows.Close()
+		defer func() {
+			if c := rows.Close(); c != nil && err == nil {
+				err = fmt.Errorf("by-service rows: %w", c)
+			}
+		}()
 		for rows.Next() {
 			var sid string
 			var c int64
@@ -149,7 +153,11 @@ SELECT to_char(created_at AT TIME ZONE 'UTC' AT TIME ZONE $4, 'YYYY-MM-DD HH24:0
 FROM tickets WHERE unit_id = $1 AND created_at >= $2 AND created_at < $3
 GROUP BY 1 ORDER BY 1`, unitID, from, to, tz).Rows()
 	if herr == nil {
-		defer hr.Close()
+		defer func() {
+			if c := hr.Close(); c != nil && err == nil {
+				err = fmt.Errorf("by-hour rows: %w", c)
+			}
+		}()
 		for hr.Next() {
 			var h string
 			var c int64
@@ -161,7 +169,11 @@ GROUP BY 1 ORDER BY 1`, unitID, from, to, tz).Rows()
 		// fallback UTC hour
 		hr2, e2 := s.db.Raw(`SELECT to_char(created_at, 'YYYY-MM-DD HH24:00'), count(*)::bigint FROM tickets WHERE unit_id = $1 AND created_at >= $2 AND created_at < $3 GROUP BY 1 ORDER BY 1`, unitID, from, to).Rows()
 		if e2 == nil {
-			defer hr2.Close()
+			defer func() {
+				if c := hr2.Close(); c != nil && err == nil {
+					err = fmt.Errorf("by-hour (utc fallback) rows: %w", c)
+				}
+			}()
 			for hr2.Next() {
 				var h string
 				var c int64
@@ -177,7 +189,11 @@ FROM queue_funnel_events
 WHERE unit_id = $1 AND event = 'ticket_created' AND created_at >= $2 AND created_at < $3
 GROUP BY 1 ORDER BY 2 DESC`, unitID, from, to).Rows()
 	if chErr == nil {
-		defer chRows.Close()
+		defer func() {
+			if c := chRows.Close(); c != nil && err == nil {
+				err = fmt.Errorf("funnel channel rows: %w", c)
+			}
+		}()
 		for chRows.Next() {
 			var ch string
 			var c int64
@@ -200,7 +216,7 @@ WHERE unit_id = $1 AND kind = 'api_ping' AND created_at >= $2 AND created_at < $
 	_ = s.db.Raw(`SELECT count(*)::bigint FROM kiosk_telemetry_events WHERE unit_id = $1 AND kind = 'print_error' AND created_at >= $2 AND created_at < $3`, unitID, from, to).Scan(&out.Telemetry.PrinterError).Error
 	_ = s.db.Raw(`SELECT count(*)::bigint FROM kiosk_telemetry_events WHERE unit_id = $1 AND kind = 'paper_out' AND created_at >= $2 AND created_at < $3`, unitID, from, to).Scan(&out.Telemetry.PaperOut).Error
 
-	return out, nil
+	return
 }
 
 // WriteKioskAnalyticsCSV writes CSV to w.
