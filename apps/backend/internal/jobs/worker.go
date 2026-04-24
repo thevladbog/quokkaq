@@ -7,6 +7,7 @@ import (
 	"os"
 
 	applogger "quokkaq-go-backend/internal/logger"
+	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 
@@ -29,6 +30,7 @@ type jobWorker struct {
 	notifRepo  repository.NotificationRepository
 	// settingsSvc is resolved per-job so runtime SMS config changes take effect immediately.
 	settingsSvc  *services.DeploymentSaaSSettingsService
+	companyRepo  repository.CompanyRepository
 	notifService *services.NotificationService
 	anomalySvc   *services.AnomalyService
 	signageFeed  SignageFeedPollRunner
@@ -88,10 +90,12 @@ func NewJobWorkerWithSMS(
 	ticketRepo repository.TicketRepository,
 	notifRepo repository.NotificationRepository,
 	settingsSvc *services.DeploymentSaaSSettingsService,
+	companyRepo repository.CompanyRepository,
 ) JobWorker {
 	base := NewJobWorker(ttsService, ticketRepo).(*jobWorker)
 	base.notifRepo = notifRepo
 	base.settingsSvc = settingsSvc
+	base.companyRepo = companyRepo
 	return base
 }
 
@@ -185,10 +189,24 @@ func (w *jobWorker) handleSMSSend(ctx context.Context, t *asynq.Task) error {
 		}
 	}
 
-	// Resolve the SMS provider per-job so admin config changes take effect immediately.
+	// Resolve tenant vs platform SMS (same policy as at enqueue time).
 	var provider services.SMSProvider
 	if w.settingsSvc != nil {
-		provider = w.settingsSvc.GetSMSProvider()
+		if p.SmsSource == "" {
+			provider = w.settingsSvc.GetSMSProvider()
+		} else {
+			var comp *models.Company
+			if w.companyRepo != nil && p.SmsSource == "tenant" && p.CompanyID != "" {
+				if c, err := w.companyRepo.FindByID(p.CompanyID); err == nil {
+					comp = c
+				}
+			}
+			dep, _ := w.settingsSvc.GetIntegrationSettings()
+			provider, _ = services.ResolveSMSProviderForCompany(comp, dep)
+			if services.IsLogSMSProvider(provider) {
+				provider = w.settingsSvc.GetSMSProvider()
+			}
+		}
 	} else {
 		provider = &services.LogSMSProvider{}
 	}

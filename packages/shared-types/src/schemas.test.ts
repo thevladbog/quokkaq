@@ -247,6 +247,28 @@ describe('TicketModelSchema', () => {
     }
   });
 
+  it('preserves visitorPhoneKnown and smsPostTicketStepRequired (kiosk DTO)', () => {
+    const r = TicketModelSchema.safeParse({
+      ...minimalTicket,
+      visitorPhoneKnown: true,
+      smsPostTicketStepRequired: true
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.visitorPhoneKnown).toBe(true);
+      expect(r.data.smsPostTicketStepRequired).toBe(true);
+    }
+  });
+
+  it('smsPostTicketStepRequired and visitorPhoneKnown are undefined when absent', () => {
+    const r = TicketModelSchema.safeParse(minimalTicket);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.smsPostTicketStepRequired).toBeUndefined();
+      expect(r.data.visitorPhoneKnown).toBeUndefined();
+    }
+  });
+
   it('smsOptInAvailable is undefined when absent (optional field)', () => {
     const r = TicketModelSchema.safeParse(minimalTicket);
     expect(r.success).toBe(true);

@@ -39,15 +39,18 @@ type Ticket struct {
 	IsEOD             bool    `gorm:"default:false" json:"isEod"`
 	// IsCredit marks a ticket issued when the monthly tickets_per_month quota was exhausted but
 	// the working day (EOD) was still open. Credit tickets are counted against the next billing period.
-	IsCredit       bool       `gorm:"default:false;column:is_credit" json:"isCredit"`
-	TTSUrl         *string    `json:"ttsUrl,omitempty"` // URL to the generated TTS audio file
-	CreatedAt      time.Time  `gorm:"default:now()" json:"createdAt"`
-	CalledAt       *time.Time `json:"calledAt,omitempty"`
-	ConfirmedAt    *time.Time `json:"confirmedAt,omitempty"`
-	CompletedAt    *time.Time `json:"completedAt,omitempty"`
-	LastCalledAt   *time.Time `json:"lastCalledAt,omitempty"`
-	MaxWaitingTime *int       `json:"maxWaitingTime,omitempty"` // Snapshot from Service at creation
-	MaxServiceTime *int       `json:"maxServiceTime,omitempty"` // Snapshot from Service at in_service; cleared on transfer/return
+	IsCredit bool    `gorm:"default:false;column:is_credit" json:"isCredit"`
+	TTSUrl   *string `json:"ttsUrl,omitempty"` // URL to the generated TTS audio file
+	// VisitorWelcomeNotifiedAt is set when the first welcome notification pipeline was claimed for this ticket.
+	VisitorWelcomeNotifiedAt *time.Time `gorm:"column:visitor_welcome_notified_at" json:"visitorWelcomeNotifiedAt,omitempty"`
+	VisitorNotificationEmail *string    `gorm:"column:visitor_notification_email" json:"visitorNotificationEmail,omitempty"`
+	CreatedAt                time.Time  `gorm:"default:now()" json:"createdAt"`
+	CalledAt                 *time.Time `json:"calledAt,omitempty"`
+	ConfirmedAt              *time.Time `json:"confirmedAt,omitempty"`
+	CompletedAt              *time.Time `json:"completedAt,omitempty"`
+	LastCalledAt             *time.Time `json:"lastCalledAt,omitempty"`
+	MaxWaitingTime           *int       `json:"maxWaitingTime,omitempty"` // Snapshot from Service at creation
+	MaxServiceTime           *int       `json:"maxServiceTime,omitempty"` // Snapshot from Service at in_service; cleared on transfer/return
 	// ServedByUserID is set when a ticket is called/picked; records the operator (counter.AssignedTo at call time).
 	ServedByUserID  *string `gorm:"column:served_by_user_id" json:"servedByUserId,omitempty"`
 	OperatorComment *string `gorm:"type:text" json:"operatorComment,omitempty"`

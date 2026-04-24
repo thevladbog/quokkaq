@@ -761,6 +761,29 @@
       "filter_unit_placeholder": "All units",
       "filter_all_units": "All units",
       "filter_unit_hint": "Narrows the list below. Each calendar connection still belongs to one unit.",
+      "visitor_sms": {
+        "title": "Visitor SMS (BYOK)",
+        "description": "Override the platform’s SMS settings for your organization. When not configured, messages use the deployment (platform) integration.",
+        "loading": "Loading…",
+        "resolved": "Current route: {source} (tenant uses your keys when enabled and valid).",
+        "stats_7d": "Last 7 days — pending: {p}, sent: {s}, failed: {f} (from notification jobs).",
+        "provider": "Provider",
+        "api_key": "API key or login",
+        "api_key_placeholder": "New key (leave empty to keep stored key)",
+        "api_secret": "API secret (if required)",
+        "from_name": "Sender name (optional)",
+        "enabled": "Use tenant credentials",
+        "enabled_hint": "When off, the platform’s SMS path is used if available.",
+        "saving": "Saving…",
+        "save": "Save",
+        "save_ok": "Visitor SMS settings saved",
+        "save_error": "Could not save",
+        "test_phone": "Test number (E.164)",
+        "test_send": "Send test",
+        "test_ok": "Sent via {p} (source: {s})",
+        "test_error": "Test send failed",
+        "plan_required": "Visitor SMS (BYOK) is not included in your current plan. Upgrade to a plan with visitor notifications to use tenant credentials and the stats below."
+      },
       "onec": {
         "title": "1C:Trade Management (UNF) — CommerceML",
         "description": "HTTP exchange for orders and statuses (CommerceML 2.x). Map catalog items and the counterparty in the platform admin, then configure credentials here for 1C to pull from this URL.",
@@ -2235,6 +2258,18 @@
       "checkInSuccess": "Check-in successful! Your ticket number is: {number}",
       "invalidBookingCode": "Invalid booking code or check-in failed."
     },
+    "sms_post_ticket": {
+      "title": "SMS updates",
+      "subtitle": "Receive a text with your number and a link to track the queue. Carrier rates may apply.",
+      "consent_label": "I agree to receive transactional SMS for this visit.",
+      "consent_error": "Please confirm that you agree to receive SMS updates.",
+      "short_phone_error": "Enter a complete phone number (country code and digits).",
+      "token_error": "This session is missing a security token. The ticket is still valid.",
+      "network_error": "Something went wrong. You can try again or choose Not now.",
+      "not_now": "Not now",
+      "send": "Send SMS",
+      "sending": "Sending…"
+    },
     "phone_identification": {
       "title": "Your phone number",
       "subtitle": "Optional. Enter your number to identify yourself, or skip.",
@@ -2310,6 +2345,8 @@
       "session_idle_before_hint": "Inactivity on the service screen before a warning. Default: 45.",
       "session_idle_countdown_label": "Countdown to reset (seconds)",
       "session_idle_countdown_hint": "How long the warning is shown before returning to the home screen. Default: 15.",
+      "visitor_sms_after_ticket": "Require SMS opt-in on success",
+      "visitor_sms_after_ticket_hint": "If your plan includes visitor SMS, show consent and number entry after the ticket is created. Turn off to use only the printed ticket and QR (no extra step).",
       "identification_per_service_note": "Phone number prompt is set per service in the admin, not here.",
       "session_idle_title": "Still here?",
       "session_idle_body": "This kiosk will return to the home screen in {seconds}s.",
@@ -2338,7 +2375,11 @@
       "screen_drill": "Service category. {title}.",
       "screen_phone": "Phone number step. You can use the number pad, then continue or skip.",
       "success_ticket": "Your ticket number is {number}.",
-      "success_live": "Your ticket number is {number}."
+      "success_live": "Your ticket number is {number}.",
+      "sms_numpad_digit": "Digit {d}",
+      "sms_numpad_backspace": "Delete last digit",
+      "sms_phone_entry": "Phone number: {n}",
+      "sms_phone_entry_empty": "Phone number, enter digits on the pad"
     },
     "lock_screen": {
       "kiosk_locked": "Kiosk Locked",

@@ -40,6 +40,8 @@ CREATE TABLE tickets (
 	is_eod integer DEFAULT 0,
 	is_credit integer DEFAULT 0,
 	tts_url text,
+	visitor_welcome_notified_at datetime,
+	visitor_notification_email text,
 	created_at datetime,
 	called_at datetime,
 	confirmed_at datetime,

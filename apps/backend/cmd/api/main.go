@@ -124,6 +124,8 @@ func run() error {
 	operatorIntervalRepo := repository.NewOperatorIntervalRepository()
 
 	notifRepo := repository.NewNotificationRepository()
+	ticketShortLinkRepo := repository.NewTicketShortLinkRepository()
+	queueFunnelRepo := repository.NewQueueFunnelRepository()
 
 	userService := services.NewUserService(userRepo, companyRepo)
 	deploymentSetupService := services.NewDeploymentSetupService(userRepo, companyRepo)
@@ -157,11 +159,13 @@ func run() error {
 	statsRefresh := services.NewStatisticsRefreshService(statsRepo, unitRepo, opStateRepo, statsSegmentsRepo)
 	operationalService := services.NewOperationalService(opStateRepo, unitRepo, statsRefresh)
 	ticketService := services.NewTicketServiceWithQuota(ticketRepo, counterRepo, serviceRepo, unitRepo, operatorIntervalRepo, unitClientRepo, visitorTagDefRepo, unitClientHistRepo, preRegRepo, operatorSkillRepo, calendarIntegrationService, hub, jobEnqueuerAdapter, quotaService, operationalService)
-	notificationService := services.NewNotificationService(notifRepo, unitRepo, unitClientRepo, jobEnqueuerAdapter, deploymentSaaSSettingsService)
+	notificationService := services.NewNotificationService(
+		notifRepo, unitRepo, unitClientRepo, companyRepo, ticketRepo, ticketShortLinkRepo, queueFunnelRepo, mailService, jobEnqueuerAdapter, deploymentSaaSSettingsService,
+	)
 	ticketService.SetNotificationService(notificationService)
 	anomalyAlertRepo := repository.NewAnomalyAlertRepository()
 	anomalyService := services.NewAnomalyService(database.DB, hub, unitRepo, anomalyAlertRepo)
-	jobWorker := jobs.NewJobWorkerWithSMS(ttsService, ticketRepo, notifRepo, deploymentSaaSSettingsService)
+	jobWorker := jobs.NewJobWorkerWithSMS(ttsService, ticketRepo, notifRepo, deploymentSaaSSettingsService, companyRepo)
 	// Wire notification service into the Asynq worker so visitor:notify jobs can delegate to it.
 	jobs.WithNotificationService(jobWorker, notificationService)
 	jobs.WithAnomalyService(jobWorker, anomalyService)
@@ -282,7 +286,8 @@ func run() error {
 	})
 	services.WireTicketServiceETAScheduler(ticketService, etaBroadcaster)
 	services.WireCounterServiceETAScheduler(counterService, etaBroadcaster)
-	ticketHandler := handlers.NewTicketHandlerFull(ticketService, operationalService, etaService, unitService, database.DB).WithSettingsService(deploymentSaaSSettingsService)
+	ticketHandler := handlers.NewTicketHandlerFull(ticketService, operationalService, etaService, unitService, database.DB).WithSettingsService(deploymentSaaSSettingsService).WithNotificationService(notificationService)
+	publicShortTicketHandler := handlers.NewPublicShortTicketHandler(ticketShortLinkRepo)
 	serviceHandler := handlers.NewServiceHandler(serviceService, userRepo)
 	counterHandler := handlers.NewCounterHandler(counterService, counterRepo, operationalService, userRepo, unitRepo)
 	bookingHandler := handlers.NewBookingHandler(bookingService, userRepo)
@@ -359,6 +364,7 @@ func run() error {
 		pubApp,
 	)
 	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo, tenantRBACRepo, database.DB)
+	companyVisitorSMSHandler := handlers.NewCompanyVisitorSMSHandler(companyRepo, userRepo, deploymentSaaSSettingsService, queueFunnelRepo)
 	screenLayoutTemplateRepo := repository.NewScreenLayoutTemplateRepository()
 	screenLayoutTemplateService := services.NewScreenLayoutTemplateService(screenLayoutTemplateRepo)
 	screenLayoutTemplateHandler := handlers.NewScreenLayoutTemplateHandler(screenLayoutTemplateService, userRepo)
@@ -409,6 +415,7 @@ func run() error {
 	r.Head("/health/live", healthLiveHead)
 	r.Get("/health/ready", healthReady)
 	r.Head("/health/ready", healthReadyHead)
+	r.With(authmiddleware.PublicAPIRateLimit).Get("/l/{code}", publicShortTicketHandler.RedirectToTicket)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := w.Write([]byte("Hello from QuokkaQ Go Backend!")); err != nil {
@@ -543,7 +550,7 @@ func run() error {
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/public-screen-announcements", signageHandler.ListAnnouncementsPublic)
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/feeds/{feedId}/data", signageHandler.PublicFeedData)
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/queue-status", ticketHandler.GetUnitQueueStatus)
-		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/virtual-queue", ticketHandler.JoinVirtualQueue)
+		r.With(authmiddleware.VirtualQueueJoinRateLimit, authmiddleware.PublicAPIRateLimit).Post("/{unitId}/virtual-queue", ticketHandler.JoinVirtualQueue)
 
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
@@ -851,6 +858,10 @@ func run() error {
 			r.Use(authmiddleware.RequireTenantAdmin(userRepo, tenantRBACRepo))
 			r.Get("/me", companyHandler.GetMyCompany)
 			r.Patch("/me", companyHandler.PatchMyCompany)
+			r.Get("/me/visitor-sms", companyVisitorSMSHandler.GetVisitorSMS)
+			r.Put("/me/visitor-sms", companyVisitorSMSHandler.PutVisitorSMS)
+			r.Post("/me/visitor-sms/test", companyVisitorSMSHandler.PostVisitorSMSTest)
+			r.Get("/me/visitor-notification-stats", companyVisitorSMSHandler.GetVisitorNotificationStats)
 			r.Get("/me/rbac/permissions", tenantRBACHTTP.GetPermissionCatalog)
 			r.Get("/me/sso/group-mappings", tenantRBACHTTP.ListGroupMappings)
 			r.Post("/me/sso/group-mappings", tenantRBACHTTP.UpsertGroupMapping)
@@ -963,6 +974,7 @@ func run() error {
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{id}", ticketHandler.GetTicketByID)
 		r.With(authmiddleware.PublicAPIRateLimit).Post("/{id}/cancel", ticketHandler.VisitorCancelTicket)
 		r.With(authmiddleware.PublicAPIRateLimit).Post("/{id}/phone", ticketHandler.AttachPhone)
+		r.With(authmiddleware.PublicAPIRateLimit).Post("/{id}/visitor-sms-skip", ticketHandler.PostVisitorSMSSkip)
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Use(authmiddleware.RequireTicketUnit(userRepo, ticketRepo))
@@ -1091,6 +1103,8 @@ func (a *jobEnqueuerAdapter) EnqueueSMSSend(payload services.SMSSendJobPayload) 
 		NotificationID: payload.NotificationID,
 		To:             payload.To,
 		Body:           payload.Body,
+		CompanyID:      payload.CompanyID,
+		SmsSource:      payload.SmsSource,
 	})
 }
 

@@ -483,7 +483,9 @@ export const KioskConfigSchema = z
       .max(3_600)
       .optional(),
     /** Countdown in seconds on the warning dialog before resetting to the kiosk home. Default 15. */
-    sessionIdleCountdownSec: z.number().int().positive().max(300).optional()
+    sessionIdleCountdownSec: z.number().int().positive().max(300).optional(),
+    /** When false, skip mandatory post-ticket SMS step. Default true when unset. */
+    visitorSmsAfterTicket: z.boolean().optional()
   })
   .passthrough();
 
@@ -795,6 +797,10 @@ export const TicketModelSchema = z.object({
   estimatedWaitSeconds: z.number().nullable().optional(),
   serviceZoneName: z.string().nullable().optional(),
   smsOptInAvailable: z.boolean().optional(),
+  /** True when the unit client for this ticket has a non-empty E.164 phone. */
+  visitorPhoneKnown: z.boolean().optional(),
+  /** Kiosk: mandatory SMS capture step (consent + phone) before closing the success dialog. */
+  smsPostTicketStepRequired: z.boolean().optional(),
   visitorToken: z.string().optional(),
   service: z
     .object({
@@ -1027,6 +1033,11 @@ export interface KioskConfig {
    * Countdown in seconds on the warning dialog before returning to the kiosk home. Defaults to 15 if unset.
    */
   sessionIdleCountdownSec?: number;
+  /**
+   * When false, the kiosk will not require the post-ticket SMS opt-in step. Defaults to true when unset
+   * (enforced in the API for `smsPostTicketStepRequired`).
+   */
+  visitorSmsAfterTicket?: boolean;
 }
 
 export interface UnitConfig {
@@ -1584,7 +1595,9 @@ export const CompanyMeFeaturesSchema = z.object({
 export const CompanyMePlanCapabilitiesSchema = z.object({
   apiAccess: z.boolean(),
   outboundWebhooks: z.boolean(),
-  publicQueueWidget: z.boolean()
+  publicQueueWidget: z.boolean(),
+  customScreenLayouts: z.boolean().optional(),
+  visitorNotifications: z.boolean().optional()
 });
 
 export const CompanyMeResponseSchema = z.object({

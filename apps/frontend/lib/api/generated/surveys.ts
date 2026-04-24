@@ -334,9 +334,12 @@ export interface ModelsTicket {
   /** URL to the generated TTS audio file */
   ttsUrl?: string;
   unitId?: string;
+  visitorNotificationEmail?: string;
   /** VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in
   the X-Visitor-Token header to prevent IDOR on cancel and phone opt-in. */
   visitorToken?: string;
+  /** VisitorWelcomeNotifiedAt is set when the first welcome notification pipeline was claimed for this ticket. */
+  visitorWelcomeNotifiedAt?: string;
 }
 
 export interface HandlersClientVisitsResponse {
@@ -359,6 +362,34 @@ export interface HandlersCompanyUserListItem {
   photoUrl?: string;
   tenantRoles?: HandlersTenantRoleBriefResponse[];
   type?: string;
+}
+
+export interface HandlersCompanyVisitorNotifStats {
+  periodDays7?: boolean;
+  smsFailed?: number;
+  smsPending?: number;
+  smsSent?: number;
+}
+
+export interface HandlersCompanyVisitorSMSPublic {
+  /** ResolvedSource is tenant | platform | log (resolved outbound route for visitor SMS). */
+  resolvedSource?: string;
+  smsApiKeyMasked?: string;
+  smsEnabled?: boolean;
+  smsFromName?: string;
+  smsProvider?: string;
+}
+
+export interface HandlersCompanyVisitorSMSPut {
+  smsApiKey?: string;
+  smsApiSecret?: string;
+  smsEnabled?: boolean;
+  smsFromName?: string;
+  smsProvider?: string;
+}
+
+export interface HandlersCompanyVisitorSMSTestRequest {
+  phone: string;
 }
 
 export interface HandlersCounterCallNextRequest {
@@ -1059,6 +1090,67 @@ export interface HandlersTestSMSIntegrationRequest {
   phone?: string;
 }
 
+/**
+ * Public ticket with opt-in and kiosk post-ticket flags.
+ */
+export interface HandlersTicketWithExtras {
+  booking?: ModelsBooking;
+  bookingId?: string;
+  calledAt?: string;
+  client?: ModelsUnitClient;
+  clientId?: string;
+  completedAt?: string;
+  confirmedAt?: string;
+  counter?: ModelsCounter;
+  counterId?: string;
+  createdAt?: string;
+  /** EstimatedWaitSeconds is the estimated seconds until this ticket is called (computed on-the-fly). */
+  estimatedWaitSeconds?: number;
+  id?: string;
+  /** IsCredit marks a ticket issued when the monthly tickets_per_month quota was exhausted but
+  the working day (EOD) was still open. Credit tickets are counted against the next billing period. */
+  isCredit?: boolean;
+  isEod?: boolean;
+  lastCalledAt?: string;
+  /** Snapshot from Service at in_service; cleared on transfer/return */
+  maxServiceTime?: number;
+  /** Snapshot from Service at creation */
+  maxWaitingTime?: number;
+  operatorComment?: string;
+  /** No DB FK: avoids AutoMigrate cycle with pre_registrations.ticket_id → tickets.id */
+  preRegistration?: ModelsPreRegistration;
+  preRegistrationId?: string;
+  priority?: number;
+  queueNumber?: string;
+  /** QueuePosition is the 1-based position in the waiting queue (computed on-the-fly, not stored). */
+  queuePosition?: number;
+  /** ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets). */
+  servedByName?: string;
+  /** ServedByUserID is set when a ticket is called/picked; records the operator (counter.AssignedTo at call time). */
+  servedByUserId?: string;
+  service?: ModelsService;
+  serviceId?: string;
+  /** ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool. */
+  serviceZoneId?: string;
+  /** ServiceZoneName is the display name of the service zone unit when ServiceZoneID is set (hydrated, not stored). */
+  serviceZoneName?: string;
+  smsOptInAvailable?: boolean;
+  smsPostTicketStepRequired?: boolean;
+  status?: string;
+  /** TransferTrail lists ticket.transferred events in chronological order (client visit APIs only). */
+  transferTrail?: ModelsClientVisitTransferEvent[];
+  /** URL to the generated TTS audio file */
+  ttsUrl?: string;
+  unitId?: string;
+  visitorNotificationEmail?: string;
+  visitorPhoneKnown?: boolean;
+  /** VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in
+  the X-Visitor-Token header to prevent IDOR on cancel and phone opt-in. */
+  visitorToken?: string;
+  /** VisitorWelcomeNotifiedAt is set when the first welcome notification pipeline was claimed for this ticket. */
+  visitorWelcomeNotifiedAt?: string;
+}
+
 export interface HandlersTransferRequest {
   /** @nullable */
   operatorComment?: string | null;
@@ -1525,6 +1617,7 @@ export interface HandlersPlanCapabilitiesDTO {
   customScreenLayouts?: boolean;
   outboundWebhooks?: boolean;
   publicQueueWidget?: boolean;
+  visitorNotifications?: boolean;
 }
 
 export interface HandlersCompanyMeResponse {

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useUnitServicesTree, useCreateTicketInUnit } from '@/lib/hooks';
-import type { Ticket, Service } from '@/lib/api';
+import { ticketsApi, type Ticket, type Service } from '@/lib/api';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import dynamic from 'next/dynamic';
 const QRCode = dynamic(() => import('react-qr-code'), { ssr: false });
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useParams } from 'next/navigation';
 import { useRouter } from '@/src/i18n/navigation';
 import { useLocale } from 'next-intl';
@@ -80,6 +81,12 @@ export default function UnitKioskPage() {
   const [successPeopleAhead, setSuccessPeopleAhead] = useState<number | null>(
     null
   );
+  /** When true, success modal does not auto-close until SMS step is done or declined. */
+  const [kioskSmsBlocking, setKioskSmsBlocking] = useState(false);
+  const [kioskSmsAgreed, setKioskSmsAgreed] = useState(false);
+  const [kioskSmsDigits, setKioskSmsDigits] = useState('');
+  const [kioskSmsError, setKioskSmsError] = useState<string | null>(null);
+  const [kioskSmsBusy, setKioskSmsBusy] = useState(false);
   const router = useRouter();
   const locale = useLocale();
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
@@ -527,6 +534,29 @@ export default function UnitKioskPage() {
     };
   }, [autoCloseTimerId]);
 
+  const scheduleTicketModalAutoClose = useCallback(() => {
+    setKioskSmsBlocking(false);
+    setCountdown(5);
+    if (autoCloseTimerId) {
+      clearInterval(autoCloseTimerId);
+    }
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          setIsTicketModalOpen(false);
+          setCreatedTicket(null);
+          setKioskSmsAgreed(false);
+          setKioskSmsDigits('');
+          setKioskSmsError(null);
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    setAutoCloseTimerId(timer);
+  }, [autoCloseTimerId]);
+
   // Visible services for the current breadcrumb level (recomputed only when tree or path changes)
   const visibleServices = useMemo(() => {
     if (!unitServicesTree) {
@@ -561,22 +591,22 @@ export default function UnitKioskPage() {
     setCreatedTicket(ticket);
     setIsTicketModalOpen(true);
     setSelectedServicePath([]);
-    setCountdown(5);
-    if (autoCloseTimerId) {
-      clearInterval(autoCloseTimerId);
+    setKioskSmsError(null);
+    setKioskSmsAgreed(false);
+    setKioskSmsDigits('');
+
+    const needSms = ticket.smsPostTicketStepRequired === true;
+    if (needSms) {
+      setKioskSmsBlocking(true);
+      if (autoCloseTimerId) {
+        clearInterval(autoCloseTimerId);
+        setAutoCloseTimerId(null);
+      }
+    } else {
+      setKioskSmsBlocking(false);
+      scheduleTicketModalAutoClose();
     }
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          setIsTicketModalOpen(false);
-          setCreatedTicket(null);
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    setAutoCloseTimerId(timer);
+
     const serviceLabel = getLocalizedName(
       service.name,
       service.nameRu || '',
@@ -690,6 +720,66 @@ export default function UnitKioskPage() {
     } else {
       // If we're at the top level, navigate back to unit selection
       router.push('/kiosk');
+    }
+  };
+
+  const KIOSK_SMS_MAX = 15;
+
+  const handleKioskSmsDecline = async () => {
+    if (!createdTicket) {
+      return;
+    }
+    if (!createdTicket.visitorToken) {
+      setKioskSmsError(t('sms_post_ticket.token_error'));
+      scheduleTicketModalAutoClose();
+      return;
+    }
+    setKioskSmsError(null);
+    setKioskSmsBusy(true);
+    try {
+      await ticketsApi.visitorSmsSkip(
+        createdTicket.id,
+        createdTicket.visitorToken
+      );
+      scheduleTicketModalAutoClose();
+    } catch (e) {
+      setKioskSmsError(
+        e instanceof Error ? e.message : t('sms_post_ticket.network_error')
+      );
+    } finally {
+      setKioskSmsBusy(false);
+    }
+  };
+
+  const handleKioskSmsConfirm = async () => {
+    if (!createdTicket?.visitorToken) {
+      setKioskSmsError(t('sms_post_ticket.token_error'));
+      return;
+    }
+    if (!kioskSmsAgreed) {
+      setKioskSmsError(t('sms_post_ticket.consent_error'));
+      return;
+    }
+    if (kioskSmsDigits.length < 5) {
+      setKioskSmsError(t('sms_post_ticket.short_phone_error'));
+      return;
+    }
+    setKioskSmsError(null);
+    setKioskSmsBusy(true);
+    try {
+      await ticketsApi.attachPhone(
+        createdTicket.id,
+        `+${kioskSmsDigits}`,
+        locale === 'ru' ? 'ru' : 'en',
+        createdTicket.visitorToken
+      );
+      scheduleTicketModalAutoClose();
+    } catch (e) {
+      setKioskSmsError(
+        e instanceof Error ? e.message : t('sms_post_ticket.network_error')
+      );
+    } finally {
+      setKioskSmsBusy(false);
     }
   };
 
@@ -1040,6 +1130,10 @@ export default function UnitKioskPage() {
             setCreatedTicket(null);
             setSuccessEtaMinutes(null);
             setSuccessPeopleAhead(null);
+            setKioskSmsBlocking(false);
+            setKioskSmsAgreed(false);
+            setKioskSmsDigits('');
+            setKioskSmsError(null);
             if (autoCloseTimerId) {
               clearInterval(autoCloseTimerId);
               setAutoCloseTimerId(null);
@@ -1130,16 +1224,146 @@ export default function UnitKioskPage() {
                   </div>
                 </>
               ) : null}
+
+              {kioskSmsBlocking && createdTicket ? (
+                <div
+                  className='border-t-border mt-4 w-full max-w-sm border-t pt-4'
+                  data-testid='kiosk-sms-capture'
+                >
+                  <p className='mb-2 text-center text-sm font-medium'>
+                    {t('sms_post_ticket.title')}
+                  </p>
+                  <p className='text-muted-foreground mb-3 text-center text-xs sm:text-sm'>
+                    {t('sms_post_ticket.subtitle')}
+                  </p>
+                  <div className='mb-3 flex items-start gap-2'>
+                    <Checkbox
+                      id='kiosk-sms-consent'
+                      checked={kioskSmsAgreed}
+                      onCheckedChange={(c) => {
+                        setKioskSmsAgreed(c === true);
+                        setKioskSmsError(null);
+                      }}
+                      className='mt-1'
+                    />
+                    <label
+                      htmlFor='kiosk-sms-consent'
+                      className='text-muted-foreground text-left text-xs sm:text-sm'
+                    >
+                      {t('sms_post_ticket.consent_label')}
+                    </label>
+                  </div>
+                  <div
+                    className='border-input bg-background mb-3 flex w-full items-center justify-center rounded-md border px-2 font-mono text-2xl font-bold select-none sm:text-3xl'
+                    style={{ minHeight: '3.5rem' }}
+                    role='status'
+                    aria-live='polite'
+                    aria-label={
+                      kioskSmsDigits.length > 0
+                        ? tA11y('sms_phone_entry', { n: `+${kioskSmsDigits}` })
+                        : tA11y('sms_phone_entry_empty')
+                    }
+                  >
+                    {kioskSmsDigits.length > 0 ? `+${kioskSmsDigits}` : '+'}
+                  </div>
+                  {kioskSmsError ? (
+                    <p className='text-destructive mb-2 text-center text-xs sm:text-sm'>
+                      {kioskSmsError}
+                    </p>
+                  ) : null}
+                  <div className='mb-3 grid max-w-sm grid-cols-3 gap-1.5 sm:gap-2'>
+                    {[
+                      '1',
+                      '2',
+                      '3',
+                      '4',
+                      '5',
+                      '6',
+                      '7',
+                      '8',
+                      '9',
+                      '',
+                      '0',
+                      '⌫'
+                    ].map((d, i) => (
+                      <span key={i} className='min-h-0 min-w-0 [contain:size]'>
+                        {d ? (
+                          <Button
+                            type='button'
+                            variant='outline'
+                            className='h-10 w-full min-w-0 px-0 text-base font-bold sm:h-12 sm:text-xl'
+                            disabled={kioskSmsBusy}
+                            aria-label={
+                              d === '⌫'
+                                ? tA11y('sms_numpad_backspace')
+                                : tA11y('sms_numpad_digit', { d })
+                            }
+                            onClick={() => {
+                              if (d === '⌫') {
+                                setKioskSmsDigits((prev) => prev.slice(0, -1));
+                                return;
+                              }
+                              setKioskSmsDigits((prev) =>
+                                prev.length >= KIOSK_SMS_MAX ? prev : prev + d
+                              );
+                            }}
+                          >
+                            {d}
+                          </Button>
+                        ) : (
+                          <span className='block' />
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                  <div className='grid w-full gap-2 sm:grid-cols-2'>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      className='w-full'
+                      disabled={kioskSmsBusy}
+                      onClick={() => void handleKioskSmsDecline()}
+                    >
+                      {t('sms_post_ticket.not_now')}
+                    </Button>
+                    <Button
+                      type='button'
+                      className='w-full'
+                      disabled={
+                        kioskSmsBusy ||
+                        !kioskSmsAgreed ||
+                        kioskSmsDigits.length < 5
+                      }
+                      onClick={() => void handleKioskSmsConfirm()}
+                    >
+                      {kioskSmsBusy
+                        ? t('sms_post_ticket.sending')
+                        : t('sms_post_ticket.send')}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
             <DialogFooter className='w-full sm:justify-center'>
-              <DialogClose asChild>
+              {kioskSmsBlocking ? (
                 <Button
+                  type='button'
                   variant='secondary'
                   className='w-full min-w-[120px] sm:w-auto'
+                  disabled
                 >
-                  {t('close')} ({countdown})
+                  {t('close')} (…)
                 </Button>
-              </DialogClose>
+              ) : (
+                <DialogClose asChild>
+                  <Button
+                    variant='secondary'
+                    className='w-full min-w-[120px] sm:w-auto'
+                  >
+                    {t('close')} ({countdown})
+                  </Button>
+                </DialogClose>
+              )}
             </DialogFooter>
           </DialogContent>
         )}
@@ -1229,37 +1453,21 @@ export default function UnitKioskPage() {
         isOpen={isRedemptionModalOpen}
         onClose={() => setIsRedemptionModalOpen(false)}
         unitId={kioskApiUnitId ?? unitId!}
-        onSuccess={(ticket) => {
-          setCreatedTicket(ticket);
-          setIsTicketModalOpen(true);
-          setSelectedServicePath([]);
-          // Start auto-close timer logic (copied from handleServiceSelection)
-          setCountdown(5);
-          if (autoCloseTimerId) {
-            clearInterval(autoCloseTimerId);
+        onSuccess={async (ticket) => {
+          let full: Ticket = ticket;
+          try {
+            full = await ticketsApi.getById(ticket.id);
+          } catch {
+            // keep redeem payload
           }
-          const timer = setInterval(() => {
-            setCountdown((prev) => {
-              if (prev <= 1) {
-                setIsTicketModalOpen(false);
-                setCreatedTicket(null);
-                clearInterval(timer);
-                return 0;
-              }
-              return prev - 1;
-            });
-          }, 1000);
-          setAutoCloseTimerId(timer);
-          const svc = unitServicesTree?.find((s) => s.id === ticket.serviceId);
-          const label = svc
-            ? getLocalizedName(
-                svc.name,
-                svc.nameRu || '',
-                svc.nameEn || '',
-                locale
-              )
-            : '';
-          void tryPrintTicket(ticket, label);
+          const svc =
+            unitServicesTree?.find((s) => s.id === full.serviceId) ??
+            ({
+              id: full.serviceId,
+              name: '',
+              isLeaf: true
+            } as Service);
+          openTicketSuccessFlow(full, svc);
         }}
       />
     </div>

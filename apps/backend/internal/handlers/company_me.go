@@ -26,10 +26,11 @@ type companyPatchSsoAccessSourceOnly struct {
 
 // planCapabilitiesDTO reflects subscription-gated integration features for the active company (tenant UI).
 type planCapabilitiesDTO struct {
-	APIAccess           bool `json:"apiAccess"`
-	OutboundWebhooks    bool `json:"outboundWebhooks"`
-	PublicQueueWidget   bool `json:"publicQueueWidget"`
-	CustomScreenLayouts bool `json:"customScreenLayouts"`
+	APIAccess            bool `json:"apiAccess"`
+	OutboundWebhooks     bool `json:"outboundWebhooks"`
+	PublicQueueWidget    bool `json:"publicQueueWidget"`
+	CustomScreenLayouts  bool `json:"customScreenLayouts"`
+	VisitorNotifications bool `json:"visitorNotifications"`
 }
 
 // companyMeResponse is returned by GET /companies/me.
@@ -118,6 +119,7 @@ func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 	outWebhooks, _ := subscriptionfeatures.CompanyHasOutboundWebhooks(r.Context(), h.db, companyID)
 	pubWidget, _ := subscriptionfeatures.CompanyHasPublicQueueWidget(r.Context(), h.db, companyID)
 	customLayouts, _ := subscriptionfeatures.CompanyHasCustomScreenLayouts(r.Context(), h.db, companyID)
+	visitorNotif, _ := services.CompanyHasPlanFeature(companyID, "visitor_notifications")
 
 	w.Header().Set("Content-Type", "application/json")
 	RespondJSON(w, companyMeResponse{
@@ -127,10 +129,11 @@ func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 			DaDataCleaner: dadataCleanerConfigured(),
 		},
 		PlanCapabilities: planCapabilitiesDTO{
-			APIAccess:           apiAccess,
-			OutboundWebhooks:    outWebhooks,
-			PublicQueueWidget:   pubWidget,
-			CustomScreenLayouts: customLayouts,
+			APIAccess:            apiAccess,
+			OutboundWebhooks:     outWebhooks,
+			PublicQueueWidget:    pubWidget,
+			CustomScreenLayouts:  customLayouts,
+			VisitorNotifications: visitorNotif,
 		},
 		PublicAPIURL: services.APIPublicURL(),
 		PublicAppURL: services.PublicAppURL(),

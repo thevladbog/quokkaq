@@ -334,9 +334,12 @@ export interface ModelsTicket {
   /** URL to the generated TTS audio file */
   ttsUrl?: string;
   unitId?: string;
+  visitorNotificationEmail?: string;
   /** VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in
   the X-Visitor-Token header to prevent IDOR on cancel and phone opt-in. */
   visitorToken?: string;
+  /** VisitorWelcomeNotifiedAt is set when the first welcome notification pipeline was claimed for this ticket. */
+  visitorWelcomeNotifiedAt?: string;
 }
 
 export interface HandlersClientVisitsResponse {
@@ -359,6 +362,34 @@ export interface HandlersCompanyUserListItem {
   photoUrl?: string;
   tenantRoles?: HandlersTenantRoleBriefResponse[];
   type?: string;
+}
+
+export interface HandlersCompanyVisitorNotifStats {
+  periodDays7?: boolean;
+  smsFailed?: number;
+  smsPending?: number;
+  smsSent?: number;
+}
+
+export interface HandlersCompanyVisitorSMSPublic {
+  /** ResolvedSource is tenant | platform | log (resolved outbound route for visitor SMS). */
+  resolvedSource?: string;
+  smsApiKeyMasked?: string;
+  smsEnabled?: boolean;
+  smsFromName?: string;
+  smsProvider?: string;
+}
+
+export interface HandlersCompanyVisitorSMSPut {
+  smsApiKey?: string;
+  smsApiSecret?: string;
+  smsEnabled?: boolean;
+  smsFromName?: string;
+  smsProvider?: string;
+}
+
+export interface HandlersCompanyVisitorSMSTestRequest {
+  phone: string;
 }
 
 export interface HandlersCounterCallNextRequest {
@@ -1059,6 +1090,67 @@ export interface HandlersTestSMSIntegrationRequest {
   phone?: string;
 }
 
+/**
+ * Public ticket with opt-in and kiosk post-ticket flags.
+ */
+export interface HandlersTicketWithExtras {
+  booking?: ModelsBooking;
+  bookingId?: string;
+  calledAt?: string;
+  client?: ModelsUnitClient;
+  clientId?: string;
+  completedAt?: string;
+  confirmedAt?: string;
+  counter?: ModelsCounter;
+  counterId?: string;
+  createdAt?: string;
+  /** EstimatedWaitSeconds is the estimated seconds until this ticket is called (computed on-the-fly). */
+  estimatedWaitSeconds?: number;
+  id?: string;
+  /** IsCredit marks a ticket issued when the monthly tickets_per_month quota was exhausted but
+  the working day (EOD) was still open. Credit tickets are counted against the next billing period. */
+  isCredit?: boolean;
+  isEod?: boolean;
+  lastCalledAt?: string;
+  /** Snapshot from Service at in_service; cleared on transfer/return */
+  maxServiceTime?: number;
+  /** Snapshot from Service at creation */
+  maxWaitingTime?: number;
+  operatorComment?: string;
+  /** No DB FK: avoids AutoMigrate cycle with pre_registrations.ticket_id → tickets.id */
+  preRegistration?: ModelsPreRegistration;
+  preRegistrationId?: string;
+  priority?: number;
+  queueNumber?: string;
+  /** QueuePosition is the 1-based position in the waiting queue (computed on-the-fly, not stored). */
+  queuePosition?: number;
+  /** ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets). */
+  servedByName?: string;
+  /** ServedByUserID is set when a ticket is called/picked; records the operator (counter.AssignedTo at call time). */
+  servedByUserId?: string;
+  service?: ModelsService;
+  serviceId?: string;
+  /** ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool. */
+  serviceZoneId?: string;
+  /** ServiceZoneName is the display name of the service zone unit when ServiceZoneID is set (hydrated, not stored). */
+  serviceZoneName?: string;
+  smsOptInAvailable?: boolean;
+  smsPostTicketStepRequired?: boolean;
+  status?: string;
+  /** TransferTrail lists ticket.transferred events in chronological order (client visit APIs only). */
+  transferTrail?: ModelsClientVisitTransferEvent[];
+  /** URL to the generated TTS audio file */
+  ttsUrl?: string;
+  unitId?: string;
+  visitorNotificationEmail?: string;
+  visitorPhoneKnown?: boolean;
+  /** VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in
+  the X-Visitor-Token header to prevent IDOR on cancel and phone opt-in. */
+  visitorToken?: string;
+  /** VisitorWelcomeNotifiedAt is set when the first welcome notification pipeline was claimed for this ticket. */
+  visitorWelcomeNotifiedAt?: string;
+}
+
 export interface HandlersTransferRequest {
   /** @nullable */
   operatorComment?: string | null;
@@ -1525,6 +1617,7 @@ export interface HandlersPlanCapabilitiesDTO {
   customScreenLayouts?: boolean;
   outboundWebhooks?: boolean;
   publicQueueWidget?: boolean;
+  visitorNotifications?: boolean;
 }
 
 export interface HandlersCompanyMeResponse {
@@ -2905,6 +2998,8 @@ export type ListCompanyUsersParams = {
  */
 search?: string;
 };
+
+export type PostCompaniesMeVisitorSmsTest200 = {[key: string]: string};
 
 export type GetCompaniesMeWebhookDeliveryLogsParams = {
 /**
@@ -7859,6 +7954,415 @@ export const usePatchUserTenantRoles = <TError = string,
         TContext
       > => {
       return useMutation(getPatchUserTenantRolesMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary SMS notification job counts (last 7 days) for observability
+ */
+export type getCompaniesMeVisitorNotificationStatsResponse200 = {
+  data: HandlersCompanyVisitorNotifStats
+  status: 200
+}
+
+export type getCompaniesMeVisitorNotificationStatsResponseSuccess = (getCompaniesMeVisitorNotificationStatsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getCompaniesMeVisitorNotificationStatsResponse = (getCompaniesMeVisitorNotificationStatsResponseSuccess)
+
+export const getGetCompaniesMeVisitorNotificationStatsUrl = () => {
+
+
+
+
+  return `/companies/me/visitor-notification-stats`
+}
+
+export const getCompaniesMeVisitorNotificationStats = async ( options?: RequestInit): Promise<getCompaniesMeVisitorNotificationStatsResponse> => {
+
+  return orvalMutator<getCompaniesMeVisitorNotificationStatsResponse>(getGetCompaniesMeVisitorNotificationStatsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCompaniesMeVisitorNotificationStatsQueryKey = () => {
+    return [
+    `/companies/me/visitor-notification-stats`
+    ] as const;
+    }
+
+
+export const getGetCompaniesMeVisitorNotificationStatsQueryOptions = <TData = Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCompaniesMeVisitorNotificationStatsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>> = ({ signal }) => getCompaniesMeVisitorNotificationStats({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCompaniesMeVisitorNotificationStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>>
+export type GetCompaniesMeVisitorNotificationStatsQueryError = unknown
+
+
+export function useGetCompaniesMeVisitorNotificationStats<TData = Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMeVisitorNotificationStats<TData = Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMeVisitorNotificationStats<TData = Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary SMS notification job counts (last 7 days) for observability
+ */
+
+export function useGetCompaniesMeVisitorNotificationStats<TData = Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeVisitorNotificationStats>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCompaniesMeVisitorNotificationStatsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary Get tenant visitor SMS settings (masked)
+ */
+export type getCompaniesMeVisitorSmsResponse200 = {
+  data: HandlersCompanyVisitorSMSPublic
+  status: 200
+}
+
+export type getCompaniesMeVisitorSmsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getCompaniesMeVisitorSmsResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getCompaniesMeVisitorSmsResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getCompaniesMeVisitorSmsResponseSuccess = (getCompaniesMeVisitorSmsResponse200) & {
+  headers: Headers;
+};
+export type getCompaniesMeVisitorSmsResponseError = (getCompaniesMeVisitorSmsResponse401 | getCompaniesMeVisitorSmsResponse403 | getCompaniesMeVisitorSmsResponse404) & {
+  headers: Headers;
+};
+
+export type getCompaniesMeVisitorSmsResponse = (getCompaniesMeVisitorSmsResponseSuccess | getCompaniesMeVisitorSmsResponseError)
+
+export const getGetCompaniesMeVisitorSmsUrl = () => {
+
+
+
+
+  return `/companies/me/visitor-sms`
+}
+
+export const getCompaniesMeVisitorSms = async ( options?: RequestInit): Promise<getCompaniesMeVisitorSmsResponse> => {
+
+  return orvalMutator<getCompaniesMeVisitorSmsResponse>(getGetCompaniesMeVisitorSmsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCompaniesMeVisitorSmsQueryKey = () => {
+    return [
+    `/companies/me/visitor-sms`
+    ] as const;
+    }
+
+
+export const getGetCompaniesMeVisitorSmsQueryOptions = <TData = Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCompaniesMeVisitorSmsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>> = ({ signal }) => getCompaniesMeVisitorSms({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCompaniesMeVisitorSmsQueryResult = NonNullable<Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>>
+export type GetCompaniesMeVisitorSmsQueryError = string
+
+
+export function useGetCompaniesMeVisitorSms<TData = Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMeVisitorSms<TData = Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMeVisitorSms<TData = Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get tenant visitor SMS settings (masked)
+ */
+
+export function useGetCompaniesMeVisitorSms<TData = Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeVisitorSms>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCompaniesMeVisitorSmsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary Set tenant visitor SMS (BYOK) section
+ */
+export type putCompaniesMeVisitorSmsResponse200 = {
+  data: HandlersCompanyVisitorSMSPublic
+  status: 200
+}
+
+export type putCompaniesMeVisitorSmsResponseSuccess = (putCompaniesMeVisitorSmsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type putCompaniesMeVisitorSmsResponse = (putCompaniesMeVisitorSmsResponseSuccess)
+
+export const getPutCompaniesMeVisitorSmsUrl = () => {
+
+
+
+
+  return `/companies/me/visitor-sms`
+}
+
+export const putCompaniesMeVisitorSms = async (handlersCompanyVisitorSMSPut: HandlersCompanyVisitorSMSPut, options?: RequestInit): Promise<putCompaniesMeVisitorSmsResponse> => {
+
+  return orvalMutator<putCompaniesMeVisitorSmsResponse>(getPutCompaniesMeVisitorSmsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersCompanyVisitorSMSPut,)
+  }
+);}
+
+
+
+
+export const getPutCompaniesMeVisitorSmsMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putCompaniesMeVisitorSms>>, TError,{data: HandlersCompanyVisitorSMSPut}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof putCompaniesMeVisitorSms>>, TError,{data: HandlersCompanyVisitorSMSPut}, TContext> => {
+
+const mutationKey = ['putCompaniesMeVisitorSms'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putCompaniesMeVisitorSms>>, {data: HandlersCompanyVisitorSMSPut}> = (props) => {
+          const {data} = props ?? {};
+
+          return  putCompaniesMeVisitorSms(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutCompaniesMeVisitorSmsMutationResult = NonNullable<Awaited<ReturnType<typeof putCompaniesMeVisitorSms>>>
+    export type PutCompaniesMeVisitorSmsMutationBody = HandlersCompanyVisitorSMSPut
+    export type PutCompaniesMeVisitorSmsMutationError = unknown
+
+    /**
+ * @summary Set tenant visitor SMS (BYOK) section
+ */
+export const usePutCompaniesMeVisitorSms = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putCompaniesMeVisitorSms>>, TError,{data: HandlersCompanyVisitorSMSPut}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putCompaniesMeVisitorSms>>,
+        TError,
+        {data: HandlersCompanyVisitorSMSPut},
+        TContext
+      > => {
+      return useMutation(getPutCompaniesMeVisitorSmsMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Send a test visitor SMS using tenant (or platform) resolution
+ */
+export type postCompaniesMeVisitorSmsTestResponse200 = {
+  data: PostCompaniesMeVisitorSmsTest200
+  status: 200
+}
+
+export type postCompaniesMeVisitorSmsTestResponseSuccess = (postCompaniesMeVisitorSmsTestResponse200) & {
+  headers: Headers;
+};
+;
+
+export type postCompaniesMeVisitorSmsTestResponse = (postCompaniesMeVisitorSmsTestResponseSuccess)
+
+export const getPostCompaniesMeVisitorSmsTestUrl = () => {
+
+
+
+
+  return `/companies/me/visitor-sms/test`
+}
+
+export const postCompaniesMeVisitorSmsTest = async (handlersCompanyVisitorSMSTestRequest: HandlersCompanyVisitorSMSTestRequest, options?: RequestInit): Promise<postCompaniesMeVisitorSmsTestResponse> => {
+
+  return orvalMutator<postCompaniesMeVisitorSmsTestResponse>(getPostCompaniesMeVisitorSmsTestUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': '*/*', ...options?.headers },
+    body: JSON.stringify(
+      handlersCompanyVisitorSMSTestRequest,)
+  }
+);}
+
+
+
+
+export const getPostCompaniesMeVisitorSmsTestMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeVisitorSmsTest>>, TError,{data: HandlersCompanyVisitorSMSTestRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeVisitorSmsTest>>, TError,{data: HandlersCompanyVisitorSMSTestRequest}, TContext> => {
+
+const mutationKey = ['postCompaniesMeVisitorSmsTest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postCompaniesMeVisitorSmsTest>>, {data: HandlersCompanyVisitorSMSTestRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postCompaniesMeVisitorSmsTest(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostCompaniesMeVisitorSmsTestMutationResult = NonNullable<Awaited<ReturnType<typeof postCompaniesMeVisitorSmsTest>>>
+    export type PostCompaniesMeVisitorSmsTestMutationBody = HandlersCompanyVisitorSMSTestRequest
+    export type PostCompaniesMeVisitorSmsTestMutationError = unknown
+
+    /**
+ * @summary Send a test visitor SMS using tenant (or platform) resolution
+ */
+export const usePostCompaniesMeVisitorSmsTest = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeVisitorSmsTest>>, TError,{data: HandlersCompanyVisitorSMSTestRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postCompaniesMeVisitorSmsTest>>,
+        TError,
+        {data: HandlersCompanyVisitorSMSTestRequest},
+        TContext
+      > => {
+      return useMutation(getPostCompaniesMeVisitorSmsTestMutationOptions(options), queryClient);
     }
 
 /**

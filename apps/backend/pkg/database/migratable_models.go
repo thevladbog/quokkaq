@@ -39,6 +39,8 @@ func AllMigratableModels() []any {
 		&models.TicketNumberSequence{},
 		&models.Booking{},
 		&models.Notification{},
+		&models.QueueFunnelEvent{},
+		&models.TicketShortLink{},
 		&models.AuditLog{},
 		&models.UnitMaterial{},
 		&models.Playlist{},

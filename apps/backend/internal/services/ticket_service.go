@@ -627,6 +627,12 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 
 	s.hub.BroadcastEvent("ticket.created", ticket, ticket.UnitID)
 	s.scheduleETA(ticket.UnitID)
+	if s.notifService != nil {
+		if full, ferr := s.repo.FindByID(ticket.ID); ferr == nil {
+			s.notifService.RecordFunnelEvent(full, "ticket_created", "ticketing", nil)
+			go s.notifService.SendTicketCreatedSMS(full)
+		}
+	}
 	return ticket, nil
 }
 
@@ -1028,6 +1034,11 @@ func (s *ticketService) AttachPhoneToTicket(ticketID, phoneE164, locale string) 
 	})
 	if err != nil {
 		return nil, err
+	}
+	if s.notifService != nil {
+		if full, ferr := s.repo.FindByID(ticket.ID); ferr == nil {
+			go s.notifService.SendTicketCreatedSMS(full)
+		}
 	}
 	return ticket, nil
 }

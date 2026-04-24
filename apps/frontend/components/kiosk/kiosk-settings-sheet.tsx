@@ -307,6 +307,9 @@ function KioskSettingsForm({
     (k0 as KioskConfig | undefined)?.sessionIdleCountdownSec ??
       DEFAULT_IDLE_COUNTDOWN_SEC
   );
+  const [visitorSmsAfterTicket, setVisitorSmsAfterTicket] = useState(
+    (k0 as KioskConfig | undefined)?.visitorSmsAfterTicket !== false
+  );
 
   const [appVersionLabel, setAppVersionLabel] = useState<string>('');
   const [browserOnline, setBrowserOnline] = useState(() =>
@@ -420,6 +423,7 @@ function KioskSettingsForm({
         serviceGridColor,
         sessionIdleBeforeWarningSec: beforeSec,
         sessionIdleCountdownSec: countSec,
+        visitorSmsAfterTicket,
         printerConnection,
         systemPrinterName:
           printerConnection === 'system'
@@ -799,6 +803,24 @@ function KioskSettingsForm({
               onChange={(e) =>
                 setSessionIdleCountdownSec(Number(e.target.value) || 0)
               }
+            />
+          </div>
+        </div>
+
+        <div className='border-t pt-4'>
+          <div className='flex items-center justify-between gap-2'>
+            <div>
+              <Label htmlFor='sheet-visitor-sms'>
+                {t('visitor_sms_after_ticket')}
+              </Label>
+              <p className='text-muted-foreground text-sm'>
+                {t('visitor_sms_after_ticket_hint')}
+              </p>
+            </div>
+            <Switch
+              id='sheet-visitor-sms'
+              checked={visitorSmsAfterTicket}
+              onCheckedChange={setVisitorSmsAfterTicket}
             />
           </div>
         </div>

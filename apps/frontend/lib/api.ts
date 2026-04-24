@@ -921,6 +921,20 @@ export const ticketsApi = {
     return TicketModelSchema.parse(json);
   },
 
+  /**
+   * Record that the visitor chose not to receive SMS on the kiosk (requires visitor token).
+   */
+  visitorSmsSkip: async (id: string, visitorToken: string) => {
+    const res = await fetch(`${API_BASE_URL}/tickets/${id}/visitor-sms-skip`, {
+      method: 'POST',
+      headers: { 'X-Visitor-Token': visitorToken }
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(body || `HTTP ${res.status}`);
+    }
+  },
+
   confirmArrival: async (id: string) => {
     const res = await orvalTc.patchTicketsIdStatus(id, {
       status: 'in_service'
@@ -1585,6 +1599,71 @@ export const companiesApiExt = {
         body: JSON.stringify(body)
       },
       CompanySchema
+    ),
+
+  getVisitorSMS: () =>
+    apiRequest(
+      `/companies/me/visitor-sms`,
+      {},
+      z.object({
+        smsProvider: z.string().optional().default(''),
+        smsApiKeyMasked: z.string().optional().default(''),
+        smsFromName: z.string().optional().default(''),
+        smsEnabled: z.boolean().optional().default(false),
+        resolvedSource: z.string().optional().default('')
+      })
+    ),
+
+  putVisitorSMS: (body: {
+    smsProvider: string;
+    smsApiKey: string;
+    smsApiSecret: string;
+    smsFromName: string;
+    smsEnabled: boolean;
+  }) =>
+    apiRequest(
+      `/companies/me/visitor-sms`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      z.object({
+        smsProvider: z.string().optional().default(''),
+        smsApiKeyMasked: z.string().optional().default(''),
+        smsFromName: z.string().optional().default(''),
+        smsEnabled: z.boolean().optional().default(false),
+        resolvedSource: z.string().optional().default('')
+      })
+    ),
+
+  postVisitorSMSTest: (phone: string) =>
+    apiRequest(
+      `/companies/me/visitor-sms/test`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone })
+      },
+      z
+        .object({
+          status: z.string().optional(),
+          provider: z.string().optional(),
+          source: z.string().optional()
+        })
+        .passthrough()
+    ),
+
+  getVisitorNotificationStats: () =>
+    apiRequest(
+      `/companies/me/visitor-notification-stats`,
+      {},
+      z.object({
+        smsPending: z.coerce.number(),
+        smsSent: z.coerce.number(),
+        smsFailed: z.coerce.number(),
+        periodDays7: z.boolean().optional()
+      })
     )
 };
 

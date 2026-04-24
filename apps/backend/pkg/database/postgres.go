@@ -2593,6 +2593,23 @@ WHERE code = 'starter'
 		return fmt.Errorf("failed to run v1.8.7_screen_layout_templates migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.8.8_queue_funnel_sms", func(db *gorm.DB) error {
+		if err := db.AutoMigrate(
+			&dbmodels.Ticket{},
+			&dbmodels.QueueFunnelEvent{},
+			&dbmodels.TicketShortLink{},
+		); err != nil {
+			return err
+		}
+		if err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_queue_funnel_events_created ON queue_funnel_events (created_at);`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.8_queue_funnel_sms migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

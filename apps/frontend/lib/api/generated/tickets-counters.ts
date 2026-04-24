@@ -334,9 +334,12 @@ export interface ModelsTicket {
   /** URL to the generated TTS audio file */
   ttsUrl?: string;
   unitId?: string;
+  visitorNotificationEmail?: string;
   /** VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in
   the X-Visitor-Token header to prevent IDOR on cancel and phone opt-in. */
   visitorToken?: string;
+  /** VisitorWelcomeNotifiedAt is set when the first welcome notification pipeline was claimed for this ticket. */
+  visitorWelcomeNotifiedAt?: string;
 }
 
 export interface HandlersClientVisitsResponse {
@@ -359,6 +362,34 @@ export interface HandlersCompanyUserListItem {
   photoUrl?: string;
   tenantRoles?: HandlersTenantRoleBriefResponse[];
   type?: string;
+}
+
+export interface HandlersCompanyVisitorNotifStats {
+  periodDays7?: boolean;
+  smsFailed?: number;
+  smsPending?: number;
+  smsSent?: number;
+}
+
+export interface HandlersCompanyVisitorSMSPublic {
+  /** ResolvedSource is tenant | platform | log (resolved outbound route for visitor SMS). */
+  resolvedSource?: string;
+  smsApiKeyMasked?: string;
+  smsEnabled?: boolean;
+  smsFromName?: string;
+  smsProvider?: string;
+}
+
+export interface HandlersCompanyVisitorSMSPut {
+  smsApiKey?: string;
+  smsApiSecret?: string;
+  smsEnabled?: boolean;
+  smsFromName?: string;
+  smsProvider?: string;
+}
+
+export interface HandlersCompanyVisitorSMSTestRequest {
+  phone: string;
 }
 
 export interface HandlersCounterCallNextRequest {
@@ -1059,6 +1090,67 @@ export interface HandlersTestSMSIntegrationRequest {
   phone?: string;
 }
 
+/**
+ * Public ticket with opt-in and kiosk post-ticket flags.
+ */
+export interface HandlersTicketWithExtras {
+  booking?: ModelsBooking;
+  bookingId?: string;
+  calledAt?: string;
+  client?: ModelsUnitClient;
+  clientId?: string;
+  completedAt?: string;
+  confirmedAt?: string;
+  counter?: ModelsCounter;
+  counterId?: string;
+  createdAt?: string;
+  /** EstimatedWaitSeconds is the estimated seconds until this ticket is called (computed on-the-fly). */
+  estimatedWaitSeconds?: number;
+  id?: string;
+  /** IsCredit marks a ticket issued when the monthly tickets_per_month quota was exhausted but
+  the working day (EOD) was still open. Credit tickets are counted against the next billing period. */
+  isCredit?: boolean;
+  isEod?: boolean;
+  lastCalledAt?: string;
+  /** Snapshot from Service at in_service; cleared on transfer/return */
+  maxServiceTime?: number;
+  /** Snapshot from Service at creation */
+  maxWaitingTime?: number;
+  operatorComment?: string;
+  /** No DB FK: avoids AutoMigrate cycle with pre_registrations.ticket_id → tickets.id */
+  preRegistration?: ModelsPreRegistration;
+  preRegistrationId?: string;
+  priority?: number;
+  queueNumber?: string;
+  /** QueuePosition is the 1-based position in the waiting queue (computed on-the-fly, not stored). */
+  queuePosition?: number;
+  /** ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets). */
+  servedByName?: string;
+  /** ServedByUserID is set when a ticket is called/picked; records the operator (counter.AssignedTo at call time). */
+  servedByUserId?: string;
+  service?: ModelsService;
+  serviceId?: string;
+  /** ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool. */
+  serviceZoneId?: string;
+  /** ServiceZoneName is the display name of the service zone unit when ServiceZoneID is set (hydrated, not stored). */
+  serviceZoneName?: string;
+  smsOptInAvailable?: boolean;
+  smsPostTicketStepRequired?: boolean;
+  status?: string;
+  /** TransferTrail lists ticket.transferred events in chronological order (client visit APIs only). */
+  transferTrail?: ModelsClientVisitTransferEvent[];
+  /** URL to the generated TTS audio file */
+  ttsUrl?: string;
+  unitId?: string;
+  visitorNotificationEmail?: string;
+  visitorPhoneKnown?: boolean;
+  /** VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in
+  the X-Visitor-Token header to prevent IDOR on cancel and phone opt-in. */
+  visitorToken?: string;
+  /** VisitorWelcomeNotifiedAt is set when the first welcome notification pipeline was claimed for this ticket. */
+  visitorWelcomeNotifiedAt?: string;
+}
+
 export interface HandlersTransferRequest {
   /** @nullable */
   operatorComment?: string | null;
@@ -1525,6 +1617,7 @@ export interface HandlersPlanCapabilitiesDTO {
   customScreenLayouts?: boolean;
   outboundWebhooks?: boolean;
   publicQueueWidget?: boolean;
+  visitorNotifications?: boolean;
 }
 
 export interface HandlersCompanyMeResponse {
@@ -3789,7 +3882,7 @@ export const usePostCountersIdRelease = <TError = string,
  * @summary Get ticket by ID
  */
 export type getTicketsIdResponse200 = {
-  data: ModelsTicket
+  data: HandlersTicketWithExtras
   status: 200
 }
 
@@ -4818,6 +4911,106 @@ export const usePatchTicketsIdVisitor = <TError = string,
     }
 
 /**
+ * Public; requires X-Visitor-Token matching ticket.visitorToken. Idempotent: duplicate declined events are not recorded.
+ * @summary Record that the visitor declined the post-ticket SMS step on a kiosk
+ */
+export type postTicketsIdVisitorSmsSkipResponse204 = {
+  data: void
+  status: 204
+}
+
+export type postTicketsIdVisitorSmsSkipResponse400 = {
+  data: string
+  status: 400
+}
+
+export type postTicketsIdVisitorSmsSkipResponse401 = {
+  data: string
+  status: 401
+}
+
+export type postTicketsIdVisitorSmsSkipResponse404 = {
+  data: string
+  status: 404
+}
+
+export type postTicketsIdVisitorSmsSkipResponseSuccess = (postTicketsIdVisitorSmsSkipResponse204) & {
+  headers: Headers;
+};
+export type postTicketsIdVisitorSmsSkipResponseError = (postTicketsIdVisitorSmsSkipResponse400 | postTicketsIdVisitorSmsSkipResponse401 | postTicketsIdVisitorSmsSkipResponse404) & {
+  headers: Headers;
+};
+
+export type postTicketsIdVisitorSmsSkipResponse = (postTicketsIdVisitorSmsSkipResponseSuccess | postTicketsIdVisitorSmsSkipResponseError)
+
+export const getPostTicketsIdVisitorSmsSkipUrl = (id: string,) => {
+
+
+
+
+  return `/tickets/${id}/visitor-sms-skip`
+}
+
+export const postTicketsIdVisitorSmsSkip = async (id: string, options?: RequestInit): Promise<postTicketsIdVisitorSmsSkipResponse> => {
+
+  return orvalMutator<postTicketsIdVisitorSmsSkipResponse>(getPostTicketsIdVisitorSmsSkipUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostTicketsIdVisitorSmsSkipMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTicketsIdVisitorSmsSkip>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postTicketsIdVisitorSmsSkip>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['postTicketsIdVisitorSmsSkip'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postTicketsIdVisitorSmsSkip>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  postTicketsIdVisitorSmsSkip(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostTicketsIdVisitorSmsSkipMutationResult = NonNullable<Awaited<ReturnType<typeof postTicketsIdVisitorSmsSkip>>>
+
+    export type PostTicketsIdVisitorSmsSkipMutationError = string
+
+    /**
+ * @summary Record that the visitor declined the post-ticket SMS step on a kiosk
+ */
+export const usePostTicketsIdVisitorSmsSkip = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTicketsIdVisitorSmsSkip>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postTicketsIdVisitorSmsSkip>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getPostTicketsIdVisitorSmsSkipMutationOptions(options), queryClient);
+    }
+
+/**
  * Full replacement of tag assignments on the ticket's visitor. Allowed when status is called or in_service; not for anonymous kiosk client. operatorComment is required and appended to the ticket operator comment.
  * @summary Replace visitor tags for ticket's client
  */
@@ -5536,7 +5729,7 @@ export function useGetUnitsUnitIdTickets<TData = Awaited<ReturnType<typeof getUn
  * @summary Create a new ticket
  */
 export type createUnitTicketResponse201 = {
-  data: ModelsTicket
+  data: HandlersTicketWithExtras
   status: 201
 }
 

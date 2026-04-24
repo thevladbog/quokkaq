@@ -37,6 +37,7 @@ import { OrganizationSsoSettingsCard } from '@/components/organization/organizat
 import { OrganizationSsoAccessSourceCard } from '@/components/organization/organization-sso-access-source-card';
 import { OrganizationTenantRbacSettings } from '@/components/organization/organization-tenant-rbac-settings';
 import { DeveloperApiIntegrations } from '@/components/settings/developer-api-integrations';
+import { VisitorSmsTenantSettingsCard } from '@/components/settings/visitor-sms-tenant-settings-card';
 
 export function IntegrationsSettingsContent() {
   const t = useTranslations('admin.integrations');
@@ -293,6 +294,7 @@ export function IntegrationsSettingsContent() {
         </TabsList>
 
         <TabsContent value='calendars' className='space-y-6'>
+          <VisitorSmsTenantSettingsCard />
           <Card>
             <CardHeader>
               <CardTitle>{t('calendars_title')}</CardTitle>

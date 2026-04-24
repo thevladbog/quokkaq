@@ -74,3 +74,42 @@ func PublicAPIRateLimit(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+const (
+	// Tighter than PublicAPI: abuse of POST virtual-queue (SMS cost / queue spam).
+	virtualQueueRateInterval = 3 * time.Second
+	virtualQueueBurst        = 5
+)
+
+var vqJoinLimiterMu sync.Mutex
+var vqJoinLimiters = make(map[string]*publicLimiterEntry)
+
+// VirtualQueueJoinRateLimit is a stricter per-IP limiter for POST /units/{id}/virtual-queue.
+func VirtualQueueJoinRateLimit(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := clientIPForRateLimit(r)
+		vqJoinLimiterMu.Lock()
+		ent, ok := vqJoinLimiters[ip]
+		if !ok {
+			if len(vqJoinLimiters) >= maxPublicAPILimiters {
+				vqJoinLimiterMu.Unlock()
+				http.Error(w, "Too many requests", http.StatusTooManyRequests)
+				return
+			}
+			ent = &publicLimiterEntry{
+				lim:      rate.NewLimiter(rate.Every(virtualQueueRateInterval), virtualQueueBurst),
+				lastSeen: time.Now(),
+			}
+			vqJoinLimiters[ip] = ent
+		} else {
+			ent.lastSeen = time.Now()
+		}
+		lim := ent.lim
+		vqJoinLimiterMu.Unlock()
+		if !lim.Allow() {
+			http.Error(w, "Too many join attempts from this address", http.StatusTooManyRequests)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
