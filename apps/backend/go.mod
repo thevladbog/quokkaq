@@ -23,7 +23,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hibiken/asynq v0.26.0
 	github.com/joho/godotenv v1.5.1
-	github.com/lmittmann/tint v1.1.2
+	github.com/lmittmann/tint v1.1.3
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/nyaruka/phonenumbers v1.7.1
 	github.com/russellhaering/goxmldsig v1.6.0
