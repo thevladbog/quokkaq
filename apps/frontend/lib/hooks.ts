@@ -30,6 +30,10 @@ import { fetchCurrentUser, loginWithPassword } from '../lib/auth-orval';
 import { authPatchMe } from '@/lib/api/generated/auth';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { invalidateTicketListQueries } from '../lib/ticket-query-invalidation';
+import {
+  readCachedKioskServiceTree,
+  readCachedKioskUnit
+} from './kiosk-snapshot-cache';
 
 // User-related hooks
 export const useUsers = (search?: string) => {
@@ -108,6 +112,8 @@ export const useUnit = (
         ) => number | false | undefined);
     refetchOnMount?: boolean | 'always';
     enabled?: boolean;
+    /** 5.5: hydrate from last good snapshot when the tab starts offline. */
+    kioskReadCache?: boolean;
   } = {}
 ) => {
   const enabled =
@@ -117,7 +123,15 @@ export const useUnit = (
     queryFn: () => unitsApi.getById(id),
     enabled,
     refetchInterval: options.refetchInterval,
-    refetchOnMount: options.refetchOnMount
+    refetchOnMount: options.refetchOnMount,
+    ...(options.kioskReadCache && id
+      ? {
+          initialData: readCachedKioskUnit(id) ?? undefined,
+          // Stale immediately so we refetch when online
+          initialDataUpdatedAt: 0
+        }
+      : {}),
+    placeholderData: (p) => p
   });
 };
 
@@ -185,14 +199,21 @@ export const useUnitServices = (unitId: string) => {
 
 export const useUnitServicesTree = (
   unitId: string,
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean; kioskReadCache?: boolean }
 ) => {
   const enabled =
     options?.enabled !== undefined ? options.enabled : Boolean(unitId);
   return useQuery({
     queryKey: ['units', unitId, 'services-tree'],
     queryFn: () => unitsApi.getServicesTree(unitId),
-    enabled: enabled && !!unitId
+    enabled: enabled && !!unitId,
+    ...(options?.kioskReadCache && unitId
+      ? {
+          initialData: readCachedKioskServiceTree(unitId) ?? undefined,
+          initialDataUpdatedAt: 0
+        }
+      : {}),
+    placeholderData: (p) => p
   });
 };
 

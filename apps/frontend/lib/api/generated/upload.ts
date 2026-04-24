@@ -116,6 +116,10 @@ export interface ModelsUserRole {
 export interface ModelsUnitOperationsPublic {
   counterLoginBlocked?: boolean;
   kioskFrozen?: boolean;
+  /** KioskIdOCR: plan includes 5.4 (ID document OCR on kiosk). UI also requires UnitConfig.kiosk.idOcrEnabled. */
+  kioskIdOcr?: boolean;
+  /** KioskOfflineMode: plan includes 5.5 (read cache + outbox). UI also needs UnitConfig.kiosk.offlineModeEnabled. */
+  kioskOfflineMode?: boolean;
   phase?: string;
 }
 
@@ -136,6 +140,8 @@ export interface ModelsService {
   gridRow?: number;
   gridRowSpan?: number;
   id?: string;
+  /** IdentificationMode selects the kiosk identification step: none|phone|qr|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column. */
+  identificationMode?: string;
   imageUrl?: string;
   isLeaf?: boolean;
   /** In seconds (service-time SLA — copied to Ticket.MaxServiceTime on in_service) */
@@ -296,6 +302,8 @@ export interface ModelsTicket {
   the working day (EOD) was still open. Credit tickets are counted against the next billing period. */
   isCredit?: boolean;
   isEod?: boolean;
+  /** KioskIdentifiedUserID is set when the ticket was issued after kiosk employee identification (badge / login) matched a user in the tenant. */
+  kioskIdentifiedUserId?: string;
   lastCalledAt?: string;
   /** Snapshot from Service at in_service; cleared on transfer/return */
   maxServiceTime?: number;
@@ -317,15 +325,20 @@ export interface ModelsTicket {
   serviceId?: string;
   /** ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool. */
   serviceZoneId?: string;
+  /** ServiceZoneName is the display name of the service zone unit when ServiceZoneID is set (hydrated, not stored). */
+  serviceZoneName?: string;
   status?: string;
   /** TransferTrail lists ticket.transferred events in chronological order (client visit APIs only). */
   transferTrail?: ModelsClientVisitTransferEvent[];
   /** URL to the generated TTS audio file */
   ttsUrl?: string;
   unitId?: string;
+  visitorNotificationEmail?: string;
   /** VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in
   the X-Visitor-Token header to prevent IDOR on cancel and phone opt-in. */
   visitorToken?: string;
+  /** VisitorWelcomeNotifiedAt is set when the first welcome notification pipeline was claimed for this ticket. */
+  visitorWelcomeNotifiedAt?: string;
 }
 
 export interface HandlersClientVisitsResponse {
@@ -348,6 +361,34 @@ export interface HandlersCompanyUserListItem {
   photoUrl?: string;
   tenantRoles?: HandlersTenantRoleBriefResponse[];
   type?: string;
+}
+
+export interface HandlersCompanyVisitorNotifStats {
+  periodDays7?: boolean;
+  smsFailed?: number;
+  smsPending?: number;
+  smsSent?: number;
+}
+
+export interface HandlersCompanyVisitorSMSPublic {
+  /** ResolvedSource is tenant | platform | log (resolved outbound route for visitor SMS). */
+  resolvedSource?: string;
+  smsApiKeyMasked?: string;
+  smsEnabled?: boolean;
+  smsFromName?: string;
+  smsProvider?: string;
+}
+
+export interface HandlersCompanyVisitorSMSPut {
+  smsApiKey?: string;
+  smsApiSecret?: string;
+  smsEnabled?: boolean;
+  smsFromName?: string;
+  smsProvider?: string;
+}
+
+export interface HandlersCompanyVisitorSMSTestRequest {
+  phone: string;
 }
 
 export interface HandlersCounterCallNextRequest {
@@ -646,6 +687,17 @@ export interface HandlersInvoicePDFPrerequisiteError {
   message: string;
 }
 
+export interface HandlersKioskPrinterTelemetryRequest {
+  kind?: string;
+  message?: string;
+}
+
+export interface HandlersKioskVisitorSurveyRequest {
+  emoji?: string;
+  score?: number;
+  ticketId?: string;
+}
+
 export interface HandlersLoginLinkResponse {
   /** Example full login URL including the token query parameter */
   exampleUrl: string;
@@ -737,6 +789,25 @@ export interface HandlersPatchUnitClientRequest {
   lastName?: string;
   phone?: string;
   tagDefinitionIds?: string[];
+}
+
+/**
+ * Secrets: name -> plaintext; stored encrypted. Omitted names unchanged.
+ */
+export type HandlersPatchUnitEmployeeIdpRequestSecretValues = {[key: string]: string};
+
+export interface HandlersPatchUnitEmployeeIdpRequest {
+  enabled?: boolean;
+  headerTemplatesJson?: string;
+  httpMethod?: string;
+  requestBodyTemplate?: string;
+  responseDisplayNamePath?: string;
+  responseEmailPath?: string;
+  secretNamesToDelete?: string[];
+  /** Secrets: name -> plaintext; stored encrypted. Omitted names unchanged. */
+  secretValues?: HandlersPatchUnitEmployeeIdpRequestSecretValues;
+  timeoutMs?: number;
+  upstreamUrl?: string;
 }
 
 export type HandlersPatchUnitKioskConfigRequestConfigKiosk = { [key: string]: unknown };
@@ -918,6 +989,14 @@ export type HandlersPlatformUpdateSubscriptionPlanBody = unknown & {
   pricingModel?: HandlersPlatformUpdateSubscriptionPlanBodyPricingModel;
 };
 
+export type HandlersPostKioskTelemetryRequestMeta = {[key: string]: unknown};
+
+export interface HandlersPostKioskTelemetryRequest {
+  /** api_ping | print_error | paper_out | heartbeat */
+  kind?: string;
+  meta?: HandlersPostKioskTelemetryRequestMeta;
+}
+
 export type HandlersPublicLeadRequestBodyBillingPeriod = typeof HandlersPublicLeadRequestBodyBillingPeriod[keyof typeof HandlersPublicLeadRequestBodyBillingPeriod];
 
 
@@ -1041,6 +1120,69 @@ export interface HandlersTerminalBootstrapResponse {
 export interface HandlersTestSMSIntegrationRequest {
   /** Phone number in E.164 format to send the test SMS to. */
   phone?: string;
+}
+
+/**
+ * Public ticket with opt-in and kiosk post-ticket flags.
+ */
+export interface HandlersTicketWithExtras {
+  booking?: ModelsBooking;
+  bookingId?: string;
+  calledAt?: string;
+  client?: ModelsUnitClient;
+  clientId?: string;
+  completedAt?: string;
+  confirmedAt?: string;
+  counter?: ModelsCounter;
+  counterId?: string;
+  createdAt?: string;
+  /** EstimatedWaitSeconds is the estimated seconds until this ticket is called (computed on-the-fly). */
+  estimatedWaitSeconds?: number;
+  id?: string;
+  /** IsCredit marks a ticket issued when the monthly tickets_per_month quota was exhausted but
+  the working day (EOD) was still open. Credit tickets are counted against the next billing period. */
+  isCredit?: boolean;
+  isEod?: boolean;
+  /** KioskIdentifiedUserID is set when the ticket was issued after kiosk employee identification (badge / login) matched a user in the tenant. */
+  kioskIdentifiedUserId?: string;
+  lastCalledAt?: string;
+  /** Snapshot from Service at in_service; cleared on transfer/return */
+  maxServiceTime?: number;
+  /** Snapshot from Service at creation */
+  maxWaitingTime?: number;
+  operatorComment?: string;
+  /** No DB FK: avoids AutoMigrate cycle with pre_registrations.ticket_id → tickets.id */
+  preRegistration?: ModelsPreRegistration;
+  preRegistrationId?: string;
+  priority?: number;
+  queueNumber?: string;
+  /** QueuePosition is the 1-based position in the waiting queue (computed on-the-fly, not stored). */
+  queuePosition?: number;
+  /** ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets). */
+  servedByName?: string;
+  /** ServedByUserID is set when a ticket is called/picked; records the operator (counter.AssignedTo at call time). */
+  servedByUserId?: string;
+  service?: ModelsService;
+  serviceId?: string;
+  /** ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool. */
+  serviceZoneId?: string;
+  /** ServiceZoneName is the display name of the service zone unit when ServiceZoneID is set (hydrated, not stored). */
+  serviceZoneName?: string;
+  smsOptInAvailable?: boolean;
+  smsPostTicketStepRequired?: boolean;
+  status?: string;
+  /** TransferTrail lists ticket.transferred events in chronological order (client visit APIs only). */
+  transferTrail?: ModelsClientVisitTransferEvent[];
+  /** URL to the generated TTS audio file */
+  ttsUrl?: string;
+  unitId?: string;
+  visitorNotificationEmail?: string;
+  visitorPhoneKnown?: boolean;
+  /** VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in
+  the X-Visitor-Token header to prevent IDOR on cancel and phone opt-in. */
+  visitorToken?: string;
+  /** VisitorWelcomeNotifiedAt is set when the first welcome notification pipeline was claimed for this ticket. */
+  visitorWelcomeNotifiedAt?: string;
 }
 
 export interface HandlersTransferRequest {
@@ -1507,8 +1649,10 @@ export interface ModelsCompany {
 export interface HandlersPlanCapabilitiesDTO {
   apiAccess?: boolean;
   customScreenLayouts?: boolean;
+  kioskEmployeeIdp?: boolean;
   outboundWebhooks?: boolean;
   publicQueueWidget?: boolean;
+  visitorNotifications?: boolean;
 }
 
 export interface HandlersCompanyMeResponse {
@@ -1722,6 +1866,19 @@ export interface HandlersSsoExchangeRequest {
 
 export interface HandlersTenantHintRequest {
   email: string;
+}
+
+export interface HandlersUnitEmployeeIdpSettingsDTO {
+  enabled?: boolean;
+  headerTemplatesJson?: string;
+  httpMethod?: string;
+  requestBodyTemplate?: string;
+  responseDisplayNamePath?: string;
+  responseEmailPath?: string;
+  secretNames?: string[];
+  timeoutMs?: number;
+  unitId?: string;
+  upstreamUrl?: string;
 }
 
 export interface HandlersWebhookDeliveryLogDTO {
@@ -1943,6 +2100,33 @@ export interface ModelsInvitation {
   userId?: string;
 }
 
+export interface ModelsKioskPhoneLookupStartRequest {
+  phone?: string;
+}
+
+export interface ModelsKioskPhoneLookupStartResponse {
+  sessionId?: string;
+}
+
+export interface ModelsKioskPhoneLookupVerifyRequest {
+  code?: string;
+  sessionId?: string;
+}
+
+export interface ModelsKioskPhoneLookupVerifyResponse {
+  lookupToken?: string;
+}
+
+export interface ModelsKioskPhoneRedeemRequest {
+  lookupToken?: string;
+  preRegistrationId?: string;
+}
+
+export interface ModelsKioskPrResolveResponse {
+  code?: string;
+  date?: string;
+}
+
 export interface ModelsMessageTemplate {
   companyId?: string;
   content?: string;
@@ -2021,6 +2205,11 @@ export interface ModelsPreRegCalendarSlotItem {
   externalEventHref?: string;
   integrationLabel?: string;
   time?: string;
+}
+
+export interface ModelsPreRegistrationBulkRemindResponse {
+  date?: string;
+  sent?: number;
 }
 
 export interface ModelsPreRegistrationCodeRequest {
@@ -2376,6 +2565,20 @@ export interface ServicesDeploymentSaaSSettingsPatch {
   trackerTypeRegistration?: string;
   trackerTypeRequest?: string;
   trackerTypeSupport?: string;
+}
+
+export interface ServicesEmployeeIdpResolveRequest {
+  /** "badge" | "login" */
+  kind?: string;
+  raw?: string;
+}
+
+export interface ServicesEmployeeIdpResolveResponse {
+  displayName?: string;
+  email?: string;
+  /** "matched" | "no_user" | "ambiguous" */
+  matchStatus?: string;
+  userId?: string;
 }
 
 export interface ServicesEmployeeRadarResponse {

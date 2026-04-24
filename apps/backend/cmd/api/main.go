@@ -124,6 +124,8 @@ func run() error {
 	operatorIntervalRepo := repository.NewOperatorIntervalRepository()
 
 	notifRepo := repository.NewNotificationRepository()
+	ticketShortLinkRepo := repository.NewTicketShortLinkRepository()
+	queueFunnelRepo := repository.NewQueueFunnelRepository()
 
 	userService := services.NewUserService(userRepo, companyRepo)
 	deploymentSetupService := services.NewDeploymentSetupService(userRepo, companyRepo)
@@ -157,11 +159,13 @@ func run() error {
 	statsRefresh := services.NewStatisticsRefreshService(statsRepo, unitRepo, opStateRepo, statsSegmentsRepo)
 	operationalService := services.NewOperationalService(opStateRepo, unitRepo, statsRefresh)
 	ticketService := services.NewTicketServiceWithQuota(ticketRepo, counterRepo, serviceRepo, unitRepo, operatorIntervalRepo, unitClientRepo, visitorTagDefRepo, unitClientHistRepo, preRegRepo, operatorSkillRepo, calendarIntegrationService, hub, jobEnqueuerAdapter, quotaService, operationalService)
-	notificationService := services.NewNotificationService(notifRepo, unitRepo, unitClientRepo, jobEnqueuerAdapter, deploymentSaaSSettingsService)
+	notificationService := services.NewNotificationService(
+		notifRepo, unitRepo, unitClientRepo, companyRepo, ticketRepo, ticketShortLinkRepo, queueFunnelRepo, mailService, jobEnqueuerAdapter, deploymentSaaSSettingsService,
+	)
 	ticketService.SetNotificationService(notificationService)
 	anomalyAlertRepo := repository.NewAnomalyAlertRepository()
 	anomalyService := services.NewAnomalyService(database.DB, hub, unitRepo, anomalyAlertRepo)
-	jobWorker := jobs.NewJobWorkerWithSMS(ttsService, ticketRepo, notifRepo, deploymentSaaSSettingsService)
+	jobWorker := jobs.NewJobWorkerWithSMS(ttsService, ticketRepo, notifRepo, deploymentSaaSSettingsService, companyRepo)
 	// Wire notification service into the Asynq worker so visitor:notify jobs can delegate to it.
 	jobs.WithNotificationService(jobWorker, notificationService)
 	jobs.WithAnomalyService(jobWorker, anomalyService)
@@ -252,6 +256,40 @@ func run() error {
 			}
 		}
 	}()
+	kioskETACal := services.NewKioskETACalibrationService(database.DB, unitRepo)
+	go func() {
+		tick := time.NewTicker(4 * time.Hour)
+		defer tick.Stop()
+		for {
+			select {
+			case <-refreshCtx.Done():
+				return
+			case <-tick.C:
+				var uids []string
+				if err := database.DB.Table("units").Pluck("id", &uids).Error; err != nil {
+					slog.Error("kiosk smart eta cron: list units", "err", err)
+					continue
+				}
+				for _, uid := range uids {
+					u, err := unitRepo.FindByIDLight(uid)
+					if err != nil || u == nil {
+						continue
+					}
+					ok, perr := services.CompanyHasPlanFeature(u.CompanyID, services.PlanFeatureKioskSmartETA)
+					if perr != nil {
+						slog.Error("kiosk smart eta cron: plan", "unit", uid, "err", perr)
+						continue
+					}
+					if !ok {
+						continue
+					}
+					if err := kioskETACal.RefreshForUnit(uid); err != nil {
+						slog.Error("kiosk smart eta refresh", "unit", uid, "err", err)
+					}
+				}
+			}
+		}
+	}()
 	shiftService := services.NewShiftService(ticketRepo, counterRepo, serviceRepo, auditLogRepo, operatorIntervalRepo, hub, userRepo)
 	templateService := services.NewTemplateService(templateRepo)
 	invitationService := services.NewInvitationServiceWithQuota(invitationRepo, mailService, userRepo, unitRepo, templateService, quotaService)
@@ -259,7 +297,7 @@ func run() error {
 	preRegService := services.NewPreRegistrationService(preRegRepo, slotRepo, ticketRepo, serviceRepo, calendarIntegrationService)
 	desktopTerminalService := services.NewDesktopTerminalService(desktopTerminalRepo, unitRepo, counterRepo)
 	surveyRepo := repository.NewSurveyRepository()
-	surveyService := services.NewSurveyService(surveyRepo, unitRepo, userRepo, ticketRepo, desktopTerminalRepo, counterRepo, storageService)
+	surveyService := services.NewSurveyService(surveyRepo, unitRepo, userRepo, ticketRepo, desktopTerminalRepo, counterRepo, storageService, hub)
 	userHandler := handlers.NewUserHandler(userService, userRepo, unitRepo, deploymentSetupService, storageService)
 	authHandler := handlers.NewAuthHandlerWithSubscription(authService, userService, userRepo, tenantRBACRepo, leadIssueService, subscriptionRepo)
 	integrationsHandler := handlers.NewIntegrationsHandler(deploymentSaaSSettingsService)
@@ -267,9 +305,9 @@ func run() error {
 	ssoHandler := handlers.NewSSOHandler(ssoService)
 	companySSOHTTP := handlers.NewCompanySSOHTTP(ssoService, userRepo, companyRepo)
 	tenantRBACHTTP := handlers.NewTenantRBACHTTP(tenantRBACRepo, userRepo, ssoService)
-	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService, userRepo)
+	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService, userRepo).WithWebSocketHub(hub)
 	signageHandler := handlers.NewSignageHandler(signageService, unitRepo)
-	etaService := services.NewETAServiceFull(ticketRepo, counterRepo, serviceRepo, unitRepo, statsRepo)
+	etaService := services.NewETAServiceFull(ticketRepo, counterRepo, serviceRepo, unitRepo, statsRepo).WithGormDB(database.DB)
 	predictionService := services.NewPredictionService(database.DB, hub, etaService, unitRepo, ticketRepo)
 	etaBroadcaster := services.NewETABroadcaster(etaService, hub, 0)
 	etaBroadcaster.SetAfterFlush(func(unitID string) {
@@ -282,19 +320,27 @@ func run() error {
 	})
 	services.WireTicketServiceETAScheduler(ticketService, etaBroadcaster)
 	services.WireCounterServiceETAScheduler(counterService, etaBroadcaster)
-	ticketHandler := handlers.NewTicketHandlerFull(ticketService, operationalService, etaService, unitService, database.DB).WithSettingsService(deploymentSaaSSettingsService)
+	employeeIdpRepo := repository.NewEmployeeIdpRepository(database.DB)
+	employeeIdpService := services.NewEmployeeIdpService(unitRepo, userRepo, employeeIdpRepo)
+	employeeIdpHandler := handlers.NewEmployeeIdpHandler(employeeIdpService, employeeIdpRepo, database.DB)
+	ticketHandler := handlers.NewTicketHandlerFull(ticketService, operationalService, etaService, unitService, database.DB).WithSettingsService(deploymentSaaSSettingsService).WithSurveyService(surveyService).WithNotificationService(notificationService).WithUserRepository(userRepo)
+	publicShortTicketHandler := handlers.NewPublicShortTicketHandler(ticketShortLinkRepo)
 	serviceHandler := handlers.NewServiceHandler(serviceService, userRepo)
 	counterHandler := handlers.NewCounterHandler(counterService, counterRepo, operationalService, userRepo, unitRepo)
 	bookingHandler := handlers.NewBookingHandler(bookingService, userRepo)
 	shiftHandler := handlers.NewShiftHandler(shiftService, operationalService)
 	statisticsHandler := handlers.NewStatisticsHandler(statsService, userRepo, unitRepo)
 	statisticsExportHandler := handlers.NewStatisticsExportHandler(statsService, userRepo, unitRepo)
+	kioskHandler := handlers.NewKioskHandler(database.DB, unitRepo)
 	operatorSkillHandler := handlers.NewOperatorSkillHandler(operatorSkillRepo, userRepo, serviceRepo)
 	operationsHandler := handlers.NewOperationsHandler(operationalService, userRepo, auditLogRepo)
 	templateHandler := handlers.NewTemplateHandler(templateService, userRepo)
 	invitationHandler := handlers.NewInvitationHandler(invitationService, userRepo)
 	slotHandler := handlers.NewSlotHandler(slotService, calendarIntegrationService)
-	preRegHandler := handlers.NewPreRegistrationHandler(preRegService, ticketService)
+	appointmentKioskLookupService := services.NewAppointmentKioskLookupService(
+		preRegRepo, preRegService, ticketService, notificationService,
+	)
+	preRegHandler := handlers.NewPreRegistrationHandler(preRegService, ticketService, appointmentKioskLookupService)
 	calendarIntegrationHandler := handlers.NewCalendarIntegrationHandler(calendarIntegrationService, userRepo)
 	integrationAPIKeyRepo := repository.NewIntegrationAPIKeyRepository(database.DB)
 	webhookEndpointRepo := repository.NewWebhookEndpointRepository(database.DB)
@@ -359,6 +405,7 @@ func run() error {
 		pubApp,
 	)
 	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo, tenantRBACRepo, database.DB)
+	companyVisitorSMSHandler := handlers.NewCompanyVisitorSMSHandler(companyRepo, userRepo, deploymentSaaSSettingsService, queueFunnelRepo)
 	screenLayoutTemplateRepo := repository.NewScreenLayoutTemplateRepository()
 	screenLayoutTemplateService := services.NewScreenLayoutTemplateService(screenLayoutTemplateRepo)
 	screenLayoutTemplateHandler := handlers.NewScreenLayoutTemplateHandler(screenLayoutTemplateService, userRepo)
@@ -409,6 +456,7 @@ func run() error {
 	r.Head("/health/live", healthLiveHead)
 	r.Get("/health/ready", healthReady)
 	r.Head("/health/ready", healthReadyHead)
+	r.With(authmiddleware.PublicAPIRateLimit).Get("/l/{code}", publicShortTicketHandler.RedirectToTicket)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := w.Write([]byte("Hello from QuokkaQ Go Backend!")); err != nil {
@@ -530,6 +578,9 @@ func run() error {
 			r.Use(authmiddleware.RequireTerminalUnitMatchOrUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermAccessKiosk))
 			r.Get("/{unitId}/services", serviceHandler.GetServicesByUnit)
 			r.Get("/{unitId}/services-tree", serviceHandler.GetServicesByUnit)
+			r.Post("/{unitId}/kiosk-printer-telemetry", unitHandler.PostKioskPrinterTelemetry)
+			r.Post("/{unitId}/kiosk-telemetry", kioskHandler.PostKioskTelemetry)
+			r.With(authmiddleware.EmployeeIdpResolveRateLimit).Post("/{unitId}/employee-idp/resolve", employeeIdpHandler.PostPublicEmployeeIdpResolve)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
@@ -542,7 +593,8 @@ func run() error {
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/public-screen-announcements", signageHandler.ListAnnouncementsPublic)
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/feeds/{feedId}/data", signageHandler.PublicFeedData)
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/queue-status", ticketHandler.GetUnitQueueStatus)
-		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/virtual-queue", ticketHandler.JoinVirtualQueue)
+		r.With(authmiddleware.VirtualQueueJoinRateLimit, authmiddleware.PublicAPIRateLimit).Post("/{unitId}/virtual-queue", ticketHandler.JoinVirtualQueue)
+		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/kiosk-visitor-survey", ticketHandler.PostKioskVisitorSurvey)
 
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
@@ -570,12 +622,23 @@ func run() error {
 
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermUnitEmployeeIdpManage))
+			r.Get("/{unitId}/employee-idp", employeeIdpHandler.GetUnitEmployeeIdp)
+			r.Patch("/{unitId}/employee-idp", employeeIdpHandler.PatchUnitEmployeeIdp)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Use(authmiddleware.RequireUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermUnitSettingsManage))
 			r.Get("/{unitId}/pre-registrations/slots", preRegHandler.GetAvailableSlots)
 			r.Post("/{unitId}/pre-registrations", preRegHandler.Create)
 		})
 		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/pre-registrations/validate", preRegHandler.Validate)
 		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/pre-registrations/redeem", preRegHandler.Redeem)
+		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/pre-registrations/kiosk-phone/start", preRegHandler.KioskPhoneLookupStart)
+		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/pre-registrations/kiosk-phone/verify", preRegHandler.KioskPhoneLookupVerify)
+		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/pre-registrations/kiosk-phone/list", preRegHandler.KioskPhoneLookupList)
+		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/pre-registrations/kiosk-phone/redeem", preRegHandler.KioskPhoneRedeem)
+		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/kiosk/resolve-pr-token", preRegHandler.KioskResolvePrToken)
 
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
@@ -642,6 +705,7 @@ func run() error {
 			r.Get("/{unitId}/pre-registrations", preRegHandler.GetByUnit)
 			r.Get("/{unitId}/pre-registrations/calendar-slots", preRegHandler.GetCalendarSlots)
 			r.Put("/{unitId}/pre-registrations/{id}", preRegHandler.Update)
+			r.Post("/{unitId}/pre-registrations/bulk-remind", preRegHandler.BulkRemindTodayAppointments)
 			r.Get("/{unitId}/visitor-tag-definitions", visitorTagHandler.ListVisitorTagDefinitions)
 			r.Post("/{unitId}/visitor-tag-definitions", visitorTagHandler.CreateVisitorTagDefinition)
 			r.Patch("/{unitId}/visitor-tag-definitions/{definitionId}", visitorTagHandler.PatchVisitorTagDefinition)
@@ -699,6 +763,8 @@ func run() error {
 			r.Get("/{unitId}/statistics/staffing-forecast", statisticsHandler.GetStaffingForecast)
 			r.Get("/{unitId}/statistics/anomaly-alerts", statisticsHandler.GetAnomalyAlerts)
 			r.Get("/{unitId}/statistics/export/pdf", statisticsExportHandler.ExportPDF)
+			r.Get("/{unitId}/kiosk-analytics", kioskHandler.GetKioskAnalytics)
+			r.Post("/{unitId}/kiosk-eta-refresh", kioskHandler.PostKioskETARefresh)
 		})
 
 		r.Group(func(r chi.Router) {
@@ -850,6 +916,10 @@ func run() error {
 			r.Use(authmiddleware.RequireTenantAdmin(userRepo, tenantRBACRepo))
 			r.Get("/me", companyHandler.GetMyCompany)
 			r.Patch("/me", companyHandler.PatchMyCompany)
+			r.Get("/me/visitor-sms", companyVisitorSMSHandler.GetVisitorSMS)
+			r.Put("/me/visitor-sms", companyVisitorSMSHandler.PutVisitorSMS)
+			r.Post("/me/visitor-sms/test", companyVisitorSMSHandler.PostVisitorSMSTest)
+			r.Get("/me/visitor-notification-stats", companyVisitorSMSHandler.GetVisitorNotificationStats)
 			r.Get("/me/rbac/permissions", tenantRBACHTTP.GetPermissionCatalog)
 			r.Get("/me/sso/group-mappings", tenantRBACHTTP.ListGroupMappings)
 			r.Post("/me/sso/group-mappings", tenantRBACHTTP.UpsertGroupMapping)
@@ -962,6 +1032,7 @@ func run() error {
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{id}", ticketHandler.GetTicketByID)
 		r.With(authmiddleware.PublicAPIRateLimit).Post("/{id}/cancel", ticketHandler.VisitorCancelTicket)
 		r.With(authmiddleware.PublicAPIRateLimit).Post("/{id}/phone", ticketHandler.AttachPhone)
+		r.With(authmiddleware.PublicAPIRateLimit).Post("/{id}/visitor-sms-skip", ticketHandler.PostVisitorSMSSkip)
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Use(authmiddleware.RequireTicketUnit(userRepo, ticketRepo))
@@ -1090,6 +1161,8 @@ func (a *jobEnqueuerAdapter) EnqueueSMSSend(payload services.SMSSendJobPayload) 
 		NotificationID: payload.NotificationID,
 		To:             payload.To,
 		Body:           payload.Body,
+		CompanyID:      payload.CompanyID,
+		SmsSource:      payload.SmsSource,
 	})
 }
 

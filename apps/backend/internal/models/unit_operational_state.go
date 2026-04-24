@@ -32,4 +32,8 @@ type UnitOperationsPublic struct {
 	KioskFrozen         bool   `json:"kioskFrozen"`
 	CounterLoginBlocked bool   `json:"counterLoginBlocked"`
 	Phase               string `json:"phase,omitempty"`
+	// KioskIdOCR: plan includes 5.4 (ID document OCR on kiosk). UI also requires UnitConfig.kiosk.idOcrEnabled.
+	KioskIdOCR bool `json:"kioskIdOcr,omitempty"`
+	// KioskOfflineMode: plan includes 5.5 (read cache + outbox). UI also needs UnitConfig.kiosk.offlineModeEnabled.
+	KioskOfflineMode bool `json:"kioskOfflineMode,omitempty"`
 }

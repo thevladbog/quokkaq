@@ -138,12 +138,16 @@ function PinCodeForm({
         <Button
           type='button'
           variant='outline'
-          className='flex-1'
+          className='kiosk-touch-min min-h-12 flex-1'
           onClick={onClose}
         >
           {t('cancel')}
         </Button>
-        <Button type='button' className='flex-1' onClick={handleSubmit}>
+        <Button
+          type='button'
+          className='kiosk-touch-min min-h-12 flex-1'
+          onClick={handleSubmit}
+        >
           {t('submit')}
         </Button>
       </div>

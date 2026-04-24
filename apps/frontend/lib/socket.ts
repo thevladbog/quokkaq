@@ -75,6 +75,23 @@ export const UnitAnomalyAlertSchema = z.object({
 
 export type UnitAnomalyAlert = z.infer<typeof UnitAnomalyAlertSchema>;
 
+export const KioskPrinterAlertSchema = z.object({
+  unitId: z.string(),
+  kind: z.string(),
+  message: z.string(),
+  at: z.string()
+});
+
+export type KioskPrinterAlertPayload = z.infer<typeof KioskPrinterAlertSchema>;
+
+export const KioskSurveyLowSchema = z.object({
+  unitId: z.string(),
+  ticketId: z.string(),
+  score: z.number()
+});
+
+export type KioskSurveyLowPayload = z.infer<typeof KioskSurveyLowSchema>;
+
 export interface QueueSnapshot {
   unitId: string;
   now: string;
@@ -309,6 +326,14 @@ export class SocketClient {
     (data: UnitAnomalyAlert) => void,
     Listener
   >();
+  private kioskPrinterWrappers = new Map<
+    (data: KioskPrinterAlertPayload) => void,
+    Listener
+  >();
+  private kioskSurveyLowWrappers = new Map<
+    (data: KioskSurveyLowPayload) => void,
+    Listener
+  >();
 
   private onSlaEvent(event: string, callback: (data: SlaAlertPayload) => void) {
     const prev = this.slaWrappers.get(callback);
@@ -446,6 +471,58 @@ export class SocketClient {
     if (wrapper) {
       this.off('unit.anomaly_alert', wrapper);
       this.anomalyWrappers.delete(callback);
+    }
+  }
+
+  onKioskPrinterAlert(callback: (data: KioskPrinterAlertPayload) => void) {
+    const prev = this.kioskPrinterWrappers.get(callback);
+    if (prev) {
+      this.off('unit.kiosk_printer', prev);
+      this.kioskPrinterWrappers.delete(callback);
+    }
+    const wrapper: Listener = (data) => {
+      const parsed = KioskPrinterAlertSchema.safeParse(data);
+      if (!parsed.success) {
+        logger.error('Invalid unit.kiosk_printer payload:', parsed.error);
+        return;
+      }
+      callback(parsed.data);
+    };
+    this.kioskPrinterWrappers.set(callback, wrapper);
+    this.on('unit.kiosk_printer', wrapper);
+  }
+
+  offKioskPrinterAlert(callback: (data: KioskPrinterAlertPayload) => void) {
+    const wrapper = this.kioskPrinterWrappers.get(callback);
+    if (wrapper) {
+      this.off('unit.kiosk_printer', wrapper);
+      this.kioskPrinterWrappers.delete(callback);
+    }
+  }
+
+  onKioskSurveyLow(callback: (data: KioskSurveyLowPayload) => void) {
+    const prev = this.kioskSurveyLowWrappers.get(callback);
+    if (prev) {
+      this.off('unit.kiosk_survey_low', prev);
+      this.kioskSurveyLowWrappers.delete(callback);
+    }
+    const wrapper: Listener = (data) => {
+      const parsed = KioskSurveyLowSchema.safeParse(data);
+      if (!parsed.success) {
+        logger.error('Invalid unit.kiosk_survey_low payload:', parsed.error);
+        return;
+      }
+      callback(parsed.data);
+    };
+    this.kioskSurveyLowWrappers.set(callback, wrapper);
+    this.on('unit.kiosk_survey_low', wrapper);
+  }
+
+  offKioskSurveyLow(callback: (data: KioskSurveyLowPayload) => void) {
+    const wrapper = this.kioskSurveyLowWrappers.get(callback);
+    if (wrapper) {
+      this.off('unit.kiosk_survey_low', wrapper);
+      this.kioskSurveyLowWrappers.delete(callback);
     }
   }
 

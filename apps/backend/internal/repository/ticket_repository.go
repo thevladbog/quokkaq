@@ -231,6 +231,9 @@ type TicketRepository interface {
 	CountTicketsCreatedSince(unitID string, since time.Time) (int64, error)
 	// CountServedInUnitInRange counts non-EOD tickets with status served or completed and completed_at in [start, end) (UTC).
 	CountServedInUnitInRange(unitID string, start, end time.Time) (int64, error)
+
+	// ClaimVisitorWelcomeIfUnset sets visitor_welcome_notified_at when it was null (idempotency for welcome channel).
+	ClaimVisitorWelcomeIfUnset(ticketID string) (ok bool, err error)
 }
 
 // ServiceWaitingCount holds the waiting queue length for a single service.
@@ -950,4 +953,15 @@ GROUP BY sub.counter_id
 		}
 	}
 	return out, nil
+}
+
+func (r *ticketRepository) ClaimVisitorWelcomeIfUnset(ticketID string) (bool, error) {
+	if strings.TrimSpace(ticketID) == "" {
+		return false, nil
+	}
+	res := r.db.Exec(`UPDATE tickets SET visitor_welcome_notified_at = NOW() WHERE id = ? AND visitor_welcome_notified_at IS NULL`, ticketID)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected == 1, nil
 }

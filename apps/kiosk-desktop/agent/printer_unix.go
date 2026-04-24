@@ -23,7 +23,49 @@ func listPrintersOS() ([]PrinterInfo, error) {
 	if len(list) == 0 {
 		return listPrintersLpstatA(defaultName)
 	}
+	applyCupsPaperInfo(list)
 	return list, nil
+}
+
+func applyCupsPaperInfo(list []PrinterInfo) {
+	for i := range list {
+		po, st := cupsPrinterPaperAndStatus(list[i].Name)
+		if po != nil {
+			list[i].PaperOut = po
+		}
+		if st != "" {
+			list[i].Status = st
+		}
+	}
+}
+
+// cupsPrinterPaperAndStatus uses lpstat -l -p (CUPS) to detect media-empty / out-of-paper in reasons.
+func cupsPrinterPaperAndStatus(printerName string) (paperOut *bool, status string) {
+	if strings.TrimSpace(printerName) == "" {
+		return nil, ""
+	}
+	out, err := exec.Command("lpstat", "-l", "-p", printerName).Output()
+	if err != nil {
+		return nil, ""
+	}
+	lower := strings.ToLower(string(out))
+	paper := false
+	if strings.Contains(lower, "media-empty") ||
+		strings.Contains(lower, "out of paper") ||
+		strings.Contains(lower, "out-of-paper") {
+		paper = true
+	}
+	st := "ok"
+	if paper {
+		st = "out_of_paper"
+	} else if strings.Contains(lower, "is stopped") {
+		st = "stopped"
+	} else if strings.Contains(lower, "is idle") {
+		st = "idle"
+	} else {
+		st = "unknown"
+	}
+	return &paper, st
 }
 
 func cupsDefaultDestination() string {
@@ -88,7 +130,11 @@ func listPrintersLpstatA(defaultName string) ([]PrinterInfo, error) {
 			IsDefault: defaultName != "" && name == defaultName,
 		})
 	}
-	return list, sc.Err()
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+	applyCupsPaperInfo(list)
+	return list, nil
 }
 
 func printSystemOS(queue string, raw []byte) error {

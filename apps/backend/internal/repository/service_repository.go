@@ -200,6 +200,7 @@ var updatableServiceColumns = []string{
 	"prebook",
 	"calendar_slot_key",
 	"offer_identification",
+	"identification_mode",
 	"is_leaf",
 	"restricted_service_zone_id",
 	"grid_row",

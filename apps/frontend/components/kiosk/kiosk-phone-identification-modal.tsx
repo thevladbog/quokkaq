@@ -109,7 +109,7 @@ function KioskPhoneIdentificationModalBody({
               key={digit}
               type='button'
               variant='outline'
-              className='h-[3.25rem] text-2xl font-bold sm:h-16 sm:text-3xl'
+              className='kiosk-touch-min h-[3.25rem] min-h-12 text-2xl font-bold sm:h-16 sm:text-3xl'
               onClick={() => handleDigit(digit.toString())}
               disabled={isPending}
             >
@@ -119,7 +119,7 @@ function KioskPhoneIdentificationModalBody({
           <Button
             type='button'
             variant='outline'
-            className='h-[3.25rem] text-2xl font-bold sm:h-16 sm:text-3xl'
+            className='kiosk-touch-min h-[3.25rem] min-h-12 text-2xl font-bold sm:h-16 sm:text-3xl'
             onClick={handleClear}
             disabled={isPending}
           >
@@ -128,7 +128,7 @@ function KioskPhoneIdentificationModalBody({
           <Button
             type='button'
             variant='outline'
-            className='h-[3.25rem] text-2xl font-bold sm:h-16 sm:text-3xl'
+            className='kiosk-touch-min h-[3.25rem] min-h-12 text-2xl font-bold sm:h-16 sm:text-3xl'
             onClick={() => handleDigit('0')}
             disabled={isPending}
           >
@@ -137,7 +137,7 @@ function KioskPhoneIdentificationModalBody({
           <Button
             type='button'
             variant='outline'
-            className='h-[3.25rem] sm:h-16'
+            className='kiosk-touch-min h-[3.25rem] min-h-12 sm:h-16'
             onClick={handleBackspace}
             disabled={isPending}
             aria-label={t('backspace', {
@@ -152,7 +152,7 @@ function KioskPhoneIdentificationModalBody({
           <Button
             type='button'
             variant='outline'
-            className='text-kiosk-ink h-12 flex-1 text-base sm:h-14 sm:text-lg'
+            className='text-kiosk-ink kiosk-touch-min h-12 min-h-12 flex-1 text-base sm:h-14 sm:text-lg'
             onClick={onSkip}
             disabled={isPending}
           >
@@ -160,12 +160,12 @@ function KioskPhoneIdentificationModalBody({
           </Button>
           <Button
             type='button'
-            className='h-12 flex-1 text-base sm:h-14 sm:text-lg'
+            className='kiosk-touch-min h-12 min-h-12 flex-1 text-base sm:h-14 sm:text-lg'
             onClick={handleConfirm}
             disabled={digits.length < 1 || isPending}
           >
             {isPending ? (
-              <Loader2 className='size-6 animate-spin sm:size-7' />
+              <Loader2 className='kiosk-a11y-respect-motion size-6 animate-spin sm:size-7' />
             ) : (
               t('confirm', { defaultValue: 'Continue' })
             )}

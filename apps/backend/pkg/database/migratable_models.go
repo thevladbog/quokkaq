@@ -39,6 +39,12 @@ func AllMigratableModels() []any {
 		&models.TicketNumberSequence{},
 		&models.Booking{},
 		&models.Notification{},
+		&models.QueueFunnelEvent{},
+		&models.KioskTelemetryEvent{},
+		&models.KioskETASlotCalibration{},
+		&models.KioskETAGBDTArtifact{},
+		&models.KioskTicketIdempotency{},
+		&models.TicketShortLink{},
 		&models.AuditLog{},
 		&models.UnitMaterial{},
 		&models.Playlist{},
@@ -70,5 +76,7 @@ func AllMigratableModels() []any {
 		&models.WebhookEndpoint{},
 		&models.WebhookDeliveryLog{},
 		&models.WebhookOutbox{},
+		&models.UnitEmployeeIdpSetting{},
+		&models.UnitEmployeeIdpSecret{},
 	}
 }

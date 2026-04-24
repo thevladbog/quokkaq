@@ -150,6 +150,75 @@
                 },
                 "type": "object"
             },
+            "handlers.CompanyVisitorNotifStats": {
+                "properties": {
+                    "periodDays7": {
+                        "type": "boolean"
+                    },
+                    "smsFailed": {
+                        "type": "integer"
+                    },
+                    "smsPending": {
+                        "type": "integer"
+                    },
+                    "smsSent": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.CompanyVisitorSMSPublic": {
+                "properties": {
+                    "resolvedSource": {
+                        "description": "ResolvedSource is tenant | platform | log (resolved outbound route for visitor SMS).",
+                        "type": "string"
+                    },
+                    "smsApiKeyMasked": {
+                        "type": "string"
+                    },
+                    "smsEnabled": {
+                        "type": "boolean"
+                    },
+                    "smsFromName": {
+                        "type": "string"
+                    },
+                    "smsProvider": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.CompanyVisitorSMSPut": {
+                "properties": {
+                    "smsApiKey": {
+                        "type": "string"
+                    },
+                    "smsApiSecret": {
+                        "type": "string"
+                    },
+                    "smsEnabled": {
+                        "type": "boolean"
+                    },
+                    "smsFromName": {
+                        "type": "string"
+                    },
+                    "smsProvider": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.CompanyVisitorSMSTestRequest": {
+                "properties": {
+                    "phone": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "phone"
+                ],
+                "type": "object"
+            },
             "handlers.CounterCallNextRequest": {
                 "properties": {
                     "serviceId": {
@@ -752,6 +821,31 @@
                 ],
                 "type": "object"
             },
+            "handlers.KioskPrinterTelemetryRequest": {
+                "properties": {
+                    "kind": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.KioskVisitorSurveyRequest": {
+                "properties": {
+                    "emoji": {
+                        "type": "string"
+                    },
+                    "score": {
+                        "type": "integer"
+                    },
+                    "ticketId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.LoginLinkResponse": {
                 "properties": {
                     "exampleUrl": {
@@ -975,6 +1069,48 @@
                             "type": "string"
                         },
                         "type": "array"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.PatchUnitEmployeeIdpRequest": {
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "headerTemplatesJson": {
+                        "type": "string"
+                    },
+                    "httpMethod": {
+                        "type": "string"
+                    },
+                    "requestBodyTemplate": {
+                        "type": "string"
+                    },
+                    "responseDisplayNamePath": {
+                        "type": "string"
+                    },
+                    "responseEmailPath": {
+                        "type": "string"
+                    },
+                    "secretNamesToDelete": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "secretValues": {
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "Secrets: name -> plaintext; stored encrypted. Omitted names unchanged.",
+                        "type": "object"
+                    },
+                    "timeoutMs": {
+                        "type": "integer"
+                    },
+                    "upstreamUrl": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -1351,6 +1487,19 @@
                 },
                 "type": "object"
             },
+            "handlers.PostKioskTelemetryRequest": {
+                "properties": {
+                    "kind": {
+                        "description": "api_ping | print_error | paper_out | heartbeat",
+                        "type": "string"
+                    },
+                    "meta": {
+                        "additionalProperties": {},
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.PublicLeadRequestBody": {
                 "properties": {
                     "billingPeriod": {
@@ -1628,6 +1777,154 @@
                 "properties": {
                     "phone": {
                         "description": "Phone number in E.164 format to send the test SMS to.",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.TicketWithExtras": {
+                "description": "Public ticket with opt-in and kiosk post-ticket flags.",
+                "properties": {
+                    "booking": {
+                        "$ref": "#/components/schemas/models.Booking"
+                    },
+                    "bookingId": {
+                        "type": "string"
+                    },
+                    "calledAt": {
+                        "type": "string"
+                    },
+                    "client": {
+                        "$ref": "#/components/schemas/models.UnitClient"
+                    },
+                    "clientId": {
+                        "type": "string"
+                    },
+                    "completedAt": {
+                        "type": "string"
+                    },
+                    "confirmedAt": {
+                        "type": "string"
+                    },
+                    "counter": {
+                        "$ref": "#/components/schemas/models.Counter"
+                    },
+                    "counterId": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "estimatedWaitSeconds": {
+                        "description": "EstimatedWaitSeconds is the estimated seconds until this ticket is called (computed on-the-fly).",
+                        "type": "integer"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "isCredit": {
+                        "description": "IsCredit marks a ticket issued when the monthly tickets_per_month quota was exhausted but\nthe working day (EOD) was still open. Credit tickets are counted against the next billing period.",
+                        "type": "boolean"
+                    },
+                    "isEod": {
+                        "type": "boolean"
+                    },
+                    "kioskIdentifiedUserId": {
+                        "description": "KioskIdentifiedUserID is set when the ticket was issued after kiosk employee identification (badge / login) matched a user in the tenant.",
+                        "type": "string"
+                    },
+                    "lastCalledAt": {
+                        "type": "string"
+                    },
+                    "maxServiceTime": {
+                        "description": "Snapshot from Service at in_service; cleared on transfer/return",
+                        "type": "integer"
+                    },
+                    "maxWaitingTime": {
+                        "description": "Snapshot from Service at creation",
+                        "type": "integer"
+                    },
+                    "operatorComment": {
+                        "type": "string"
+                    },
+                    "preRegistration": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/models.PreRegistration"
+                            }
+                        ],
+                        "description": "No DB FK: avoids AutoMigrate cycle with pre_registrations.ticket_id → tickets.id"
+                    },
+                    "preRegistrationId": {
+                        "type": "string"
+                    },
+                    "priority": {
+                        "type": "integer"
+                    },
+                    "queueNumber": {
+                        "type": "string"
+                    },
+                    "queuePosition": {
+                        "description": "QueuePosition is the 1-based position in the waiting queue (computed on-the-fly, not stored).",
+                        "type": "integer"
+                    },
+                    "servedByName": {
+                        "description": "ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets).",
+                        "type": "string"
+                    },
+                    "servedByUserId": {
+                        "description": "ServedByUserID is set when a ticket is called/picked; records the operator (counter.AssignedTo at call time).",
+                        "type": "string"
+                    },
+                    "service": {
+                        "$ref": "#/components/schemas/models.Service"
+                    },
+                    "serviceId": {
+                        "type": "string"
+                    },
+                    "serviceZoneId": {
+                        "description": "ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool.",
+                        "type": "string"
+                    },
+                    "serviceZoneName": {
+                        "description": "ServiceZoneName is the display name of the service zone unit when ServiceZoneID is set (hydrated, not stored).",
+                        "type": "string"
+                    },
+                    "smsOptInAvailable": {
+                        "type": "boolean"
+                    },
+                    "smsPostTicketStepRequired": {
+                        "type": "boolean"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "transferTrail": {
+                        "description": "TransferTrail lists ticket.transferred events in chronological order (client visit APIs only).",
+                        "items": {
+                            "$ref": "#/components/schemas/models.ClientVisitTransferEvent"
+                        },
+                        "type": "array"
+                    },
+                    "ttsUrl": {
+                        "description": "URL to the generated TTS audio file",
+                        "type": "string"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    },
+                    "visitorNotificationEmail": {
+                        "type": "string"
+                    },
+                    "visitorPhoneKnown": {
+                        "type": "boolean"
+                    },
+                    "visitorToken": {
+                        "description": "VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in\nthe X-Visitor-Token header to prevent IDOR on cancel and phone opt-in.",
+                        "type": "string"
+                    },
+                    "visitorWelcomeNotifiedAt": {
+                        "description": "VisitorWelcomeNotifiedAt is set when the first welcome notification pipeline was claimed for this ticket.",
                         "type": "string"
                     }
                 },
@@ -2317,10 +2614,16 @@
                     "customScreenLayouts": {
                         "type": "boolean"
                     },
+                    "kioskEmployeeIdp": {
+                        "type": "boolean"
+                    },
                     "outboundWebhooks": {
                         "type": "boolean"
                     },
                     "publicQueueWidget": {
+                        "type": "boolean"
+                    },
+                    "visitorNotifications": {
                         "type": "boolean"
                     }
                 },
@@ -2503,6 +2806,44 @@
                 "required": [
                     "email"
                 ],
+                "type": "object"
+            },
+            "handlers.unitEmployeeIdpSettingsDTO": {
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "headerTemplatesJson": {
+                        "type": "string"
+                    },
+                    "httpMethod": {
+                        "type": "string"
+                    },
+                    "requestBodyTemplate": {
+                        "type": "string"
+                    },
+                    "responseDisplayNamePath": {
+                        "type": "string"
+                    },
+                    "responseEmailPath": {
+                        "type": "string"
+                    },
+                    "secretNames": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "timeoutMs": {
+                        "type": "integer"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    },
+                    "upstreamUrl": {
+                        "type": "string"
+                    }
+                },
                 "type": "object"
             },
             "handlers.webhookDeliveryLogDTO": {
@@ -3380,6 +3721,63 @@
                 },
                 "type": "object"
             },
+            "models.KioskPhoneLookupStartRequest": {
+                "properties": {
+                    "phone": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "models.KioskPhoneLookupStartResponse": {
+                "properties": {
+                    "sessionId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "models.KioskPhoneLookupVerifyRequest": {
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "sessionId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "models.KioskPhoneLookupVerifyResponse": {
+                "properties": {
+                    "lookupToken": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "models.KioskPhoneRedeemRequest": {
+                "properties": {
+                    "lookupToken": {
+                        "type": "string"
+                    },
+                    "preRegistrationId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "models.KioskPrResolveResponse": {
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "date": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "models.MessageTemplate": {
                 "properties": {
                     "companyId": {
@@ -3657,6 +4055,17 @@
                 },
                 "type": "object"
             },
+            "models.PreRegistrationBulkRemindResponse": {
+                "properties": {
+                    "date": {
+                        "type": "string"
+                    },
+                    "sent": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "models.PreRegistrationCodeRequest": {
                 "properties": {
                     "code": {
@@ -3876,6 +4285,10 @@
                         "type": "integer"
                     },
                     "id": {
+                        "type": "string"
+                    },
+                    "identificationMode": {
+                        "description": "IdentificationMode selects the kiosk identification step: none|phone|qr|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column.",
                         "type": "string"
                     },
                     "imageUrl": {
@@ -4434,6 +4847,10 @@
                     "isEod": {
                         "type": "boolean"
                     },
+                    "kioskIdentifiedUserId": {
+                        "description": "KioskIdentifiedUserID is set when the ticket was issued after kiosk employee identification (badge / login) matched a user in the tenant.",
+                        "type": "string"
+                    },
                     "lastCalledAt": {
                         "type": "string"
                     },
@@ -4487,6 +4904,10 @@
                         "description": "ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool.",
                         "type": "string"
                     },
+                    "serviceZoneName": {
+                        "description": "ServiceZoneName is the display name of the service zone unit when ServiceZoneID is set (hydrated, not stored).",
+                        "type": "string"
+                    },
                     "status": {
                         "type": "string"
                     },
@@ -4504,8 +4925,15 @@
                     "unitId": {
                         "type": "string"
                     },
+                    "visitorNotificationEmail": {
+                        "type": "string"
+                    },
                     "visitorToken": {
                         "description": "VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in\nthe X-Visitor-Token header to prevent IDOR on cancel and phone opt-in.",
+                        "type": "string"
+                    },
+                    "visitorWelcomeNotifiedAt": {
+                        "description": "VisitorWelcomeNotifiedAt is set when the first welcome notification pipeline was claimed for this ticket.",
                         "type": "string"
                     }
                 },
@@ -4670,6 +5098,14 @@
                         "type": "boolean"
                     },
                     "kioskFrozen": {
+                        "type": "boolean"
+                    },
+                    "kioskIdOcr": {
+                        "description": "KioskIdOCR: plan includes 5.4 (ID document OCR on kiosk). UI also requires UnitConfig.kiosk.idOcrEnabled.",
+                        "type": "boolean"
+                    },
+                    "kioskOfflineMode": {
+                        "description": "KioskOfflineMode: plan includes 5.5 (read cache + outbox). UI also needs UnitConfig.kiosk.offlineModeEnabled.",
                         "type": "boolean"
                     },
                     "phase": {
@@ -5247,6 +5683,36 @@
                         "type": "string"
                     },
                     "trackerTypeSupport": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.EmployeeIdpResolveRequest": {
+                "properties": {
+                    "kind": {
+                        "description": "\"badge\" | \"login\"",
+                        "type": "string"
+                    },
+                    "raw": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.EmployeeIdpResolveResponse": {
+                "properties": {
+                    "displayName": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "matchStatus": {
+                        "description": "\"matched\" | \"no_user\" | \"ambiguous\"",
+                        "type": "string"
+                    },
+                    "userId": {
                         "type": "string"
                     }
                 },
@@ -10987,6 +11453,191 @@
                     }
                 ],
                 "summary": "Replace tenant role assignments for a user",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/visitor-notification-stats": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.CompanyVisitorNotifStats"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "SMS notification job counts (last 7 days) for observability",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/visitor-sms": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Tenant when user has multiple orgs",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.CompanyVisitorSMSPublic"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get tenant visitor SMS settings (masked)",
+                "tags": [
+                    "companies"
+                ]
+            },
+            "put": {
+                "parameters": [
+                    {
+                        "description": "Tenant when user has multiple orgs",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.CompanyVisitorSMSPut"
+                            }
+                        }
+                    },
+                    "description": "Visitor SMS section",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.CompanyVisitorSMSPublic"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Set tenant visitor SMS (BYOK) section",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/visitor-sms/test": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Tenant",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "*/*": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.CompanyVisitorSMSTestRequest"
+                            }
+                        }
+                    },
+                    "description": "phone E.164",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Send a test visitor SMS using tenant (or platform) resolution",
                 "tags": [
                     "companies"
                 ]
@@ -18201,11 +18852,11 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/models.Ticket"
+                                    "$ref": "#/components/schemas/handlers.TicketWithExtras"
                                 }
                             }
                         },
-                        "description": "OK"
+                        "description": "Ticket with smsOptInAvailable, visitorPhoneKnown, smsPostTicketStepRequired"
                     },
                     "404": {
                         "content": {
@@ -18879,6 +19530,70 @@
                     }
                 ],
                 "summary": "Attach or change visitor on active ticket",
+                "tags": [
+                    "tickets"
+                ]
+            }
+        },
+        "/tickets/{id}/visitor-sms-skip": {
+            "post": {
+                "description": "Public; requires X-Visitor-Token matching ticket.visitorToken. Idempotent: duplicate declined events are not recorded.",
+                "parameters": [
+                    {
+                        "description": "Ticket ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Token issued on ticket (ticket.visitorToken); required to prevent IDOR",
+                        "in": "header",
+                        "name": "X-Visitor-Token",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "no content"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "id required"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "X-Visitor-Token missing or invalid"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Ticket not found"
+                    }
+                },
+                "summary": "Record that the visitor declined the post-ticket SMS step on a kiosk",
                 "tags": [
                     "tickets"
                 ]
@@ -20767,6 +21482,164 @@
                 ]
             }
         },
+        "/units/{unitId}/employee-idp": {
+            "patch": {
+                "description": "Authenticated; permission unit.employee_idp.manage. Optional secretValues (encrypted); secretNamesToDelete removes named stored secrets.",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.PatchUnitEmployeeIdpRequest"
+                            }
+                        }
+                    },
+                    "description": "Settings and secrets",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.unitEmployeeIdpSettingsDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Error message"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Error message"
+                    }
+                },
+                "summary": "Update unit external employee IdP (HTTPS) settings",
+                "tags": [
+                    "units"
+                ]
+            }
+        },
+        "/units/{unitId}/employee-idp/resolve": {
+            "post": {
+                "description": "Authenticated kiosk session (access.kiosk or terminal JWT). Resolves against unit HTTPS template; does not return raw upstream body.",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/services.EmployeeIdpResolveRequest"
+                            }
+                        }
+                    },
+                    "description": "kind + raw",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.EmployeeIdpResolveResponse"
+                                }
+                            }
+                        },
+                        "description": "matchStatus: matched|no_user|ambiguous (userId set only for matched; ambiguous when >1 user shares email in company)"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Error message; 429 = rate limit"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Error message; 429 = rate limit"
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Error message; 429 = rate limit"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Error message; 429 = rate limit"
+                    },
+                    "502": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Error message; 429 = rate limit"
+                    }
+                },
+                "summary": "Resolve employee badge or login against tenant IdP",
+                "tags": [
+                    "kiosk"
+                ]
+            }
+        },
         "/units/{unitId}/feeds": {
             "get": {
                 "operationId": "ListSignageFeeds",
@@ -21518,6 +22391,58 @@
                 ]
             }
         },
+        "/units/{unitId}/kiosk-analytics": {
+            "get": {
+                "description": "Aggregated tickets, funnel, telemetry for a unit. Requires plan feature kiosk_operations_analytics and statistics access.",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "RFC3339 or YYYY-MM-DD (default: 7d ago)",
+                        "in": "query",
+                        "name": "from",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "RFC3339 or YYYY-MM-DD (default: now)",
+                        "in": "query",
+                        "name": "to",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "json (default) or csv",
+                        "in": "query",
+                        "name": "format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    }
+                },
+                "summary": "Kiosk operations analytics",
+                "tags": [
+                    "units"
+                ]
+            }
+        },
         "/units/{unitId}/kiosk-config": {
             "patch": {
                 "description": "Body must be {\"config\":{\"kiosk\":{...}}}. Updates only config.kiosk (other config keys unchanged). Allowed for desktop terminal JWT bound to this unit, unit members, and admins.",
@@ -21610,6 +22535,206 @@
                 "summary": "Merge kiosk settings into unit config",
                 "tags": [
                     "units"
+                ]
+            }
+        },
+        "/units/{unitId}/kiosk-eta-refresh": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "units"
+                ]
+            }
+        },
+        "/units/{unitId}/kiosk-printer-telemetry": {
+            "post": {
+                "description": "Terminal-authenticated. Emits `unit.kiosk_printer` to the unit room for supervisor dashboards. No response body.",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.KioskPrinterTelemetryRequest"
+                            }
+                        }
+                    },
+                    "description": "kind: print_error | agent_error | paper_out",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    }
+                },
+                "summary": "Report a kiosk printer issue (broadcast to unit WebSocket)",
+                "tags": [
+                    "units"
+                ]
+            }
+        },
+        "/units/{unitId}/kiosk-telemetry": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "*/*": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.PostKioskTelemetryRequest"
+                            }
+                        }
+                    },
+                    "description": "Sample",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "units"
+                ]
+            }
+        },
+        "/units/{unitId}/kiosk-visitor-survey": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Visitor ownership token (same as ticket page)",
+                        "in": "header",
+                        "name": "X-Visitor-Token",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "*/*": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.KioskVisitorSurveyRequest"
+                            }
+                        }
+                    },
+                    "description": "Score and optional emoji",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "units"
+                ]
+            }
+        },
+        "/units/{unitId}/kiosk/resolve-pr-token": {
+            "get": {
+                "description": "Server-signed HMAC token (JWT_SECRET) used in email/QR; returns code and date for the unit. Public; rate-limited.",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Signed token from notification link",
+                        "in": "query",
+                        "name": "prToken",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.KioskPrResolveResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request (missing or invalid token)"
+                    }
+                },
+                "summary": "Resolve signed prToken to six-digit code (kiosk / deep link)",
+                "tags": [
+                    "pre-registrations"
                 ]
             }
         },
@@ -22896,6 +24021,91 @@
                 ]
             }
         },
+        "/units/{unitId}/pre-registrations/bulk-remind": {
+            "post": {
+                "description": "Enqueues one transactional SMS per open pre-registration for the unit and calendar day. Requires unit settings manage permission. Optional query date=YYYY-MM-DD.",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Date YYYY-MM-DD (default: today UTC)",
+                        "in": "query",
+                        "name": "date",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.PreRegistrationBulkRemindResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Service Unavailable (no SMS for unit)"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Enqueue bulk SMS reminders for today’s bookings",
+                "tags": [
+                    "pre-registrations"
+                ]
+            }
+        },
         "/units/{unitId}/pre-registrations/calendar-slots": {
             "get": {
                 "description": "Returns CalDAV slot rows (href, etag, time) for a service and date; requires Bearer auth and unit membership. Empty array when no integration or no slots.",
@@ -22990,6 +24200,322 @@
                     }
                 ],
                 "summary": "List calendar-backed slots with CalDAV hrefs (when integration enabled)",
+                "tags": [
+                    "pre-registrations"
+                ]
+            }
+        },
+        "/units/{unitId}/pre-registrations/kiosk-phone/list": {
+            "get": {
+                "description": "Requires X-Lookup-Token from verify. Returns pre-registration rows the visitor may check in. Public; rate-limited.",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Token from /kiosk-phone/verify",
+                        "in": "header",
+                        "name": "X-Lookup-Token",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/models.PreRegistration"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized (missing or invalid token)"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Service Unavailable"
+                    }
+                },
+                "summary": "List today’s pre-registrations for verified phone",
+                "tags": [
+                    "pre-registrations"
+                ]
+            }
+        },
+        "/units/{unitId}/pre-registrations/kiosk-phone/redeem": {
+            "post": {
+                "description": "Issues a ticket for the selected preRegistrationId. Same response shape as code redeem. Public; rate-limited.",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/models.KioskPhoneRedeemRequest"
+                            }
+                        }
+                    },
+                    "description": "lookupToken and preRegistrationId",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.PreRegistrationRedeemResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Service Unavailable"
+                    }
+                },
+                "summary": "Redeem pre-registration after phone lookup",
+                "tags": [
+                    "pre-registrations"
+                ]
+            }
+        },
+        "/units/{unitId}/pre-registrations/kiosk-phone/start": {
+            "post": {
+                "description": "Sends a 6-digit SMS code; returns a sessionId for /kiosk-phone/verify. Public; rate-limited. Requires tenant SMS to be available for the unit.",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/models.KioskPhoneLookupStartRequest"
+                            }
+                        }
+                    },
+                    "description": "E.164 or local phone",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.KioskPhoneLookupStartResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Too Many Requests"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Service Unavailable (no SMS for unit)"
+                    }
+                },
+                "summary": "Start phone verification for kiosk appointment lookup",
+                "tags": [
+                    "pre-registrations"
+                ]
+            }
+        },
+        "/units/{unitId}/pre-registrations/kiosk-phone/verify": {
+            "post": {
+                "description": "Validates the 6-digit code; returns a short-lived lookupToken for list/redeem.",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/models.KioskPhoneLookupVerifyRequest"
+                            }
+                        }
+                    },
+                    "description": "Session from start + SMS code",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.KioskPhoneLookupVerifyResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized (wrong or expired code)"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Service Unavailable"
+                    }
+                },
+                "summary": "Verify SMS code for kiosk phone lookup",
                 "tags": [
                     "pre-registrations"
                 ]
@@ -26856,11 +28382,11 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/models.Ticket"
+                                    "$ref": "#/components/schemas/handlers.TicketWithExtras"
                                 }
                             }
                         },
-                        "description": "Created"
+                        "description": "Created ticket with smsOptInAvailable, visitorPhoneKnown, smsPostTicketStepRequired"
                     },
                     "400": {
                         "content": {

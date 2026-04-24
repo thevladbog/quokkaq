@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
+    "test:a11y": "vitest run lib/kiosk-wcag-contrast.test.ts",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "format:fix": "prettier --write .",
@@ -88,6 +89,7 @@
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
+    "tesseract.js": "^5.1.1",
     "zod": "^4.3.6",
     "zustand": "^5.0.12"
   },

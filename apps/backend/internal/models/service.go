@@ -25,7 +25,9 @@ type Service struct {
 	// When non-empty (after trim), it must be unique per unit — enforced by DB partial unique index and create/update validation.
 	CalendarSlotKey     *string `json:"calendarSlotKey,omitempty" gorm:"column:calendar_slot_key"`
 	OfferIdentification bool    `gorm:"default:false" json:"offerIdentification"`
-	IsLeaf              bool    `gorm:"default:false" json:"isLeaf"`
+	// IdentificationMode selects the kiosk identification step: none|phone|qr|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column.
+	IdentificationMode string `gorm:"not null;default:'none';column:identification_mode" json:"identificationMode"`
+	IsLeaf             bool   `gorm:"default:false" json:"isLeaf"`
 	// RestrictedServiceZoneID: when set, this leaf service is only offered in that service_zone's waiting pool (child of UnitID subdivision).
 	RestrictedServiceZoneID *string `json:"restrictedServiceZoneId,omitempty" gorm:"column:restricted_service_zone_id"`
 

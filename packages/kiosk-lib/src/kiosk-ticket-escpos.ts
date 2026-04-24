@@ -32,6 +32,10 @@ export type BuildKioskTicketEscPosInput = {
    * when storage URLs are not CORS-readable from the browser).
    */
   logoFetchUrl?: string;
+  /**
+   * Extra text lines on the receipt after the queue number (localized at call site, e.g. position / zone).
+   */
+  extraBodyLines?: string[];
 };
 
 /** Epson `ESC t n`: WPC1251 Cyrillic (page 46). Not 17 — on TM series 17 is PC866. */
@@ -451,6 +455,19 @@ async function buildRichTicketEscPos(
     appendSelectCharSize(parts, 0x44);
     appendLine(parts, queueNum || '—', 'center');
     appendSelectCharSize(parts, 0x00);
+  }
+
+  if (input.extraBodyLines && input.extraBodyLines.length > 0) {
+    appendSelectWpc1251(parts);
+    for (const line of input.extraBodyLines) {
+      const t = String(line).trim();
+      if (!t) {
+        continue;
+      }
+      for (const wl of wrapLine(t, maxC)) {
+        appendLine(parts, wl, 'center');
+      }
+    }
   }
 
   appendLine(parts, wrapToDashes(maxC), 'left');

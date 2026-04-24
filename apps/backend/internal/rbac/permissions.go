@@ -6,19 +6,21 @@ const LegacyGlobalRoleAdmin = "admin"
 
 // Company-scoped (tenant-wide) permissions.
 const (
-	PermTenantAdmin       = "tenant.admin"
-	PermUsersManage       = "users.manage"
-	PermUnitsManage       = "units.manage"
-	PermTicketsRead       = "tickets.read"
-	PermTicketsWrite      = "tickets.write"
-	PermStatisticsRead    = "statistics.read"
-	PermSupportReports    = "support.reports"
-	PermKioskManage       = "kiosk.manage"
-	PermCounterOperate    = "counter.operate"
-	PermSurveyManage      = "survey.manage"
-	PermCalendarManage    = "calendar.manage"
-	PermTemplatesManage   = "templates.manage"
-	PermInvitationsManage = "invitations.manage"
+	PermTenantAdmin    = "tenant.admin"
+	PermUsersManage    = "users.manage"
+	PermUnitsManage    = "units.manage"
+	PermTicketsRead    = "tickets.read"
+	PermTicketsWrite   = "tickets.write"
+	PermStatisticsRead = "statistics.read"
+	PermSupportReports = "support.reports"
+	PermKioskManage    = "kiosk.manage"
+	// PermUnitEmployeeIdpManage allows configuring the external employee IdP (badge/login) for a unit.
+	PermUnitEmployeeIdpManage = "unit.employee_idp.manage"
+	PermCounterOperate        = "counter.operate"
+	PermSurveyManage          = "survey.manage"
+	PermCalendarManage        = "calendar.manage"
+	PermTemplatesManage       = "templates.manage"
+	PermInvitationsManage     = "invitations.manage"
 )
 
 // Unit-scoped permissions (stored on user_units.permissions and tenant_role_units.permissions).
@@ -61,6 +63,7 @@ func All() []string {
 		PermStatisticsRead,
 		PermSupportReports,
 		PermKioskManage,
+		PermUnitEmployeeIdpManage,
 		PermCounterOperate,
 		PermSurveyManage,
 		PermCalendarManage,

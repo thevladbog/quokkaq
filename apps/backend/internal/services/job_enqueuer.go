@@ -22,6 +22,8 @@ type SMSSendJobPayload struct {
 	NotificationID string
 	To             string
 	Body           string
+	CompanyID      string // for tenant SMS; empty = platform only
+	SmsSource      string // "tenant" | "platform" | "log" — as resolved at enqueue time
 }
 
 // VisitorNotifyJobPayload is the services-layer DTO for enqueuing a visitor:notify job.

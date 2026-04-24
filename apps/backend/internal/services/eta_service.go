@@ -1,12 +1,15 @@
 package services
 
 import (
+	"encoding/json"
 	"math"
 	"strings"
 	"time"
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
+
+	"gorm.io/gorm"
 )
 
 const (
@@ -29,6 +32,13 @@ type ETAService struct {
 	serviceRepo repository.ServiceRepository
 	unitRepo    repository.UnitRepository
 	statsRepo   repository.StatisticsRepository
+	db          *gorm.DB // optional: kiosk smart ETA (5.2) calibration
+}
+
+// WithGormDB sets DB for smart ETA slot calibration reads (5.2).
+func (s *ETAService) WithGormDB(db *gorm.DB) *ETAService {
+	s.db = db
+	return s
 }
 
 // NewETAService creates a new ETAService.
@@ -77,9 +87,11 @@ type QueuePositionResult struct {
 
 // TicketETAInfo is per-ticket ETA for WebSocket snapshots.
 type TicketETAInfo struct {
-	TicketID         string `json:"ticketId"`
-	Position         int    `json:"queuePosition"`
-	EstimatedWaitSec int    `json:"estimatedWaitSeconds"`
+	TicketID         string  `json:"ticketId"`
+	Position         int     `json:"queuePosition"`
+	EstimatedWaitSec int     `json:"estimatedWaitSeconds"`
+	EtaSource        string  `json:"etaSource,omitempty"`     // "baseline" | "kiosk_model_blended"
+	EtaConfidence    float64 `json:"etaConfidence,omitempty"` // 0..1 when kiosk_model
 }
 
 // UnitETASnapshot is broadcast on unit.eta_update for real-time clients.
@@ -277,11 +289,14 @@ func (s *ETAService) ComputeUnitETASnapshot(unitID string) (UnitETASnapshot, err
 			}
 		}
 		etaSec := estimateWaitSecondsFromInputs(t, pos, baseSec, activeCounters, thr)
-		snap.Tickets = append(snap.Tickets, TicketETAInfo{
+		info := TicketETAInfo{
 			TicketID:         t.ID,
 			Position:         pos,
 			EstimatedWaitSec: etaSec,
-		})
+			EtaSource:        "baseline",
+			EtaConfidence:    0.5,
+		}
+		snap.Tickets = append(snap.Tickets, s.applyKioskSmartETABlend(unitID, t, now, info))
 	}
 
 	if s.serviceRepo != nil {
@@ -511,4 +526,74 @@ func (s *ETAService) estimateWaitSecondsEnhanced(ticket *models.Ticket, position
 	}
 	throughput := harmonicThroughputFromOccupiedSamples(perCounter, baseSec, activeCounters)
 	return estimateWaitSecondsFromInputs(ticket, position, baseSec, activeCounters, throughput)
+}
+
+// applyKioskSmartETABlend mixes baseline ETA with per-slot p50 from kiosk_eta_slot_calibration (5.2).
+func (s *ETAService) applyKioskSmartETABlend(unitID string, ticket *models.Ticket, now time.Time, in TicketETAInfo) TicketETAInfo {
+	if s == nil || s.db == nil || s.unitRepo == nil || ticket == nil {
+		return in
+	}
+	u, err := s.unitRepo.FindByIDLight(unitID)
+	if err != nil || u == nil {
+		return in
+	}
+	ok, perr := CompanyHasPlanFeature(u.CompanyID, PlanFeatureKioskSmartETA)
+	if perr != nil || !ok {
+		return in
+	}
+	loc := time.UTC
+	if tzn := strings.TrimSpace(u.Timezone); tzn != "" {
+		if l, lerr := time.LoadLocation(tzn); lerr == nil {
+			loc = l
+		}
+	}
+	lt := now.In(loc)
+	// Go: Sunday=0 — align SQL EXTRACT DOW: PG Sunday=0. time.Weekday and Hour are 0-6 and 0-23.
+	dow := int16(lt.Weekday()) // #nosec G115
+	hr := int16(lt.Hour())     // #nosec G115
+	var p50, p90, p95, n int
+	er := s.db.Raw(`
+SELECT p50_wait_sec, p90_wait_sec, p95_wait_sec, sample_n FROM kiosk_eta_slot_calibration
+WHERE unit_id = ? AND service_id = ? AND day_of_week = ? AND hour = ?`,
+		unitID, ticket.ServiceID, dow, hr,
+	).Row().Scan(&p50, &p90, &p95, &n)
+	if er != nil || n < 3 || p50 <= 0 {
+		return in
+	}
+	var wjson []byte
+	_ = s.db.Raw(`SELECT weights_json FROM kiosk_eta_gbm_artifact WHERE unit_id = ?`, unitID).Scan(&wjson)
+	var w []float64
+	_ = json.Unmarshal(wjson, &w)
+	if len(w) != 4 {
+		w = []float64{0.35, 0.25, 0.2, 0.2}
+	}
+	base := float64(in.EstimatedWaitSec)
+	if p90 <= 0 {
+		p90 = p50
+	}
+	if p95 <= 0 {
+		p95 = p90
+	}
+	sum := 0.0
+	for i, v := range w {
+		if v < 0 {
+			w[i] = 0
+		}
+		sum += w[i]
+	}
+	if sum < 1e-6 {
+		return in
+	}
+	for i := range w {
+		w[i] /= sum
+	}
+	pred := w[0]*base + w[1]*float64(p50) + w[2]*float64(p90) + w[3]*float64(p95)
+	blended := int(math.Round(pred))
+	if blended < 0 {
+		blended = 0
+	}
+	in.EstimatedWaitSec = blended
+	in.EtaSource = "kiosk_model_blended"
+	in.EtaConfidence = 0.72
+	return in
 }

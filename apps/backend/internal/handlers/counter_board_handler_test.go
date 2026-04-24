@@ -61,6 +61,10 @@ func (s *stubSurveyServiceCounterBoard) SubmitGuestResponse(context.Context, str
 	panic("unexpected SubmitGuestResponse")
 }
 
+func (s *stubSurveyServiceCounterBoard) SubmitKioskPostServiceResponse(context.Context, string, *models.Ticket, int, string) error {
+	panic("unexpected SubmitKioskPostServiceResponse")
+}
+
 func (s *stubSurveyServiceCounterBoard) CompanyIDForUnit(string) (string, error) {
 	panic("unexpected CompanyIDForUnit")
 }

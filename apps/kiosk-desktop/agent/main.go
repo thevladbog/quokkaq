@@ -38,10 +38,13 @@ func main() {
 	mux.HandleFunc("/health", handleHealth)
 	mux.HandleFunc("/v1/printers", handleListPrinters)
 	mux.HandleFunc("/v1/print", handlePrint)
+	mux.HandleFunc("/v1/serial-ports", handleListSerial)
+	mux.HandleFunc("/v1/serial/test", handleSerialTest)
+	mux.HandleFunc("/v1/serial/stream", handleSerialStream)
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           mux,
+		Handler:           withCORS(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	log.Printf("quokkaq-kiosk-agent listening on http://%s", addr)
@@ -128,6 +131,20 @@ func handlePrint(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte(`{"ok":true}`))
+}
+
+// withCORS allows the Tauri / browser shell to call the local agent from a different origin.
+func withCORS(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Cache-Control")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
 }
 
 func printTCP(address string, raw []byte) error {

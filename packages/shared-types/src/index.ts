@@ -111,6 +111,8 @@ export type ServiceModel = {
   maxServiceTime?: number | null;
   prebook?: boolean;
   offerIdentification?: boolean;
+  /** Kiosk identification step: none | phone | qr | login | badge */
+  identificationMode?: 'none' | 'phone' | 'qr' | 'login' | 'badge';
   isLeaf?: boolean;
   gridRow?: number | null;
   gridCol?: number | null;
@@ -146,6 +148,9 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
   maxServiceTime: z.number().nullable().optional(),
   prebook: z.boolean().optional(),
   offerIdentification: z.boolean().optional(),
+  identificationMode: z
+    .enum(['none', 'phone', 'qr', 'login', 'badge'])
+    .optional(),
   isLeaf: z.boolean().optional(),
   gridRow: z.number().nullable().optional(),
   gridCol: z.number().nullable().optional(),
@@ -473,8 +478,47 @@ export const KioskConfigSchema = z
     isPrintEnabled: z.boolean().optional(),
     feedbackUrl: z.string().optional(),
     isPreRegistrationEnabled: z.boolean().optional(),
+    /**
+     * When true, kiosk shows the “I have an appointment / check-in” path (code, phone, scan).
+     * If unset, follows `isPreRegistrationEnabled` for backward compatibility.
+     */
+    isAppointmentCheckinEnabled: z.boolean().optional(),
+    /**
+     * When not false, kiosk may offer the phone + SMS OTP “find my booking” flow. Default: enabled when check-in is on.
+     */
+    isAppointmentPhoneLookupEnabled: z.boolean().optional(),
     showUnitInHeader: z.boolean().optional(),
-    kioskUnitLabelText: z.string().optional()
+    kioskUnitLabelText: z.string().optional(),
+    /** Seconds of inactivity on the service grid before showing the session warning. Default 45. */
+    sessionIdleBeforeWarningSec: z
+      .number()
+      .int()
+      .positive()
+      .max(3_600)
+      .optional(),
+    /** Countdown in seconds on the warning dialog before resetting to the kiosk home. Default 15. */
+    sessionIdleCountdownSec: z.number().int().positive().max(300).optional(),
+    /** When false, skip mandatory post-ticket SMS step. Default true when unset. */
+    visitorSmsAfterTicket: z.boolean().optional(),
+    /**
+     * When true (and the tenant plan has `kiosk_id_ocr`), kiosk may offer in-session ID scan (camera / Tesseract).
+     * No raw image or OCR text is persisted in local storage; processing is in-memory / Tauri temp only.
+     */
+    idOcrEnabled: z.boolean().optional(),
+    /** In Tauri: prefer the native `tesseract` CLI. When false or in browser, use tesseract.js (5.4). */
+    idOcrPreferNative: z.boolean().optional(),
+    /**
+     * HID / serial: ICAO MRZ (2–3 lines) when false disables the MRZ sub-mode in the ID dialog; unset = on (with id OCR).
+     */
+    idOcrWedgeMrz: z.boolean().optional(),
+    /**
+     * HID / serial: RU driver’s license (PDF417 open or base64); when false disables. Unset = on.
+     */
+    idOcrWedgeRuDriverLicense: z.boolean().optional(),
+    /**
+     * When true and plan `kiosk_offline_mode` is on, the kiosk uses cached unit/services and may queue creates (5.5).
+     */
+    offlineModeEnabled: z.boolean().optional()
   })
   .passthrough();
 
@@ -728,7 +772,9 @@ export const UnitConfigSchema = z
 export const UnitOperationsPublicSchema = z.object({
   kioskFrozen: z.boolean().optional(),
   counterLoginBlocked: z.boolean().optional(),
-  phase: z.string().optional()
+  phase: z.string().optional(),
+  kioskIdOcr: z.boolean().optional(),
+  kioskOfflineMode: z.boolean().optional()
 });
 
 export const UnitModelSchema = z.object({
@@ -784,7 +830,12 @@ export const TicketModelSchema = z.object({
   transferTrail: z.array(ClientVisitTransferEventSchema).optional(),
   queuePosition: z.number().nullable().optional(),
   estimatedWaitSeconds: z.number().nullable().optional(),
+  serviceZoneName: z.string().nullable().optional(),
   smsOptInAvailable: z.boolean().optional(),
+  /** True when the unit client for this ticket has a non-empty E.164 phone. */
+  visitorPhoneKnown: z.boolean().optional(),
+  /** Kiosk: mandatory SMS capture step (consent + phone) before closing the success dialog. */
+  smsPostTicketStepRequired: z.boolean().optional(),
   visitorToken: z.string().optional(),
   service: z
     .object({
@@ -1005,10 +1056,30 @@ export interface KioskConfig {
   isPrintEnabled?: boolean;
   feedbackUrl?: string;
   isPreRegistrationEnabled?: boolean;
+  isAppointmentCheckinEnabled?: boolean;
+  isAppointmentPhoneLookupEnabled?: boolean;
   /** Show unit title in kiosk header (next to logo). Default true when unset. */
   showUnitInHeader?: boolean;
   /** Custom kiosk header label; when empty, the unit name from the API is shown. */
   kioskUnitLabelText?: string;
+  /**
+   * Seconds of inactivity on the service selection flow before the session warning dialog. Defaults to 45 if unset.
+   */
+  sessionIdleBeforeWarningSec?: number;
+  /**
+   * Countdown in seconds on the warning dialog before returning to the kiosk home. Defaults to 15 if unset.
+   */
+  sessionIdleCountdownSec?: number;
+  /**
+   * When false, the kiosk will not require the post-ticket SMS opt-in step. Defaults to true when unset
+   * (enforced in the API for `smsPostTicketStepRequired`).
+   */
+  visitorSmsAfterTicket?: boolean;
+  idOcrEnabled?: boolean;
+  idOcrPreferNative?: boolean;
+  idOcrWedgeMrz?: boolean;
+  idOcrWedgeRuDriverLicense?: boolean;
+  offlineModeEnabled?: boolean;
 }
 
 export interface UnitConfig {
@@ -1059,7 +1130,8 @@ export const createTicketRequestSchema = z
     serviceId: z.string().min(1),
     clientId: z.string().optional(),
     visitorPhone: z.string().optional(),
-    visitorLocale: kioskVisitorLocaleSchema.optional()
+    visitorLocale: kioskVisitorLocaleSchema.optional(),
+    kioskIdentifiedUserId: z.string().uuid().optional()
   })
   .superRefine((data, ctx) => {
     const cid = (data.clientId ?? '').trim();
@@ -1067,7 +1139,16 @@ export const createTicketRequestSchema = z
     const hasClient = cid.length > 0;
     const hasPhone = phone.length > 0;
     const hasLocale = data.visitorLocale !== undefined;
+    const hasKid = (data.kioskIdentifiedUserId ?? '').trim().length > 0;
 
+    if (hasKid && (hasClient || hasPhone)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'kioskIdentifiedUserId cannot be combined with clientId or visitor phone',
+        path: ['kioskIdentifiedUserId']
+      });
+    }
     if (hasClient && hasPhone) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -1094,11 +1175,13 @@ export const createTicketRequestSchema = z
     const serviceId = data.serviceId.trim();
     const cid = (data.clientId ?? '').trim();
     const phone = (data.visitorPhone ?? '').trim();
+    const kid = (data.kioskIdentifiedUserId ?? '').trim();
     const out: {
       serviceId: string;
       clientId?: string;
       visitorPhone?: string;
       visitorLocale?: z.infer<typeof kioskVisitorLocaleSchema>;
+      kioskIdentifiedUserId?: string;
     } = { serviceId };
     if (cid) {
       out.clientId = cid;
@@ -1106,6 +1189,9 @@ export const createTicketRequestSchema = z
     if (phone && data.visitorLocale) {
       out.visitorPhone = phone;
       out.visitorLocale = data.visitorLocale;
+    }
+    if (kid) {
+      out.kioskIdentifiedUserId = kid;
     }
     return out;
   });
@@ -1123,6 +1209,7 @@ export type CreateTicketInUnitMutationVariables =
       clientId?: never;
       visitorPhone?: never;
       visitorLocale?: never;
+      kioskIdentifiedUserId?: never;
     }
   | {
       unitId: string;
@@ -1130,6 +1217,7 @@ export type CreateTicketInUnitMutationVariables =
       clientId: string;
       visitorPhone?: never;
       visitorLocale?: never;
+      kioskIdentifiedUserId?: never;
     }
   | {
       unitId: string;
@@ -1137,6 +1225,15 @@ export type CreateTicketInUnitMutationVariables =
       visitorPhone: string;
       visitorLocale: z.infer<typeof kioskVisitorLocaleSchema>;
       clientId?: never;
+      kioskIdentifiedUserId?: never;
+    }
+  | {
+      unitId: string;
+      serviceId: string;
+      kioskIdentifiedUserId: string;
+      clientId?: never;
+      visitorPhone?: never;
+      visitorLocale?: never;
     };
 
 /** POST /units/{unitId}/call-next — matches backend handlers.CallNextRequest after trim/dedupe. */
@@ -1566,7 +1663,11 @@ export const CompanyMeFeaturesSchema = z.object({
 export const CompanyMePlanCapabilitiesSchema = z.object({
   apiAccess: z.boolean(),
   outboundWebhooks: z.boolean(),
-  publicQueueWidget: z.boolean()
+  publicQueueWidget: z.boolean(),
+  customScreenLayouts: z.boolean().optional(),
+  visitorNotifications: z.boolean().optional(),
+  /** Employee badge / login server-side IdP (per-unit config). */
+  kioskEmployeeIdp: z.boolean().optional()
 });
 
 export const CompanyMeResponseSchema = z.object({

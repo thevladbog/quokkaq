@@ -606,13 +606,119 @@ export const unitsApi = {
     return UnitModelSchema.parse(res.data);
   },
 
+  postKioskPrinterTelemetry: async (
+    unitId: string,
+    body: { kind: string; message: string }
+  ) => {
+    const res = await orvalUnits.postUnitsUnitIdKioskPrinterTelemetry(unitId, {
+      kind: body.kind,
+      message: body.message
+    });
+    if (res.status !== 204) {
+      throw new Error(`kiosk printer telemetry: HTTP ${res.status}`);
+    }
+  },
+
+  /** POST /units/{unitId}/employee-idp/resolve — kiosk terminal session. */
+  resolveEmployeeIdp: async (
+    unitId: string,
+    payload: { kind: 'badge' | 'login'; raw: string }
+  ) => {
+    const res = await authenticatedApiFetch(
+      `${API_BASE_URL}/units/${unitId}/employee-idp/resolve`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }
+    );
+    if (!res.ok) {
+      const errText = await res.text();
+      throwApiHttpErrorFromBody(res.status, errText || '{}');
+    }
+    return (await res.json()) as {
+      matchStatus: string;
+      userId?: string;
+      email?: string;
+      displayName?: string;
+    };
+  },
+
+  getUnitEmployeeIdp: async (unitId: string) => {
+    const res = await authenticatedApiFetch(
+      `${API_BASE_URL}/units/${unitId}/employee-idp`
+    );
+    if (!res.ok) {
+      const errText = await res.text();
+      throwApiHttpErrorFromBody(res.status, errText || '{}');
+    }
+    return (await res.json()) as {
+      unitId: string;
+      enabled: boolean;
+      httpMethod: string;
+      upstreamUrl: string;
+      requestBodyTemplate: string;
+      responseEmailPath: string;
+      responseDisplayNamePath: string;
+      headerTemplatesJson: string;
+      timeoutMs: number;
+      secretNames: string[];
+    };
+  },
+
+  patchUnitEmployeeIdp: async (
+    unitId: string,
+    body: {
+      enabled?: boolean;
+      httpMethod?: string;
+      upstreamUrl?: string;
+      requestBodyTemplate?: string;
+      responseEmailPath?: string;
+      responseDisplayNamePath?: string;
+      headerTemplatesJson?: string;
+      timeoutMs?: number;
+      secretValues?: Record<string, string>;
+      secretNamesToDelete?: string[];
+    }
+  ) => {
+    const res = await authenticatedApiFetch(
+      `${API_BASE_URL}/units/${unitId}/employee-idp`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }
+    );
+    if (!res.ok) {
+      const errText = await res.text();
+      throwApiHttpErrorFromBody(res.status, errText || '{}');
+    }
+    return (await res.json()) as {
+      unitId: string;
+      enabled: boolean;
+      httpMethod: string;
+      upstreamUrl: string;
+      requestBodyTemplate: string;
+      responseEmailPath: string;
+      responseDisplayNamePath: string;
+      headerTemplatesJson: string;
+      timeoutMs: number;
+      secretNames: string[];
+    };
+  },
+
   createTicket: async (
     unitId: string,
     ticketData: CreateTicketRequestInput
   ) => {
     const normalized = createTicketRequestSchema.parse(ticketData);
     let body: orvalTc.HandlersCreateTicketRequest;
-    if (normalized.visitorPhone && normalized.visitorLocale) {
+    if (normalized.kioskIdentifiedUserId) {
+      body = {
+        serviceId: normalized.serviceId,
+        kioskIdentifiedUserId: normalized.kioskIdentifiedUserId
+      } as orvalTc.HandlersCreateTicketRequest;
+    } else if (normalized.visitorPhone && normalized.visitorLocale) {
       body = {
         serviceId: normalized.serviceId,
         visitorPhone: normalized.visitorPhone,
@@ -626,7 +732,13 @@ export const unitsApi = {
     } else {
       body = { serviceId: normalized.serviceId };
     }
-    const res = await orvalTc.createUnitTicket(unitId, body);
+    const idem =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+    const res = await orvalTc.createUnitTicket(unitId, body, {
+      headers: { 'Idempotency-Key': idem }
+    });
     return TicketModelSchema.parse(res.data);
   },
 
@@ -906,6 +1018,20 @@ export const ticketsApi = {
     }
     const json = await res.json();
     return TicketModelSchema.parse(json);
+  },
+
+  /**
+   * Record that the visitor chose not to receive SMS on the kiosk (requires visitor token).
+   */
+  visitorSmsSkip: async (id: string, visitorToken: string) => {
+    const res = await fetch(`${API_BASE_URL}/tickets/${id}/visitor-sms-skip`, {
+      method: 'POST',
+      headers: { 'X-Visitor-Token': visitorToken }
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(body || `HTTP ${res.status}`);
+    }
   },
 
   confirmArrival: async (id: string) => {
@@ -1414,6 +1540,60 @@ export const preRegistrationsApi = {
         method: 'POST',
         body: JSON.stringify({ code })
       }
+    ),
+
+  /** SMS OTP: request code for "find by phone" on the kiosk. */
+  kioskPhoneStart: (unitId: string, phone: string) =>
+    apiRequest<{ sessionId: string }>(
+      `/units/${unitId}/pre-registrations/kiosk-phone/start`,
+      { method: 'POST', body: JSON.stringify({ phone }) }
+    ),
+
+  kioskPhoneVerify: (unitId: string, sessionId: string, code: string) =>
+    apiRequest<{ lookupToken: string }>(
+      `/units/${unitId}/pre-registrations/kiosk-phone/verify`,
+      { method: 'POST', body: JSON.stringify({ sessionId, code }) }
+    ),
+
+  kioskPhoneList: (unitId: string, lookupToken: string) =>
+    apiRequest<PreRegistration[]>(
+      `/units/${unitId}/pre-registrations/kiosk-phone/list`,
+      {
+        method: 'GET',
+        headers: { 'X-Lookup-Token': lookupToken }
+      }
+    ),
+
+  kioskPhoneRedeem: (
+    unitId: string,
+    lookupToken: string,
+    preRegistrationId: string
+  ) =>
+    apiRequest<{ success: boolean; ticket?: Ticket; message?: string }>(
+      `/units/${unitId}/pre-registrations/kiosk-phone/redeem`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          lookupToken,
+          preRegistrationId
+        })
+      }
+    ),
+
+  /** Resolve server-signed prToken to { code, date } (HMAC, JWT_SECRET). */
+  resolvePrToken: (unitId: string, prToken: string) =>
+    apiRequest<{ code: string; date: string }>(
+      `/units/${unitId}/kiosk/resolve-pr-token?${new URLSearchParams({ prToken })}`,
+      {}
+    ),
+
+  /** Staff: send reminder SMS to each open booking for the day. */
+  bulkRemind: (unitId: string, date?: string) =>
+    apiRequest<{ sent: number; date: string }>(
+      date
+        ? `/units/${unitId}/pre-registrations/bulk-remind?date=${encodeURIComponent(date)}`
+        : `/units/${unitId}/pre-registrations/bulk-remind`,
+      { method: 'POST' }
     )
 };
 
@@ -1572,6 +1752,71 @@ export const companiesApiExt = {
         body: JSON.stringify(body)
       },
       CompanySchema
+    ),
+
+  getVisitorSMS: () =>
+    apiRequest(
+      `/companies/me/visitor-sms`,
+      {},
+      z.object({
+        smsProvider: z.string().optional().default(''),
+        smsApiKeyMasked: z.string().optional().default(''),
+        smsFromName: z.string().optional().default(''),
+        smsEnabled: z.boolean().optional().default(false),
+        resolvedSource: z.string().optional().default('')
+      })
+    ),
+
+  putVisitorSMS: (body: {
+    smsProvider: string;
+    smsApiKey: string;
+    smsApiSecret: string;
+    smsFromName: string;
+    smsEnabled: boolean;
+  }) =>
+    apiRequest(
+      `/companies/me/visitor-sms`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      z.object({
+        smsProvider: z.string().optional().default(''),
+        smsApiKeyMasked: z.string().optional().default(''),
+        smsFromName: z.string().optional().default(''),
+        smsEnabled: z.boolean().optional().default(false),
+        resolvedSource: z.string().optional().default('')
+      })
+    ),
+
+  postVisitorSMSTest: (phone: string) =>
+    apiRequest(
+      `/companies/me/visitor-sms/test`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone })
+      },
+      z
+        .object({
+          status: z.string().optional(),
+          provider: z.string().optional(),
+          source: z.string().optional()
+        })
+        .passthrough()
+    ),
+
+  getVisitorNotificationStats: () =>
+    apiRequest(
+      `/companies/me/visitor-notification-stats`,
+      {},
+      z.object({
+        smsPending: z.coerce.number(),
+        smsSent: z.coerce.number(),
+        smsFailed: z.coerce.number(),
+        periodDays7: z.boolean().optional()
+      })
     )
 };
 

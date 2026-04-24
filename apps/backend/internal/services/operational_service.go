@@ -112,10 +112,26 @@ func (s *OperationalService) GetPublicSnapshot(unitID string) (*models.UnitOpera
 	if err != nil {
 		return nil, err
 	}
+	u, uerr := s.unitRepo.FindByIDLight(unitID)
+	if uerr != nil {
+		if repository.IsNotFound(uerr) {
+			return nil, uerr
+		}
+		return nil, uerr
+	}
+	var idOCR, off bool
+	if ok, ferr := CompanyHasPlanFeature(u.CompanyID, PlanFeatureKioskIDOCR); ferr == nil {
+		idOCR = ok
+	}
+	if ok, ferr := CompanyHasPlanFeature(u.CompanyID, PlanFeatureKioskOfflineMode); ferr == nil {
+		off = ok
+	}
 	return &models.UnitOperationsPublic{
 		KioskFrozen:         st.KioskFrozen,
 		CounterLoginBlocked: st.CounterLoginBlocked,
 		Phase:               st.Phase,
+		KioskIdOCR:          idOCR,
+		KioskOfflineMode:    off,
 	}, nil
 }
 

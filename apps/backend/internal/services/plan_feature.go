@@ -16,6 +16,18 @@ const PlanFeatureCounterBoard = "counter_board"
 // PlanFeatureCustomScreenLayouts enables tenant library CRUD for visual screen templates (cell-grid studio).
 const PlanFeatureCustomScreenLayouts = "custom_screen_layouts"
 
+// Kiosk / phase 5 plan feature keys (boolean in subscription plan JSON; see docs/plan/kiosk-payment-future.md#plan-feature-keys)
+const (
+	PlanFeatureKioskOperationsAnalytics = "kiosk_operations_analytics"
+	PlanFeatureKioskSmartETA            = "kiosk_smart_eta"
+	PlanFeatureKioskPostServiceSurvey   = "kiosk_post_service_survey"
+	PlanFeatureKioskIDOCR               = "kiosk_id_ocr"
+	PlanFeatureKioskOfflineMode         = "kiosk_offline_mode"
+	PlanFeatureKioskVisitorPayment      = "kiosk_visitor_payment" // reserved: separate initiative, not in phase 5.1–5.5 delivery
+	// PlanFeatureKioskEmployeeIdp enables external HTTPS IdP for kiosk/staff employee identification (badge/login).
+	PlanFeatureKioskEmployeeIdp = "kiosk_employee_idp"
+)
+
 // CompanyHasCounterBoardFeature is true when the plan enables counter_board, or when it has websocket_updates
 // (older plans omitted counter_board in JSON; must match CounterBoardSession / ensureCounterBoardFeatureForUnit).
 func CompanyHasCounterBoardFeature(companyID string) (bool, error) {

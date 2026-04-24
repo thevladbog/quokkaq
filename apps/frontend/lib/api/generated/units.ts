@@ -152,6 +152,10 @@ export interface ModelsUserRole {
 export interface ModelsUnitOperationsPublic {
   counterLoginBlocked?: boolean;
   kioskFrozen?: boolean;
+  /** KioskIdOCR: plan includes 5.4 (ID document OCR on kiosk). UI also requires UnitConfig.kiosk.idOcrEnabled. */
+  kioskIdOcr?: boolean;
+  /** KioskOfflineMode: plan includes 5.5 (read cache + outbox). UI also needs UnitConfig.kiosk.offlineModeEnabled. */
+  kioskOfflineMode?: boolean;
   phase?: string;
 }
 
@@ -172,6 +176,8 @@ export interface ModelsService {
   gridRow?: number;
   gridRowSpan?: number;
   id?: string;
+  /** IdentificationMode selects the kiosk identification step: none|phone|qr|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column. */
+  identificationMode?: string;
   imageUrl?: string;
   isLeaf?: boolean;
   /** In seconds (service-time SLA — copied to Ticket.MaxServiceTime on in_service) */
@@ -332,6 +338,8 @@ export interface ModelsTicket {
   the working day (EOD) was still open. Credit tickets are counted against the next billing period. */
   isCredit?: boolean;
   isEod?: boolean;
+  /** KioskIdentifiedUserID is set when the ticket was issued after kiosk employee identification (badge / login) matched a user in the tenant. */
+  kioskIdentifiedUserId?: string;
   lastCalledAt?: string;
   /** Snapshot from Service at in_service; cleared on transfer/return */
   maxServiceTime?: number;
@@ -353,15 +361,20 @@ export interface ModelsTicket {
   serviceId?: string;
   /** ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool. */
   serviceZoneId?: string;
+  /** ServiceZoneName is the display name of the service zone unit when ServiceZoneID is set (hydrated, not stored). */
+  serviceZoneName?: string;
   status?: string;
   /** TransferTrail lists ticket.transferred events in chronological order (client visit APIs only). */
   transferTrail?: ModelsClientVisitTransferEvent[];
   /** URL to the generated TTS audio file */
   ttsUrl?: string;
   unitId?: string;
+  visitorNotificationEmail?: string;
   /** VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in
   the X-Visitor-Token header to prevent IDOR on cancel and phone opt-in. */
   visitorToken?: string;
+  /** VisitorWelcomeNotifiedAt is set when the first welcome notification pipeline was claimed for this ticket. */
+  visitorWelcomeNotifiedAt?: string;
 }
 
 export interface HandlersClientVisitsResponse {
@@ -384,6 +397,34 @@ export interface HandlersCompanyUserListItem {
   photoUrl?: string;
   tenantRoles?: HandlersTenantRoleBriefResponse[];
   type?: string;
+}
+
+export interface HandlersCompanyVisitorNotifStats {
+  periodDays7?: boolean;
+  smsFailed?: number;
+  smsPending?: number;
+  smsSent?: number;
+}
+
+export interface HandlersCompanyVisitorSMSPublic {
+  /** ResolvedSource is tenant | platform | log (resolved outbound route for visitor SMS). */
+  resolvedSource?: string;
+  smsApiKeyMasked?: string;
+  smsEnabled?: boolean;
+  smsFromName?: string;
+  smsProvider?: string;
+}
+
+export interface HandlersCompanyVisitorSMSPut {
+  smsApiKey?: string;
+  smsApiSecret?: string;
+  smsEnabled?: boolean;
+  smsFromName?: string;
+  smsProvider?: string;
+}
+
+export interface HandlersCompanyVisitorSMSTestRequest {
+  phone: string;
 }
 
 export interface HandlersCounterCallNextRequest {
@@ -682,6 +723,17 @@ export interface HandlersInvoicePDFPrerequisiteError {
   message: string;
 }
 
+export interface HandlersKioskPrinterTelemetryRequest {
+  kind?: string;
+  message?: string;
+}
+
+export interface HandlersKioskVisitorSurveyRequest {
+  emoji?: string;
+  score?: number;
+  ticketId?: string;
+}
+
 export interface HandlersLoginLinkResponse {
   /** Example full login URL including the token query parameter */
   exampleUrl: string;
@@ -773,6 +825,25 @@ export interface HandlersPatchUnitClientRequest {
   lastName?: string;
   phone?: string;
   tagDefinitionIds?: string[];
+}
+
+/**
+ * Secrets: name -> plaintext; stored encrypted. Omitted names unchanged.
+ */
+export type HandlersPatchUnitEmployeeIdpRequestSecretValues = {[key: string]: string};
+
+export interface HandlersPatchUnitEmployeeIdpRequest {
+  enabled?: boolean;
+  headerTemplatesJson?: string;
+  httpMethod?: string;
+  requestBodyTemplate?: string;
+  responseDisplayNamePath?: string;
+  responseEmailPath?: string;
+  secretNamesToDelete?: string[];
+  /** Secrets: name -> plaintext; stored encrypted. Omitted names unchanged. */
+  secretValues?: HandlersPatchUnitEmployeeIdpRequestSecretValues;
+  timeoutMs?: number;
+  upstreamUrl?: string;
 }
 
 export type HandlersPatchUnitKioskConfigRequestConfigKiosk = { [key: string]: unknown };
@@ -954,6 +1025,14 @@ export type HandlersPlatformUpdateSubscriptionPlanBody = unknown & {
   pricingModel?: HandlersPlatformUpdateSubscriptionPlanBodyPricingModel;
 };
 
+export type HandlersPostKioskTelemetryRequestMeta = {[key: string]: unknown};
+
+export interface HandlersPostKioskTelemetryRequest {
+  /** api_ping | print_error | paper_out | heartbeat */
+  kind?: string;
+  meta?: HandlersPostKioskTelemetryRequestMeta;
+}
+
 export type HandlersPublicLeadRequestBodyBillingPeriod = typeof HandlersPublicLeadRequestBodyBillingPeriod[keyof typeof HandlersPublicLeadRequestBodyBillingPeriod];
 
 
@@ -1077,6 +1156,69 @@ export interface HandlersTerminalBootstrapResponse {
 export interface HandlersTestSMSIntegrationRequest {
   /** Phone number in E.164 format to send the test SMS to. */
   phone?: string;
+}
+
+/**
+ * Public ticket with opt-in and kiosk post-ticket flags.
+ */
+export interface HandlersTicketWithExtras {
+  booking?: ModelsBooking;
+  bookingId?: string;
+  calledAt?: string;
+  client?: ModelsUnitClient;
+  clientId?: string;
+  completedAt?: string;
+  confirmedAt?: string;
+  counter?: ModelsCounter;
+  counterId?: string;
+  createdAt?: string;
+  /** EstimatedWaitSeconds is the estimated seconds until this ticket is called (computed on-the-fly). */
+  estimatedWaitSeconds?: number;
+  id?: string;
+  /** IsCredit marks a ticket issued when the monthly tickets_per_month quota was exhausted but
+  the working day (EOD) was still open. Credit tickets are counted against the next billing period. */
+  isCredit?: boolean;
+  isEod?: boolean;
+  /** KioskIdentifiedUserID is set when the ticket was issued after kiosk employee identification (badge / login) matched a user in the tenant. */
+  kioskIdentifiedUserId?: string;
+  lastCalledAt?: string;
+  /** Snapshot from Service at in_service; cleared on transfer/return */
+  maxServiceTime?: number;
+  /** Snapshot from Service at creation */
+  maxWaitingTime?: number;
+  operatorComment?: string;
+  /** No DB FK: avoids AutoMigrate cycle with pre_registrations.ticket_id → tickets.id */
+  preRegistration?: ModelsPreRegistration;
+  preRegistrationId?: string;
+  priority?: number;
+  queueNumber?: string;
+  /** QueuePosition is the 1-based position in the waiting queue (computed on-the-fly, not stored). */
+  queuePosition?: number;
+  /** ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets). */
+  servedByName?: string;
+  /** ServedByUserID is set when a ticket is called/picked; records the operator (counter.AssignedTo at call time). */
+  servedByUserId?: string;
+  service?: ModelsService;
+  serviceId?: string;
+  /** ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool. */
+  serviceZoneId?: string;
+  /** ServiceZoneName is the display name of the service zone unit when ServiceZoneID is set (hydrated, not stored). */
+  serviceZoneName?: string;
+  smsOptInAvailable?: boolean;
+  smsPostTicketStepRequired?: boolean;
+  status?: string;
+  /** TransferTrail lists ticket.transferred events in chronological order (client visit APIs only). */
+  transferTrail?: ModelsClientVisitTransferEvent[];
+  /** URL to the generated TTS audio file */
+  ttsUrl?: string;
+  unitId?: string;
+  visitorNotificationEmail?: string;
+  visitorPhoneKnown?: boolean;
+  /** VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in
+  the X-Visitor-Token header to prevent IDOR on cancel and phone opt-in. */
+  visitorToken?: string;
+  /** VisitorWelcomeNotifiedAt is set when the first welcome notification pipeline was claimed for this ticket. */
+  visitorWelcomeNotifiedAt?: string;
 }
 
 export interface HandlersTransferRequest {
@@ -1543,8 +1685,10 @@ export interface ModelsCompany {
 export interface HandlersPlanCapabilitiesDTO {
   apiAccess?: boolean;
   customScreenLayouts?: boolean;
+  kioskEmployeeIdp?: boolean;
   outboundWebhooks?: boolean;
   publicQueueWidget?: boolean;
+  visitorNotifications?: boolean;
 }
 
 export interface HandlersCompanyMeResponse {
@@ -1758,6 +1902,19 @@ export interface HandlersSsoExchangeRequest {
 
 export interface HandlersTenantHintRequest {
   email: string;
+}
+
+export interface HandlersUnitEmployeeIdpSettingsDTO {
+  enabled?: boolean;
+  headerTemplatesJson?: string;
+  httpMethod?: string;
+  requestBodyTemplate?: string;
+  responseDisplayNamePath?: string;
+  responseEmailPath?: string;
+  secretNames?: string[];
+  timeoutMs?: number;
+  unitId?: string;
+  upstreamUrl?: string;
 }
 
 export interface HandlersWebhookDeliveryLogDTO {
@@ -1979,6 +2136,33 @@ export interface ModelsInvitation {
   userId?: string;
 }
 
+export interface ModelsKioskPhoneLookupStartRequest {
+  phone?: string;
+}
+
+export interface ModelsKioskPhoneLookupStartResponse {
+  sessionId?: string;
+}
+
+export interface ModelsKioskPhoneLookupVerifyRequest {
+  code?: string;
+  sessionId?: string;
+}
+
+export interface ModelsKioskPhoneLookupVerifyResponse {
+  lookupToken?: string;
+}
+
+export interface ModelsKioskPhoneRedeemRequest {
+  lookupToken?: string;
+  preRegistrationId?: string;
+}
+
+export interface ModelsKioskPrResolveResponse {
+  code?: string;
+  date?: string;
+}
+
 export interface ModelsMessageTemplate {
   companyId?: string;
   content?: string;
@@ -2057,6 +2241,11 @@ export interface ModelsPreRegCalendarSlotItem {
   externalEventHref?: string;
   integrationLabel?: string;
   time?: string;
+}
+
+export interface ModelsPreRegistrationBulkRemindResponse {
+  date?: string;
+  sent?: number;
 }
 
 export interface ModelsPreRegistrationCodeRequest {
@@ -2412,6 +2601,20 @@ export interface ServicesDeploymentSaaSSettingsPatch {
   trackerTypeRegistration?: string;
   trackerTypeRequest?: string;
   trackerTypeSupport?: string;
+}
+
+export interface ServicesEmployeeIdpResolveRequest {
+  /** "badge" | "login" */
+  kind?: string;
+  raw?: string;
+}
+
+export interface ServicesEmployeeIdpResolveResponse {
+  displayName?: string;
+  email?: string;
+  /** "matched" | "no_user" | "ambiguous" */
+  matchStatus?: string;
+  userId?: string;
 }
 
 export interface ServicesEmployeeRadarResponse {
@@ -2862,6 +3065,21 @@ export interface ServicesUtilizationResponse {
 export type PatchUnitsUnitIdAdSettingsBody = { [key: string]: unknown };
 
 export type PatchUnitsUnitIdAdSettings200 = {[key: string]: boolean};
+
+export type GetUnitsUnitIdKioskAnalyticsParams = {
+/**
+ * RFC3339 or YYYY-MM-DD (default: 7d ago)
+ */
+from?: string;
+/**
+ * RFC3339 or YYYY-MM-DD (default: now)
+ */
+to?: string;
+/**
+ * json (default) or csv
+ */
+format?: string;
+};
 
 export type ListUnitOperatorSkillsParams = {
 /**
@@ -3900,6 +4118,103 @@ export function useGetUnitsUnitIdChildWorkplaces<TData = Awaited<ReturnType<type
 
 
 
+/**
+ * Authenticated; permission unit.employee_idp.manage. Optional secretValues (encrypted); secretNamesToDelete removes named stored secrets.
+ * @summary Update unit external employee IdP (HTTPS) settings
+ */
+export type patchUnitsUnitIdEmployeeIdpResponse200 = {
+  data: HandlersUnitEmployeeIdpSettingsDTO
+  status: 200
+}
+
+export type patchUnitsUnitIdEmployeeIdpResponse400 = {
+  data: string
+  status: 400
+}
+
+export type patchUnitsUnitIdEmployeeIdpResponse500 = {
+  data: string
+  status: 500
+}
+
+export type patchUnitsUnitIdEmployeeIdpResponseSuccess = (patchUnitsUnitIdEmployeeIdpResponse200) & {
+  headers: Headers;
+};
+export type patchUnitsUnitIdEmployeeIdpResponseError = (patchUnitsUnitIdEmployeeIdpResponse400 | patchUnitsUnitIdEmployeeIdpResponse500) & {
+  headers: Headers;
+};
+
+export type patchUnitsUnitIdEmployeeIdpResponse = (patchUnitsUnitIdEmployeeIdpResponseSuccess | patchUnitsUnitIdEmployeeIdpResponseError)
+
+export const getPatchUnitsUnitIdEmployeeIdpUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/employee-idp`
+}
+
+export const patchUnitsUnitIdEmployeeIdp = async (unitId: string,
+    handlersPatchUnitEmployeeIdpRequest: HandlersPatchUnitEmployeeIdpRequest, options?: RequestInit): Promise<patchUnitsUnitIdEmployeeIdpResponse> => {
+
+  return orvalMutator<patchUnitsUnitIdEmployeeIdpResponse>(getPatchUnitsUnitIdEmployeeIdpUrl(unitId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersPatchUnitEmployeeIdpRequest,)
+  }
+);}
+
+
+
+
+export const getPatchUnitsUnitIdEmployeeIdpMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUnitsUnitIdEmployeeIdp>>, TError,{unitId: string;data: HandlersPatchUnitEmployeeIdpRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchUnitsUnitIdEmployeeIdp>>, TError,{unitId: string;data: HandlersPatchUnitEmployeeIdpRequest}, TContext> => {
+
+const mutationKey = ['patchUnitsUnitIdEmployeeIdp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchUnitsUnitIdEmployeeIdp>>, {unitId: string;data: HandlersPatchUnitEmployeeIdpRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  patchUnitsUnitIdEmployeeIdp(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PatchUnitsUnitIdEmployeeIdpMutationResult = NonNullable<Awaited<ReturnType<typeof patchUnitsUnitIdEmployeeIdp>>>
+    export type PatchUnitsUnitIdEmployeeIdpMutationBody = HandlersPatchUnitEmployeeIdpRequest
+    export type PatchUnitsUnitIdEmployeeIdpMutationError = string
+
+    /**
+ * @summary Update unit external employee IdP (HTTPS) settings
+ */
+export const usePatchUnitsUnitIdEmployeeIdp = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUnitsUnitIdEmployeeIdp>>, TError,{unitId: string;data: HandlersPatchUnitEmployeeIdpRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof patchUnitsUnitIdEmployeeIdp>>,
+        TError,
+        {unitId: string;data: HandlersPatchUnitEmployeeIdpRequest},
+        TContext
+      > => {
+      return useMutation(getPatchUnitsUnitIdEmployeeIdpMutationOptions(options), queryClient);
+    }
+
 export type listSignageFeedsResponse200 = {
   data: ModelsExternalFeed[]
   status: 200
@@ -4359,6 +4674,142 @@ export function useGetSignageFeedDataPublic<TData = Awaited<ReturnType<typeof ge
 
 
 /**
+ * Aggregated tickets, funnel, telemetry for a unit. Requires plan feature kiosk_operations_analytics and statistics access.
+ * @summary Kiosk operations analytics
+ */
+export type getUnitsUnitIdKioskAnalyticsResponse200 = {
+  data: void
+  status: 200
+}
+
+export type getUnitsUnitIdKioskAnalyticsResponse403 = {
+  data: void
+  status: 403
+}
+
+export type getUnitsUnitIdKioskAnalyticsResponseSuccess = (getUnitsUnitIdKioskAnalyticsResponse200) & {
+  headers: Headers;
+};
+export type getUnitsUnitIdKioskAnalyticsResponseError = (getUnitsUnitIdKioskAnalyticsResponse403) & {
+  headers: Headers;
+};
+
+export type getUnitsUnitIdKioskAnalyticsResponse = (getUnitsUnitIdKioskAnalyticsResponseSuccess | getUnitsUnitIdKioskAnalyticsResponseError)
+
+export const getGetUnitsUnitIdKioskAnalyticsUrl = (unitId: string,
+    params?: GetUnitsUnitIdKioskAnalyticsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/units/${unitId}/kiosk-analytics?${stringifiedParams}` : `/units/${unitId}/kiosk-analytics`
+}
+
+export const getUnitsUnitIdKioskAnalytics = async (unitId: string,
+    params?: GetUnitsUnitIdKioskAnalyticsParams, options?: RequestInit): Promise<getUnitsUnitIdKioskAnalyticsResponse> => {
+
+  return orvalMutator<getUnitsUnitIdKioskAnalyticsResponse>(getGetUnitsUnitIdKioskAnalyticsUrl(unitId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUnitsUnitIdKioskAnalyticsQueryKey = (unitId: string,
+    params?: GetUnitsUnitIdKioskAnalyticsParams,) => {
+    return [
+    `/units/${unitId}/kiosk-analytics`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetUnitsUnitIdKioskAnalyticsQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError = void>(unitId: string,
+    params?: GetUnitsUnitIdKioskAnalyticsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdKioskAnalyticsQueryKey(unitId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>> = ({ signal }) => getUnitsUnitIdKioskAnalytics(unitId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetUnitsUnitIdKioskAnalyticsQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>>
+export type GetUnitsUnitIdKioskAnalyticsQueryError = void
+
+
+export function useGetUnitsUnitIdKioskAnalytics<TData = Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError = void>(
+ unitId: string,
+    params: undefined |  GetUnitsUnitIdKioskAnalyticsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitsUnitIdKioskAnalytics<TData = Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError = void>(
+ unitId: string,
+    params?: GetUnitsUnitIdKioskAnalyticsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitsUnitIdKioskAnalytics<TData = Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError = void>(
+ unitId: string,
+    params?: GetUnitsUnitIdKioskAnalyticsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Kiosk operations analytics
+ */
+
+export function useGetUnitsUnitIdKioskAnalytics<TData = Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError = void>(
+ unitId: string,
+    params?: GetUnitsUnitIdKioskAnalyticsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetUnitsUnitIdKioskAnalyticsQueryOptions(unitId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
  * Body must be {"config":{"kiosk":{...}}}. Updates only config.kiosk (other config keys unchanged). Allowed for desktop terminal JWT bound to this unit, unit members, and admins.
  * @summary Merge kiosk settings into unit config
  */
@@ -4468,6 +4919,330 @@ export const usePatchUnitKioskConfig = <TError = string,
         TContext
       > => {
       return useMutation(getPatchUnitKioskConfigMutationOptions(options), queryClient);
+    }
+
+export type postUnitsUnitIdKioskEtaRefreshResponse204 = {
+  data: void
+  status: 204
+}
+
+export type postUnitsUnitIdKioskEtaRefreshResponseSuccess = (postUnitsUnitIdKioskEtaRefreshResponse204) & {
+  headers: Headers;
+};
+;
+
+export type postUnitsUnitIdKioskEtaRefreshResponse = (postUnitsUnitIdKioskEtaRefreshResponseSuccess)
+
+export const getPostUnitsUnitIdKioskEtaRefreshUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/kiosk-eta-refresh`
+}
+
+export const postUnitsUnitIdKioskEtaRefresh = async (unitId: string, options?: RequestInit): Promise<postUnitsUnitIdKioskEtaRefreshResponse> => {
+
+  return orvalMutator<postUnitsUnitIdKioskEtaRefreshResponse>(getPostUnitsUnitIdKioskEtaRefreshUrl(unitId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostUnitsUnitIdKioskEtaRefreshMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskEtaRefresh>>, TError,{unitId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskEtaRefresh>>, TError,{unitId: string}, TContext> => {
+
+const mutationKey = ['postUnitsUnitIdKioskEtaRefresh'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdKioskEtaRefresh>>, {unitId: string}> = (props) => {
+          const {unitId} = props ?? {};
+
+          return  postUnitsUnitIdKioskEtaRefresh(unitId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostUnitsUnitIdKioskEtaRefreshMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdKioskEtaRefresh>>>
+
+    export type PostUnitsUnitIdKioskEtaRefreshMutationError = unknown
+
+    export const usePostUnitsUnitIdKioskEtaRefresh = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskEtaRefresh>>, TError,{unitId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postUnitsUnitIdKioskEtaRefresh>>,
+        TError,
+        {unitId: string},
+        TContext
+      > => {
+      return useMutation(getPostUnitsUnitIdKioskEtaRefreshMutationOptions(options), queryClient);
+    }
+
+/**
+ * Terminal-authenticated. Emits `unit.kiosk_printer` to the unit room for supervisor dashboards. No response body.
+ * @summary Report a kiosk printer issue (broadcast to unit WebSocket)
+ */
+export type postUnitsUnitIdKioskPrinterTelemetryResponse204 = {
+  data: void
+  status: 204
+}
+
+export type postUnitsUnitIdKioskPrinterTelemetryResponse400 = {
+  data: string
+  status: 400
+}
+
+export type postUnitsUnitIdKioskPrinterTelemetryResponseSuccess = (postUnitsUnitIdKioskPrinterTelemetryResponse204) & {
+  headers: Headers;
+};
+export type postUnitsUnitIdKioskPrinterTelemetryResponseError = (postUnitsUnitIdKioskPrinterTelemetryResponse400) & {
+  headers: Headers;
+};
+
+export type postUnitsUnitIdKioskPrinterTelemetryResponse = (postUnitsUnitIdKioskPrinterTelemetryResponseSuccess | postUnitsUnitIdKioskPrinterTelemetryResponseError)
+
+export const getPostUnitsUnitIdKioskPrinterTelemetryUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/kiosk-printer-telemetry`
+}
+
+export const postUnitsUnitIdKioskPrinterTelemetry = async (unitId: string,
+    handlersKioskPrinterTelemetryRequest: HandlersKioskPrinterTelemetryRequest, options?: RequestInit): Promise<postUnitsUnitIdKioskPrinterTelemetryResponse> => {
+
+  return orvalMutator<postUnitsUnitIdKioskPrinterTelemetryResponse>(getPostUnitsUnitIdKioskPrinterTelemetryUrl(unitId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersKioskPrinterTelemetryRequest,)
+  }
+);}
+
+
+
+
+export const getPostUnitsUnitIdKioskPrinterTelemetryMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskPrinterTelemetry>>, TError,{unitId: string;data: HandlersKioskPrinterTelemetryRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskPrinterTelemetry>>, TError,{unitId: string;data: HandlersKioskPrinterTelemetryRequest}, TContext> => {
+
+const mutationKey = ['postUnitsUnitIdKioskPrinterTelemetry'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdKioskPrinterTelemetry>>, {unitId: string;data: HandlersKioskPrinterTelemetryRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  postUnitsUnitIdKioskPrinterTelemetry(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostUnitsUnitIdKioskPrinterTelemetryMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdKioskPrinterTelemetry>>>
+    export type PostUnitsUnitIdKioskPrinterTelemetryMutationBody = HandlersKioskPrinterTelemetryRequest
+    export type PostUnitsUnitIdKioskPrinterTelemetryMutationError = string
+
+    /**
+ * @summary Report a kiosk printer issue (broadcast to unit WebSocket)
+ */
+export const usePostUnitsUnitIdKioskPrinterTelemetry = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskPrinterTelemetry>>, TError,{unitId: string;data: HandlersKioskPrinterTelemetryRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postUnitsUnitIdKioskPrinterTelemetry>>,
+        TError,
+        {unitId: string;data: HandlersKioskPrinterTelemetryRequest},
+        TContext
+      > => {
+      return useMutation(getPostUnitsUnitIdKioskPrinterTelemetryMutationOptions(options), queryClient);
+    }
+
+export type postUnitsUnitIdKioskTelemetryResponse204 = {
+  data: void
+  status: 204
+}
+
+export type postUnitsUnitIdKioskTelemetryResponseSuccess = (postUnitsUnitIdKioskTelemetryResponse204) & {
+  headers: Headers;
+};
+;
+
+export type postUnitsUnitIdKioskTelemetryResponse = (postUnitsUnitIdKioskTelemetryResponseSuccess)
+
+export const getPostUnitsUnitIdKioskTelemetryUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/kiosk-telemetry`
+}
+
+export const postUnitsUnitIdKioskTelemetry = async (unitId: string,
+    handlersPostKioskTelemetryRequest: HandlersPostKioskTelemetryRequest, options?: RequestInit): Promise<postUnitsUnitIdKioskTelemetryResponse> => {
+
+  return orvalMutator<postUnitsUnitIdKioskTelemetryResponse>(getPostUnitsUnitIdKioskTelemetryUrl(unitId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': '*/*', ...options?.headers },
+    body: JSON.stringify(
+      handlersPostKioskTelemetryRequest,)
+  }
+);}
+
+
+
+
+export const getPostUnitsUnitIdKioskTelemetryMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskTelemetry>>, TError,{unitId: string;data: HandlersPostKioskTelemetryRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskTelemetry>>, TError,{unitId: string;data: HandlersPostKioskTelemetryRequest}, TContext> => {
+
+const mutationKey = ['postUnitsUnitIdKioskTelemetry'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdKioskTelemetry>>, {unitId: string;data: HandlersPostKioskTelemetryRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  postUnitsUnitIdKioskTelemetry(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostUnitsUnitIdKioskTelemetryMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdKioskTelemetry>>>
+    export type PostUnitsUnitIdKioskTelemetryMutationBody = HandlersPostKioskTelemetryRequest
+    export type PostUnitsUnitIdKioskTelemetryMutationError = unknown
+
+    export const usePostUnitsUnitIdKioskTelemetry = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskTelemetry>>, TError,{unitId: string;data: HandlersPostKioskTelemetryRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postUnitsUnitIdKioskTelemetry>>,
+        TError,
+        {unitId: string;data: HandlersPostKioskTelemetryRequest},
+        TContext
+      > => {
+      return useMutation(getPostUnitsUnitIdKioskTelemetryMutationOptions(options), queryClient);
+    }
+
+export type postUnitsUnitIdKioskVisitorSurveyResponse204 = {
+  data: void
+  status: 204
+}
+
+export type postUnitsUnitIdKioskVisitorSurveyResponseSuccess = (postUnitsUnitIdKioskVisitorSurveyResponse204) & {
+  headers: Headers;
+};
+;
+
+export type postUnitsUnitIdKioskVisitorSurveyResponse = (postUnitsUnitIdKioskVisitorSurveyResponseSuccess)
+
+export const getPostUnitsUnitIdKioskVisitorSurveyUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/kiosk-visitor-survey`
+}
+
+export const postUnitsUnitIdKioskVisitorSurvey = async (unitId: string,
+    handlersKioskVisitorSurveyRequest: HandlersKioskVisitorSurveyRequest, options?: RequestInit): Promise<postUnitsUnitIdKioskVisitorSurveyResponse> => {
+
+  return orvalMutator<postUnitsUnitIdKioskVisitorSurveyResponse>(getPostUnitsUnitIdKioskVisitorSurveyUrl(unitId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': '*/*', ...options?.headers },
+    body: JSON.stringify(
+      handlersKioskVisitorSurveyRequest,)
+  }
+);}
+
+
+
+
+export const getPostUnitsUnitIdKioskVisitorSurveyMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskVisitorSurvey>>, TError,{unitId: string;data: HandlersKioskVisitorSurveyRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskVisitorSurvey>>, TError,{unitId: string;data: HandlersKioskVisitorSurveyRequest}, TContext> => {
+
+const mutationKey = ['postUnitsUnitIdKioskVisitorSurvey'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdKioskVisitorSurvey>>, {unitId: string;data: HandlersKioskVisitorSurveyRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  postUnitsUnitIdKioskVisitorSurvey(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostUnitsUnitIdKioskVisitorSurveyMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdKioskVisitorSurvey>>>
+    export type PostUnitsUnitIdKioskVisitorSurveyMutationBody = HandlersKioskVisitorSurveyRequest
+    export type PostUnitsUnitIdKioskVisitorSurveyMutationError = unknown
+
+    export const usePostUnitsUnitIdKioskVisitorSurvey = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskVisitorSurvey>>, TError,{unitId: string;data: HandlersKioskVisitorSurveyRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postUnitsUnitIdKioskVisitorSurvey>>,
+        TError,
+        {unitId: string;data: HandlersKioskVisitorSurveyRequest},
+        TContext
+      > => {
+      return useMutation(getPostUnitsUnitIdKioskVisitorSurveyMutationOptions(options), queryClient);
     }
 
 /**

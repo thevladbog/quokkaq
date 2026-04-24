@@ -75,6 +75,7 @@ CREATE TABLE tickets (
 	service_id text NOT NULL,
 	counter_id text,
 	pre_registration_id text,
+	kiosk_identified_user_id text,
 	client_id text,
 	status text DEFAULT 'waiting',
 	priority integer DEFAULT 0,

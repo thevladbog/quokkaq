@@ -7,6 +7,10 @@ const GS = 0x1d;
 export type PrinterInfo = {
   name: string;
   isDefault: boolean;
+  /** Set when the OS / driver reports an out-of-paper (or similar) condition. */
+  paperOut?: boolean;
+  /** Short driver/status hint for supervisors (e.g. WMI or CUPS). */
+  status?: string;
 };
 
 /** True when running inside a Tauri webview (local or remote allowlisted URL). */

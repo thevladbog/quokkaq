@@ -69,3 +69,29 @@ VALUES ('t-zone', 'Z-1', ?, ?, ?, 'waiting', 0, 0, ?),
 		t.Fatalf("zone pool: want ticket t-zone, got %s", gotZ.ID)
 	}
 }
+
+// Pre-registration check-in tickets get priority=10; walk-in stays 0. Next client must be the booking first.
+func TestFindWaiting_preRegistrationPriorityAheadOfWalkIn(t *testing.T) {
+	db := newFindWaitingTestDB(t)
+	r := &ticketRepository{db: db}
+
+	unitID := "unit-prio"
+	svcID := "svc-1"
+	earlier := time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339)
+	later := time.Now().UTC().Format(time.RFC3339)
+	if err := db.Exec(`
+INSERT INTO tickets (id, queue_number, unit_id, service_zone_id, service_id, status, priority, is_eod, created_at)
+VALUES ('t-walk', 'A-1', ?, NULL, ?, 'waiting', 0, 0, ?),
+       ('t-book', 'B-1', ?, NULL, ?, 'waiting', 10, 0, ?);
+`, unitID, svcID, earlier, unitID, svcID, later).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := r.FindWaiting(unitID, []string{svcID}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != "t-book" {
+		t.Fatalf("FindWaiting: want pre-registration ticket t-book first, got %s (priority order)", got.ID)
+	}
+}

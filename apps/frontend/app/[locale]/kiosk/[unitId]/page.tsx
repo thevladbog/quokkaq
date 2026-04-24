@@ -1,10 +1,15 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useUnitServicesTree, useCreateTicketInUnit } from '@/lib/hooks';
-import type { Ticket, Service } from '@/lib/api';
+import {
+  ticketsApi,
+  preRegistrationsApi,
+  type Ticket,
+  type Service
+} from '@/lib/api';
 import {
   Dialog,
   DialogContent,
@@ -18,10 +23,16 @@ import dynamic from 'next/dynamic';
 const QRCode = dynamic(() => import('react-qr-code'), { ssr: false });
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { useParams } from 'next/navigation';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useRouter } from '@/src/i18n/navigation';
 import { useLocale } from 'next-intl';
-import { getLocalizedName } from '@/lib/utils';
+import { getLocalizedName, cn } from '@/lib/utils';
+import { KIOSK_FORCED_HIGH_CONTRAST } from '@/lib/kiosk-hc-palette';
+import { KioskAccessibilityToolbar } from '@/components/kiosk/kiosk-accessibility-toolbar';
+import { useKioskA11y } from '@/contexts/kiosk-accessibility-context';
+import { useKioskA11yAudio } from '@/hooks/use-kiosk-a11y-audio';
+import { useKioskSpeech } from '@/hooks/use-kiosk-speech';
 import KioskLanguageSwitcher from '@/components/KioskLanguageSwitcher';
 import { useUnit } from '@/lib/hooks';
 import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
@@ -41,9 +52,12 @@ import {
 } from '@/lib/kiosk-print';
 import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import { logger } from '@/lib/logger';
+import { reportKioskPrinterTelemetry } from '@/lib/kiosk-printer-telemetry';
 import { socketClient, type UnitETASnapshot } from '@/lib/socket';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { isQuotaExceededError } from '@/lib/quota-error';
+import { getServiceIdentificationMode } from '@/lib/kiosk-service-identification';
+import { KioskEmployeeIdFlow } from '@/components/kiosk/kiosk-employee-id-flow';
 import {
   GRID_ZONE_SCOPE_NONE,
   SERVICE_GRID_CELL_COUNT,
@@ -52,11 +66,21 @@ import {
   isServicePlacedOnGrid,
   serviceMatchesGridZoneScope
 } from '@/lib/service-grid';
+import { useKioskSessionIdle } from '@/hooks/use-kiosk-session-idle';
+import { useKioskPrinterPaperOutPoll } from '@/hooks/use-kiosk-printer-paper-poll';
+import { KioskIdOcrDialog } from '@/components/kiosk/kiosk-id-ocr-dialog';
+import { useKioskTelemetryPing } from '@/hooks/use-kiosk-telemetry-ping';
+import {
+  persistKioskServiceTreeSnapshot,
+  persistKioskUnitSnapshot
+} from '@/lib/kiosk-snapshot-cache';
+import { toast } from 'sonner';
 
 export default function UnitKioskPage() {
   const queryClient = useQueryClient();
   const params = useParams() as { unitId?: string };
   const unitId = params.unitId;
+  const searchParams = useSearchParams();
   const [selectedServicePath, setSelectedServicePath] = useState<Service[]>([]);
   const [, setMessage] = useState('');
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
@@ -69,10 +93,29 @@ export default function UnitKioskPage() {
   const [successEtaMinutes, setSuccessEtaMinutes] = useState<number | null>(
     null
   );
+  const [successPeopleAhead, setSuccessPeopleAhead] = useState<number | null>(
+    null
+  );
+  /** When true, success modal does not auto-close until SMS step is done or declined. */
+  const [kioskSmsBlocking, setKioskSmsBlocking] = useState(false);
+  const [kioskSmsAgreed, setKioskSmsAgreed] = useState(false);
+  const [kioskSmsDigits, setKioskSmsDigits] = useState('');
+  const [kioskSmsError, setKioskSmsError] = useState<string | null>(null);
+  const [kioskSmsBusy, setKioskSmsBusy] = useState(false);
+  const [idOcrOpen, setIdOcrOpen] = useState(false);
+  const [browserOnline, setBrowserOnline] = useState(
+    () => typeof window === 'undefined' || navigator.onLine
+  );
   const router = useRouter();
   const locale = useLocale();
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
   const t = useTranslations('kiosk');
+  const tEmployee = useTranslations('kiosk.employee_id');
+  const tA11y = useTranslations('kiosk.a11y');
+  const a11y = useKioskA11y();
+  const kioskAudio = useKioskA11yAudio({ ttsEnabled: a11y.ttsEnabled });
+  const tts = useKioskSpeech(kioskAudio);
+  const ttsKeyRef = useRef('');
   const [baseAppUrl] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.location.origin;
@@ -91,10 +134,22 @@ export default function UnitKioskPage() {
       return u?.operations?.kioskFrozen ? 10_000 : 120_000;
     },
     // Desktop WebView + React Query cache: always pick up fresh kiosk PIN / config.
-    refetchOnMount: 'always'
+    refetchOnMount: 'always',
+    kioskReadCache: true
   });
 
   const serverKioskFrozen = Boolean(unit?.operations?.kioskFrozen);
+
+  useEffect(() => {
+    const up = () => setBrowserOnline(true);
+    const down = () => setBrowserOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => {
+      window.removeEventListener('online', up);
+      window.removeEventListener('offline', down);
+    };
+  }, []);
 
   const invalidateUnitQuery = useCallback(() => {
     if (!unitId) {
@@ -134,6 +189,11 @@ export default function UnitKioskPage() {
     return unit.id;
   }, [unit]);
 
+  useKioskTelemetryPing(
+    kioskApiUnitId,
+    Boolean(kioskApiUnitId) && !serverKioskFrozen
+  );
+
   useEffect(() => {
     if (!isTicketModalOpen || !createdTicket || !kioskApiUnitId) {
       return;
@@ -145,6 +205,9 @@ export default function UnitKioskPage() {
         setSuccessEtaMinutes(
           Math.max(1, Math.round(row.estimatedWaitSeconds / 60))
         );
+      }
+      if (row && row.queuePosition > 0) {
+        setSuccessPeopleAhead(Math.max(0, row.queuePosition - 1));
       }
     };
     socketClient.onEtaUpdate(h);
@@ -167,8 +230,21 @@ export default function UnitKioskPage() {
     isError: servicesQueryError,
     refetch: refetchServicesTree
   } = useUnitServicesTree(kioskApiUnitId ?? '', {
-    enabled: Boolean(kioskApiUnitId)
+    enabled: Boolean(kioskApiUnitId),
+    kioskReadCache: true
   });
+
+  useEffect(() => {
+    if (unitId && unit) {
+      persistKioskUnitSnapshot(unitId, unit);
+    }
+  }, [unitId, unit]);
+
+  useEffect(() => {
+    if (kioskApiUnitId && unitServicesTree) {
+      persistKioskServiceTreeSnapshot(kioskApiUnitId, unitServicesTree);
+    }
+  }, [kioskApiUnitId, unitServicesTree]);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => {
@@ -195,17 +271,48 @@ export default function UnitKioskPage() {
         typeof window !== 'undefined' && logoForPrint
           ? `${window.location.origin}/api/kiosk-print-logo?url=${encodeURIComponent(logoForPrint)}`
           : undefined;
+      const extraBodyLines: string[] = [];
+      if (
+        typeof ticket.queuePosition === 'number' &&
+        ticket.queuePosition > 0
+      ) {
+        extraBodyLines.push(
+          t('ticket.receipt_queue_position', { n: ticket.queuePosition })
+        );
+        const ahead = Math.max(0, ticket.queuePosition - 1);
+        extraBodyLines.push(t('ticket.receipt_people_ahead', { n: ahead }));
+      }
+      if (ticket.serviceZoneName?.trim()) {
+        extraBodyLines.push(
+          t('ticket.receipt_zone', { zone: ticket.serviceZoneName.trim() })
+        );
+      }
       const bytes = await buildKioskTicketEscPos({
         kiosk: kc,
         ticket,
         serviceLabel,
         ticketPageUrl,
         unitDisplayTitle,
-        logoFetchUrl
+        logoFetchUrl,
+        extraBodyLines: extraBodyLines.length > 0 ? extraBodyLines : undefined
       });
-      await printReceiptBytesFromKioskConfig(kc, bytes);
+      const ok = await printReceiptBytesFromKioskConfig(kc, bytes);
+      if (!ok && kioskApiUnitId && isTauriKiosk()) {
+        reportKioskPrinterTelemetry(
+          kioskApiUnitId,
+          'print_error',
+          'Print not sent (missing target, label mode, or desktop print pipeline)'
+        );
+      }
     } catch (e) {
       console.error('Kiosk native print failed:', e);
+      if (kioskApiUnitId) {
+        reportKioskPrinterTelemetry(
+          kioskApiUnitId,
+          'print_error',
+          e instanceof Error ? e.message : String(e)
+        );
+      }
     }
   };
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
@@ -213,6 +320,13 @@ export default function UnitKioskPage() {
   const [isLocked, setIsLocked] = useState(false);
   const [, setClockClicks] = useState(0);
   const [isRedemptionModalOpen, setIsRedemptionModalOpen] = useState(false);
+  /** When user picks a service with identificationMode=qr — same modal as pre-reg, no deeplink. */
+  const [isKioskQrIdentificationOpen, setIsKioskQrIdentificationOpen] =
+    useState(false);
+  const [isKioskQrCheckinDisabledOpen, setIsKioskQrCheckinDisabledOpen] =
+    useState(false);
+  const [kioskPrIdentModalKey, setKioskPrIdentModalKey] = useState(0);
+  const [redeemModalKey, setRedeemModalKey] = useState(0);
   const [isPhoneIdentificationOpen, setIsPhoneIdentificationOpen] =
     useState(false);
   const [pendingPhoneService, setPendingPhoneService] =
@@ -220,21 +334,144 @@ export default function UnitKioskPage() {
   const [phoneIdentificationError, setPhoneIdentificationError] = useState('');
   const [phoneIdentificationSessionKey, setPhoneIdentificationSessionKey] =
     useState(0);
+  const [isEmployeeIdentificationOpen, setIsEmployeeIdentificationOpen] =
+    useState(false);
+  const [pendingEmployeeService, setPendingEmployeeService] =
+    useState<Service | null>(null);
+  const [employeeIdSubmode, setEmployeeIdSubmode] = useState<'badge' | 'login'>(
+    'badge'
+  );
+  const [employeeCreateTicketError, setEmployeeCreateTicketError] =
+    useState('');
+  const beforeIdleSec = unit?.config?.kiosk?.sessionIdleBeforeWarningSec ?? 45;
+  const idleCountdownSec = unit?.config?.kiosk?.sessionIdleCountdownSec ?? 15;
+  const sessionIdleEnabled = Boolean(
+    unit &&
+    !unitQueryError &&
+    !serverKioskFrozen &&
+    !isTicketModalOpen &&
+    !isSettingsOpen &&
+    !isLocked &&
+    !isPinModalOpen &&
+    !isRedemptionModalOpen &&
+    !isKioskQrIdentificationOpen &&
+    !isKioskQrCheckinDisabledOpen &&
+    !isPhoneIdentificationOpen &&
+    !isEmployeeIdentificationOpen
+  );
+  const onIdleSessionEnd = useCallback(() => {
+    setSelectedServicePath([]);
+    setIsPhoneIdentificationOpen(false);
+    setPhoneIdentificationError('');
+    setPendingPhoneService(null);
+    setIsEmployeeIdentificationOpen(false);
+    setPendingEmployeeService(null);
+    setIsKioskQrIdentificationOpen(false);
+    setIsKioskQrCheckinDisabledOpen(false);
+    setIsRedemptionModalOpen(false);
+    setIsPinModalOpen(false);
+    setMessage('');
+  }, []);
+  const {
+    showWarning: showIdleWarning,
+    remainingSec: idleRemainingSec,
+    continueSession: continueIdleSession
+  } = useKioskSessionIdle({
+    enabled: sessionIdleEnabled,
+    beforeWarningSec: beforeIdleSec,
+    countdownSec: idleCountdownSec,
+    onSessionEnd: onIdleSessionEnd
+  });
 
-  // Custom colors from config
   const isCustomColorsEnabled =
     unit?.config?.kiosk?.isCustomColorsEnabled || false;
-  const headerColor = isCustomColorsEnabled
-    ? unit?.config?.kiosk?.headerColor || '#fff9f4'
-    : '#fff9f4';
-  const bodyColor = isCustomColorsEnabled
-    ? unit?.config?.kiosk?.bodyColor || '#fef8f3'
-    : '#fef8f3';
-  const serviceGridColor = isCustomColorsEnabled
-    ? unit?.config?.kiosk?.serviceGridColor || '#f2ebe6'
-    : '#f2ebe6';
+  const kcKiosk = unit?.config?.kiosk;
+  const useHcSurfaces = a11y.highContrast;
+  const headerColor = useHcSurfaces
+    ? KIOSK_FORCED_HIGH_CONTRAST.headerBackground
+    : isCustomColorsEnabled
+      ? kcKiosk?.headerColor || '#fff9f4'
+      : '#fff9f4';
+  const bodyColor = useHcSurfaces
+    ? KIOSK_FORCED_HIGH_CONTRAST.bodyBackground
+    : isCustomColorsEnabled
+      ? kcKiosk?.bodyColor || '#fef8f3'
+      : '#fef8f3';
+  const serviceGridColor = useHcSurfaces
+    ? KIOSK_FORCED_HIGH_CONTRAST.serviceGridBackground
+    : isCustomColorsEnabled
+      ? kcKiosk?.serviceGridColor || '#f2ebe6'
+      : '#f2ebe6';
 
   const kioskCfg = unit?.config?.kiosk;
+  const appointmentCheckinEnabled = Boolean(
+    kioskCfg?.isAppointmentCheckinEnabled ?? kioskCfg?.isPreRegistrationEnabled
+  );
+  const showPhoneForAppointment =
+    (kioskCfg?.isAppointmentPhoneLookupEnabled ?? true) &&
+    appointmentCheckinEnabled;
+  const [deeplinkPrCode, setDeeplinkPrCode] = useState<string | undefined>(
+    undefined
+  );
+  const [redeemAutoFromDeeplink, setRedeemAutoFromDeeplink] = useState(false);
+
+  useEffect(() => {
+    const uid = kioskApiUnitId ?? unitId;
+    if (!uid) {
+      return;
+    }
+    const raw = (searchParams.get('prCode') || '')
+      .replace(/\D/g, '')
+      .slice(0, 6);
+    if (raw.length === 6) {
+      setDeeplinkPrCode(raw);
+      if (appointmentCheckinEnabled) {
+        setRedeemAutoFromDeeplink(true);
+        setRedeemModalKey((k) => k + 1);
+        setIsRedemptionModalOpen(true);
+      }
+      return;
+    }
+    const prToken = searchParams.get('prToken')?.trim();
+    if (prToken) {
+      void preRegistrationsApi
+        .resolvePrToken(uid, prToken)
+        .then((r) => {
+          const c = (r.code || '').replace(/\D/g, '').slice(0, 6);
+          if (c) {
+            setDeeplinkPrCode(c);
+          }
+          if (appointmentCheckinEnabled) {
+            setRedeemAutoFromDeeplink(true);
+            setRedeemModalKey((k) => k + 1);
+            setIsRedemptionModalOpen(true);
+          }
+        })
+        .catch(() => {
+          // invalid token or server HMAC not configured
+        });
+    }
+  }, [searchParams, kioskApiUnitId, unitId, appointmentCheckinEnabled]);
+
+  const paperOutPollEnabled = Boolean(
+    kioskApiUnitId &&
+    !unitQueryError &&
+    !serverKioskFrozen &&
+    !isTicketModalOpen &&
+    !isSettingsOpen &&
+    !isLocked &&
+    !isPinModalOpen &&
+    !isRedemptionModalOpen &&
+    !isKioskQrIdentificationOpen &&
+    !isKioskQrCheckinDisabledOpen &&
+    !isPhoneIdentificationOpen &&
+    !isEmployeeIdentificationOpen
+  );
+  useKioskPrinterPaperOutPoll({
+    unitId: kioskApiUnitId,
+    enabled: paperOutPollEnabled,
+    kiosk: kioskCfg
+  });
   const showTicketHeader = kioskCfg?.showHeader !== false;
   const showTicketFooter = kioskCfg?.showFooter !== false;
 
@@ -245,13 +482,31 @@ export default function UnitKioskPage() {
     (unit ? getUnitDisplayName(unit, locale) : '').trim() ||
     t('kioskTitle');
 
-  const switcherClass =
-    'text-kiosk-ink h-11 min-w-[3.25rem] rounded-full border-0 bg-[#f2ede8] px-4 text-base font-semibold shadow-sm hover:bg-[#ebe4de] md:h-12 md:min-w-[3.5rem]';
+  const switcherClass = cn(
+    'kiosk-touch-min text-kiosk-ink h-12 min-w-[3.5rem] rounded-full border-0 bg-[#f2ede8] px-4 text-base font-semibold shadow-sm hover:bg-[#ebe4de]'
+  );
+
+  const showKioskIdOcr = Boolean(
+    unit?.operations?.kioskIdOcr && kioskCfg?.idOcrEnabled
+  );
+  const showOfflineShell = Boolean(
+    unit?.operations?.kioskOfflineMode && kioskCfg?.offlineModeEnabled
+  );
 
   const topBarLeading = (
     <>
       {kioskCfg?.logoUrl ? (
-        <div className='relative h-10 w-auto shrink-0 md:h-14'>
+        <div
+          className={cn(
+            'relative h-10 w-auto shrink-0 md:h-14',
+            useHcSurfaces && 'rounded-lg p-1'
+          )}
+          style={
+            useHcSurfaces
+              ? { backgroundColor: KIOSK_FORCED_HIGH_CONTRAST.logoSurround }
+              : undefined
+          }
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={kioskCfg.logoUrl}
@@ -261,7 +516,12 @@ export default function UnitKioskPage() {
         </div>
       ) : null}
       {showUnitInHeader ? (
-        <p className='text-kiosk-ink min-w-0 truncate text-lg font-bold tracking-tight sm:text-xl md:text-2xl'>
+        <p
+          className={cn(
+            'min-w-0 truncate text-lg font-bold tracking-tight sm:text-xl md:text-2xl',
+            useHcSurfaces ? 'text-white' : 'text-kiosk-ink'
+          )}
+        >
           {resolvedHeaderUnitTitle}
         </p>
       ) : null}
@@ -270,13 +530,45 @@ export default function UnitKioskPage() {
 
   const topBarBeforeClock = (
     <>
-      {kioskCfg?.isPreRegistrationEnabled ? (
+      <KioskAccessibilityToolbar audio={kioskAudio} />
+      {showOfflineShell ? (
+        <span
+          className={cn(
+            'kiosk-touch-min flex h-10 max-w-[11rem] shrink-0 items-center justify-center rounded-full px-2.5 text-center text-xs font-semibold sm:max-w-none sm:px-3 sm:text-sm',
+            browserOnline
+              ? 'bg-emerald-600/15 text-emerald-900'
+              : 'bg-amber-600/25 text-amber-950'
+          )}
+        >
+          {browserOnline
+            ? t('network.online', { defaultValue: 'Online' })
+            : t('network.offline', { defaultValue: 'No network' })}
+        </span>
+      ) : null}
+      {showKioskIdOcr ? (
+        <Button
+          type='button'
+          variant='secondary'
+          className='text-kiosk-ink kiosk-touch-min h-12 shrink-0 rounded-full px-4 text-base font-semibold shadow-sm'
+          onClick={() => setIdOcrOpen(true)}
+        >
+          {t('id_ocr.action', { defaultValue: 'Scan document' })}
+        </Button>
+      ) : null}
+      {appointmentCheckinEnabled ? (
         <Button
           variant='secondary'
-          className='text-kiosk-ink h-11 shrink-0 rounded-full px-4 text-base font-semibold shadow-sm md:h-12'
-          onClick={() => setIsRedemptionModalOpen(true)}
+          className='text-kiosk-ink kiosk-touch-min h-12 shrink-0 rounded-full px-4 text-base font-semibold shadow-sm'
+          onClick={() => {
+            setDeeplinkPrCode(undefined);
+            setRedeemAutoFromDeeplink(false);
+            setRedeemModalKey((k) => k + 1);
+            setIsRedemptionModalOpen(true);
+          }}
         >
-          {t('pre_registration.button', { defaultValue: 'I have a code' })}
+          {t('pre_registration.cta_appointment', {
+            defaultValue: 'I have an appointment'
+          })}
         </Button>
       ) : null}
       <KioskLanguageSwitcher className={switcherClass} />
@@ -298,6 +590,91 @@ export default function UnitKioskPage() {
   const heroSubtitle = isServiceRoot
     ? kioskCfg?.welcomeSubtitle?.trim() || t('welcome_default_subtitle')
     : undefined;
+
+  useEffect(() => {
+    if (!tts.canSpeak) {
+      ttsKeyRef.current = '';
+      tts.cancel();
+    }
+  }, [tts]);
+
+  const handleA11yTileVocalize = useCallback(
+    (s: Service) => {
+      if (!tts.canSpeak) {
+        return;
+      }
+      tts.speak(
+        getLocalizedName(s.name, s.nameRu || '', s.nameEn || '', locale)
+      );
+    },
+    [locale, tts]
+  );
+
+  useEffect(() => {
+    if (!unit || !tts.canSpeak) {
+      return;
+    }
+    const key = [
+      isTicketModalOpen,
+      createdTicket?.id,
+      isServiceRoot,
+      pathLeaf?.id ?? 'root',
+      successEtaMinutes ?? 'x',
+      successPeopleAhead ?? 'x',
+      isPhoneIdentificationOpen,
+      isEmployeeIdentificationOpen,
+      isKioskQrIdentificationOpen
+    ].join(':');
+    if (key === ttsKeyRef.current) {
+      return;
+    }
+    ttsKeyRef.current = key;
+    if (isKioskQrIdentificationOpen) {
+      tts.speak(tA11y('screen_qr_checkin'));
+      return;
+    }
+    if (isPhoneIdentificationOpen) {
+      tts.speak(tA11y('screen_phone'));
+      return;
+    }
+    if (isEmployeeIdentificationOpen) {
+      tts.speak(tA11y('screen_employee'));
+      return;
+    }
+    if (isTicketModalOpen && createdTicket) {
+      const parts = [
+        tA11y('success_ticket', { number: String(createdTicket.queueNumber) })
+      ];
+      if (successEtaMinutes != null) {
+        parts.push(t('ticket.success_eta', { minutes: successEtaMinutes }));
+      }
+      if (successPeopleAhead != null) {
+        parts.push(t('ticket.success_ahead', { n: successPeopleAhead }));
+      }
+      tts.speak(parts.join(' '));
+      return;
+    }
+    if (isServiceRoot) {
+      tts.speak(tA11y('screen_welcome', { title: heroTitle }));
+    } else {
+      tts.speak(tA11y('screen_drill', { title: heroTitle }));
+    }
+  }, [
+    unit,
+    tts,
+    t,
+    isTicketModalOpen,
+    createdTicket,
+    isServiceRoot,
+    pathLeaf?.id,
+    successEtaMinutes,
+    successPeopleAhead,
+    heroTitle,
+    tA11y,
+    isPhoneIdentificationOpen,
+    isEmployeeIdentificationOpen,
+    isKioskQrIdentificationOpen
+  ]);
 
   const handleClockClick = () => {
     setClockClicks((prev) => {
@@ -332,6 +709,29 @@ export default function UnitKioskPage() {
     };
   }, [autoCloseTimerId]);
 
+  const scheduleTicketModalAutoClose = useCallback(() => {
+    setKioskSmsBlocking(false);
+    setCountdown(5);
+    if (autoCloseTimerId) {
+      clearInterval(autoCloseTimerId);
+    }
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          setIsTicketModalOpen(false);
+          setCreatedTicket(null);
+          setKioskSmsAgreed(false);
+          setKioskSmsDigits('');
+          setKioskSmsError(null);
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    setAutoCloseTimerId(timer);
+  }, [autoCloseTimerId]);
+
   // Visible services for the current breadcrumb level (recomputed only when tree or path changes)
   const visibleServices = useMemo(() => {
     if (!unitServicesTree) {
@@ -358,25 +758,30 @@ export default function UnitKioskPage() {
 
   const openTicketSuccessFlow = (ticket: Ticket, service: Service) => {
     setSuccessEtaMinutes(null);
+    if (typeof ticket.queuePosition === 'number' && ticket.queuePosition > 0) {
+      setSuccessPeopleAhead(Math.max(0, ticket.queuePosition - 1));
+    } else {
+      setSuccessPeopleAhead(null);
+    }
     setCreatedTicket(ticket);
     setIsTicketModalOpen(true);
     setSelectedServicePath([]);
-    setCountdown(5);
-    if (autoCloseTimerId) {
-      clearInterval(autoCloseTimerId);
+    setKioskSmsError(null);
+    setKioskSmsAgreed(false);
+    setKioskSmsDigits('');
+
+    const needSms = ticket.smsPostTicketStepRequired === true;
+    if (needSms) {
+      setKioskSmsBlocking(true);
+      if (autoCloseTimerId) {
+        clearInterval(autoCloseTimerId);
+        setAutoCloseTimerId(null);
+      }
+    } else {
+      setKioskSmsBlocking(false);
+      scheduleTicketModalAutoClose();
     }
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          setIsTicketModalOpen(false);
-          setCreatedTicket(null);
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    setAutoCloseTimerId(timer);
+
     const serviceLabel = getLocalizedName(
       service.name,
       service.nameRu || '',
@@ -394,27 +799,40 @@ export default function UnitKioskPage() {
 
   const createTicketForService = async (
     service: Service,
-    opts?: { visitorPhone: string; visitorLocale: 'en' | 'ru' },
-    failTarget?: 'phoneModal' | 'page'
+    opts?:
+      | { visitorPhone: string; visitorLocale: 'en' | 'ru' }
+      | { kioskIdentifiedUserId: string },
+    failTarget?: 'phoneModal' | 'page' | 'employeeModal'
   ) => {
     setMessage('');
+    setEmployeeCreateTicketError('');
     try {
-      const ticket = await createTicketMutation.mutateAsync(
-        opts
-          ? {
-              unitId: kioskApiUnitId!,
-              serviceId: service.id,
-              visitorPhone: opts.visitorPhone,
-              visitorLocale: opts.visitorLocale
-            }
-          : {
-              unitId: kioskApiUnitId!,
-              serviceId: service.id
-            }
-      );
+      let ticket;
+      if (opts && 'kioskIdentifiedUserId' in opts) {
+        ticket = await createTicketMutation.mutateAsync({
+          unitId: kioskApiUnitId!,
+          serviceId: service.id,
+          kioskIdentifiedUserId: opts.kioskIdentifiedUserId
+        });
+      } else if (opts && 'visitorPhone' in opts) {
+        ticket = await createTicketMutation.mutateAsync({
+          unitId: kioskApiUnitId!,
+          serviceId: service.id,
+          visitorPhone: opts.visitorPhone,
+          visitorLocale: opts.visitorLocale
+        });
+      } else {
+        ticket = await createTicketMutation.mutateAsync({
+          unitId: kioskApiUnitId!,
+          serviceId: service.id
+        });
+      }
       setPhoneIdentificationError('');
       setIsPhoneIdentificationOpen(false);
       setPendingPhoneService(null);
+      setIsEmployeeIdentificationOpen(false);
+      setPendingEmployeeService(null);
+      setEmployeeIdSubmode('badge');
       openTicketSuccessFlow(ticket, service);
     } catch (error) {
       console.error('Failed to create ticket:', error);
@@ -422,6 +840,8 @@ export default function UnitKioskPage() {
         const quotaMsg = t('ticketQuotaExceeded');
         if (failTarget === 'phoneModal') {
           setPhoneIdentificationError(quotaMsg);
+        } else if (failTarget === 'employeeModal') {
+          setEmployeeCreateTicketError(quotaMsg);
         } else {
           setMessage(quotaMsg);
         }
@@ -436,6 +856,10 @@ export default function UnitKioskPage() {
             defaultValue: failDefault
           })
         );
+      } else if (failTarget === 'employeeModal') {
+        setEmployeeCreateTicketError(
+          tEmployee('ticket_create_failed', { defaultValue: failDefault })
+        );
       } else {
         setMessage(failDefault);
       }
@@ -444,11 +868,28 @@ export default function UnitKioskPage() {
 
   const handleServiceSelection = async (service: Service) => {
     if (service.isLeaf) {
-      if (service.offerIdentification) {
+      const mode = getServiceIdentificationMode(service);
+      if (mode === 'phone') {
         setPhoneIdentificationError('');
         setPendingPhoneService(service);
         setPhoneIdentificationSessionKey((k) => k + 1);
         setIsPhoneIdentificationOpen(true);
+        return;
+      }
+      if (mode === 'qr') {
+        if (!appointmentCheckinEnabled) {
+          setIsKioskQrCheckinDisabledOpen(true);
+          return;
+        }
+        setKioskPrIdentModalKey((k) => k + 1);
+        setIsKioskQrIdentificationOpen(true);
+        return;
+      }
+      if (mode === 'login' || mode === 'badge') {
+        setEmployeeCreateTicketError('');
+        setPendingEmployeeService(service);
+        setEmployeeIdSubmode(mode === 'login' ? 'login' : 'badge');
+        setIsEmployeeIdentificationOpen(true);
         return;
       }
       await createTicketForService(service);
@@ -493,9 +934,75 @@ export default function UnitKioskPage() {
     }
   };
 
+  const KIOSK_SMS_MAX = 15;
+
+  const handleKioskSmsDecline = async () => {
+    if (!createdTicket) {
+      return;
+    }
+    if (!createdTicket.visitorToken) {
+      setKioskSmsError(t('sms_post_ticket.token_error'));
+      scheduleTicketModalAutoClose();
+      return;
+    }
+    setKioskSmsError(null);
+    setKioskSmsBusy(true);
+    try {
+      await ticketsApi.visitorSmsSkip(
+        createdTicket.id,
+        createdTicket.visitorToken
+      );
+      scheduleTicketModalAutoClose();
+    } catch (e) {
+      setKioskSmsError(
+        e instanceof Error ? e.message : t('sms_post_ticket.network_error')
+      );
+    } finally {
+      setKioskSmsBusy(false);
+    }
+  };
+
+  const handleKioskSmsConfirm = async () => {
+    if (!createdTicket?.visitorToken) {
+      setKioskSmsError(t('sms_post_ticket.token_error'));
+      return;
+    }
+    if (!kioskSmsAgreed) {
+      setKioskSmsError(t('sms_post_ticket.consent_error'));
+      return;
+    }
+    if (kioskSmsDigits.length < 5) {
+      setKioskSmsError(t('sms_post_ticket.short_phone_error'));
+      return;
+    }
+    setKioskSmsError(null);
+    setKioskSmsBusy(true);
+    try {
+      await ticketsApi.attachPhone(
+        createdTicket.id,
+        `+${kioskSmsDigits}`,
+        locale === 'ru' ? 'ru' : 'en',
+        createdTicket.visitorToken
+      );
+      scheduleTicketModalAutoClose();
+    } catch (e) {
+      setKioskSmsError(
+        e instanceof Error ? e.message : t('sms_post_ticket.network_error')
+      );
+    } finally {
+      setKioskSmsBusy(false);
+    }
+  };
+
   return (
     <div
-      className='text-kiosk-ink flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4'
+      className={cn(
+        'kiosk-motion-root kiosk-a11y-root flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4',
+        useHcSurfaces ? 'text-zinc-100' : 'text-kiosk-ink',
+        useHcSurfaces && 'kiosk-hc'
+      )}
+      data-kiosk-font-step={a11y.fontStep}
+      data-kiosk-hc={useHcSurfaces ? 'true' : 'false'}
       style={{ backgroundColor: bodyColor }}
     >
       <KioskTopBar
@@ -503,6 +1010,7 @@ export default function UnitKioskPage() {
         currentTime={currentTime}
         onClockClick={handleClockClick}
         headerColor={headerColor}
+        useLightHeaderText={useHcSurfaces}
         leading={topBarLeading}
         beforeClock={topBarBeforeClock}
       />
@@ -544,7 +1052,7 @@ export default function UnitKioskPage() {
       ) : unitPending && !unit ? (
         <div className='flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden px-4'>
           <div className='text-center'>
-            <div className='border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
+            <div className='kiosk-a11y-respect-motion border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
             <p className='text-kiosk-ink-muted'>{t('loading')}</p>
             {unitSlowLoad ? (
               <>
@@ -605,7 +1113,7 @@ export default function UnitKioskPage() {
       ) : servicesLoading ? (
         <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
           <div className='text-center'>
-            <div className='border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
+            <div className='kiosk-a11y-respect-motion border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
             <p className='text-kiosk-ink-muted'>{t('loading')}</p>
           </div>
         </div>
@@ -669,14 +1177,32 @@ export default function UnitKioskPage() {
         </div>
       ) : (
         <>
-          <KioskWelcomeHero title={heroTitle} subtitle={heroSubtitle} />
+          <KioskWelcomeHero
+            title={heroTitle}
+            subtitle={heroSubtitle}
+            highContrast={useHcSurfaces}
+          />
 
           {/* Navigation breadcrumbs and buttons */}
-          <div className='border-kiosk-border/50 mb-2 flex shrink-0 items-center justify-between rounded-xl border bg-white/40 px-3 py-2 sm:mb-3 sm:px-4'>
-            <div className='text-kiosk-ink-muted flex min-w-0 items-center overflow-x-auto text-sm font-medium'>
+          <div
+            className={cn(
+              'mb-2 flex shrink-0 items-center justify-between rounded-xl border px-3 py-2 sm:mb-3 sm:px-4',
+              useHcSurfaces
+                ? 'border-white/20 bg-zinc-800/80'
+                : 'border-kiosk-border/50 bg-white/40'
+            )}
+          >
+            <div
+              className={cn(
+                'flex min-w-0 items-center overflow-x-auto text-sm font-medium',
+                useHcSurfaces ? 'text-zinc-300' : 'text-kiosk-ink-muted'
+              )}
+            >
               <span className='mr-2 shrink-0 opacity-70'>#</span>
               {selectedServicePath.length === 0 ? (
-                <span>{t('services', { defaultValue: 'Services' })}</span>
+                <span className={useHcSurfaces ? 'text-zinc-200' : undefined}>
+                  {t('services', { defaultValue: 'Services' })}
+                </span>
               ) : (
                 selectedServicePath.map((service, index) => (
                   <div key={index} className='flex items-center'>
@@ -686,7 +1212,12 @@ export default function UnitKioskPage() {
                         className='bg-kiosk-border mx-2 h-4'
                       />
                     )}
-                    <span className='text-kiosk-ink whitespace-nowrap'>
+                    <span
+                      className={cn(
+                        'whitespace-nowrap',
+                        useHcSurfaces ? 'text-white' : 'text-kiosk-ink'
+                      )}
+                    >
                       {getLocalizedName(
                         service.name,
                         service.nameRu,
@@ -704,10 +1235,10 @@ export default function UnitKioskPage() {
                 <Button
                   variant='outline'
                   size='sm'
-                  className='border-kiosk-border/60 rounded-full'
+                  className='kiosk-touch-min h-12 min-w-12 gap-2 rounded-full sm:px-4'
                   onClick={() => setSelectedServicePath([])}
                 >
-                  <Home className='mr-2 h-4 w-4' />
+                  <Home className='size-5 shrink-0' />
                   {t('home', { defaultValue: 'Home' })}
                 </Button>
               )}
@@ -715,10 +1246,10 @@ export default function UnitKioskPage() {
                 <Button
                   variant='outline'
                   size='sm'
-                  className='border-kiosk-border/60 rounded-full'
+                  className='kiosk-touch-min h-12 min-w-12 gap-2 rounded-full sm:px-4'
                   onClick={handleGoBack}
                 >
-                  <ArrowLeft className='mr-2 h-4 w-4' />
+                  <ArrowLeft className='size-5 shrink-0' />
                   {t('back', { defaultValue: 'Back' })}
                 </Button>
               )}
@@ -754,6 +1285,7 @@ export default function UnitKioskPage() {
                     service={service}
                     locale={locale}
                     onSelect={handleServiceSelection}
+                    onA11yFocus={handleA11yTileVocalize}
                   />
                 </div>
               );
@@ -808,6 +1340,11 @@ export default function UnitKioskPage() {
           if (!open) {
             setCreatedTicket(null);
             setSuccessEtaMinutes(null);
+            setSuccessPeopleAhead(null);
+            setKioskSmsBlocking(false);
+            setKioskSmsAgreed(false);
+            setKioskSmsDigits('');
+            setKioskSmsError(null);
             if (autoCloseTimerId) {
               clearInterval(autoCloseTimerId);
               setAutoCloseTimerId(null);
@@ -817,6 +1354,11 @@ export default function UnitKioskPage() {
       >
         {createdTicket && (
           <DialogContent className='flex w-[320px] flex-col items-center sm:w-[420px]'>
+            <div className='sr-only' aria-live='polite' aria-atomic>
+              {tA11y('success_live', {
+                number: String(createdTicket.queueNumber)
+              })}
+            </div>
             {/* Logo (top) */}
             {unit?.config?.kiosk?.logoUrl && (
               <div className='mb-4 h-16 w-auto'>
@@ -858,6 +1400,18 @@ export default function UnitKioskPage() {
                   {t('ticket.success_eta', { minutes: successEtaMinutes })}
                 </p>
               )}
+              {successPeopleAhead != null && (
+                <p className='text-muted-foreground mb-1 text-sm'>
+                  {t('ticket.success_ahead', { n: successPeopleAhead })}
+                </p>
+              )}
+              {createdTicket.serviceZoneName?.trim() ? (
+                <p className='text-muted-foreground mb-2 text-sm'>
+                  {t('ticket.success_zone', {
+                    zone: createdTicket.serviceZoneName.trim()
+                  })}
+                </p>
+              ) : null}
 
               <Separator className='my-4 w-full' />
 
@@ -881,16 +1435,146 @@ export default function UnitKioskPage() {
                   </div>
                 </>
               ) : null}
+
+              {kioskSmsBlocking && createdTicket ? (
+                <div
+                  className='border-t-border mt-4 w-full max-w-sm border-t pt-4'
+                  data-testid='kiosk-sms-capture'
+                >
+                  <p className='mb-2 text-center text-sm font-medium'>
+                    {t('sms_post_ticket.title')}
+                  </p>
+                  <p className='text-muted-foreground mb-3 text-center text-xs sm:text-sm'>
+                    {t('sms_post_ticket.subtitle')}
+                  </p>
+                  <div className='mb-3 flex items-start gap-2'>
+                    <Checkbox
+                      id='kiosk-sms-consent'
+                      checked={kioskSmsAgreed}
+                      onCheckedChange={(c) => {
+                        setKioskSmsAgreed(c === true);
+                        setKioskSmsError(null);
+                      }}
+                      className='mt-1'
+                    />
+                    <label
+                      htmlFor='kiosk-sms-consent'
+                      className='text-muted-foreground text-left text-xs sm:text-sm'
+                    >
+                      {t('sms_post_ticket.consent_label')}
+                    </label>
+                  </div>
+                  <div
+                    className='border-input bg-background mb-3 flex w-full items-center justify-center rounded-md border px-2 font-mono text-2xl font-bold select-none sm:text-3xl'
+                    style={{ minHeight: '3.5rem' }}
+                    role='status'
+                    aria-live='polite'
+                    aria-label={
+                      kioskSmsDigits.length > 0
+                        ? tA11y('sms_phone_entry', { n: `+${kioskSmsDigits}` })
+                        : tA11y('sms_phone_entry_empty')
+                    }
+                  >
+                    {kioskSmsDigits.length > 0 ? `+${kioskSmsDigits}` : '+'}
+                  </div>
+                  {kioskSmsError ? (
+                    <p className='text-destructive mb-2 text-center text-xs sm:text-sm'>
+                      {kioskSmsError}
+                    </p>
+                  ) : null}
+                  <div className='mb-3 grid max-w-sm grid-cols-3 gap-1.5 sm:gap-2'>
+                    {[
+                      '1',
+                      '2',
+                      '3',
+                      '4',
+                      '5',
+                      '6',
+                      '7',
+                      '8',
+                      '9',
+                      '',
+                      '0',
+                      '⌫'
+                    ].map((d, i) => (
+                      <span key={i} className='min-h-0 min-w-0 [contain:size]'>
+                        {d ? (
+                          <Button
+                            type='button'
+                            variant='outline'
+                            className='h-10 w-full min-w-0 px-0 text-base font-bold sm:h-12 sm:text-xl'
+                            disabled={kioskSmsBusy}
+                            aria-label={
+                              d === '⌫'
+                                ? tA11y('sms_numpad_backspace')
+                                : tA11y('sms_numpad_digit', { d })
+                            }
+                            onClick={() => {
+                              if (d === '⌫') {
+                                setKioskSmsDigits((prev) => prev.slice(0, -1));
+                                return;
+                              }
+                              setKioskSmsDigits((prev) =>
+                                prev.length >= KIOSK_SMS_MAX ? prev : prev + d
+                              );
+                            }}
+                          >
+                            {d}
+                          </Button>
+                        ) : (
+                          <span className='block' />
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                  <div className='grid w-full gap-2 sm:grid-cols-2'>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      className='w-full'
+                      disabled={kioskSmsBusy}
+                      onClick={() => void handleKioskSmsDecline()}
+                    >
+                      {t('sms_post_ticket.not_now')}
+                    </Button>
+                    <Button
+                      type='button'
+                      className='w-full'
+                      disabled={
+                        kioskSmsBusy ||
+                        !kioskSmsAgreed ||
+                        kioskSmsDigits.length < 5
+                      }
+                      onClick={() => void handleKioskSmsConfirm()}
+                    >
+                      {kioskSmsBusy
+                        ? t('sms_post_ticket.sending')
+                        : t('sms_post_ticket.send')}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
             <DialogFooter className='w-full sm:justify-center'>
-              <DialogClose asChild>
+              {kioskSmsBlocking ? (
                 <Button
+                  type='button'
                   variant='secondary'
                   className='w-full min-w-[120px] sm:w-auto'
+                  disabled
                 >
-                  {t('close')} ({countdown})
+                  {t('close')} (…)
                 </Button>
-              </DialogClose>
+              ) : (
+                <DialogClose asChild>
+                  <Button
+                    variant='secondary'
+                    className='w-full min-w-[120px] sm:w-auto'
+                  >
+                    {t('close')} ({countdown})
+                  </Button>
+                </DialogClose>
+              )}
             </DialogFooter>
           </DialogContent>
         )}
@@ -909,6 +1593,9 @@ export default function UnitKioskPage() {
         unitId={unitId!}
         unitName={unit ? getUnitDisplayName(unit, locale) : ''}
         currentConfig={unit?.config}
+        hasUnit={Boolean(unit)}
+        unitQueryError={unitQueryError}
+        unitPending={unitPending}
         onLock={() => {
           setIsSettingsOpen(false);
           setIsLocked(true);
@@ -919,6 +1606,33 @@ export default function UnitKioskPage() {
           setIsSettingsOpen(false);
         }}
       />
+
+      <Dialog
+        open={showIdleWarning}
+        onOpenChange={() => {
+          /* reset only via Continue; backdrop close calls continue */
+        }}
+      >
+        <DialogContent
+          className='w-[min(100%,22rem)]'
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>{t('settings.session_idle_title')}</DialogTitle>
+          </DialogHeader>
+          <p className='text-muted-foreground text-sm'>
+            {t('settings.session_idle_body', { seconds: idleRemainingSec })}
+          </p>
+          <Button
+            type='button'
+            className='w-full'
+            onClick={() => continueIdleSession()}
+          >
+            {t('settings.session_idle_continue')}
+          </Button>
+        </DialogContent>
+      </Dialog>
 
       {serverKioskFrozen ? (
         <div
@@ -946,41 +1660,145 @@ export default function UnitKioskPage() {
         errorMessage={phoneIdentificationError || undefined}
       />
 
-      <PreRegRedemptionModal
-        isOpen={isRedemptionModalOpen}
-        onClose={() => setIsRedemptionModalOpen(false)}
-        unitId={kioskApiUnitId ?? unitId!}
-        onSuccess={(ticket) => {
-          setCreatedTicket(ticket);
-          setIsTicketModalOpen(true);
-          setSelectedServicePath([]);
-          // Start auto-close timer logic (copied from handleServiceSelection)
-          setCountdown(5);
-          if (autoCloseTimerId) {
-            clearInterval(autoCloseTimerId);
+      <Dialog
+        open={isEmployeeIdentificationOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsEmployeeIdentificationOpen(false);
+            setPendingEmployeeService(null);
+            setEmployeeIdSubmode('badge');
+            setEmployeeCreateTicketError('');
           }
-          const timer = setInterval(() => {
-            setCountdown((prev) => {
-              if (prev <= 1) {
-                setIsTicketModalOpen(false);
-                setCreatedTicket(null);
-                clearInterval(timer);
-                return 0;
+        }}
+      >
+        <DialogContent
+          className='max-w-lg'
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>{tEmployee('dialog_title')}</DialogTitle>
+          </DialogHeader>
+          {employeeCreateTicketError ? (
+            <p className='text-destructive text-sm' role='alert'>
+              {employeeCreateTicketError}
+            </p>
+          ) : null}
+          {kioskApiUnitId && pendingEmployeeService ? (
+            <KioskEmployeeIdFlow
+              unitId={kioskApiUnitId}
+              service={pendingEmployeeService}
+              mode={employeeIdSubmode}
+              onBack={() => {
+                setIsEmployeeIdentificationOpen(false);
+                setPendingEmployeeService(null);
+                setEmployeeIdSubmode('badge');
+                setEmployeeCreateTicketError('');
+              }}
+              onIdentified={(userId) => {
+                const svc = pendingEmployeeService;
+                if (!svc) {
+                  return;
+                }
+                void createTicketForService(
+                  svc,
+                  { kioskIdentifiedUserId: userId },
+                  'employeeModal'
+                );
+              }}
+              onUseKeyboard={
+                getServiceIdentificationMode(pendingEmployeeService) === 'badge'
+                  ? () => setEmployeeIdSubmode('login')
+                  : undefined
               }
-              return prev - 1;
-            });
-          }, 1000);
-          setAutoCloseTimerId(timer);
-          const svc = unitServicesTree?.find((s) => s.id === ticket.serviceId);
-          const label = svc
-            ? getLocalizedName(
-                svc.name,
-                svc.nameRu || '',
-                svc.nameEn || '',
-                locale
-              )
-            : '';
-          void tryPrintTicket(ticket, label);
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isKioskQrCheckinDisabledOpen}
+        onOpenChange={setIsKioskQrCheckinDisabledOpen}
+      >
+        <DialogContent className='max-w-md'>
+          <DialogHeader>
+            <DialogTitle>{t('pre_registration.title_appointment')}</DialogTitle>
+          </DialogHeader>
+          <p className='text-kiosk-ink-muted text-sm leading-relaxed'>
+            {t('qr_checkin_unavailable')}
+          </p>
+          <DialogFooter className='sm:justify-end'>
+            <Button
+              type='button'
+              onClick={() => {
+                setIsKioskQrCheckinDisabledOpen(false);
+                setSelectedServicePath([]);
+              }}
+            >
+              {t('qr_checkin_unavailable_ok')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {showKioskIdOcr ? (
+        <KioskIdOcrDialog
+          open={idOcrOpen}
+          onOpenChange={setIdOcrOpen}
+          preferNative={kioskCfg?.idOcrPreferNative !== false}
+          wedgeMrz={kioskCfg?.idOcrWedgeMrz !== false}
+          wedgeRu={kioskCfg?.idOcrWedgeRuDriverLicense !== false}
+          onUseText={(text) => {
+            void (async () => {
+              try {
+                await navigator.clipboard.writeText(text);
+                toast.success(
+                  t('id_ocr.pasted', {
+                    defaultValue:
+                      'OCR text copied. Paste where needed (long-press or Ctrl+V).'
+                  })
+                );
+              } catch {
+                toast.info(text.slice(0, 800));
+              }
+            })();
+          }}
+        />
+      ) : null}
+
+      <PreRegRedemptionModal
+        key={
+          isKioskQrIdentificationOpen
+            ? `kiosk-qr-${kioskPrIdentModalKey}`
+            : redeemModalKey
+        }
+        isOpen={isRedemptionModalOpen || isKioskQrIdentificationOpen}
+        onClose={() => {
+          setIsRedemptionModalOpen(false);
+          setIsKioskQrIdentificationOpen(false);
+          setRedeemAutoFromDeeplink(false);
+        }}
+        unitId={kioskApiUnitId ?? unitId!}
+        initialCode={isKioskQrIdentificationOpen ? undefined : deeplinkPrCode}
+        showPhoneTab={showPhoneForAppointment}
+        autoRedeemFromDeeplink={
+          redeemAutoFromDeeplink && !isKioskQrIdentificationOpen
+        }
+        onSuccess={async (ticket) => {
+          let full: Ticket = ticket;
+          try {
+            full = await ticketsApi.getById(ticket.id);
+          } catch {
+            // keep redeem payload
+          }
+          const svc =
+            unitServicesTree?.find((s) => s.id === full.serviceId) ??
+            ({
+              id: full.serviceId,
+              name: '',
+              isLeaf: true
+            } as Service);
+          openTicketSuccessFlow(full, svc);
         }}
       />
     </div>

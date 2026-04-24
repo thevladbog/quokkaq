@@ -22,6 +22,8 @@ type SMSSendPayload struct {
 	NotificationID string `json:"notificationId"`
 	To             string `json:"to"`
 	Body           string `json:"body"`
+	CompanyID      string `json:"companyId"`
+	SmsSource      string `json:"smsSource"`
 }
 
 // VisitorNotifyPayload is the Asynq task payload for TypeVisitorNotify.

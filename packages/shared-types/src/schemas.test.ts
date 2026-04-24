@@ -4,6 +4,7 @@ import {
   DesktopTerminalKindSchema,
   DesktopTerminalSchema,
   effectiveDesktopTerminalKind,
+  KioskConfigSchema,
   TicketModelSchema,
   UnitKindSchema,
   UserModelSchema
@@ -115,6 +116,35 @@ describe('UnitKindSchema', () => {
 
   it('rejects unknown kind', () => {
     expect(UnitKindSchema.safeParse('invalid').success).toBe(false);
+  });
+});
+
+describe('KioskConfigSchema', () => {
+  it('accepts optional appointment check-in and phone flags', () => {
+    const r = KioskConfigSchema.safeParse({
+      isPreRegistrationEnabled: true,
+      isAppointmentCheckinEnabled: true,
+      isAppointmentPhoneLookupEnabled: true
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.isAppointmentCheckinEnabled).toBe(true);
+      expect(r.data.isAppointmentPhoneLookupEnabled).toBe(true);
+    }
+  });
+
+  it('parses empty object', () => {
+    const r = KioskConfigSchema.safeParse({});
+    expect(r.success).toBe(true);
+  });
+
+  it('accepts 5.4/5.5 optional kiosk feature flags', () => {
+    const r = KioskConfigSchema.safeParse({
+      idOcrEnabled: true,
+      idOcrPreferNative: true,
+      offlineModeEnabled: true
+    });
+    expect(r.success).toBe(true);
   });
 });
 
@@ -244,6 +274,28 @@ describe('TicketModelSchema', () => {
     expect(r.success).toBe(true);
     if (r.success) {
       expect(r.data.smsOptInAvailable).toBe(false);
+    }
+  });
+
+  it('preserves visitorPhoneKnown and smsPostTicketStepRequired (kiosk DTO)', () => {
+    const r = TicketModelSchema.safeParse({
+      ...minimalTicket,
+      visitorPhoneKnown: true,
+      smsPostTicketStepRequired: true
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.visitorPhoneKnown).toBe(true);
+      expect(r.data.smsPostTicketStepRequired).toBe(true);
+    }
+  });
+
+  it('smsPostTicketStepRequired and visitorPhoneKnown are undefined when absent', () => {
+    const r = TicketModelSchema.safeParse(minimalTicket);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.smsPostTicketStepRequired).toBeUndefined();
+      expect(r.data.visitorPhoneKnown).toBeUndefined();
     }
   });
 

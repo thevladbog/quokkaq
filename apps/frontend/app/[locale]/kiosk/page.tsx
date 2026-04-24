@@ -71,7 +71,7 @@ export default function KioskPage() {
         />
         <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
           <div className='text-center'>
-            <div className='border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
+            <div className='kiosk-a11y-respect-motion border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
             <p className='text-kiosk-ink-muted'>{t('loading')}</p>
           </div>
         </div>

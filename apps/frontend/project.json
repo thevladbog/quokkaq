@@ -41,6 +41,13 @@
         "cwd": "apps/frontend"
       }
     },
+    "test-a11y": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm test:a11y",
+        "cwd": "apps/frontend"
+      }
+    },
     "format:check": {
       "executor": "nx:run-commands",
       "options": {

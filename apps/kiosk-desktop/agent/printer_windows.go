@@ -13,12 +13,94 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// psPrinterCim is JSON from PowerShell: Win32_Printer. ExtendedPrinterStatus 9 = paper/output empty (paper out).
+type psPrinterCim struct {
+	Name        string `json:"name"`
+	IsDefault   bool   `json:"isDefault"`
+	PaperOut    bool   `json:"paperOut"`
+	Status      string `json:"status"`
+}
+
+const listPrintersCimScript = `$ErrorActionPreference = 'Stop'
+Get-CimInstance -ClassName Win32_Printer | ForEach-Object {
+	$ext = 0
+	if ($null -ne $_.ExtendedPrinterStatus) { $ext = [int]$_.ExtendedPrinterStatus }
+	$paper = ($ext -eq 9)
+	$st = if ($null -ne $_.ExtendedPrinterStatus) { [string]$ext } else { "" }
+	[PSCustomObject]@{
+		name = $_.Name
+		isDefault = [bool]$_.Default
+		paperOut = $paper
+		status = $st
+	}
+} | ConvertTo-Json -Compress -Depth 4`
+
+func listPrintersOS() ([]PrinterInfo, error) {
+	cmd := exec.Command(
+		"powershell", "-NoProfile", "-NonInteractive", "-Command",
+		listPrintersCimScript,
+	)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	out, err := cmd.Output()
+	if err != nil {
+		return listPrintersOSLegacy()
+	}
+	trimmed := strings.TrimSpace(string(out))
+	if trimmed == "" {
+		return []PrinterInfo{}, nil
+	}
+	list, err := parseCimPrintersJSON(trimmed)
+	if err != nil {
+		return listPrintersOSLegacy()
+	}
+	return list, nil
+}
+
+func parseCimPrintersJSON(trimmed string) ([]PrinterInfo, error) {
+	var out []PrinterInfo
+	switch trimmed[0] {
+	case '[':
+		var arr []psPrinterCim
+		if err := json.Unmarshal([]byte(trimmed), &arr); err != nil {
+			return nil, fmt.Errorf("parse printers json: %w", err)
+		}
+		for _, p := range arr {
+			if p.Name == "" {
+				continue
+			}
+			po := p.PaperOut
+			out = append(out, PrinterInfo{
+				Name:        p.Name,
+				IsDefault:   p.IsDefault,
+				PaperOut:    &po,
+				Status:      p.Status,
+			})
+		}
+	default:
+		var one psPrinterCim
+		if err := json.Unmarshal([]byte(trimmed), &one); err != nil {
+			return nil, fmt.Errorf("parse printer json: %w", err)
+		}
+		if one.Name == "" {
+			return []PrinterInfo{}, nil
+		}
+		po := one.PaperOut
+		out = append(out, PrinterInfo{
+			Name:        one.Name,
+			IsDefault:   one.IsDefault,
+			PaperOut:    &po,
+			Status:      one.Status,
+		})
+	}
+	return out, nil
+}
+
 type psPrinter struct {
 	Name    string `json:"Name"`
 	Default bool   `json:"Default"`
 }
 
-func listPrintersOS() ([]PrinterInfo, error) {
+func listPrintersOSLegacy() ([]PrinterInfo, error) {
 	cmd := exec.Command(
 		"powershell", "-NoProfile", "-NonInteractive", "-Command",
 		"Get-Printer | Select-Object Name,Default | ConvertTo-Json -Compress -Depth 4",

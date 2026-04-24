@@ -26,6 +26,10 @@ func (s *spyNotifRepo) Create(n *models.Notification) error {
 	return nil
 }
 
+func (s *spyNotifRepo) HasNotificationForTicketType(_, _ string) (bool, error) {
+	return false, nil
+}
+
 // spySMSEnqueuer records EnqueueSMSSend calls.
 type spySMSEnqueuer struct {
 	noopJobEnqueuer
@@ -59,7 +63,6 @@ func newNotifSvcNoGate(notifRepo repository.NotificationRepository, clientRepo r
 		notifRepo:  notifRepo,
 		clientRepo: clientRepo,
 		jobClient:  enqueuer,
-		// unitRepo nil → resolveCompanyID = "" → feature gate returns false (no DB)
 	}
 }
 
@@ -192,9 +195,9 @@ func TestResolvePhone_returnsEmptyWhenNoClientID(t *testing.T) {
 	}
 }
 
-// --- enqueueNotification creates row + enqueues job ---
+// --- enqueueSMS creates row + enqueues job ---
 
-func TestEnqueueNotification_createsRowAndEnqueuesJob(t *testing.T) {
+func TestEnqueueSMS_createsRowAndEnqueuesJob(t *testing.T) {
 	t.Parallel()
 	notifRepo := &spyNotifRepo{}
 	enq := &spySMSEnqueuer{}
@@ -202,7 +205,8 @@ func TestEnqueueNotification_createsRowAndEnqueuesJob(t *testing.T) {
 		notifRepo: notifRepo,
 		jobClient: enq,
 	}
-	ns.enqueueNotification("ticket-1", "+79001234567", "Test body", "ticket_called")
+	tk := &models.Ticket{ID: "ticket-1", UnitID: "u1"}
+	ns.enqueueSMS("ticket-1", "co1", "+79001234567", "Test body", "ticket_called", "u1", tk)
 
 	if len(notifRepo.created) != 1 {
 		t.Fatalf("expected 1 notification row, got %d", len(notifRepo.created))
@@ -221,21 +225,23 @@ func TestEnqueueNotification_createsRowAndEnqueuesJob(t *testing.T) {
 	}
 }
 
-func TestEnqueueNotification_noopWhenNotifRepoNil(t *testing.T) {
+func TestEnqueueSMS_noopWhenNotifRepoNil(t *testing.T) {
 	t.Parallel()
 	enq := &spySMSEnqueuer{}
 	ns := &NotificationService{notifRepo: nil, jobClient: enq}
-	ns.enqueueNotification("t1", "+7000", "body", "ticket_called") // must not panic
+	tk := &models.Ticket{ID: "t1", UnitID: "u1"}
+	ns.enqueueSMS("t1", "c1", "+7000", "body", "ticket_called", "u1", tk) // must not panic
 	if len(enq.sent) != 0 {
 		t.Errorf("should not enqueue when notifRepo is nil")
 	}
 }
 
-func TestEnqueueNotification_noopWhenJobClientNil(t *testing.T) {
+func TestEnqueueSMS_noopWhenJobClientNil(t *testing.T) {
 	t.Parallel()
 	notifRepo := &spyNotifRepo{}
 	ns := &NotificationService{notifRepo: notifRepo, jobClient: nil}
-	ns.enqueueNotification("t1", "+7000", "body", "ticket_called") // must not panic
+	tk := &models.Ticket{ID: "t1", UnitID: "u1"}
+	ns.enqueueSMS("t1", "c1", "+7000", "body", "ticket_called", "u1", tk) // must not panic
 }
 
 // --- SendQueuePositionAlert: gate check (nil unitRepo → no-op) ---

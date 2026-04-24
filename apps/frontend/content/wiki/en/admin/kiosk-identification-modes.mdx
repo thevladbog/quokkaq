@@ -1,0 +1,22 @@
+---
+title: Kiosk service identification modes
+description: How per-service modes (none, phone, QR, staff login, badge) interact with pre-registration, SSO, and employee IdP.
+---
+
+# Kiosk service identification modes
+
+Each **leaf** service on a kiosk can use an **identification mode** (in service settings). This controls what happens **before** a ticket is created.
+
+| Mode      | What the visitor does                                            | Requirements / notes                                                                                                                                                                                                       |
+| --------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **none**  | None — a ticket is issued directly                               | —                                                                                                                                                                                                                          |
+| **phone** | Enter or confirm a phone (may use SMS)                           | Kiosk and plan allow phone capture as configured.                                                                                                                                                                          |
+| **qr**    | Scan or enter a **pre-registration / appointment** code          | **Pre-registration or appointment check-in** must be enabled for the unit; the flow matches the same “check-in” experience as the code button. If check-in is off, the kiosk should show a clear error — not a blank step. |
+| **login** | Type a work login; server resolves against your **employee IdP** | **Employee IdP** must be enabled for the unit (plan + HTTPS upstream). **Resolve runs only on kiosk/terminal** — staff in the **web app** use **SSO**, not this resolve API.                                               |
+| **badge** | Present a **badge** (wedge/serial)                               | Same **employee IdP** as **login**; the reader sends a line to **resolve** on the server.                                                                                                                                  |
+
+**SSO in the browser:** the **web** app identifies staff with **SSO** (or other normal login). **Badge** and **employee IdP resolve** are for the **kiosk (or similar terminal) app**, not for identifying staff in the regular browser.
+
+**Scanners:** USB **HID** (“keyboard”) readers vs **serial** path through the optional desktop agent — see the operator runbook in this repo: `docs/operator/kiosk-scanner.md`.
+
+**External wiki:** for HTTP contract to your **HR/IdP endpoint**, see the tenant-facing `developer-api` page in the deployment docs.
