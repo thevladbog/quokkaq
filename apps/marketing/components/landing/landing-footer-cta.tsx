@@ -1,11 +1,14 @@
 import Link from 'next/link';
 
 import { CookieSettingsButton } from '@/components/consent/cookie-settings-button';
+import { LandingCtaAssurances } from '@/components/landing/landing-cta-assurances';
 import { LeadRequestCta } from '@/components/landing/lead-request-cta';
 import { TextLogoImg } from '@/components/landing/text-logo-img';
 import {
+  localeBlogPath,
   localeHomePath,
   localePrivacyPath,
+  localeRoiPath,
   localeTermsPath
 } from '@/lib/locale-paths';
 import type { AppLocale, HomeMessages } from '@/src/messages';
@@ -34,19 +37,14 @@ export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
   const signupHref = normalizedAppBase
     ? `${normalizedAppBase}/${locale}/signup`
     : null;
-  /** Without app URL, primary CTA scrolls to this anchor on the marketing site. */
-  const trialHref = normalizedAppBase
-    ? `${normalizedAppBase}/${locale}#book-demo`
-    : `${localeHomePath(locale)}#book-demo`;
+  /** Primary pill without product URL: scroll to Cal.com / demo section on this site. */
+  const trialHref = `${localeHomePath(locale)}#book-demo`;
   const privacyHref = localePrivacyPath(locale);
   const termsHref = localeTermsPath(locale);
 
   return (
     <footer className='relative z-10'>
-      <div
-        id='book-demo'
-        className='scroll-mt-24 overflow-x-hidden bg-gradient-to-br from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] px-4 py-16 text-center sm:px-6 sm:py-20'
-      >
+      <div className='scroll-mt-24 overflow-x-hidden bg-gradient-to-br from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] px-4 py-16 text-center sm:px-6 sm:py-20'>
         <div className='mx-auto max-w-3xl min-w-0'>
           <h2 className='font-display mb-4 text-3xl font-bold tracking-tight text-white sm:mb-5 sm:text-4xl'>
             {copy.footer.title}
@@ -89,6 +87,7 @@ export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
               </a>
             )}
           </div>
+          <LandingCtaAssurances copy={copy} variant='footer' />
         </div>
       </div>
 
@@ -112,6 +111,20 @@ export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
             className='flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:justify-end'
             aria-label='Legal'
           >
+            <Link
+              href={localeBlogPath(locale)}
+              prefetch={false}
+              className='focus-ring rounded-sm transition hover:text-[color:var(--color-primary)] dark:hover:text-[color:var(--color-primary)]'
+            >
+              {copy.footer.blog}
+            </Link>
+            <Link
+              href={localeRoiPath(locale)}
+              prefetch={false}
+              className='focus-ring rounded-sm transition hover:text-[color:var(--color-primary)] dark:hover:text-[color:var(--color-primary)]'
+            >
+              {copy.footer.roi}
+            </Link>
             <Link
               href={privacyHref}
               prefetch={false}

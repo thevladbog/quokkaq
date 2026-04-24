@@ -70,6 +70,30 @@
   }
 }
 
+@keyframes landing-integrations-marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.landing-integrations-marquee-track {
+  display: flex;
+  width: max-content;
+  align-items: center;
+  animation: landing-integrations-marquee 48s linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-integrations-marquee-track {
+    animation: none;
+  }
+}
+
 @keyframes landing-pricing-popular-shimmer-sweep {
   0% {
     left: -82%;
@@ -81,6 +105,40 @@
 
   100% {
     left: 108%;
+  }
+}
+
+@keyframes comparison-roi-table-tag-shimmer {
+  0%,
+  100% {
+    background-position: 0% 40%;
+  }
+
+  50% {
+    background-position: 100% 60%;
+  }
+}
+
+/** Gradient “shimmer” for the ROI link tag on the comparison table (marketing). */
+.comparison-roi-table-tag {
+  background-image: linear-gradient(
+    125deg,
+    color-mix(in oklab, var(--color-primary) 78%, #0f0806) 0%,
+    color-mix(in oklab, var(--color-secondary) 85%, #fffaf6) 28%,
+    color-mix(in oklab, var(--color-primary) 55%, #fff) 45%,
+    color-mix(in oklab, var(--color-secondary) 80%, #0c0a08) 62%,
+    color-mix(in oklab, var(--color-primary) 72%, #000) 100%
+  );
+  background-size: 240% 240%;
+  background-position: 0% 50%;
+  animation: comparison-roi-table-tag-shimmer 6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comparison-roi-table-tag {
+    animation: none;
+    background-position: 50% 50%;
+    background-size: 100% 100%;
   }
 }
 
@@ -331,4 +389,73 @@ body.doc-scroll-active::-webkit-scrollbar-thumb:hover {
   .landing-annual-bubble__body {
     transform: none;
   }
+}
+
+/* Blog markdown (react-markdown) */
+.blog-md {
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: var(--color-text-muted);
+}
+
+.blog-md > * + * {
+  margin-top: 1rem;
+}
+
+.blog-md h2 {
+  margin-top: 2.25rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.blog-md h2:first-child {
+  margin-top: 0;
+}
+
+.blog-md h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.35rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.blog-md ul {
+  margin-top: 0.75rem;
+  padding-left: 1.35rem;
+  list-style: disc;
+}
+
+.blog-md ol {
+  margin-top: 0.75rem;
+  padding-left: 1.35rem;
+  list-style: decimal;
+}
+
+.blog-md li {
+  margin-top: 0.35rem;
+}
+
+.blog-md a {
+  font-weight: 500;
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.blog-md a:hover {
+  color: var(--color-primary-hover);
+}
+
+.blog-md strong {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.blog-md hr {
+  margin: 2rem 0;
+  border-color: var(--color-border);
 }

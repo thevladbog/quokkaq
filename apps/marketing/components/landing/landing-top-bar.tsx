@@ -1,10 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState
+} from 'react';
 
 import { HomeControls } from '@/app/home-controls';
+import { dispatchMarketingMobileNavOpen } from '@/lib/marketing-mobile-nav-event';
 import { pushMarketingEvent } from '@/lib/marketing-analytics';
 import { localeHomePath } from '@/lib/locale-paths';
 import type { AppLocale, HomeMessages } from '@/src/messages';
@@ -17,33 +24,285 @@ type Props = {
   appBaseUrl: string | null;
 };
 
+type NavItem = { href: string; label: string };
+
 const navLinkClass =
-  'focus-ring text-sm font-medium text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-primary)]';
+  'focus-ring whitespace-nowrap text-sm font-medium text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-primary)]';
 
 const headerCtaClass =
-  'focus-ring inline-flex max-w-[10.5rem] shrink-0 items-center justify-center truncate rounded-full bg-gradient-to-r from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] px-3 py-2 text-xs font-semibold text-white shadow-md shadow-[color:var(--color-primary)]/25 transition hover:brightness-105 sm:max-w-none sm:px-5 sm:py-2.5 sm:text-sm';
+  'focus-ring inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-gradient-to-r from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] px-3 py-2 text-xs font-semibold text-white shadow-md shadow-[color:var(--color-primary)]/25 transition hover:brightness-105 sm:px-4 sm:py-2.5 sm:text-sm';
 
-const mobileNavRowClass =
-  'focus-ring block w-full rounded-lg px-3 py-2.5 text-left text-base font-medium text-[color:var(--color-text)] transition hover:bg-[color:var(--color-surface-elevated)]';
+const overflowLinkClass =
+  'focus-ring block w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium text-[color:var(--color-text)] transition hover:bg-[color:var(--color-surface-elevated)]';
 
-function getFocusableElements(root: HTMLElement): HTMLElement[] {
-  const selector =
-    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-  return [...root.querySelectorAll<HTMLElement>(selector)].filter(
-    (el) =>
-      !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true'
+const DESKTOP_NAV_MIN_WIDTH = '(min-width: 1536px)';
+const COMPACT_NAV_GAP_PX = 8;
+/** Reserve width for the “More” control + gap until it can be measured. */
+const MORE_BUTTON_RESERVE_PX = 96;
+
+function computeVisibleCount(
+  shellWidth: number,
+  widths: number[],
+  moreReserve: number,
+  gap: number
+): number {
+  const n = widths.length;
+  if (n === 0 || shellWidth <= 0) {
+    return 0;
+  }
+  if (widths.every((w) => w <= 0)) {
+    return n;
+  }
+
+  let best = 0;
+  for (let k = 0; k <= n; k++) {
+    const rest = n - k;
+    const needMore = rest > 0;
+    let sum = 0;
+    for (let i = 0; i < k; i++) {
+      sum += widths[i] + (i > 0 ? gap : 0);
+    }
+    const total = sum + (needMore ? gap + moreReserve : 0);
+    if (total <= shellWidth) {
+      best = k;
+    }
+  }
+  return best;
+}
+
+function IconChevronDown({ open }: { open: boolean }) {
+  return (
+    <svg
+      className={`ml-0.5 h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+      fill='none'
+      viewBox='0 0 24 24'
+      stroke='currentColor'
+      strokeWidth='2'
+      aria-hidden
+    >
+      <path strokeLinecap='round' strokeLinejoin='round' d='M19 9l-7 7-7-7' />
+    </svg>
   );
 }
 
-const MD_MIN_WIDTH = '(min-width: 768px)';
+function TopBarCompactNav({
+  items,
+  topNav
+}: {
+  items: NavItem[];
+  topNav: HomeMessages['topNav'];
+}) {
+  const [visibleCount, setVisibleCount] = useState(items.length);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const measureRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const moreWrapRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
+
+  const remeasure = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (window.matchMedia(DESKTOP_NAV_MIN_WIDTH).matches) {
+      setVisibleCount(items.length);
+      setMoreOpen(false);
+      return;
+    }
+
+    const shell = shellRef.current;
+    if (!shell) {
+      return;
+    }
+
+    const widths = items.map(
+      (_, i) => measureRefs.current[i]?.getBoundingClientRect().width ?? 0
+    );
+    if (widths.some((w) => w <= 0)) {
+      return;
+    }
+
+    const moreReserve = MORE_BUTTON_RESERVE_PX;
+
+    const next = computeVisibleCount(
+      shell.clientWidth,
+      widths,
+      moreReserve,
+      COMPACT_NAV_GAP_PX
+    );
+    setVisibleCount(next);
+  }, [items]);
+
+  useLayoutEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) {
+      return;
+    }
+    const run = () => requestAnimationFrame(remeasure);
+    run();
+    requestAnimationFrame(() => requestAnimationFrame(remeasure));
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(remeasure);
+    });
+    ro.observe(shell);
+    window.addEventListener('resize', remeasure);
+    let cancelled = false;
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      void document.fonts.ready.then(() => {
+        if (!cancelled) {
+          requestAnimationFrame(remeasure);
+        }
+      });
+    }
+    return () => {
+      cancelled = true;
+      ro.disconnect();
+      window.removeEventListener('resize', remeasure);
+    };
+  }, [remeasure]);
+
+  useEffect(() => {
+    dispatchMarketingMobileNavOpen(moreOpen);
+  }, [moreOpen]);
+
+  useEffect(() => {
+    if (!moreOpen) {
+      return;
+    }
+    const onDoc = (e: Event) => {
+      const t = e.target as Node;
+      if (panelRef.current?.contains(t) || moreWrapRef.current?.contains(t)) {
+        return;
+      }
+      setMoreOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('pointerdown', onDoc);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('pointerdown', onDoc);
+    };
+  }, [moreOpen]);
+
+  useEffect(() => {
+    if (!moreOpen) {
+      return;
+    }
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMoreOpen(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [moreOpen]);
+
+  const visible = items.slice(0, visibleCount);
+  const overflow = items.slice(visibleCount);
+
+  const onNav = (href: string, scope?: string) => {
+    pushMarketingEvent('marketing_nav_click', {
+      nav_href: href,
+      ...(scope ? { nav_scope: scope } : {})
+    });
+  };
+
+  return (
+    <nav
+      className='relative flex min-h-10 w-full min-w-0 flex-1 items-center 2xl:hidden'
+      aria-label={topNav.navAriaLabel}
+    >
+      <div
+        ref={shellRef}
+        className='flex min-h-10 w-full max-w-full min-w-0 flex-1 justify-end'
+      >
+        <div
+          className='inset-inline-start-0 pointer-events-none fixed top-0 -z-10 flex w-max max-w-none gap-2 whitespace-nowrap opacity-0'
+          aria-hidden
+        >
+          {items.map((item, i) => (
+            <span
+              key={item.href}
+              ref={(el) => {
+                measureRefs.current[i] = el;
+              }}
+              className={`${navLinkClass} inline-flex shrink-0`}
+            >
+              {item.label}
+            </span>
+          ))}
+        </div>
+
+        {/*
+          Do not use overflow-hidden here: the overflow menu is position:absolute below the row
+          and would be clipped (looks like “click does nothing”).
+        */}
+        <div className='flex max-w-full min-w-0 items-center justify-end gap-2'>
+          {visible.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              className={navLinkClass}
+              onClick={() => onNav(item.href)}
+            >
+              {item.label}
+            </a>
+          ))}
+          {overflow.length > 0 ? (
+            <div ref={moreWrapRef} className='relative shrink-0'>
+              <button
+                type='button'
+                className={`${navLinkClass} inline-flex cursor-pointer items-center border-0 bg-transparent p-0 shadow-none`}
+                aria-expanded={moreOpen}
+                aria-haspopup='menu'
+                aria-controls={panelId}
+                onClick={() => {
+                  setMoreOpen((o) => {
+                    const next = !o;
+                    pushMarketingEvent('marketing_nav_overflow_toggle', {
+                      open: next
+                    });
+                    return next;
+                  });
+                }}
+              >
+                {topNav.moreNav}
+                <IconChevronDown open={moreOpen} />
+              </button>
+              {moreOpen ? (
+                <div
+                  ref={panelRef}
+                  id={panelId}
+                  role='menu'
+                  aria-label={topNav.moreNavMenuAriaLabel}
+                  className='absolute top-full right-0 z-50 mt-1.5 max-w-[min(22rem,calc(100vw-2rem))] min-w-[12rem] rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] py-1 shadow-xl dark:bg-[color:var(--color-surface-elevated)]'
+                >
+                  {overflow.map((item) => (
+                    <a
+                      key={item.href}
+                      role='menuitem'
+                      href={item.href}
+                      className={overflowLinkClass}
+                      onClick={() => {
+                        onNav(item.href, 'overflow');
+                        setMoreOpen(false);
+                      }}
+                    >
+                      {item.label}
+                    </a>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </nav>
+  );
+}
 
 export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
   const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const mobilePanelId = useId();
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const mobileMenuCloseButtonRef = useRef<HTMLButtonElement>(null);
-  const mobileDialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => {
@@ -53,76 +312,6 @@ export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
-
-  const closeMenu = useCallback(() => {
-    setMenuOpen(false);
-    requestAnimationFrame(() => {
-      menuButtonRef.current?.focus();
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeMenu();
-      }
-    };
-    const mq = window.matchMedia(MD_MIN_WIDTH);
-    const onViewport = () => {
-      if (mq.matches) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    mq.addEventListener('change', onViewport);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      mq.removeEventListener('change', onViewport);
-      document.body.style.overflow = prev;
-    };
-  }, [menuOpen, closeMenu]);
-
-  useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-    const id = requestAnimationFrame(() => {
-      mobileMenuCloseButtonRef.current?.focus();
-    });
-    return () => cancelAnimationFrame(id);
-  }, [menuOpen]);
-
-  const handleMobileMenuKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'Tab' || !mobileDialogRef.current) {
-      return;
-    }
-    const focusables = getFocusableElements(mobileDialogRef.current);
-    if (focusables.length === 0) {
-      return;
-    }
-    const first = focusables[0];
-    const last = focusables[focusables.length - 1];
-    const active = document.activeElement;
-    if (!active || !focusables.includes(active as HTMLElement)) {
-      e.preventDefault();
-      first.focus();
-      return;
-    }
-    if (e.shiftKey) {
-      if (active === first) {
-        e.preventDefault();
-        last.focus();
-      }
-    } else if (active === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  };
 
   const trialHref = appBaseUrl
     ? `${String(appBaseUrl).replace(/\/$/, '')}/${locale}/signup`
@@ -139,12 +328,13 @@ export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
     ? 'border-[color:var(--color-border)]/55 bg-[color:var(--color-surface)]/52 backdrop-blur-xl dark:border-[color:var(--color-border)]/40 dark:bg-[color:var(--color-surface)]/42'
     : 'border-[color:var(--color-border)]/85 bg-[#f3ebe1]/97 dark:border-[color:var(--color-border)] dark:bg-[color:var(--color-surface-elevated)]/94';
 
-  const allNav: Array<{ href: string; label: string }> = [
+  const allNav: NavItem[] = [
     { href: '#features', label: copy.topNav.features },
     { href: '#how-it-works', label: copy.topNav.howItWorks },
     { href: '#pillars', label: copy.topNav.benefits },
     { href: '#interface-showcase', label: copy.topNav.interfaceShowcase },
     { href: '#use-cases', label: copy.topNav.useCases },
+    { href: '#book-demo', label: copy.topNav.bookDemo },
     { href: '#pricing', label: copy.topNav.pricing },
     { href: '#faq', label: copy.topNav.faq }
   ];
@@ -153,40 +343,41 @@ export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
     <header
       className={`landing-reveal landing-top-bar sticky top-0 z-50 border-b transition-[background-color,backdrop-filter,border-color] duration-300 ease-out ${headerSurface}`}
     >
-      <div className='mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3.5 sm:gap-4 sm:px-6 sm:py-4 lg:px-8'>
+      <div className='mx-auto flex max-w-7xl min-w-0 items-center justify-between gap-2 px-4 py-3.5 sm:gap-3 sm:px-6 sm:py-4 lg:px-8'>
         <Link
           href={localeHomePath(locale)}
           prefetch={false}
-          className='focus-ring shrink-0 rounded-md'
+          className='focus-ring relative z-10 shrink-0 rounded-md'
           aria-label={copy.logoAlt}
         >
           <TextLogoImg locale={locale} className='h-8 w-auto sm:h-9' />
         </Link>
 
-        <nav
-          className='hidden min-w-0 grow items-center justify-center gap-1.5 md:flex md:gap-2.5 md:pl-1 lg:gap-4'
-          aria-label='Main navigation'
-        >
-          {allNav.map((item, i) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className={`${navLinkClass} ${
-                i === 3 || i === 4 ? 'hidden lg:inline' : ''
-              }`}
-              onClick={() => {
-                pushMarketingEvent('marketing_nav_click', {
-                  nav_href: item.href
-                });
-              }}
-            >
-              {item.label}
-            </a>
-          ))}
-        </nav>
+        <div className='flex min-w-0 flex-1 items-center justify-end 2xl:justify-center'>
+          <TopBarCompactNav items={allNav} topNav={copy.topNav} />
+          <nav
+            className='3xl:gap-4 hidden min-h-10 max-w-full min-w-0 flex-1 items-center justify-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain px-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-2 2xl:flex 2xl:gap-3 [&::-webkit-scrollbar]:hidden'
+            aria-label={copy.topNav.navAriaLabel}
+          >
+            {allNav.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className={navLinkClass}
+                onClick={() => {
+                  pushMarketingEvent('marketing_nav_click', {
+                    nav_href: item.href
+                  });
+                }}
+              >
+                {item.label}
+              </a>
+            ))}
+          </nav>
+        </div>
 
-        <div className='flex min-w-0 shrink-0 items-center justify-end gap-1.5 sm:gap-2.5 md:shrink md:gap-2 lg:gap-3'>
-          <div className='shrink-0 sm:mr-0.5 md:mx-0'>
+        <div className='relative z-10 flex shrink-0 items-center justify-end gap-1.5 sm:gap-2 2xl:gap-3'>
+          <div className='shrink-0 sm:mr-0.5 2xl:mx-0'>
             <HomeControls copy={copy} locale={locale} />
           </div>
           {appBaseUrl ? (
@@ -209,121 +400,8 @@ export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
               {copy.topNav.primaryCta}
             </Link>
           )}
-          <div className='shrink-0 md:hidden'>
-            <button
-              ref={menuButtonRef}
-              type='button'
-              className='focus-ring flex h-10 w-10 items-center justify-center rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)]/80 text-[color:var(--color-text)] shadow-sm'
-              aria-expanded={menuOpen}
-              aria-controls={menuOpen ? mobilePanelId : undefined}
-              onClick={() => {
-                setMenuOpen((o) => !o);
-                pushMarketingEvent('marketing_mobile_menu_toggle', {
-                  open: !menuOpen
-                });
-              }}
-            >
-              <span className='sr-only'>
-                {menuOpen ? copy.topNav.closeMenu : copy.topNav.openMenu}
-              </span>
-              {menuOpen ? <IconClose /> : <IconHamburger />}
-            </button>
-          </div>
         </div>
       </div>
-
-      {menuOpen ? (
-        <div
-          ref={mobileDialogRef}
-          className='fixed inset-0 z-[60] md:hidden'
-          id={mobilePanelId}
-          role='dialog'
-          aria-modal
-          tabIndex={-1}
-          onKeyDown={handleMobileMenuKeyDown}
-        >
-          <div
-            className='absolute inset-0 cursor-default bg-[color:var(--color-text)]/40 backdrop-blur-sm'
-            role='presentation'
-            onClick={closeMenu}
-          />
-          <div className='absolute top-0 right-0 left-0 max-h-[min(90dvh,28rem)] overflow-y-auto border-b border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3 shadow-2xl dark:bg-[color:var(--color-surface-elevated)]'>
-            <div className='mb-1 flex items-center justify-between border-b border-[color:var(--color-border)]/50 px-1 pb-2.5'>
-              <span className='text-sm font-semibold text-[color:var(--color-text)]'>
-                {copy.logoAlt}
-              </span>
-              <button
-                ref={mobileMenuCloseButtonRef}
-                type='button'
-                className='focus-ring rounded-md p-2 text-[color:var(--color-text)]'
-                onClick={closeMenu}
-                aria-label={copy.topNav.closeMenu}
-              >
-                <IconClose />
-              </button>
-            </div>
-            <nav
-              className='flex flex-col gap-0.5'
-              aria-label='Mobile main navigation'
-            >
-              {allNav.map((item) => (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  className={mobileNavRowClass}
-                  onClick={() => {
-                    pushMarketingEvent('marketing_nav_click', {
-                      nav_href: item.href,
-                      nav_scope: 'mobile'
-                    });
-                    closeMenu();
-                  }}
-                >
-                  {item.label}
-                </a>
-              ))}
-            </nav>
-          </div>
-        </div>
-      ) : null}
     </header>
-  );
-}
-
-function IconHamburger() {
-  return (
-    <svg
-      className='h-5 w-5'
-      fill='none'
-      viewBox='0 0 24 24'
-      stroke='currentColor'
-      strokeWidth='2'
-      aria-hidden
-    >
-      <path
-        strokeLinecap='round'
-        strokeLinejoin='round'
-        d='M4 6h16M4 12h16M4 18h16'
-      />
-    </svg>
-  );
-}
-
-function IconClose() {
-  return (
-    <svg
-      className='h-5 w-5'
-      fill='none'
-      viewBox='0 0 24 24'
-      stroke='currentColor'
-      strokeWidth='2'
-      aria-hidden
-    >
-      <path
-        strokeLinecap='round'
-        strokeLinejoin='round'
-        d='M6 18L18 6M6 6l12 12'
-      />
-    </svg>
   );
 }

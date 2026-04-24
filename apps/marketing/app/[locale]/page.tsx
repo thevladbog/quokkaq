@@ -6,22 +6,31 @@ import {
   marketingCanonicalUrl,
   ogLocale
 } from '@/lib/marketing-metadata';
+import { fetchMarketingPublicStats } from '@/lib/fetch-marketing-public-stats';
 import {
   fetchMarketingSubscriptionPlans,
   marketingAppBaseUrl
 } from '@/lib/fetch-marketing-subscription-plans';
+import { LandingBookDemo } from '@/components/landing/landing-book-demo';
+import { LandingComparison } from '@/components/landing/landing-comparison';
 import { LandingFaq } from '@/components/landing/landing-faq';
 import { LandingFeatures } from '@/components/landing/landing-features';
 import { LandingFooterCta } from '@/components/landing/landing-footer-cta';
 import { LandingHero } from '@/components/landing/landing-hero';
+import { LandingIntegrations } from '@/components/landing/landing-integrations';
 import { LandingHowItWorks } from '@/components/landing/landing-how-it-works';
 import { LandingInterfaceShowcase } from '@/components/landing/landing-interface-showcase';
 import { LandingPillars } from '@/components/landing/landing-pillars';
 import { LandingPricing } from '@/components/landing/landing-pricing';
 import { LandingStats } from '@/components/landing/landing-stats';
+import { LandingExitIntent } from '@/components/landing/landing-exit-intent';
+import { LandingStickyMobileCta } from '@/components/landing/landing-sticky-mobile-cta';
 import { LandingTopBar } from '@/components/landing/landing-top-bar';
+import { LandingTrustBadges } from '@/components/landing/landing-trust-badges';
+import { LandingTestimonials } from '@/components/landing/landing-testimonials';
 import { LandingUseCases } from '@/components/landing/landing-use-cases';
 import { HomePageJsonLd } from '@/components/seo/home-page-json-ld';
+import { marketingTestimonialItems } from '@/content/marketing-testimonials';
 import { isAppLocale, messages } from '@/src/messages';
 
 type PageProps = {
@@ -72,8 +81,13 @@ export default async function HomePage({ params }: PageProps) {
   }
 
   const t = messages[raw];
-  const plansFromApi = await fetchMarketingSubscriptionPlans();
+  const [plansFromApi, marketingStats] = await Promise.all([
+    fetchMarketingSubscriptionPlans(),
+    fetchMarketingPublicStats()
+  ]);
   const appBaseUrl = marketingAppBaseUrl();
+  const walkthroughVideoEmbedSrc =
+    process.env.NEXT_PUBLIC_MARKETING_DEMO_VIDEO_EMBED?.trim() || null;
 
   return (
     <div className='landing-page flex min-h-dvh flex-col'>
@@ -81,21 +95,39 @@ export default async function HomePage({ params }: PageProps) {
       <LandingTopBar copy={t.home} locale={raw} appBaseUrl={appBaseUrl} />
       <main className='relative z-10 flex min-w-0 flex-1 flex-col overflow-x-clip'>
         <LandingHero copy={t.home} locale={raw} appBaseUrl={appBaseUrl} />
-        <LandingStats copy={t.home} />
+        <LandingIntegrations copy={t.home.integrations} />
+        <LandingStats copy={t.home} statsFromApi={marketingStats} />
         <LandingPillars copy={t.home} />
         <LandingHowItWorks copy={t.home} />
+        <LandingComparison copy={t.home.comparison} locale={raw} />
         <LandingFeatures copy={t.home} />
-        <LandingInterfaceShowcase copy={t.home} />
+        <LandingInterfaceShowcase
+          copy={t.home}
+          walkthroughVideoEmbedSrc={walkthroughVideoEmbedSrc}
+        />
         <LandingUseCases copy={t.home} />
+        <LandingTestimonials
+          locale={raw}
+          items={marketingTestimonialItems}
+          heading={t.home.testimonials.heading}
+        />
+        <LandingBookDemo locale={raw} copy={t.home} appBaseUrl={appBaseUrl} />
         <LandingPricing
           copy={t.home}
           locale={raw}
           plansFromApi={plansFromApi}
           appBaseUrl={appBaseUrl}
         />
+        <LandingTrustBadges copy={t.home.trust} />
         <LandingFaq copy={t.home} />
+        <LandingStickyMobileCta
+          locale={raw}
+          copy={t.home}
+          appBaseUrl={appBaseUrl}
+        />
       </main>
       <LandingFooterCta copy={t.home} locale={raw} appBaseUrl={appBaseUrl} />
+      <LandingExitIntent locale={raw} copy={t.exitIntent} />
     </div>
   );
 }

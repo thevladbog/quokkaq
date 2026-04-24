@@ -1,5 +1,3 @@
-import Image from 'next/image';
-
 import type { AppLocale } from '@/src/messages';
 
 type Props = {
@@ -11,25 +9,31 @@ type Props = {
   alt?: string;
 };
 
+/**
+ * Local SVG wordmark — use `<img>` so Tailwind height-only sizing (`h-8 w-auto`)
+ * does not trigger Next/Image “set width or height to auto” dev warnings.
+ */
 export function TextLogoImg({
   locale,
   className = 'h-8 w-auto',
   heightClass,
-  alt = 'QuokkaQ'
+  alt
 }: Props) {
+  const resolvedAlt = alt ?? (locale === 'ru' ? 'КвоккаКю' : 'QuokkaQ');
   const src = locale === 'ru' ? '/logo-text-ru.svg' : '/logo-text.svg';
   const imageClassName = [className, heightClass].filter(Boolean).join(' ');
 
   return (
-    <Image
+    // eslint-disable-next-line @next/next/no-img-element -- SVG from /public; avoids next/image aspect-ratio warning with h-* + w-auto
+    <img
       src={src}
-      alt={alt}
+      alt={resolvedAlt}
       width={160}
       height={40}
       className={imageClassName}
-      unoptimized
-      priority
       loading='eager'
+      decoding='async'
+      fetchPriority='high'
     />
   );
 }

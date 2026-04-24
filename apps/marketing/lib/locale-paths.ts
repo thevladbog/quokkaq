@@ -20,3 +20,19 @@ export function localePrivacyPath(
 export function localeTermsPath(locale: AppLocale): '/en/terms' | '/ru/terms' {
   return locale === 'ru' ? '/ru/terms' : '/en/terms';
 }
+
+export function localeBlogPath(locale: AppLocale): '/en/blog' | '/ru/blog' {
+  return locale === 'ru' ? '/ru/blog' : '/en/blog';
+}
+
+export function localeBlogPostPath(
+  locale: AppLocale,
+  slug: string
+): `/en/blog/${string}` | `/ru/blog/${string}` {
+  const enc = encodeURIComponent(slug);
+  return locale === 'ru' ? `/ru/blog/${enc}` : `/en/blog/${enc}`;
+}
+
+export function localeRoiPath(locale: AppLocale): '/en/roi' | '/ru/roi' {
+  return locale === 'ru' ? '/ru/roi' : '/en/roi';
+}

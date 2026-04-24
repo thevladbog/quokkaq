@@ -1054,6 +1054,19 @@ export interface HandlersPublicLeadRequestBody {
   source?: string;
 }
 
+export interface HandlersPublicMarketingStatsResponse {
+  /**
+     * ActiveCompanies counts tenant companies excluding the SaaS operator row (snapshot at request time).
+     * @minimum 0
+     */
+  activeCompanies: number;
+  /**
+     * ActiveHumanUsers counts active human user accounts across tenants (snapshot at request time).
+     * @minimum 0
+     */
+  activeHumanUsers: number;
+}
+
 /**
  * Error is always "quota_exceeded".
  */

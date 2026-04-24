@@ -21,7 +21,7 @@ export function LandingHowItWorks({ copy }: Props) {
   return (
     <section
       id='how-it-works'
-      className='relative z-10 border-t border-[color:var(--color-border)] bg-white py-14 sm:py-16 dark:bg-[color:var(--color-surface)]'
+      className='relative z-10 border-t border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)] py-14 sm:py-16'
       aria-labelledby='how-it-works-heading'
     >
       <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
@@ -38,7 +38,7 @@ export function LandingHowItWorks({ copy }: Props) {
             const card = (
               <article
                 key={step.title}
-                className='landing-reveal flex min-h-0 flex-1 flex-col items-center rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)] px-6 py-8 text-center shadow-sm lg:max-w-none lg:min-w-0 lg:px-5 lg:py-8 xl:px-7'
+                className='landing-reveal flex min-h-0 flex-1 flex-col items-center rounded-2xl border-2 border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-6 py-8 text-center shadow-md ring-1 shadow-black/[0.07] ring-black/[0.04] lg:max-w-none lg:min-w-0 lg:px-5 lg:py-8 xl:px-7 dark:shadow-[0_12px_40px_-12px_rgb(0_0_0/0.65)] dark:ring-white/[0.06]'
                 style={{ animationDelay: `${0.08 * index}s` }}
               >
                 <div className='mb-5 flex h-11 w-11 items-center justify-center rounded-full bg-[color:var(--color-primary)]/12 sm:h-12 sm:w-12'>

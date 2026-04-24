@@ -159,7 +159,13 @@ export function LandingPricing({
           </div>
         ) : null}
 
-        <div className='grid gap-8 lg:grid-cols-3'>
+        <div
+          className={`grid gap-8 lg:grid-cols-3 ${
+            useApi
+              ? 'min-h-[32rem] lg:min-h-[28rem]'
+              : 'min-h-[28rem] lg:min-h-[26rem]'
+          }`}
+        >
           {useApi
             ? apiPlans.map((plan, index) => {
                 const planExt = plan as SubscriptionPlan & {

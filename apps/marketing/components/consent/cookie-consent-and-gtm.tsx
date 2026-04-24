@@ -5,7 +5,7 @@ import { startTransition, useCallback, useEffect, useState } from 'react';
 import {
   COOKIE_CONSENT_MAX_AGE_SEC,
   COOKIE_CONSENT_NAME,
-  parseConsentCookie,
+  parseConsentFromRawCookieHeader,
   serializeConsent,
   type StoredConsentV1
 } from '@/lib/cookie-consent';
@@ -81,20 +81,7 @@ function readConsentCookie(): StoredConsentV1 | null {
   if (typeof document === 'undefined') {
     return null;
   }
-  const all = `; ${document.cookie}`;
-  const key = `; ${COOKIE_CONSENT_NAME}=`;
-  const idx = all.indexOf(key);
-  if (idx === -1) {
-    return null;
-  }
-  const start = idx + key.length;
-  const end = all.indexOf(';', start);
-  const value = end === -1 ? all.slice(start) : all.slice(start, end);
-  try {
-    return parseConsentCookie(decodeURIComponent(value));
-  } catch {
-    return null;
-  }
+  return parseConsentFromRawCookieHeader(document.cookie);
 }
 
 function writeConsentCookie(state: StoredConsentV1) {
