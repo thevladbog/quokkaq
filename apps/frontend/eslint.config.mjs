@@ -7,6 +7,12 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   prettier,
+  {
+    rules: {
+      // New in eslint-plugin-react-hooks 7.1+; codebase uses common patterns (e.g. isClient, media queries).
+      'react-hooks/set-state-in-effect': 'off'
+    }
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

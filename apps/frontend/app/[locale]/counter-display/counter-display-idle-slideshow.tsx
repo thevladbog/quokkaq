@@ -46,7 +46,6 @@ function IdleSlideContent({
   const [isVideo, setIsVideo] = useState(false);
   const [mediaReady, setMediaReady] = useState(false);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- load authenticated blob URL for slide */
   useEffect(() => {
     if (slide.type !== 'image' && slide.type !== 'video') {
       setBlobUrl(null);
@@ -95,7 +94,6 @@ function IdleSlideContent({
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [slide, bearerToken, onMediaFailed]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const transitionMs = reduceMotion ? 0 : 280;
   const wrapStyle: CSSProperties = {
@@ -210,11 +208,9 @@ export function CounterDisplayIdleSlideshow({
   const n = slides.length;
   const [index, setIndex] = useState(0);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- reset carousel when idle config changes */
   useEffect(() => {
     setIndex(0);
   }, [idle]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const goNext = useCallback(() => {
     if (n <= 1) return;

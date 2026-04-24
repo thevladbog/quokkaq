@@ -333,7 +333,9 @@ export default function StaffWorkspacePage({
   );
 
   const refetchTicketsRef = useRef(refetch);
-  refetchTicketsRef.current = refetch;
+  useEffect(() => {
+    refetchTicketsRef.current = refetch;
+  }, [refetch]);
 
   // WebSocket Connection
   useEffect(() => {

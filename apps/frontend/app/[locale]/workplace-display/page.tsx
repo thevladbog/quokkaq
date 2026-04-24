@@ -84,7 +84,6 @@ function WorkplaceDisplayPageInner() {
     };
   }, []);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- hydrate terminal pairing from localStorage */
   useEffect(() => {
     const tok = localStorage.getItem(COUNTER_BOARD_TOKEN_KEY);
     const uid = localStorage.getItem(COUNTER_BOARD_UNIT_KEY);
@@ -94,7 +93,6 @@ function WorkplaceDisplayPageInner() {
     }
     setHydrated(true);
   }, []);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const sessionQuery = useQuery({
     queryKey: ['counter-board-session', unitId, token],
@@ -186,7 +184,6 @@ function WorkplaceDisplayPageInner() {
     [pathname, router, searchParams, t]
   );
 
-  /* eslint-disable react-hooks/set-state-in-effect -- one-shot bootstrap from ?code= */
   useEffect(() => {
     if (!hydrated || token) return;
     const q = searchParams.get('code')?.trim();
@@ -199,7 +196,6 @@ function WorkplaceDisplayPageInner() {
       }
     });
   }, [hydrated, token, searchParams, pathname, router, pairWithCode]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handlePair = useCallback(
     async (e: FormEvent) => {
@@ -230,7 +226,7 @@ function WorkplaceDisplayPageInner() {
     const err = sessionQuery.error;
     if (isApiHttpError(err) && err.status === 401) {
       /* Pairing token rejected by API — mirror manual unpair (clears storage + session). */
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional recovery from auth failure
+
       handleReset();
     }
   }, [sessionQuery.isError, sessionQuery.error, handleReset]);

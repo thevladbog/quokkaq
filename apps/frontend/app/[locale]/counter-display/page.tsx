@@ -185,7 +185,7 @@ function CounterDisplayPageInner() {
   }, []);
 
   // Client-only: read pairing from localStorage after mount (avoid SSR/localStorage skew).
-  /* eslint-disable react-hooks/set-state-in-effect -- hydrate terminal pairing from localStorage */
+
   useEffect(() => {
     const tok = localStorage.getItem(COUNTER_DISPLAY_TOKEN_KEY);
     const uid = localStorage.getItem(COUNTER_DISPLAY_UNIT_KEY);
@@ -195,7 +195,6 @@ function CounterDisplayPageInner() {
     }
     setHydrated(true);
   }, []);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const sessionQuery = useQuery({
     queryKey: ['guest-survey-session', unitId, token],
@@ -267,14 +266,12 @@ function CounterDisplayPageInner() {
     }
   }, [surveyKey, resetSessionLocale]);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- reset wizard step for new ticket/survey */
   useEffect(() => {
     setSurveyStepIndex(0);
   }, [surveyKey]);
   useEffect(() => {
     setScaleValues({});
   }, [surveyKey]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const scaleBlocks = useMemo(
     () =>

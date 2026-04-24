@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import {
@@ -74,13 +74,7 @@ export default function InviteDialog({
 
   const { data: units } = useUnits();
 
-  useEffect(() => {
-    if (open) {
-      fetchTemplates();
-    }
-  }, [open]);
-
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     try {
       const response = await fetch('/api/templates', {
         headers: {
@@ -94,7 +88,13 @@ export default function InviteDialog({
     } catch (error) {
       console.error('Error fetching templates:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      void fetchTemplates();
+    }
+  }, [open, fetchTemplates]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

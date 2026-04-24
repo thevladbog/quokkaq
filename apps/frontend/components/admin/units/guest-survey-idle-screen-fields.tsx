@@ -26,7 +26,6 @@ function IdleSlideMediaPreview({ apiUrl }: { apiUrl: string }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [isVideo, setIsVideo] = useState(false);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- admin preview: fetch blob with staff JWT */
   useEffect(() => {
     let cancelled = false;
     let objectUrl: string | null = null;
@@ -54,7 +53,6 @@ function IdleSlideMediaPreview({ apiUrl }: { apiUrl: string }) {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [apiUrl]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (!apiUrl.trim()) {
     return <p className='text-muted-foreground text-xs'>—</p>;
