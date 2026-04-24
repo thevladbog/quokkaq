@@ -346,6 +346,48 @@ func (ns *NotificationService) enqueueSMS(ticketID, companyID, phone, body, noti
 	_ = ns.funnelInsert(ticket, "visitor_sms_queued", map[string]any{"notifType": notifType, "smsSource": smsSource, "unitId": unitID})
 }
 
+// EnqueueUnitTransactionalSMS sends a one-off SMS tied to a unit (no ticket, no queue funnel), e.g. OTP or reminders.
+func (ns *NotificationService) EnqueueUnitTransactionalSMS(unitID, phone, body, notifType string) error {
+	if ns.notifRepo == nil || ns.jobClient == nil {
+		return fmt.Errorf("notification service not fully configured")
+	}
+	companyID := ns.resolveCompanyID(unitID)
+	comp := (*models.Company)(nil)
+	if companyID != "" && ns.companyRepo != nil {
+		comp, _ = ns.companyRepo.FindByID(companyID)
+	}
+	dep := ns.deploymentOrNil()
+	_, smsSource := ResolveSMSProviderForCompany(comp, dep)
+	payload, _ := json.Marshal(map[string]string{
+		"ticket_id":   "",
+		"phone":       phone,
+		"body":        body,
+		"company_id":  companyID,
+		"unit_id":     unitID,
+		"visitor_not": notifType,
+	})
+	now := time.Now()
+	notif := &models.Notification{
+		Type:    notifType,
+		Payload: payload,
+		Status:  "pending",
+		LastAt:  &now,
+	}
+	if err := ns.notifRepo.Create(notif); err != nil {
+		return err
+	}
+	if err := ns.jobClient.EnqueueSMSSend(SMSSendJobPayload{
+		NotificationID: notif.ID,
+		To:             phone,
+		Body:           body,
+		CompanyID:      companyID,
+		SmsSource:      smsSource,
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
 // RecordFunnelEvent writes a marketing/analytics event (e.g. ticket created from virtual queue).
 func (ns *NotificationService) RecordFunnelEvent(ticket *models.Ticket, event, source string, meta map[string]any) {
 	if ns.funnelRepo == nil || ticket == nil {

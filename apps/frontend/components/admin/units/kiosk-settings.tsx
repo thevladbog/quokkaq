@@ -90,6 +90,14 @@ export function KioskSettings({
   const [isPreRegistrationEnabled, setIsPreRegistrationEnabled] = useState(
     kioskConfig.isPreRegistrationEnabled ?? false
   );
+  const [isAppointmentCheckinEnabled, setIsAppointmentCheckinEnabled] =
+    useState(
+      kioskConfig.isAppointmentCheckinEnabled ??
+        kioskConfig.isPreRegistrationEnabled ??
+        false
+    );
+  const [isAppointmentPhoneLookupEnabled, setIsAppointmentPhoneLookupEnabled] =
+    useState(kioskConfig.isAppointmentPhoneLookupEnabled ?? true);
 
   // New color settings
   const [isCustomColorsEnabled, setIsCustomColorsEnabled] = useState(
@@ -144,6 +152,8 @@ export function KioskSettings({
         ...headerKioskSaveFields(),
         feedbackUrl,
         isPreRegistrationEnabled,
+        isAppointmentCheckinEnabled,
+        isAppointmentPhoneLookupEnabled,
         isCustomColorsEnabled,
         headerColor,
         bodyColor,
@@ -463,6 +473,43 @@ export function KioskSettings({
                 checked={isPreRegistrationEnabled}
                 onCheckedChange={setIsPreRegistrationEnabled}
               />
+            </div>
+
+            <div className='space-y-1 border-t pt-3'>
+              <div className='flex items-center justify-between'>
+                <div>
+                  <Label htmlFor='admin-appointment-checkin'>
+                    {t('enable_appointment_checkin')}
+                  </Label>
+                  <p className='text-muted-foreground text-xs'>
+                    {t('enable_appointment_checkin_hint')}
+                  </p>
+                </div>
+                <Switch
+                  id='admin-appointment-checkin'
+                  checked={isAppointmentCheckinEnabled}
+                  onCheckedChange={setIsAppointmentCheckinEnabled}
+                />
+              </div>
+              <div className='flex items-center justify-between pt-1'>
+                <div>
+                  <Label htmlFor='admin-appointment-phone-lookup'>
+                    {t('enable_appointment_phone_lookup')}
+                  </Label>
+                  <p className='text-muted-foreground text-xs'>
+                    {t('enable_appointment_phone_lookup_hint')}
+                  </p>
+                </div>
+                <Switch
+                  id='admin-appointment-phone-lookup'
+                  disabled={!isAppointmentCheckinEnabled}
+                  checked={
+                    isAppointmentCheckinEnabled &&
+                    isAppointmentPhoneLookupEnabled
+                  }
+                  onCheckedChange={setIsAppointmentPhoneLookupEnabled}
+                />
+              </div>
             </div>
 
             <div className='space-y-3 border-t py-2'>

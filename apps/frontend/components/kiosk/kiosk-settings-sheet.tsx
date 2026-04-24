@@ -19,7 +19,12 @@ import {
 import { usePatchKioskConfig } from '@/lib/hooks';
 import { toast } from 'sonner';
 import { LogoUpload } from '@/components/ui/logo-upload';
-import type { UnitConfig } from '@/lib/api';
+import { preRegistrationsApi, type UnitConfig } from '@/lib/api';
+import {
+  listKioskSerialPorts,
+  testKioskSerialPort
+} from '@/lib/kiosk-scanner-agent';
+import { Link } from '@/src/i18n/navigation';
 import {
   isTauriKiosk,
   listPrintersViaTauri,
@@ -286,6 +291,20 @@ function KioskSettingsForm({
   const [isPreRegistrationEnabled, setIsPreRegistrationEnabled] = useState(
     (k0 as KioskConfig | undefined)?.isPreRegistrationEnabled ?? false
   );
+  const [isAppointmentCheckinEnabled, setIsAppointmentCheckinEnabled] =
+    useState(
+      (k0 as KioskConfig | undefined)?.isAppointmentCheckinEnabled ??
+        (k0 as KioskConfig | undefined)?.isPreRegistrationEnabled ??
+        false
+    );
+  const [isAppointmentPhoneLookupEnabled, setIsAppointmentPhoneLookupEnabled] =
+    useState(
+      (k0 as KioskConfig | undefined)?.isAppointmentPhoneLookupEnabled !== false
+    );
+  const [serialBaud, setSerialBaud] = useState(9600);
+  const [serialPath, setSerialPath] = useState('');
+  const [serialList, setSerialList] = useState<{ path: string }[]>([]);
+  const [serialChal, setSerialChal] = useState<string | null>(null);
   const [isCustomColorsEnabled, setIsCustomColorsEnabled] = useState(
     (k0 as KioskConfig | undefined)?.isCustomColorsEnabled || false
   );
@@ -358,6 +377,27 @@ function KioskSettingsForm({
     };
   }, [isOpen, t]);
 
+  useEffect(() => {
+    if (!isOpen || !isTauriKiosk()) {
+      return;
+    }
+    const p = localStorage.getItem('kioskSerialPath') || '';
+    const b = Number(localStorage.getItem('kioskSerialBaud') || '9600') || 9600;
+    setSerialPath(p);
+    setSerialBaud(b);
+    void listKioskSerialPorts()
+      .then((r) =>
+        setSerialList(
+          (r.ports || []).map((x) => ({
+            path: x.path
+          }))
+        )
+      )
+      .catch(() => {
+        setSerialList([]);
+      });
+  }, [isOpen]);
+
   const connectionKey = (() => {
     if (!browserOnline) {
       return 'connection_offline' as const;
@@ -404,6 +444,14 @@ function KioskSettingsForm({
       300,
       Math.max(5, sessionIdleCountdownSec || DEFAULT_IDLE_COUNTDOWN_SEC)
     );
+    if (isTauriKiosk()) {
+      if (serialPath.trim()) {
+        localStorage.setItem('kioskSerialPath', serialPath.trim());
+      } else {
+        localStorage.removeItem('kioskSerialPath');
+      }
+      localStorage.setItem('kioskSerialBaud', String(serialBaud));
+    }
     const newConfig = {
       ...currentConfig,
       kiosk: {
@@ -417,6 +465,8 @@ function KioskSettingsForm({
         footerText,
         feedbackUrl: feedbackUrl.trim() || undefined,
         isPreRegistrationEnabled,
+        isAppointmentCheckinEnabled,
+        isAppointmentPhoneLookupEnabled,
         isCustomColorsEnabled,
         headerColor,
         bodyColor,
@@ -867,6 +917,127 @@ function KioskSettingsForm({
             checked={isPreRegistrationEnabled}
             onCheckedChange={setIsPreRegistrationEnabled}
           />
+        </div>
+
+        <div className='flex items-center justify-between'>
+          <div>
+            <Label htmlFor='sheet-appt'>
+              {t('enable_appointment_checkin')}
+            </Label>
+            <p className='text-muted-foreground text-xs'>
+              {t('enable_appointment_checkin_hint')}
+            </p>
+          </div>
+          <Switch
+            id='sheet-appt'
+            checked={isAppointmentCheckinEnabled}
+            onCheckedChange={setIsAppointmentCheckinEnabled}
+          />
+        </div>
+
+        <div className='flex items-center justify-between'>
+          <div>
+            <Label htmlFor='sheet-phone'>{t('enable_phone_lookup')}</Label>
+            <p className='text-muted-foreground text-xs'>
+              {t('enable_phone_lookup_hint')}
+            </p>
+          </div>
+          <Switch
+            id='sheet-phone'
+            checked={isAppointmentPhoneLookupEnabled}
+            onCheckedChange={setIsAppointmentPhoneLookupEnabled}
+            disabled={!isAppointmentCheckinEnabled}
+          />
+        </div>
+
+        {isTauriKiosk() && (
+          <div className='space-y-2 border-t pt-2'>
+            <p className='text-sm font-medium'>{t('serial_scanner')}</p>
+            <p className='text-muted-foreground text-xs'>{t('serial_hint')}</p>
+            <div className='flex flex-col gap-2 sm:flex-row'>
+              <select
+                className='border-input bg-background min-h-11 w-full flex-1 rounded-md border px-2 text-sm'
+                value={serialPath}
+                onChange={(e) => setSerialPath(e.target.value)}
+              >
+                <option value=''>{t('serial_pick_port')}</option>
+                {serialList.map((s) => (
+                  <option key={s.path} value={s.path}>
+                    {s.path}
+                  </option>
+                ))}
+              </select>
+              <Input
+                type='number'
+                className='w-28'
+                value={serialBaud}
+                onChange={(e) => setSerialBaud(Number(e.target.value) || 9600)}
+              />
+            </div>
+            {serialChal ? (
+              <p className='text-center font-mono text-sm'>{serialChal}</p>
+            ) : null}
+            <div className='flex flex-wrap gap-2'>
+              <Button
+                type='button'
+                size='sm'
+                variant='secondary'
+                onClick={async () => {
+                  if (!isTauriKiosk()) {
+                    return;
+                  }
+                  const r = await testKioskSerialPort({
+                    port: serialPath.trim() || serialList[0]?.path || '',
+                    baud: serialBaud
+                  });
+                  if (r.challenge) {
+                    setSerialChal(r.challenge);
+                    toast.info(
+                      t('serial_scan_test_label', { code: r.challenge })
+                    );
+                  }
+                  if (r.ok) {
+                    toast.success(t('serial_test_ok'));
+                    setSerialChal(null);
+                  } else {
+                    toast.error(r.message || r.read || t('serial_test_fail'));
+                  }
+                }}
+              >
+                {t('serial_test')}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className='border-t pt-2'>
+          <p className='mb-1 text-sm font-medium'>
+            {t('appointments_staff_link')}
+          </p>
+          <div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
+            <Button type='button' asChild size='sm' variant='secondary'>
+              <Link href={`/pre-registrations/${unitId}`}>
+                {t('open_appointments_admin')}
+              </Link>
+            </Button>
+            <Button
+              type='button'
+              size='sm'
+              variant='outline'
+              onClick={async () => {
+                try {
+                  const r = await preRegistrationsApi.bulkRemind(unitId);
+                  toast.success(t('bulk_remind_toast', { n: r.sent }));
+                } catch (e) {
+                  toast.error(
+                    e instanceof Error ? e.message : t('bulk_remind_fail')
+                  );
+                }
+              }}
+            >
+              {t('bulk_remind_today')}
+            </Button>
+          </div>
         </div>
 
         <div className='flex items-center justify-between'>

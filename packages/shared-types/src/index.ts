@@ -473,6 +473,15 @@ export const KioskConfigSchema = z
     isPrintEnabled: z.boolean().optional(),
     feedbackUrl: z.string().optional(),
     isPreRegistrationEnabled: z.boolean().optional(),
+    /**
+     * When true, kiosk shows the “I have an appointment / check-in” path (code, phone, scan).
+     * If unset, follows `isPreRegistrationEnabled` for backward compatibility.
+     */
+    isAppointmentCheckinEnabled: z.boolean().optional(),
+    /**
+     * When not false, kiosk may offer the phone + SMS OTP “find my booking” flow. Default: enabled when check-in is on.
+     */
+    isAppointmentPhoneLookupEnabled: z.boolean().optional(),
     showUnitInHeader: z.boolean().optional(),
     kioskUnitLabelText: z.string().optional(),
     /** Seconds of inactivity on the service grid before showing the session warning. Default 45. */
@@ -1021,6 +1030,8 @@ export interface KioskConfig {
   isPrintEnabled?: boolean;
   feedbackUrl?: string;
   isPreRegistrationEnabled?: boolean;
+  isAppointmentCheckinEnabled?: boolean;
+  isAppointmentPhoneLookupEnabled?: boolean;
   /** Show unit title in kiosk header (next to logo). Default true when unset. */
   showUnitInHeader?: boolean;
   /** Custom kiosk header label; when empty, the unit name from the API is shown. */

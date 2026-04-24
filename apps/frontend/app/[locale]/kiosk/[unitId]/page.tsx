@@ -4,7 +4,12 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useUnitServicesTree, useCreateTicketInUnit } from '@/lib/hooks';
-import { ticketsApi, type Ticket, type Service } from '@/lib/api';
+import {
+  ticketsApi,
+  preRegistrationsApi,
+  type Ticket,
+  type Service
+} from '@/lib/api';
 import {
   Dialog,
   DialogContent,
@@ -19,7 +24,7 @@ const QRCode = dynamic(() => import('react-qr-code'), { ssr: false });
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useRouter } from '@/src/i18n/navigation';
 import { useLocale } from 'next-intl';
 import { getLocalizedName, cn } from '@/lib/utils';
@@ -66,6 +71,7 @@ export default function UnitKioskPage() {
   const queryClient = useQueryClient();
   const params = useParams() as { unitId?: string };
   const unitId = params.unitId;
+  const searchParams = useSearchParams();
   const [selectedServicePath, setSelectedServicePath] = useState<Service[]>([]);
   const [, setMessage] = useState('');
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
@@ -270,6 +276,7 @@ export default function UnitKioskPage() {
   const [isLocked, setIsLocked] = useState(false);
   const [, setClockClicks] = useState(0);
   const [isRedemptionModalOpen, setIsRedemptionModalOpen] = useState(false);
+  const [redeemModalKey, setRedeemModalKey] = useState(0);
   const [isPhoneIdentificationOpen, setIsPhoneIdentificationOpen] =
     useState(false);
   const [pendingPhoneService, setPendingPhoneService] =
@@ -331,6 +338,55 @@ export default function UnitKioskPage() {
       : '#f2ebe6';
 
   const kioskCfg = unit?.config?.kiosk;
+  const appointmentCheckinEnabled = Boolean(
+    kioskCfg?.isAppointmentCheckinEnabled ?? kioskCfg?.isPreRegistrationEnabled
+  );
+  const showPhoneForAppointment =
+    (kioskCfg?.isAppointmentPhoneLookupEnabled ?? true) &&
+    appointmentCheckinEnabled;
+  const [deeplinkPrCode, setDeeplinkPrCode] = useState<string | undefined>(
+    undefined
+  );
+  const [redeemAutoFromDeeplink, setRedeemAutoFromDeeplink] = useState(false);
+
+  useEffect(() => {
+    const uid = kioskApiUnitId ?? unitId;
+    if (!uid) {
+      return;
+    }
+    const raw = (searchParams.get('prCode') || '')
+      .replace(/\D/g, '')
+      .slice(0, 6);
+    if (raw.length === 6) {
+      setDeeplinkPrCode(raw);
+      if (appointmentCheckinEnabled) {
+        setRedeemAutoFromDeeplink(true);
+        setRedeemModalKey((k) => k + 1);
+        setIsRedemptionModalOpen(true);
+      }
+      return;
+    }
+    const prToken = searchParams.get('prToken')?.trim();
+    if (prToken) {
+      void preRegistrationsApi
+        .resolvePrToken(uid, prToken)
+        .then((r) => {
+          const c = (r.code || '').replace(/\D/g, '').slice(0, 6);
+          if (c) {
+            setDeeplinkPrCode(c);
+          }
+          if (appointmentCheckinEnabled) {
+            setRedeemAutoFromDeeplink(true);
+            setRedeemModalKey((k) => k + 1);
+            setIsRedemptionModalOpen(true);
+          }
+        })
+        .catch(() => {
+          // invalid token or server HMAC not configured
+        });
+    }
+  }, [searchParams, kioskApiUnitId, unitId, appointmentCheckinEnabled]);
+
   const paperOutPollEnabled = Boolean(
     kioskApiUnitId &&
     !unitQueryError &&
@@ -399,13 +455,20 @@ export default function UnitKioskPage() {
   const topBarBeforeClock = (
     <>
       <KioskAccessibilityToolbar audio={kioskAudio} />
-      {kioskCfg?.isPreRegistrationEnabled ? (
+      {appointmentCheckinEnabled ? (
         <Button
           variant='secondary'
           className='text-kiosk-ink kiosk-touch-min h-12 shrink-0 rounded-full px-4 text-base font-semibold shadow-sm'
-          onClick={() => setIsRedemptionModalOpen(true)}
+          onClick={() => {
+            setDeeplinkPrCode(undefined);
+            setRedeemAutoFromDeeplink(false);
+            setRedeemModalKey((k) => k + 1);
+            setIsRedemptionModalOpen(true);
+          }}
         >
-          {t('pre_registration.button', { defaultValue: 'I have a code' })}
+          {t('pre_registration.cta_appointment', {
+            defaultValue: 'I have an appointment'
+          })}
         </Button>
       ) : null}
       <KioskLanguageSwitcher className={switcherClass} />
@@ -1450,9 +1513,16 @@ export default function UnitKioskPage() {
       />
 
       <PreRegRedemptionModal
+        key={redeemModalKey}
         isOpen={isRedemptionModalOpen}
-        onClose={() => setIsRedemptionModalOpen(false)}
+        onClose={() => {
+          setIsRedemptionModalOpen(false);
+          setRedeemAutoFromDeeplink(false);
+        }}
         unitId={kioskApiUnitId ?? unitId!}
+        initialCode={deeplinkPrCode}
+        showPhoneTab={showPhoneForAppointment}
+        autoRedeemFromDeeplink={redeemAutoFromDeeplink}
         onSuccess={async (ticket) => {
           let full: Ticket = ticket;
           try {

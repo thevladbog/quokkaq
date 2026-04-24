@@ -1441,6 +1441,60 @@ export const preRegistrationsApi = {
         method: 'POST',
         body: JSON.stringify({ code })
       }
+    ),
+
+  /** SMS OTP: request code for "find by phone" on the kiosk. */
+  kioskPhoneStart: (unitId: string, phone: string) =>
+    apiRequest<{ sessionId: string }>(
+      `/units/${unitId}/pre-registrations/kiosk-phone/start`,
+      { method: 'POST', body: JSON.stringify({ phone }) }
+    ),
+
+  kioskPhoneVerify: (unitId: string, sessionId: string, code: string) =>
+    apiRequest<{ lookupToken: string }>(
+      `/units/${unitId}/pre-registrations/kiosk-phone/verify`,
+      { method: 'POST', body: JSON.stringify({ sessionId, code }) }
+    ),
+
+  kioskPhoneList: (unitId: string, lookupToken: string) =>
+    apiRequest<PreRegistration[]>(
+      `/units/${unitId}/pre-registrations/kiosk-phone/list`,
+      {
+        method: 'GET',
+        headers: { 'X-Lookup-Token': lookupToken }
+      }
+    ),
+
+  kioskPhoneRedeem: (
+    unitId: string,
+    lookupToken: string,
+    preRegistrationId: string
+  ) =>
+    apiRequest<{ success: boolean; ticket?: Ticket; message?: string }>(
+      `/units/${unitId}/pre-registrations/kiosk-phone/redeem`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          lookupToken,
+          preRegistrationId
+        })
+      }
+    ),
+
+  /** Resolve server-signed prToken to { code, date } (HMAC, JWT_SECRET). */
+  resolvePrToken: (unitId: string, prToken: string) =>
+    apiRequest<{ code: string; date: string }>(
+      `/units/${unitId}/kiosk/resolve-pr-token?${new URLSearchParams({ prToken })}`,
+      {}
+    ),
+
+  /** Staff: send reminder SMS to each open booking for the day. */
+  bulkRemind: (unitId: string, date?: string) =>
+    apiRequest<{ sent: number; date: string }>(
+      date
+        ? `/units/${unitId}/pre-registrations/bulk-remind?date=${encodeURIComponent(date)}`
+        : `/units/${unitId}/pre-registrations/bulk-remind`,
+      { method: 'POST' }
     )
 };
 

@@ -299,7 +299,10 @@ func run() error {
 	templateHandler := handlers.NewTemplateHandler(templateService, userRepo)
 	invitationHandler := handlers.NewInvitationHandler(invitationService, userRepo)
 	slotHandler := handlers.NewSlotHandler(slotService, calendarIntegrationService)
-	preRegHandler := handlers.NewPreRegistrationHandler(preRegService, ticketService)
+	appointmentKioskLookupService := services.NewAppointmentKioskLookupService(
+		preRegRepo, preRegService, ticketService, notificationService,
+	)
+	preRegHandler := handlers.NewPreRegistrationHandler(preRegService, ticketService, appointmentKioskLookupService)
 	calendarIntegrationHandler := handlers.NewCalendarIntegrationHandler(calendarIntegrationService, userRepo)
 	integrationAPIKeyRepo := repository.NewIntegrationAPIKeyRepository(database.DB)
 	webhookEndpointRepo := repository.NewWebhookEndpointRepository(database.DB)
@@ -584,6 +587,11 @@ func run() error {
 		})
 		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/pre-registrations/validate", preRegHandler.Validate)
 		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/pre-registrations/redeem", preRegHandler.Redeem)
+		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/pre-registrations/kiosk-phone/start", preRegHandler.KioskPhoneLookupStart)
+		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/pre-registrations/kiosk-phone/verify", preRegHandler.KioskPhoneLookupVerify)
+		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/pre-registrations/kiosk-phone/list", preRegHandler.KioskPhoneLookupList)
+		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/pre-registrations/kiosk-phone/redeem", preRegHandler.KioskPhoneRedeem)
+		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/kiosk/resolve-pr-token", preRegHandler.KioskResolvePrToken)
 
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
@@ -650,6 +658,7 @@ func run() error {
 			r.Get("/{unitId}/pre-registrations", preRegHandler.GetByUnit)
 			r.Get("/{unitId}/pre-registrations/calendar-slots", preRegHandler.GetCalendarSlots)
 			r.Put("/{unitId}/pre-registrations/{id}", preRegHandler.Update)
+			r.Post("/{unitId}/pre-registrations/bulk-remind", preRegHandler.BulkRemindTodayAppointments)
 			r.Get("/{unitId}/visitor-tag-definitions", visitorTagHandler.ListVisitorTagDefinitions)
 			r.Post("/{unitId}/visitor-tag-definitions", visitorTagHandler.CreateVisitorTagDefinition)
 			r.Patch("/{unitId}/visitor-tag-definitions/{definitionId}", visitorTagHandler.PatchVisitorTagDefinition)

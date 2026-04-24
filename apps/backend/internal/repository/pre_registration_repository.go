@@ -31,6 +31,28 @@ func (r *PreRegistrationRepository) Update(preReg *models.PreRegistration) error
 	return database.DB.Save(preReg).Error
 }
 
+// ListActiveByUnitPhoneAndDate returns created pre-registrations for the unit, date, and exact stored phone.
+func (r *PreRegistrationRepository) ListActiveByUnitPhoneAndDate(unitID, phone, date string) ([]models.PreRegistration, error) {
+	var rows []models.PreRegistration
+	err := database.DB.
+		Where("unit_id = ? AND customer_phone = ? AND date = ? AND status = ?", unitID, phone, date, "created").
+		Preload("Service").
+		Order("time ASC").
+		Find(&rows).Error
+	return rows, err
+}
+
+// ListCreatedByUnitAndDate returns active (created) pre-registrations for a given calendar day.
+func (r *PreRegistrationRepository) ListCreatedByUnitAndDate(unitID, date string) ([]models.PreRegistration, error) {
+	var rows []models.PreRegistration
+	err := database.DB.
+		Where("unit_id = ? AND date = ? AND status = ?", unitID, date, "created").
+		Preload("Service").
+		Order("time ASC").
+		Find(&rows).Error
+	return rows, err
+}
+
 func (r *PreRegistrationRepository) GetByCodeAndDate(code string, date string) (*models.PreRegistration, error) {
 	var preReg models.PreRegistration
 	err := database.DB.Where("code = ? AND date = ?", code, date).

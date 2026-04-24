@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"quokkaq-go-backend/internal/logger"
 	"strings"
+	"time"
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/phoneutil"
@@ -32,13 +33,19 @@ func preRegistrationVisitorValidation(customerFirstName, customerLastName, custo
 
 type PreRegistrationHandler struct {
 	service       *services.PreRegistrationService
-	ticketService services.TicketService // Interface
+	ticketService services.TicketService
+	kioskLookup   *services.AppointmentKioskLookupService
 }
 
-func NewPreRegistrationHandler(service *services.PreRegistrationService, ticketService services.TicketService) *PreRegistrationHandler {
+func NewPreRegistrationHandler(
+	service *services.PreRegistrationService,
+	ticketService services.TicketService,
+	kioskLookup *services.AppointmentKioskLookupService,
+) *PreRegistrationHandler {
 	return &PreRegistrationHandler{
 		service:       service,
 		ticketService: ticketService,
+		kioskLookup:   kioskLookup,
 	}
 }
 
@@ -376,4 +383,219 @@ func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) 
 		Success: true,
 		Ticket:  ticket,
 	})
+}
+
+// KioskPhoneLookupStart godoc
+// @Summary      Start phone verification for kiosk appointment lookup
+// @Description  Sends a 6-digit SMS code; returns a sessionId for /kiosk-phone/verify. Public; rate-limited. Requires tenant SMS to be available for the unit.
+// @Tags         pre-registrations
+// @Accept       json
+// @Produce      json
+// @Param        unitId path      string                                 true  "Unit ID"
+// @Param        body   body      models.KioskPhoneLookupStartRequest  true  "E.164 or local phone"
+// @Success      200    {object}  models.KioskPhoneLookupStartResponse
+// @Failure      400    {string}  string "Bad Request"
+// @Failure      429    {string}  string "Too Many Requests"
+// @Failure      503    {string}  string "Service Unavailable (no SMS for unit)"
+// @Router       /units/{unitId}/pre-registrations/kiosk-phone/start [post]
+func (h *PreRegistrationHandler) KioskPhoneLookupStart(w http.ResponseWriter, r *http.Request) {
+	if h.kioskLookup == nil {
+		http.Error(w, "not available", http.StatusServiceUnavailable)
+		return
+	}
+	var req models.KioskPhoneLookupStartRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	unitID := chi.URLParam(r, "unitId")
+	sid, err := h.kioskLookup.StartPhoneLookup(unitID, req.Phone)
+	if err != nil {
+		if errors.Is(err, services.ErrKioskLookupNoSMS) {
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		if strings.Contains(err.Error(), "too many requests") {
+			http.Error(w, err.Error(), http.StatusTooManyRequests)
+			return
+		}
+		logger.PrintfCtx(r.Context(), "KioskPhoneLookupStart: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	RespondJSON(w, models.KioskPhoneLookupStartResponse{SessionID: sid})
+}
+
+// KioskPhoneLookupVerify godoc
+// @Summary      Verify SMS code for kiosk phone lookup
+// @Description  Validates the 6-digit code; returns a short-lived lookupToken for list/redeem.
+// @Tags         pre-registrations
+// @Accept       json
+// @Produce      json
+// @Param        unitId path      string                                 true  "Unit ID"
+// @Param        body   body      models.KioskPhoneLookupVerifyRequest  true  "Session from start + SMS code"
+// @Success      200    {object}  models.KioskPhoneLookupVerifyResponse
+// @Failure      400    {string}  string "Bad Request"
+// @Failure      401    {string}  string "Unauthorized (wrong or expired code)"
+// @Failure      503    {string}  string "Service Unavailable"
+// @Router       /units/{unitId}/pre-registrations/kiosk-phone/verify [post]
+func (h *PreRegistrationHandler) KioskPhoneLookupVerify(w http.ResponseWriter, r *http.Request) {
+	if h.kioskLookup == nil {
+		http.Error(w, "not available", http.StatusServiceUnavailable)
+		return
+	}
+	var req models.KioskPhoneLookupVerifyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	tok, err := h.kioskLookup.VerifyPhoneLookup(req.SessionID, req.Code)
+	if err != nil {
+		if errors.Is(err, services.ErrKioskLookupInvalidOTP) {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	RespondJSON(w, models.KioskPhoneLookupVerifyResponse{LookupToken: tok})
+}
+
+// KioskPhoneLookupList godoc
+// @Summary      List today’s pre-registrations for verified phone
+// @Description  Requires X-Lookup-Token from verify. Returns pre-registration rows the visitor may check in. Public; rate-limited.
+// @Tags         pre-registrations
+// @Produce      json
+// @Param        unitId          path     string  true  "Unit ID"
+// @Param        X-Lookup-Token  header   string  true  "Token from /kiosk-phone/verify"
+// @Success      200             {array}  models.PreRegistration
+// @Failure      400             {string} string "Bad Request"
+// @Failure      401             {string} string "Unauthorized (missing or invalid token)"
+// @Failure      500             {string} string "Internal Server Error"
+// @Failure      503             {string} string "Service Unavailable"
+// @Router       /units/{unitId}/pre-registrations/kiosk-phone/list [get]
+func (h *PreRegistrationHandler) KioskPhoneLookupList(w http.ResponseWriter, r *http.Request) {
+	if h.kioskLookup == nil {
+		http.Error(w, "not available", http.StatusServiceUnavailable)
+		return
+	}
+	unitID := chi.URLParam(r, "unitId")
+	tok := strings.TrimSpace(r.Header.Get("X-Lookup-Token"))
+	if tok == "" {
+		http.Error(w, "X-Lookup-Token required", http.StatusBadRequest)
+		return
+	}
+	rows, err := h.kioskLookup.ListByLookupToken(tok, unitID)
+	if err != nil {
+		if errors.Is(err, services.ErrKioskLookupNotFound) {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+		logger.PrintfCtx(r.Context(), "KioskPhoneLookupList: %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	RespondJSON(w, rows)
+}
+
+// KioskPhoneRedeem godoc
+// @Summary      Redeem pre-registration after phone lookup
+// @Description  Issues a ticket for the selected preRegistrationId. Same response shape as code redeem. Public; rate-limited.
+// @Tags         pre-registrations
+// @Accept       json
+// @Produce      json
+// @Param        unitId path      string                              true  "Unit ID"
+// @Param        body   body      models.KioskPhoneRedeemRequest      true  "lookupToken and preRegistrationId"
+// @Success      200    {object}  models.PreRegistrationRedeemResponse
+// @Failure      400    {string}  string "Bad Request"
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      500    {string}  string "Internal Server Error"
+// @Failure      503    {string}  string "Service Unavailable"
+// @Router       /units/{unitId}/pre-registrations/kiosk-phone/redeem [post]
+func (h *PreRegistrationHandler) KioskPhoneRedeem(w http.ResponseWriter, r *http.Request) {
+	if h.kioskLookup == nil {
+		http.Error(w, "not available", http.StatusServiceUnavailable)
+		return
+	}
+	var req models.KioskPhoneRedeemRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	unitID := chi.URLParam(r, "unitId")
+	ticket, err := h.kioskLookup.RedeemByLookupToken(req.LookupToken, unitID, req.PreRegistrationID)
+	if err != nil {
+		if errors.Is(err, services.ErrKioskLookupNotFound) {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+		if errors.Is(err, services.ErrPreRegistrationTooEarly) || errors.Is(err, services.ErrPreRegistrationTooLate) {
+			RespondJSON(w, models.PreRegistrationRedeemResponse{Success: false, Message: err.Error()})
+			return
+		}
+		RespondJSON(w, models.PreRegistrationRedeemResponse{Success: false, Message: err.Error()})
+		return
+	}
+	RespondJSON(w, models.PreRegistrationRedeemResponse{Success: true, Ticket: ticket})
+}
+
+// KioskResolvePrToken godoc
+// @Summary      Resolve signed prToken to six-digit code (kiosk / deep link)
+// @Description  Server-signed HMAC token (JWT_SECRET) used in email/QR; returns code and date for the unit. Public; rate-limited.
+// @Tags         pre-registrations
+// @Produce      json
+// @Param        unitId  path     string  true  "Unit ID"
+// @Param        prToken query    string  true  "Signed token from notification link"
+// @Success      200     {object} models.KioskPrResolveResponse
+// @Failure      400     {string} string "Bad Request (missing or invalid token)"
+// @Router       /units/{unitId}/kiosk/resolve-pr-token [get]
+func (h *PreRegistrationHandler) KioskResolvePrToken(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
+	tok := r.URL.Query().Get("prToken")
+	if tok == "" {
+		http.Error(w, "prToken required", http.StatusBadRequest)
+		return
+	}
+	code, date, err := services.ParseKioskCheckinPrToken(tok, unitID)
+	if err != nil {
+		http.Error(w, "invalid token", http.StatusBadRequest)
+		return
+	}
+	RespondJSON(w, models.KioskPrResolveResponse{Code: code, Date: date})
+}
+
+// BulkRemindTodayAppointments godoc
+// @Summary      Enqueue bulk SMS reminders for today’s bookings
+// @Description  Enqueues one transactional SMS per open pre-registration for the unit and calendar day. Requires unit settings manage permission. Optional query date=YYYY-MM-DD.
+// @Tags         pre-registrations
+// @Produce      json
+// @Security     BearerAuth
+// @Param        unitId path     string  true  "Unit ID"
+// @Param        date   query    string  false "Date YYYY-MM-DD (default: today UTC)"
+// @Success      200    {object} models.PreRegistrationBulkRemindResponse
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
+// @Failure      500    {string}  string "Internal Server Error"
+// @Failure      503    {string}  string "Service Unavailable (no SMS for unit)"
+// @Router       /units/{unitId}/pre-registrations/bulk-remind [post]
+func (h *PreRegistrationHandler) BulkRemindTodayAppointments(w http.ResponseWriter, r *http.Request) {
+	if h.kioskLookup == nil {
+		http.Error(w, "not available", http.StatusServiceUnavailable)
+		return
+	}
+	unitID := chi.URLParam(r, "unitId")
+	day := strings.TrimSpace(r.URL.Query().Get("date"))
+	if day == "" {
+		day = time.Now().Format("2006-01-02")
+	}
+	n, err := h.kioskLookup.SendTodayAppointmentReminders(unitID, day)
+	if err != nil {
+		if errors.Is(err, services.ErrKioskLookupNoSMS) {
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	RespondJSON(w, models.PreRegistrationBulkRemindResponse{Sent: n, Date: day})
 }

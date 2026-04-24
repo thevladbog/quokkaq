@@ -2079,6 +2079,33 @@ export interface ModelsInvitation {
   userId?: string;
 }
 
+export interface ModelsKioskPhoneLookupStartRequest {
+  phone?: string;
+}
+
+export interface ModelsKioskPhoneLookupStartResponse {
+  sessionId?: string;
+}
+
+export interface ModelsKioskPhoneLookupVerifyRequest {
+  code?: string;
+  sessionId?: string;
+}
+
+export interface ModelsKioskPhoneLookupVerifyResponse {
+  lookupToken?: string;
+}
+
+export interface ModelsKioskPhoneRedeemRequest {
+  lookupToken?: string;
+  preRegistrationId?: string;
+}
+
+export interface ModelsKioskPrResolveResponse {
+  code?: string;
+  date?: string;
+}
+
 export interface ModelsMessageTemplate {
   companyId?: string;
   content?: string;
@@ -2157,6 +2184,11 @@ export interface ModelsPreRegCalendarSlotItem {
   externalEventHref?: string;
   integrationLabel?: string;
   time?: string;
+}
+
+export interface ModelsPreRegistrationBulkRemindResponse {
+  date?: string;
+  sent?: number;
 }
 
 export interface ModelsPreRegistrationCodeRequest {

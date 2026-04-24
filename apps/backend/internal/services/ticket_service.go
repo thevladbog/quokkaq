@@ -127,6 +127,10 @@ var ErrVisitorPhoneInvalid = errors.New("invalid visitor phone number")
 // ErrPreRegistrationServiceMismatch is returned when a pre-registration's service does not match the requested service.
 var ErrPreRegistrationServiceMismatch = errors.New("pre-registration does not match the requested service")
 
+// PriorityTicketFromPreRegistration is the ticket.priority value for walk-in is 0; check-in from an advance
+// booking (pre-registration redeem) is ordered ahead of same-priority walk-ins (see ticket_repository ordering).
+const PriorityTicketFromPreRegistration = 10
+
 // ErrTicketServiceNotInUnit is returned when the target service belongs to a different unit than the ticket request.
 var ErrTicketServiceNotInUnit = errors.New("service does not belong to this unit")
 
@@ -579,6 +583,9 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 			ClientID:          &resolvedClientID,
 			IsCredit:          isCredit,
 			VisitorToken:      uuid.New().String(),
+		}
+		if preRegID != nil {
+			ticket.Priority = PriorityTicketFromPreRegistration
 		}
 
 		payload := map[string]interface{}{

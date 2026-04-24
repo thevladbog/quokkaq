@@ -4,6 +4,7 @@ import {
   DesktopTerminalKindSchema,
   DesktopTerminalSchema,
   effectiveDesktopTerminalKind,
+  KioskConfigSchema,
   TicketModelSchema,
   UnitKindSchema,
   UserModelSchema
@@ -115,6 +116,26 @@ describe('UnitKindSchema', () => {
 
   it('rejects unknown kind', () => {
     expect(UnitKindSchema.safeParse('invalid').success).toBe(false);
+  });
+});
+
+describe('KioskConfigSchema', () => {
+  it('accepts optional appointment check-in and phone flags', () => {
+    const r = KioskConfigSchema.safeParse({
+      isPreRegistrationEnabled: true,
+      isAppointmentCheckinEnabled: true,
+      isAppointmentPhoneLookupEnabled: true
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.isAppointmentCheckinEnabled).toBe(true);
+      expect(r.data.isAppointmentPhoneLookupEnabled).toBe(true);
+    }
+  });
+
+  it('parses empty object', () => {
+    const r = KioskConfigSchema.safeParse({});
+    expect(r.success).toBe(true);
   });
 });
 

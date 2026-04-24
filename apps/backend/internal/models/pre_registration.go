@@ -93,6 +93,45 @@ type PreRegistrationCodeRequest struct {
 	Code string `json:"code"`
 }
 
+// KioskPhoneLookupStartRequest starts SMS verification for “find my booking by phone” on the kiosk.
+type KioskPhoneLookupStartRequest struct {
+	Phone string `json:"phone"`
+}
+
+// KioskPhoneLookupStartResponse is returned with a short-lived session id; SMS carries the 6-digit code.
+type KioskPhoneLookupStartResponse struct {
+	SessionID string `json:"sessionId"`
+}
+
+// KioskPhoneLookupVerifyRequest completes OTP; returns a lookupToken for listing and redeeming.
+type KioskPhoneLookupVerifyRequest struct {
+	SessionID string `json:"sessionId"`
+	Code      string `json:"code"`
+}
+
+// KioskPhoneLookupVerifyResponse carries an opaque token for subsequent public GET/POSTs.
+type KioskPhoneLookupVerifyResponse struct {
+	LookupToken string `json:"lookupToken"`
+}
+
+// KioskPhoneRedeemRequest redeems a booking after a verified Kiosk phone lookup.
+type KioskPhoneRedeemRequest struct {
+	LookupToken       string `json:"lookupToken"`
+	PreRegistrationID string `json:"preRegistrationId"`
+}
+
+// KioskPrResolveResponse is the JSON from resolving a signed prToken query.
+type KioskPrResolveResponse struct {
+	Code string `json:"code"`
+	Date string `json:"date"`
+}
+
+// PreRegistrationBulkRemindResponse is the JSON from staff bulk appointment reminder.
+type PreRegistrationBulkRemindResponse struct {
+	Sent int    `json:"sent"`
+	Date string `json:"date"`
+}
+
 // PreRegistrationRedeemResponse is returned by the redeem endpoint (HTTP 200 for both success and validation failure).
 type PreRegistrationRedeemResponse struct {
 	Success bool    `json:"success"`

@@ -2052,6 +2052,33 @@ export interface ModelsInvitation {
   userId?: string;
 }
 
+export interface ModelsKioskPhoneLookupStartRequest {
+  phone?: string;
+}
+
+export interface ModelsKioskPhoneLookupStartResponse {
+  sessionId?: string;
+}
+
+export interface ModelsKioskPhoneLookupVerifyRequest {
+  code?: string;
+  sessionId?: string;
+}
+
+export interface ModelsKioskPhoneLookupVerifyResponse {
+  lookupToken?: string;
+}
+
+export interface ModelsKioskPhoneRedeemRequest {
+  lookupToken?: string;
+  preRegistrationId?: string;
+}
+
+export interface ModelsKioskPrResolveResponse {
+  code?: string;
+  date?: string;
+}
+
 export interface ModelsMessageTemplate {
   companyId?: string;
   content?: string;
@@ -2130,6 +2157,11 @@ export interface ModelsPreRegCalendarSlotItem {
   externalEventHref?: string;
   integrationLabel?: string;
   time?: string;
+}
+
+export interface ModelsPreRegistrationBulkRemindResponse {
+  date?: string;
+  sent?: number;
 }
 
 export interface ModelsPreRegistrationCodeRequest {
@@ -2932,6 +2964,20 @@ export interface ServicesUtilizationResponse {
   points?: ServicesUtilizationPoint[];
 }
 
+export type GetUnitsUnitIdKioskResolvePrTokenParams = {
+/**
+ * Signed token from notification link
+ */
+prToken: string;
+};
+
+export type PostUnitsUnitIdPreRegistrationsBulkRemindParams = {
+/**
+ * Date YYYY-MM-DD (default: today UTC)
+ */
+date?: string;
+};
+
 export type GetCalendarSlotsByUnitParams = {
 /**
  * Service ID
@@ -2955,6 +3001,142 @@ date: string;
 };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+/**
+ * Server-signed HMAC token (JWT_SECRET) used in email/QR; returns code and date for the unit. Public; rate-limited.
+ * @summary Resolve signed prToken to six-digit code (kiosk / deep link)
+ */
+export type getUnitsUnitIdKioskResolvePrTokenResponse200 = {
+  data: ModelsKioskPrResolveResponse
+  status: 200
+}
+
+export type getUnitsUnitIdKioskResolvePrTokenResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getUnitsUnitIdKioskResolvePrTokenResponseSuccess = (getUnitsUnitIdKioskResolvePrTokenResponse200) & {
+  headers: Headers;
+};
+export type getUnitsUnitIdKioskResolvePrTokenResponseError = (getUnitsUnitIdKioskResolvePrTokenResponse400) & {
+  headers: Headers;
+};
+
+export type getUnitsUnitIdKioskResolvePrTokenResponse = (getUnitsUnitIdKioskResolvePrTokenResponseSuccess | getUnitsUnitIdKioskResolvePrTokenResponseError)
+
+export const getGetUnitsUnitIdKioskResolvePrTokenUrl = (unitId: string,
+    params: GetUnitsUnitIdKioskResolvePrTokenParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/units/${unitId}/kiosk/resolve-pr-token?${stringifiedParams}` : `/units/${unitId}/kiosk/resolve-pr-token`
+}
+
+export const getUnitsUnitIdKioskResolvePrToken = async (unitId: string,
+    params: GetUnitsUnitIdKioskResolvePrTokenParams, options?: RequestInit): Promise<getUnitsUnitIdKioskResolvePrTokenResponse> => {
+
+  return orvalMutator<getUnitsUnitIdKioskResolvePrTokenResponse>(getGetUnitsUnitIdKioskResolvePrTokenUrl(unitId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUnitsUnitIdKioskResolvePrTokenQueryKey = (unitId: string,
+    params?: GetUnitsUnitIdKioskResolvePrTokenParams,) => {
+    return [
+    `/units/${unitId}/kiosk/resolve-pr-token`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetUnitsUnitIdKioskResolvePrTokenQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>, TError = string>(unitId: string,
+    params: GetUnitsUnitIdKioskResolvePrTokenParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdKioskResolvePrTokenQueryKey(unitId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>> = ({ signal }) => getUnitsUnitIdKioskResolvePrToken(unitId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetUnitsUnitIdKioskResolvePrTokenQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>>
+export type GetUnitsUnitIdKioskResolvePrTokenQueryError = string
+
+
+export function useGetUnitsUnitIdKioskResolvePrToken<TData = Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>, TError = string>(
+ unitId: string,
+    params: GetUnitsUnitIdKioskResolvePrTokenParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitsUnitIdKioskResolvePrToken<TData = Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>, TError = string>(
+ unitId: string,
+    params: GetUnitsUnitIdKioskResolvePrTokenParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitsUnitIdKioskResolvePrToken<TData = Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>, TError = string>(
+ unitId: string,
+    params: GetUnitsUnitIdKioskResolvePrTokenParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Resolve signed prToken to six-digit code (kiosk / deep link)
+ */
+
+export function useGetUnitsUnitIdKioskResolvePrToken<TData = Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>, TError = string>(
+ unitId: string,
+    params: GetUnitsUnitIdKioskResolvePrTokenParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskResolvePrToken>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetUnitsUnitIdKioskResolvePrTokenQueryOptions(unitId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 
 
@@ -3202,6 +3384,120 @@ export const usePostUnitsUnitIdPreRegistrations = <TError = string,
     }
 
 /**
+ * Enqueues one transactional SMS per open pre-registration for the unit and calendar day. Requires unit settings manage permission. Optional query date=YYYY-MM-DD.
+ * @summary Enqueue bulk SMS reminders for today’s bookings
+ */
+export type postUnitsUnitIdPreRegistrationsBulkRemindResponse200 = {
+  data: ModelsPreRegistrationBulkRemindResponse
+  status: 200
+}
+
+export type postUnitsUnitIdPreRegistrationsBulkRemindResponse401 = {
+  data: string
+  status: 401
+}
+
+export type postUnitsUnitIdPreRegistrationsBulkRemindResponse403 = {
+  data: string
+  status: 403
+}
+
+export type postUnitsUnitIdPreRegistrationsBulkRemindResponse500 = {
+  data: string
+  status: 500
+}
+
+export type postUnitsUnitIdPreRegistrationsBulkRemindResponse503 = {
+  data: string
+  status: 503
+}
+
+export type postUnitsUnitIdPreRegistrationsBulkRemindResponseSuccess = (postUnitsUnitIdPreRegistrationsBulkRemindResponse200) & {
+  headers: Headers;
+};
+export type postUnitsUnitIdPreRegistrationsBulkRemindResponseError = (postUnitsUnitIdPreRegistrationsBulkRemindResponse401 | postUnitsUnitIdPreRegistrationsBulkRemindResponse403 | postUnitsUnitIdPreRegistrationsBulkRemindResponse500 | postUnitsUnitIdPreRegistrationsBulkRemindResponse503) & {
+  headers: Headers;
+};
+
+export type postUnitsUnitIdPreRegistrationsBulkRemindResponse = (postUnitsUnitIdPreRegistrationsBulkRemindResponseSuccess | postUnitsUnitIdPreRegistrationsBulkRemindResponseError)
+
+export const getPostUnitsUnitIdPreRegistrationsBulkRemindUrl = (unitId: string,
+    params?: PostUnitsUnitIdPreRegistrationsBulkRemindParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/units/${unitId}/pre-registrations/bulk-remind?${stringifiedParams}` : `/units/${unitId}/pre-registrations/bulk-remind`
+}
+
+export const postUnitsUnitIdPreRegistrationsBulkRemind = async (unitId: string,
+    params?: PostUnitsUnitIdPreRegistrationsBulkRemindParams, options?: RequestInit): Promise<postUnitsUnitIdPreRegistrationsBulkRemindResponse> => {
+
+  return orvalMutator<postUnitsUnitIdPreRegistrationsBulkRemindResponse>(getPostUnitsUnitIdPreRegistrationsBulkRemindUrl(unitId,params),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostUnitsUnitIdPreRegistrationsBulkRemindMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsBulkRemind>>, TError,{unitId: string;params?: PostUnitsUnitIdPreRegistrationsBulkRemindParams}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsBulkRemind>>, TError,{unitId: string;params?: PostUnitsUnitIdPreRegistrationsBulkRemindParams}, TContext> => {
+
+const mutationKey = ['postUnitsUnitIdPreRegistrationsBulkRemind'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsBulkRemind>>, {unitId: string;params?: PostUnitsUnitIdPreRegistrationsBulkRemindParams}> = (props) => {
+          const {unitId,params} = props ?? {};
+
+          return  postUnitsUnitIdPreRegistrationsBulkRemind(unitId,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostUnitsUnitIdPreRegistrationsBulkRemindMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsBulkRemind>>>
+
+    export type PostUnitsUnitIdPreRegistrationsBulkRemindMutationError = string
+
+    /**
+ * @summary Enqueue bulk SMS reminders for today’s bookings
+ */
+export const usePostUnitsUnitIdPreRegistrationsBulkRemind = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsBulkRemind>>, TError,{unitId: string;params?: PostUnitsUnitIdPreRegistrationsBulkRemindParams}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsBulkRemind>>,
+        TError,
+        {unitId: string;params?: PostUnitsUnitIdPreRegistrationsBulkRemindParams},
+        TContext
+      > => {
+      return useMutation(getPostUnitsUnitIdPreRegistrationsBulkRemindMutationOptions(options), queryClient);
+    }
+
+/**
  * Returns CalDAV slot rows (href, etag, time) for a service and date; requires Bearer auth and unit membership. Empty array when no integration or no slots.
  * @summary List calendar-backed slots with CalDAV hrefs (when integration enabled)
  */
@@ -3351,6 +3647,453 @@ export function useGetCalendarSlotsByUnit<TData = Awaited<ReturnType<typeof getC
 
 
 
+
+/**
+ * Requires X-Lookup-Token from verify. Returns pre-registration rows the visitor may check in. Public; rate-limited.
+ * @summary List today’s pre-registrations for verified phone
+ */
+export type getUnitsUnitIdPreRegistrationsKioskPhoneListResponse200 = {
+  data: ModelsPreRegistration[]
+  status: 200
+}
+
+export type getUnitsUnitIdPreRegistrationsKioskPhoneListResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getUnitsUnitIdPreRegistrationsKioskPhoneListResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getUnitsUnitIdPreRegistrationsKioskPhoneListResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getUnitsUnitIdPreRegistrationsKioskPhoneListResponse503 = {
+  data: string
+  status: 503
+}
+
+export type getUnitsUnitIdPreRegistrationsKioskPhoneListResponseSuccess = (getUnitsUnitIdPreRegistrationsKioskPhoneListResponse200) & {
+  headers: Headers;
+};
+export type getUnitsUnitIdPreRegistrationsKioskPhoneListResponseError = (getUnitsUnitIdPreRegistrationsKioskPhoneListResponse400 | getUnitsUnitIdPreRegistrationsKioskPhoneListResponse401 | getUnitsUnitIdPreRegistrationsKioskPhoneListResponse500 | getUnitsUnitIdPreRegistrationsKioskPhoneListResponse503) & {
+  headers: Headers;
+};
+
+export type getUnitsUnitIdPreRegistrationsKioskPhoneListResponse = (getUnitsUnitIdPreRegistrationsKioskPhoneListResponseSuccess | getUnitsUnitIdPreRegistrationsKioskPhoneListResponseError)
+
+export const getGetUnitsUnitIdPreRegistrationsKioskPhoneListUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/pre-registrations/kiosk-phone/list`
+}
+
+export const getUnitsUnitIdPreRegistrationsKioskPhoneList = async (unitId: string, options?: RequestInit): Promise<getUnitsUnitIdPreRegistrationsKioskPhoneListResponse> => {
+
+  return orvalMutator<getUnitsUnitIdPreRegistrationsKioskPhoneListResponse>(getGetUnitsUnitIdPreRegistrationsKioskPhoneListUrl(unitId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUnitsUnitIdPreRegistrationsKioskPhoneListQueryKey = (unitId: string,) => {
+    return [
+    `/units/${unitId}/pre-registrations/kiosk-phone/list`
+    ] as const;
+    }
+
+
+export const getGetUnitsUnitIdPreRegistrationsKioskPhoneListQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdPreRegistrationsKioskPhoneListQueryKey(unitId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>> = ({ signal }) => getUnitsUnitIdPreRegistrationsKioskPhoneList(unitId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetUnitsUnitIdPreRegistrationsKioskPhoneListQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>>
+export type GetUnitsUnitIdPreRegistrationsKioskPhoneListQueryError = string
+
+
+export function useGetUnitsUnitIdPreRegistrationsKioskPhoneList<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>, TError = string>(
+ unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitsUnitIdPreRegistrationsKioskPhoneList<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitsUnitIdPreRegistrationsKioskPhoneList<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List today’s pre-registrations for verified phone
+ */
+
+export function useGetUnitsUnitIdPreRegistrationsKioskPhoneList<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsKioskPhoneList>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetUnitsUnitIdPreRegistrationsKioskPhoneListQueryOptions(unitId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Issues a ticket for the selected preRegistrationId. Same response shape as code redeem. Public; rate-limited.
+ * @summary Redeem pre-registration after phone lookup
+ */
+export type postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponse200 = {
+  data: ModelsPreRegistrationRedeemResponse
+  status: 200
+}
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponse400 = {
+  data: string
+  status: 400
+}
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponse401 = {
+  data: string
+  status: 401
+}
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponse500 = {
+  data: string
+  status: 500
+}
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponse503 = {
+  data: string
+  status: 503
+}
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponseSuccess = (postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponse200) & {
+  headers: Headers;
+};
+export type postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponseError = (postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponse400 | postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponse401 | postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponse500 | postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponse503) & {
+  headers: Headers;
+};
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponse = (postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponseSuccess | postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponseError)
+
+export const getPostUnitsUnitIdPreRegistrationsKioskPhoneRedeemUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/pre-registrations/kiosk-phone/redeem`
+}
+
+export const postUnitsUnitIdPreRegistrationsKioskPhoneRedeem = async (unitId: string,
+    modelsKioskPhoneRedeemRequest: ModelsKioskPhoneRedeemRequest, options?: RequestInit): Promise<postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponse> => {
+
+  return orvalMutator<postUnitsUnitIdPreRegistrationsKioskPhoneRedeemResponse>(getPostUnitsUnitIdPreRegistrationsKioskPhoneRedeemUrl(unitId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      modelsKioskPhoneRedeemRequest,)
+  }
+);}
+
+
+
+
+export const getPostUnitsUnitIdPreRegistrationsKioskPhoneRedeemMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneRedeem>>, TError,{unitId: string;data: ModelsKioskPhoneRedeemRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneRedeem>>, TError,{unitId: string;data: ModelsKioskPhoneRedeemRequest}, TContext> => {
+
+const mutationKey = ['postUnitsUnitIdPreRegistrationsKioskPhoneRedeem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneRedeem>>, {unitId: string;data: ModelsKioskPhoneRedeemRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  postUnitsUnitIdPreRegistrationsKioskPhoneRedeem(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostUnitsUnitIdPreRegistrationsKioskPhoneRedeemMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneRedeem>>>
+    export type PostUnitsUnitIdPreRegistrationsKioskPhoneRedeemMutationBody = ModelsKioskPhoneRedeemRequest
+    export type PostUnitsUnitIdPreRegistrationsKioskPhoneRedeemMutationError = string
+
+    /**
+ * @summary Redeem pre-registration after phone lookup
+ */
+export const usePostUnitsUnitIdPreRegistrationsKioskPhoneRedeem = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneRedeem>>, TError,{unitId: string;data: ModelsKioskPhoneRedeemRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneRedeem>>,
+        TError,
+        {unitId: string;data: ModelsKioskPhoneRedeemRequest},
+        TContext
+      > => {
+      return useMutation(getPostUnitsUnitIdPreRegistrationsKioskPhoneRedeemMutationOptions(options), queryClient);
+    }
+
+/**
+ * Sends a 6-digit SMS code; returns a sessionId for /kiosk-phone/verify. Public; rate-limited. Requires tenant SMS to be available for the unit.
+ * @summary Start phone verification for kiosk appointment lookup
+ */
+export type postUnitsUnitIdPreRegistrationsKioskPhoneStartResponse200 = {
+  data: ModelsKioskPhoneLookupStartResponse
+  status: 200
+}
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneStartResponse400 = {
+  data: string
+  status: 400
+}
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneStartResponse429 = {
+  data: string
+  status: 429
+}
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneStartResponse503 = {
+  data: string
+  status: 503
+}
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneStartResponseSuccess = (postUnitsUnitIdPreRegistrationsKioskPhoneStartResponse200) & {
+  headers: Headers;
+};
+export type postUnitsUnitIdPreRegistrationsKioskPhoneStartResponseError = (postUnitsUnitIdPreRegistrationsKioskPhoneStartResponse400 | postUnitsUnitIdPreRegistrationsKioskPhoneStartResponse429 | postUnitsUnitIdPreRegistrationsKioskPhoneStartResponse503) & {
+  headers: Headers;
+};
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneStartResponse = (postUnitsUnitIdPreRegistrationsKioskPhoneStartResponseSuccess | postUnitsUnitIdPreRegistrationsKioskPhoneStartResponseError)
+
+export const getPostUnitsUnitIdPreRegistrationsKioskPhoneStartUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/pre-registrations/kiosk-phone/start`
+}
+
+export const postUnitsUnitIdPreRegistrationsKioskPhoneStart = async (unitId: string,
+    modelsKioskPhoneLookupStartRequest: ModelsKioskPhoneLookupStartRequest, options?: RequestInit): Promise<postUnitsUnitIdPreRegistrationsKioskPhoneStartResponse> => {
+
+  return orvalMutator<postUnitsUnitIdPreRegistrationsKioskPhoneStartResponse>(getPostUnitsUnitIdPreRegistrationsKioskPhoneStartUrl(unitId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      modelsKioskPhoneLookupStartRequest,)
+  }
+);}
+
+
+
+
+export const getPostUnitsUnitIdPreRegistrationsKioskPhoneStartMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneStart>>, TError,{unitId: string;data: ModelsKioskPhoneLookupStartRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneStart>>, TError,{unitId: string;data: ModelsKioskPhoneLookupStartRequest}, TContext> => {
+
+const mutationKey = ['postUnitsUnitIdPreRegistrationsKioskPhoneStart'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneStart>>, {unitId: string;data: ModelsKioskPhoneLookupStartRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  postUnitsUnitIdPreRegistrationsKioskPhoneStart(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostUnitsUnitIdPreRegistrationsKioskPhoneStartMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneStart>>>
+    export type PostUnitsUnitIdPreRegistrationsKioskPhoneStartMutationBody = ModelsKioskPhoneLookupStartRequest
+    export type PostUnitsUnitIdPreRegistrationsKioskPhoneStartMutationError = string
+
+    /**
+ * @summary Start phone verification for kiosk appointment lookup
+ */
+export const usePostUnitsUnitIdPreRegistrationsKioskPhoneStart = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneStart>>, TError,{unitId: string;data: ModelsKioskPhoneLookupStartRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneStart>>,
+        TError,
+        {unitId: string;data: ModelsKioskPhoneLookupStartRequest},
+        TContext
+      > => {
+      return useMutation(getPostUnitsUnitIdPreRegistrationsKioskPhoneStartMutationOptions(options), queryClient);
+    }
+
+/**
+ * Validates the 6-digit code; returns a short-lived lookupToken for list/redeem.
+ * @summary Verify SMS code for kiosk phone lookup
+ */
+export type postUnitsUnitIdPreRegistrationsKioskPhoneVerifyResponse200 = {
+  data: ModelsKioskPhoneLookupVerifyResponse
+  status: 200
+}
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneVerifyResponse400 = {
+  data: string
+  status: 400
+}
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneVerifyResponse401 = {
+  data: string
+  status: 401
+}
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneVerifyResponse503 = {
+  data: string
+  status: 503
+}
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneVerifyResponseSuccess = (postUnitsUnitIdPreRegistrationsKioskPhoneVerifyResponse200) & {
+  headers: Headers;
+};
+export type postUnitsUnitIdPreRegistrationsKioskPhoneVerifyResponseError = (postUnitsUnitIdPreRegistrationsKioskPhoneVerifyResponse400 | postUnitsUnitIdPreRegistrationsKioskPhoneVerifyResponse401 | postUnitsUnitIdPreRegistrationsKioskPhoneVerifyResponse503) & {
+  headers: Headers;
+};
+
+export type postUnitsUnitIdPreRegistrationsKioskPhoneVerifyResponse = (postUnitsUnitIdPreRegistrationsKioskPhoneVerifyResponseSuccess | postUnitsUnitIdPreRegistrationsKioskPhoneVerifyResponseError)
+
+export const getPostUnitsUnitIdPreRegistrationsKioskPhoneVerifyUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/pre-registrations/kiosk-phone/verify`
+}
+
+export const postUnitsUnitIdPreRegistrationsKioskPhoneVerify = async (unitId: string,
+    modelsKioskPhoneLookupVerifyRequest: ModelsKioskPhoneLookupVerifyRequest, options?: RequestInit): Promise<postUnitsUnitIdPreRegistrationsKioskPhoneVerifyResponse> => {
+
+  return orvalMutator<postUnitsUnitIdPreRegistrationsKioskPhoneVerifyResponse>(getPostUnitsUnitIdPreRegistrationsKioskPhoneVerifyUrl(unitId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      modelsKioskPhoneLookupVerifyRequest,)
+  }
+);}
+
+
+
+
+export const getPostUnitsUnitIdPreRegistrationsKioskPhoneVerifyMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneVerify>>, TError,{unitId: string;data: ModelsKioskPhoneLookupVerifyRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneVerify>>, TError,{unitId: string;data: ModelsKioskPhoneLookupVerifyRequest}, TContext> => {
+
+const mutationKey = ['postUnitsUnitIdPreRegistrationsKioskPhoneVerify'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneVerify>>, {unitId: string;data: ModelsKioskPhoneLookupVerifyRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  postUnitsUnitIdPreRegistrationsKioskPhoneVerify(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostUnitsUnitIdPreRegistrationsKioskPhoneVerifyMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneVerify>>>
+    export type PostUnitsUnitIdPreRegistrationsKioskPhoneVerifyMutationBody = ModelsKioskPhoneLookupVerifyRequest
+    export type PostUnitsUnitIdPreRegistrationsKioskPhoneVerifyMutationError = string
+
+    /**
+ * @summary Verify SMS code for kiosk phone lookup
+ */
+export const usePostUnitsUnitIdPreRegistrationsKioskPhoneVerify = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneVerify>>, TError,{unitId: string;data: ModelsKioskPhoneLookupVerifyRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsKioskPhoneVerify>>,
+        TError,
+        {unitId: string;data: ModelsKioskPhoneLookupVerifyRequest},
+        TContext
+      > => {
+      return useMutation(getPostUnitsUnitIdPreRegistrationsKioskPhoneVerifyMutationOptions(options), queryClient);
+    }
 
 /**
  * Validates the code, creates a ticket, and marks the pre-registration redeemed. Invalid codes return HTTP 200 with success=false and a message; server errors use 5xx.
