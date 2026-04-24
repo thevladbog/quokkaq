@@ -235,6 +235,10 @@ export type HomeMessages = {
     label: string;
     ariaLabel: string;
   };
+  /** Shown only when `LandingTestimonials` receives non-empty `items`. */
+  testimonials: {
+    heading: string;
+  };
   footer: {
     title: string;
     body: string;
@@ -244,6 +248,10 @@ export type HomeMessages = {
     ctaSecondary: string;
     privacy: string;
     terms: string;
+    /** Footer link to `/blog`. */
+    blog: string;
+    /** Footer link to `/roi`. */
+    roi: string;
     /** Reopens the cookie / analytics consent banner when GTM is configured. */
     cookieSettings: string;
     /** Company line after © year (e.g. “QuokkaQ Systems”). */
@@ -261,9 +269,53 @@ export type CookieConsentMessages = {
   privacyLinkLabel: string;
 };
 
+export type BlogMessages = {
+  metaTitle: string;
+  metaDescription: string;
+  listHeading: string;
+  listSubheading: string;
+  readMore: string;
+  publishedPrefix: string;
+  listEmpty: string;
+  postBackToBlog: string;
+  postNotFoundTitle: string;
+  postNotFoundBody: string;
+};
+
+export type RoiMessages = {
+  metaTitle: string;
+  metaDescription: string;
+  heading: string;
+  subheading: string;
+  disclaimer: string;
+  visitorsPerDay: string;
+  waitMinutes: string;
+  locations: string;
+  aggregateWaitLabel: string;
+  aggregateWaitHint: string;
+  illustrativeStaffLabel: string;
+  illustrativeStaffHint: string;
+  methodology: string;
+};
+
+export type ExitIntentMessages = {
+  title: string;
+  body: string;
+  bookDemoCta: string;
+  emailSalesCta: string;
+  dismiss: string;
+  mailtoSubject: string;
+};
+
 export const messages: Record<
   AppLocale,
-  { home: HomeMessages; cookieConsent: CookieConsentMessages }
+  {
+    home: HomeMessages;
+    blog: BlogMessages;
+    roi: RoiMessages;
+    exitIntent: ExitIntentMessages;
+    cookieConsent: CookieConsentMessages;
+  }
 > = {
   en: {
     home: {
@@ -628,13 +680,22 @@ export const messages: Record<
             title:
               'For Russian organizations, our processes line up with what 152-FZ asks for'
           },
-          { title: 'Enterprise plans can include up to 99.9% availability in the SLA' },
-          { title: 'Traffic is encrypted in transit; stored data is handled with care' }
+          {
+            title:
+              'Enterprise plans can include up to 99.9% availability in the SLA'
+          },
+          {
+            title:
+              'Traffic is encrypted in transit; stored data is handled with care'
+          }
         ]
       },
       stickyMobileCta: {
         label: 'Start free',
         ariaLabel: 'Open product signup to start a free trial'
+      },
+      testimonials: {
+        heading: 'What teams say'
       },
       faq: {
         heading: 'Frequently asked questions',
@@ -708,10 +769,56 @@ export const messages: Record<
         ctaSecondary: 'Contact us',
         privacy: 'Privacy Policy',
         terms: 'Terms of Service',
+        blog: 'Blog',
+        roi: 'ROI estimate',
         cookieSettings: 'Cookie settings',
         copyrightBrand: 'Bogatyrev V.',
         copyrightReserved: 'All rights reserved.'
       }
+    },
+    blog: {
+      metaTitle: 'Blog',
+      metaDescription:
+        'Notes on queue operations, public-sector rollouts, and honest ROI framing for multi-branch teams.',
+      listHeading: 'Blog',
+      listSubheading:
+        'Short articles for operations and IT—methodology first, no invented customer stories.',
+      readMore: 'Read article',
+      publishedPrefix: 'Published',
+      listEmpty: 'No articles yet.',
+      postBackToBlog: 'Back to blog',
+      postNotFoundTitle: 'Article not found',
+      postNotFoundBody: 'This slug does not exist or was removed.'
+    },
+    roi: {
+      metaTitle: 'ROI estimate',
+      metaDescription:
+        'Illustrative calculator for visitor waiting hours and a discussion-only staff-time proxy— not a promise of savings.',
+      heading: 'Rough ROI framing (illustrative)',
+      subheading:
+        'Adjust the sliders to explore orders of magnitude. Share the disclaimer with finance before treating any number as a budget line.',
+      disclaimer:
+        'This page shows illustrative arithmetic for internal discussions only. It is not financial advice, not a QuokkaQ performance guarantee, and not calibrated to your sites. Real outcomes depend on processes, staffing rules, and adoption.',
+      visitorsPerDay: 'Visitors per day (per location, average)',
+      waitMinutes: 'Typical wait today (minutes, visitor perception)',
+      locations: 'Number of locations / branches in scope',
+      aggregateWaitLabel: 'Approx. aggregate visitor waiting hours / month',
+      aggregateWaitHint:
+        'Computed as visitors × wait minutes ÷ 60 × ~22 weekdays × number of locations. It is a coarse load indicator, not wasted staff time.',
+      illustrativeStaffLabel:
+        'Illustrative staff-time proxy / month (discussion only)',
+      illustrativeStaffHint:
+        'Uses a fixed 6% heuristic applied to the aggregate waiting hours—meant only to spark a conversation with operations, not to forecast payroll savings.',
+      methodology:
+        'Replace the default 6% with a coefficient your team agrees on after observing manual reconciliations, escalations, and rework for a sample week.'
+    },
+    exitIntent: {
+      title: 'Leaving already?',
+      body: 'If timing is tight, book a short demo or email us—we will keep it factual and low pressure.',
+      bookDemoCta: 'Book a demo',
+      emailSalesCta: 'Email sales',
+      dismiss: 'Close',
+      mailtoSubject: 'Question from the marketing site'
     },
     cookieConsent: {
       title: 'Cookies and analytics',
@@ -1099,6 +1206,9 @@ export const messages: Record<
         label: 'Начать бесплатно',
         ariaLabel: 'Открыть регистрацию для пробного периода'
       },
+      testimonials: {
+        heading: 'Что говорят команды'
+      },
       faq: {
         heading: 'Часто задаваемые вопросы',
         items: [
@@ -1171,10 +1281,58 @@ export const messages: Record<
         ctaSecondary: 'Связаться с нами',
         privacy: 'Политика конфиденциальности',
         terms: 'Условия использования',
+        blog: 'Блог',
+        roi: 'Оценка эффекта',
         cookieSettings: 'Настройки cookie',
         copyrightBrand: 'Богатырев В.С.',
         copyrightReserved: 'Все права защищены.'
       }
+    },
+    blog: {
+      metaTitle: 'Блог',
+      metaDescription:
+        'Заметки про эксплуатацию очередей, госсектор и честную постановку ROI для сетей филиалов.',
+      listHeading: 'Блог',
+      listSubheading:
+        'Короткие материалы для эксплуатации и ИТ: сначала методология, без вымышленных кейсов.',
+      readMore: 'Читать статью',
+      publishedPrefix: 'Опубликовано',
+      listEmpty: 'Пока нет статей.',
+      postBackToBlog: 'К списку статей',
+      postNotFoundTitle: 'Статья не найдена',
+      postNotFoundBody: 'Такого адреса нет или материал снят с публикации.'
+    },
+    roi: {
+      metaTitle: 'Оценка эффекта (иллюстративно)',
+      metaDescription:
+        'Грубый калькулятор часов ожидания посетителей и обсуждаемого прокси времени персонала — не обещание экономии.',
+      heading: 'Грубая оценка эффекта (для обсуждения)',
+      subheading:
+        'Подвиньте ползунки, чтобы увидеть порядок величин. Перед тем как заносить цифры в бюджет, покажите дисклеймер финансам и эксплуатации.',
+      disclaimer:
+        'Страница показывает иллюстративную арифметику для внутренних обсуждений. Это не финансовая рекомендация, не гарантия результата от КвоккаКю и не калибровка под ваши площадки. Итог зависит от процессов, регламентов и внедрения.',
+      visitorsPerDay: 'Посетителей в день (в среднем на точку)',
+      waitMinutes:
+        'Типичное ожидание сейчас (минуты, субъективно у посетителя)',
+      locations: 'Число локаций / филиалов в расчёте',
+      aggregateWaitLabel:
+        'Ориентировочно суммарные часы ожидания посетителей / месяц',
+      aggregateWaitHint:
+        'Считается как посетители × минуты ожидания ÷ 60 × ~22 рабочих дня × число локаций. Это грубый индикатор нагрузки, а не «потерянное» время персонала.',
+      illustrativeStaffLabel:
+        'Иллюстративный прокси времени персонала / месяц (только для разговора)',
+      illustrativeStaffHint:
+        'Используется фиксированный коэффициент 6% к суммарным часам ожидания — лишь чтобы завести разговор с эксплуатацией, а не прогнозировать ФОТ.',
+      methodology:
+        'Замените 6% на коэффициент, который ваша команда согласует после недели наблюдений за ручными сверками, эскалациями и переделками.'
+    },
+    exitIntent: {
+      title: 'Уже уходите?',
+      body: 'Если сейчас неудобно — запишитесь на короткое демо или напишите нам: без давления и с опорой на факты.',
+      bookDemoCta: 'Записаться на демо',
+      emailSalesCta: 'Написать в sales',
+      dismiss: 'Закрыть',
+      mailtoSubject: 'Вопрос с маркетингового сайта'
     },
     cookieConsent: {
       title: 'Файлы cookie и аналитика',

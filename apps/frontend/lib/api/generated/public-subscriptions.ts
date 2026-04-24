@@ -1008,6 +1008,11 @@ export interface HandlersPublicLeadRequestBody {
   source?: string;
 }
 
+export interface HandlersPublicMarketingStatsResponse {
+  activeCompanies?: number;
+  activeHumanUsers?: number;
+}
+
 /**
  * Error is always "quota_exceeded".
  */
@@ -3019,6 +3024,50 @@ export interface ServicesUtilizationResponse {
 export type PostSubscriptionCustomTermsLeadRequest201 = {[key: string]: string};
 
 export type PostSubscriptionPlanChangeRequest201 = {[key: string]: string};
+
+/**
+ * Returns non-sensitive counts for the public marketing landing (tenant companies excluding the SaaS operator row, and active human users). Cached briefly via HTTP headers.
+ * @summary Public marketing aggregate counts
+ */
+export type getPublicMarketingStatsResponse200 = {
+  data: HandlersPublicMarketingStatsResponse
+  status: 200
+}
+
+export type getPublicMarketingStatsResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getPublicMarketingStatsResponseSuccess = (getPublicMarketingStatsResponse200) & {
+  headers: Headers;
+};
+export type getPublicMarketingStatsResponseError = (getPublicMarketingStatsResponse500) & {
+  headers: Headers;
+};
+
+export type getPublicMarketingStatsResponse = (getPublicMarketingStatsResponseSuccess | getPublicMarketingStatsResponseError)
+
+export const getGetPublicMarketingStatsUrl = () => {
+
+
+
+
+  return `/public/marketing-stats`
+}
+
+export const getPublicMarketingStats = async ( options?: RequestInit): Promise<getPublicMarketingStatsResponse> => {
+
+  return publicBackendOrvalMutator<getPublicMarketingStatsResponse>(getGetPublicMarketingStatsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
 
 /**
  * Creates a checkout session for subscription upgrade

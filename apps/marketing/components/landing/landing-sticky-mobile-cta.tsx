@@ -68,7 +68,7 @@ export function LandingStickyMobileCta({ locale, copy, appBaseUrl }: Props) {
 
   return (
     <div
-      className={`fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 lg:hidden ${
+      className={`fixed inset-x-0 bottom-0 z-40 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden ${
         visible
           ? 'pointer-events-auto translate-y-0 opacity-100 transition-[opacity,transform] duration-200'
           : 'pointer-events-none translate-y-2 opacity-0 transition-[opacity,transform] duration-200'

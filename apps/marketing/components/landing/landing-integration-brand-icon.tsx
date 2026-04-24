@@ -13,7 +13,11 @@ function SimpleBrandGlyph({ icon }: { icon: SimpleIcon }) {
   );
 }
 
-export function LandingIntegrationBrandIcon({ id }: { id: LandingIntegrationId }) {
+export function LandingIntegrationBrandIcon({
+  id
+}: {
+  id: LandingIntegrationId;
+}) {
   switch (id) {
     case 'googleCalendar':
       return <SimpleBrandGlyph icon={siGooglecalendar} />;

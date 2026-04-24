@@ -7,6 +7,18 @@ export const size = { width: 1200, height: 630 };
 
 export const contentType = 'image/png';
 
+/** Keep OG text within a safe length for image layout and social previews. */
+function clampOgText(text: string, maxChars: number): string {
+  const t = text.trim().replace(/\s+/g, ' ');
+  if (t.length <= maxChars) {
+    return t;
+  }
+  const cut = t.slice(0, maxChars - 1);
+  const lastSpace = cut.lastIndexOf(' ');
+  const base = lastSpace > 40 ? cut.slice(0, lastSpace) : cut;
+  return `${base.trimEnd()}…`;
+}
+
 export default async function Image({
   params
 }: {
@@ -18,6 +30,7 @@ export default async function Image({
   }
 
   const t = messages[raw].home;
+  const ogDescription = clampOgText(t.description, 200);
   const brand = raw === 'ru' ? 'КвоккаКю' : 'QuokkaQ';
   const tagline =
     raw === 'ru'
@@ -34,7 +47,7 @@ export default async function Image({
         alignItems: 'flex-start',
         justifyContent: 'center',
         background:
-          'linear-gradient(135deg, #fafafa 0%, #eef2ff 45%, #ffffff 100%)',
+          'linear-gradient(135deg, #fff8f3 0%, #fff0e8 42%, #fafafa 100%)',
         padding: 64
       }}
     >
@@ -51,7 +64,7 @@ export default async function Image({
         }}
       >
         <span>{t.titleBefore}</span>
-        <span style={{ color: '#2563eb' }}>{t.titleAccent}</span>
+        <span style={{ color: '#ff6b35' }}>{t.titleAccent}</span>
       </div>
       <div
         style={{
@@ -62,7 +75,7 @@ export default async function Image({
           lineHeight: 1.45
         }}
       >
-        {t.description}
+        {ogDescription}
       </div>
       <div
         style={{

@@ -5,7 +5,13 @@ type Props = {
   copy: HomeMessages['integrations'];
 };
 
-function IntegrationPill({ id, label }: { id: LandingIntegrationId; label: string }) {
+function IntegrationPill({
+  id,
+  label
+}: {
+  id: LandingIntegrationId;
+  label: string;
+}) {
   return (
     <li className='flex shrink-0 items-center gap-2.5 rounded-full border border-[color:var(--color-border)]/90 bg-[color:var(--color-surface-elevated)] px-4 py-2.5 shadow-sm'>
       <LandingIntegrationBrandIcon id={id} />
@@ -39,7 +45,10 @@ export function LandingIntegrations({ copy }: Props) {
         <p className='sr-only'>{srSummary}</p>
 
         <div className='hidden motion-reduce:block'>
-          <ul className='flex max-w-full flex-wrap justify-center gap-3' role='list'>
+          <ul
+            className='flex max-w-full flex-wrap justify-center gap-3'
+            role='list'
+          >
             {items.map((item) => (
               <IntegrationPill key={item.id} id={item.id} label={item.label} />
             ))}
@@ -59,12 +68,20 @@ export function LandingIntegrations({ copy }: Props) {
             <div className='landing-integrations-marquee-track' aria-hidden>
               <ul className='flex items-center gap-5 pr-5'>
                 {items.map((item) => (
-                  <IntegrationPill key={`a-${item.id}`} id={item.id} label={item.label} />
+                  <IntegrationPill
+                    key={`a-${item.id}`}
+                    id={item.id}
+                    label={item.label}
+                  />
                 ))}
               </ul>
               <ul className='flex items-center gap-5 pr-5'>
                 {items.map((item) => (
-                  <IntegrationPill key={`b-${item.id}`} id={item.id} label={item.label} />
+                  <IntegrationPill
+                    key={`b-${item.id}`}
+                    id={item.id}
+                    label={item.label}
+                  />
                 ))}
               </ul>
             </div>

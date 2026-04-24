@@ -35,7 +35,7 @@ export function LandingTrustBadges({ copy }: Props) {
                 >
                   <Icon className='h-5 w-5' strokeWidth={1.75} />
                 </span>
-                <span className='text-pretty text-left text-sm leading-relaxed font-medium text-[color:var(--color-text)] sm:text-base'>
+                <span className='text-left text-sm leading-relaxed font-medium text-pretty text-[color:var(--color-text)] sm:text-base'>
                   {item.title}
                 </span>
               </li>

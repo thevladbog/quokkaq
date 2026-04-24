@@ -150,9 +150,7 @@ export function LandingHero({ locale, copy, appBaseUrl }: Props) {
             Narrow alpha fade on the far right only: hides the raster’s hard edge without
             touching the character. (Wide masks and backdrop-blur both harmed the mascot.)
           */}
-          <div
-            className='relative w-full [-webkit-mask-image:linear-gradient(to_left,transparent_0%,black_min(9%,3.25rem))] [-webkit-mask-repeat:no-repeat] [-webkit-mask-size:100%_100%] [mask-image:linear-gradient(to_left,transparent_0%,black_min(9%,3.25rem))] [mask-repeat:no-repeat] [mask-size:100%_100%]'
-          >
+          <div className='relative w-full [mask-image:linear-gradient(to_left,transparent_0%,black_min(9%,3.25rem))] [mask-size:100%_100%] [mask-repeat:no-repeat] [-webkit-mask-image:linear-gradient(to_left,transparent_0%,black_min(9%,3.25rem))] [-webkit-mask-repeat:no-repeat] [-webkit-mask-size:100%_100%]'>
             <Image
               src='/quokka-logo.svg'
               alt=''

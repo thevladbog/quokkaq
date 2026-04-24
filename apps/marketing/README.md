@@ -37,13 +37,15 @@ Public-facing Next.js website for QuokkaQ — the modern queue management system
 
 ## Routes (locales: `en`, `ru`)
 
-| Path                                   | Description                                               |
-| -------------------------------------- | --------------------------------------------------------- |
-| `/{locale}`                            | Home (full landing)                                       |
-| `/{locale}/pricing`                    | Pricing-only page (shared pricing component + footer CTA) |
-| `/{locale}/privacy`, `/{locale}/terms` | Legal                                                     |
+| Path                                      | Description                                               |
+| ----------------------------------------- | --------------------------------------------------------- |
+| `/{locale}`                               | Home (full landing)                                       |
+| `/{locale}/pricing`                       | Pricing-only page (shared pricing component + footer CTA) |
+| `/{locale}/privacy`, `/{locale}/terms`    | Legal                                                     |
+| `/{locale}/blog`, `/{locale}/blog/[slug]` | Blog (markdown in `content/blog/{locale}`)                |
+| `/{locale}/roi`                           | ROI estimate calculator (disclaimer in copy)              |
 
-Main on-page anchors used by the header: `#features`, `#how-it-works`, `#pillars`, `#interface-showcase`, `#use-cases`, `#pricing`, `#faq`, `#book-demo`.
+Main on-page anchors used by the header: `#features`, `#how-it-works`, `#pillars`, `#interface-showcase`, `#use-cases`, `#comparison`, `#pricing`, `#faq`, `#book-demo` (integrations strip is directly under the hero; no anchor).
 
 ---
 
@@ -60,6 +62,33 @@ When `NEXT_PUBLIC_GTM_ID` is set, the site loads GTM (see `components/consent/co
 | `marketing_lead_submit`        | Successful lead form POST (`source`, `plan_code`, `billing_period`) |
 
 In **Google Tag Manager**, create a Custom Event trigger for `marketing` and branch on the **Data Layer Variable** for `event_name` (or use a single tag with lookup tables).
+
+---
+
+## Cal.com embed and Content-Security-Policy
+
+The **Book a demo** block loads a Cal.com (or self-hosted Cal) URL in an `<iframe>`. If your reverse proxy or CDN injects a **Content-Security-Policy** with a restrictive `frame-src`, extend it so the embed origin is allowed.
+
+Typical origins:
+
+- Cloud Cal.com: `https://app.cal.com` (and sometimes `https://cal.com` depending on embed URL)
+- Self-hosted: the same host you set in `NEXT_PUBLIC_CALCOM_BASE_URL`
+
+Example directive fragment (merge into your full CSP; do not copy as a standalone policy):
+
+```http
+frame-src 'self' https://app.cal.com https://cal.com;
+```
+
+Also allow **video** hosts if you use `NEXT_PUBLIC_MARKETING_DEMO_VIDEO_EMBED` (e.g. `https://www.youtube-nocookie.com`).
+
+The marketing app does **not** ship a global CSP by default — avoids breaking Next.js scripts in varied deploy setups. Configure CSP at the edge to match your embed and analytics domains.
+
+---
+
+## Open Graph image (manual QA)
+
+The dynamic route [`app/[locale]/opengraph-image.tsx`](app/[locale]/opengraph-image.tsx) renders 1200×630 PNGs. Long `home.description` strings are **clamped** for the image. After changing copy or layout, spot-check previews (e.g. Telegram / VK / LinkedIn debuggers) for truncation and readability.
 
 ---
 
@@ -192,7 +221,7 @@ apps/marketing/
 │   └── ...               # Fetch helpers and utilities
 ├── public/               # Static assets
 ├── orval.config.ts       # Orval code generation configuration
-├── next.config.ts        # Next.js configuration
+├── next.config.mjs       # Next.js configuration
 └── package.json
 ```
 

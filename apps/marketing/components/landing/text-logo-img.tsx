@@ -28,6 +28,7 @@ export function TextLogoImg({
       width={160}
       height={40}
       className={imageClassName}
+      style={{ width: 'auto' }}
       unoptimized
       priority
       loading='eager'

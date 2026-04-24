@@ -171,10 +171,7 @@ function TopBarCompactNav({
     }
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node;
-      if (
-        panelRef.current?.contains(t) ||
-        moreWrapRef.current?.contains(t)
-      ) {
+      if (panelRef.current?.contains(t) || moreWrapRef.current?.contains(t)) {
         return;
       }
       setMoreOpen(false);
@@ -208,12 +205,12 @@ function TopBarCompactNav({
 
   return (
     <nav
-      className='relative flex min-h-10 min-w-0 w-full flex-1 items-center 2xl:hidden'
+      className='relative flex min-h-10 w-full min-w-0 flex-1 items-center 2xl:hidden'
       aria-label={topNav.navAriaLabel}
     >
       <div
         ref={shellRef}
-        className='flex min-h-10 min-w-0 w-full max-w-full flex-1 justify-end'
+        className='flex min-h-10 w-full max-w-full min-w-0 flex-1 justify-end'
       >
         <div
           className='pointer-events-none fixed top-0 left-0 -z-10 flex gap-2 opacity-0'
@@ -236,7 +233,7 @@ function TopBarCompactNav({
           Do not use overflow-hidden here: the overflow menu is position:absolute below the row
           and would be clipped (looks like “click does nothing”).
         */}
-        <div className='flex min-w-0 max-w-full items-center justify-end gap-2'>
+        <div className='flex max-w-full min-w-0 items-center justify-end gap-2'>
           {visible.map((item) => (
             <a
               key={item.href}
@@ -274,7 +271,7 @@ function TopBarCompactNav({
                   id={panelId}
                   role='menu'
                   aria-label={topNav.moreNavMenuAriaLabel}
-                  className='absolute top-full right-0 z-50 mt-1.5 min-w-[12rem] max-w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] py-1 shadow-xl dark:bg-[color:var(--color-surface-elevated)]'
+                  className='absolute top-full right-0 z-50 mt-1.5 max-w-[min(22rem,calc(100vw-2rem))] min-w-[12rem] rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] py-1 shadow-xl dark:bg-[color:var(--color-surface-elevated)]'
                 >
                   {overflow.map((item) => (
                     <a
@@ -342,7 +339,7 @@ export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
     <header
       className={`landing-reveal landing-top-bar sticky top-0 z-50 border-b transition-[background-color,backdrop-filter,border-color] duration-300 ease-out ${headerSurface}`}
     >
-      <div className='mx-auto flex min-w-0 max-w-7xl items-center justify-between gap-2 px-4 py-3.5 sm:gap-3 sm:px-6 sm:py-4 lg:px-8'>
+      <div className='mx-auto flex max-w-7xl min-w-0 items-center justify-between gap-2 px-4 py-3.5 sm:gap-3 sm:px-6 sm:py-4 lg:px-8'>
         <Link
           href={localeHomePath(locale)}
           prefetch={false}
@@ -355,7 +352,7 @@ export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
         <div className='flex min-w-0 flex-1 items-center justify-end 2xl:justify-center'>
           <TopBarCompactNav items={allNav} topNav={copy.topNav} />
           <nav
-            className='hidden min-h-10 min-w-0 max-w-full flex-1 items-center justify-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain px-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-2 2xl:flex 2xl:gap-3 3xl:gap-4 [&::-webkit-scrollbar]:hidden'
+            className='3xl:gap-4 hidden min-h-10 max-w-full min-w-0 flex-1 items-center justify-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain px-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-2 2xl:flex 2xl:gap-3 [&::-webkit-scrollbar]:hidden'
             aria-label={copy.topNav.navAriaLabel}
           >
             {allNav.map((item) => (

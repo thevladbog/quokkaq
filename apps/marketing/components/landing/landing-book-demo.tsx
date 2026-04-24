@@ -11,19 +11,39 @@ type Props = {
   appBaseUrl: string | null;
 };
 
-function calEmbedSrc(): string | null {
-  const u = process.env.NEXT_PUBLIC_CALCOM_EMBED_SRC?.trim();
-  return u ? u : null;
+/**
+ * Full iframe `src` wins. Otherwise compose from public base + event slug (Cal.com / self-host).
+ * @see https://cal.com/docs/core-features/embed
+ */
+function resolveCalEmbedSrc(): string | null {
+  const direct = process.env.NEXT_PUBLIC_CALCOM_EMBED_SRC?.trim();
+  if (direct) {
+    return direct;
+  }
+  const base = process.env.NEXT_PUBLIC_CALCOM_BASE_URL?.trim().replace(
+    /\/$/,
+    ''
+  );
+  const slug = process.env.NEXT_PUBLIC_CALCOM_EVENT_SLUG?.trim();
+  if (!base || !slug) {
+    return null;
+  }
+  const path = slug.replace(/^\/+/, '');
+  let url = `${base}/${path}`;
+  if (!/\bembed=true\b/i.test(url) && !/\/embed\/?$/i.test(url)) {
+    url += `${url.includes('?') ? '&' : '?'}embed=true`;
+  }
+  return url;
 }
 
 export function LandingBookDemo({ locale, copy, appBaseUrl }: Props) {
-  const embedSrc = useMemo(() => calEmbedSrc(), []);
+  const embedSrc = useMemo(() => resolveCalEmbedSrc(), []);
   const bd = copy.bookDemo;
 
   return (
     <section
       id='book-demo'
-      className='scroll-mt-24 relative z-20 border-t border-[color:var(--color-border)] bg-gradient-to-b from-[color:var(--color-surface-elevated)] via-[color:var(--color-surface)] to-[color:var(--color-primary)]/10 py-16 sm:py-24 dark:to-[color:var(--color-primary)]/15'
+      className='relative z-20 scroll-mt-24 border-t border-[color:var(--color-border)] bg-gradient-to-b from-[color:var(--color-surface-elevated)] via-[color:var(--color-surface)] to-[color:var(--color-primary)]/10 py-16 sm:py-24 dark:to-[color:var(--color-primary)]/15'
       aria-labelledby='book-demo-heading'
     >
       <div className='relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8'>
@@ -39,7 +59,7 @@ export function LandingBookDemo({ locale, copy, appBaseUrl }: Props) {
 
         {embedSrc ? (
           <div className='space-y-4'>
-            <div className='relative overflow-hidden rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-1 shadow-[0_20px_50px_-12px_rgb(0_0_0/0.18)] ring-1 ring-black/5 dark:bg-[color:var(--color-surface-elevated)] dark:shadow-[0_24px_60px_-12px_rgb(0_0_0/0.45)] dark:ring-white/10 sm:p-2'>
+            <div className='relative overflow-hidden rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-1 shadow-[0_20px_50px_-12px_rgb(0_0_0/0.18)] ring-1 ring-black/5 sm:p-2 dark:bg-[color:var(--color-surface-elevated)] dark:shadow-[0_24px_60px_-12px_rgb(0_0_0/0.45)] dark:ring-white/10'>
               <iframe
                 title={bd.embedTitle}
                 src={embedSrc}

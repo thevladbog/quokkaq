@@ -23,11 +23,14 @@ import { LandingInterfaceShowcase } from '@/components/landing/landing-interface
 import { LandingPillars } from '@/components/landing/landing-pillars';
 import { LandingPricing } from '@/components/landing/landing-pricing';
 import { LandingStats } from '@/components/landing/landing-stats';
+import { LandingExitIntent } from '@/components/landing/landing-exit-intent';
 import { LandingStickyMobileCta } from '@/components/landing/landing-sticky-mobile-cta';
 import { LandingTopBar } from '@/components/landing/landing-top-bar';
 import { LandingTrustBadges } from '@/components/landing/landing-trust-badges';
+import { LandingTestimonials } from '@/components/landing/landing-testimonials';
 import { LandingUseCases } from '@/components/landing/landing-use-cases';
 import { HomePageJsonLd } from '@/components/seo/home-page-json-ld';
+import { marketingTestimonialItems } from '@/content/marketing-testimonials';
 import { isAppLocale, messages } from '@/src/messages';
 
 type PageProps = {
@@ -103,11 +106,11 @@ export default async function HomePage({ params }: PageProps) {
           walkthroughVideoEmbedSrc={walkthroughVideoEmbedSrc}
         />
         <LandingUseCases copy={t.home} />
-        <LandingBookDemo
-          locale={raw}
-          copy={t.home}
-          appBaseUrl={appBaseUrl}
+        <LandingTestimonials
+          items={marketingTestimonialItems}
+          heading={t.home.testimonials.heading}
         />
+        <LandingBookDemo locale={raw} copy={t.home} appBaseUrl={appBaseUrl} />
         <LandingPricing
           copy={t.home}
           locale={raw}
@@ -123,6 +126,7 @@ export default async function HomePage({ params }: PageProps) {
         />
       </main>
       <LandingFooterCta copy={t.home} locale={raw} appBaseUrl={appBaseUrl} />
+      <LandingExitIntent locale={raw} copy={t.exitIntent} />
     </div>
   );
 }

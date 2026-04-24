@@ -45,7 +45,9 @@ export function LandingCtaAssurances({ copy, variant }: Props) {
             }`}
             aria-hidden
           >
-            <Icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${iconClass[variant]}`} />
+            <Icon
+              className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${iconClass[variant]}`}
+            />
           </span>
           <span className='leading-snug'>{label}</span>
         </li>

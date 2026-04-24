@@ -53,6 +53,7 @@ export function LandingInterfaceShowcase({
                       src={item.image}
                       alt={item.imageAlt}
                       fill
+                      priority={index === 0}
                       className='object-cover object-top transition duration-300 group-hover:scale-105'
                       sizes='(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 600px'
                     />

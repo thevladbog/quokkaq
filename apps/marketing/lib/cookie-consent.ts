@@ -33,3 +33,29 @@ export function parseConsentCookie(
 export function serializeConsent(state: StoredConsentV1): string {
   return JSON.stringify(state);
 }
+
+/**
+ * Read consent from a raw `document.cookie` string (call only in the browser).
+ * Keeps parsing in one place for GTM, exit-intent, and other client UI.
+ */
+export function parseConsentFromRawCookieHeader(
+  header: string | undefined
+): StoredConsentV1 | null {
+  if (!header?.trim()) {
+    return null;
+  }
+  const all = `; ${header}`;
+  const key = `; ${COOKIE_CONSENT_NAME}=`;
+  const idx = all.indexOf(key);
+  if (idx === -1) {
+    return null;
+  }
+  const start = idx + key.length;
+  const end = all.indexOf(';', start);
+  const value = end === -1 ? all.slice(start) : all.slice(start, end);
+  try {
+    return parseConsentCookie(decodeURIComponent(value));
+  } catch {
+    return null;
+  }
+}

@@ -161,7 +161,9 @@ export function LandingPricing({
 
         <div
           className={`grid gap-8 lg:grid-cols-3 ${
-            useApi ? 'min-h-[32rem] lg:min-h-[28rem]' : ''
+            useApi
+              ? 'min-h-[32rem] lg:min-h-[28rem]'
+              : 'min-h-[28rem] lg:min-h-[26rem]'
           }`}
         >
           {useApi

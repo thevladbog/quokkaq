@@ -5,8 +5,10 @@ import { LandingCtaAssurances } from '@/components/landing/landing-cta-assurance
 import { LeadRequestCta } from '@/components/landing/lead-request-cta';
 import { TextLogoImg } from '@/components/landing/text-logo-img';
 import {
+  localeBlogPath,
   localeHomePath,
   localePrivacyPath,
+  localeRoiPath,
   localeTermsPath
 } from '@/lib/locale-paths';
 import type { AppLocale, HomeMessages } from '@/src/messages';
@@ -109,6 +111,20 @@ export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
             className='flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:justify-end'
             aria-label='Legal'
           >
+            <Link
+              href={localeBlogPath(locale)}
+              prefetch={false}
+              className='focus-ring rounded-sm transition hover:text-[color:var(--color-primary)] dark:hover:text-[color:var(--color-primary)]'
+            >
+              {copy.footer.blog}
+            </Link>
+            <Link
+              href={localeRoiPath(locale)}
+              prefetch={false}
+              className='focus-ring rounded-sm transition hover:text-[color:var(--color-primary)] dark:hover:text-[color:var(--color-primary)]'
+            >
+              {copy.footer.roi}
+            </Link>
             <Link
               href={privacyHref}
               prefetch={false}

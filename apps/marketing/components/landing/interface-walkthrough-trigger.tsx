@@ -19,6 +19,7 @@ export function InterfaceWalkthroughTrigger({
 }: Props) {
   const [open, setOpen] = useState(false);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
   const onClose = useCallback(() => setOpen(false), []);
@@ -49,6 +50,41 @@ export function InterfaceWalkthroughTrigger({
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
+  /** Keep Tab cycling inside the dialog (close + iframe). */
+  useEffect(() => {
+    if (!open || !panelRef.current) {
+      return;
+    }
+    const panel = panelRef.current;
+    const focusables = () =>
+      Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), iframe[tabindex="0"]'
+        )
+      );
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') {
+        return;
+      }
+      const list = focusables();
+      if (list.length < 2) {
+        return;
+      }
+      const first = list[0];
+      const last = list[list.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    panel.addEventListener('keydown', onKeyDown);
+    return () => panel.removeEventListener('keydown', onKeyDown);
+  }, [open]);
+
   return (
     <>
       <div className='relative aspect-[16/10] overflow-hidden rounded-t-2xl border-b border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)]'>
@@ -56,7 +92,8 @@ export function InterfaceWalkthroughTrigger({
           src={item.image}
           alt={item.imageAlt}
           fill
-          className='object-cover object-top transition duration-300 group-hover:scale-105'
+          priority
+          className='object-cover object-top transition duration-300 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100'
           sizes='(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 600px'
         />
         <div className='absolute inset-0 flex items-center justify-center bg-black/25 transition group-hover:bg-black/35'>
@@ -83,6 +120,7 @@ export function InterfaceWalkthroughTrigger({
           onClick={onClose}
         >
           <div
+            ref={panelRef}
             role='dialog'
             aria-modal
             aria-labelledby={titleId}
@@ -107,6 +145,7 @@ export function InterfaceWalkthroughTrigger({
             </div>
             <div className='relative min-h-0 flex-1 bg-black'>
               <iframe
+                tabIndex={0}
                 src={videoEmbedSrc}
                 title={walkthroughCopy.dialogTitle}
                 className='aspect-video h-auto min-h-[12rem] w-full sm:min-h-[20rem]'

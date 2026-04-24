@@ -58,7 +58,7 @@ export function LandingComparison({ copy, locale }: Props) {
                 <div className='bg-[color:var(--color-surface)]/90 px-5 py-5 text-[15px] leading-relaxed text-[color:var(--color-text-muted)] sm:px-7 sm:text-base dark:bg-[color:var(--color-surface)]/70'>
                   {row.before}
                 </div>
-                <div className='bg-[color:var(--color-primary)]/[0.07] px-5 py-5 text-[15px] font-medium leading-relaxed text-[color:var(--color-text)] sm:px-7 sm:text-base dark:bg-[color:var(--color-primary)]/12'>
+                <div className='bg-[color:var(--color-primary)]/[0.07] px-5 py-5 text-[15px] leading-relaxed font-medium text-[color:var(--color-text)] sm:px-7 sm:text-base dark:bg-[color:var(--color-primary)]/12'>
                   {row.after}
                 </div>
               </li>

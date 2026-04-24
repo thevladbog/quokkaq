@@ -1,10 +1,4 @@
-import {
-  Building2,
-  CalendarDays,
-  Clock,
-  Globe,
-  Plug
-} from 'lucide-react';
+import { Building2, CalendarDays, Clock, Globe, Plug } from 'lucide-react';
 
 import type { HandlersPublicMarketingStatsResponse } from '@/lib/api/generated/subscriptions';
 import type { HomeMessages } from '@/src/messages';
@@ -78,9 +72,7 @@ export function LandingStats({ copy, statsFromApi }: Props) {
           >
             {heading}
           </h2>
-          <ul
-            className='-mx-1 flex w-full flex-nowrap items-stretch justify-center gap-x-2 gap-y-2 overflow-x-auto px-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-x-3 sm:gap-y-0 md:gap-x-4 [&::-webkit-scrollbar]:hidden'
-          >
+          <ul className='-mx-1 flex w-full flex-nowrap items-stretch justify-center gap-x-2 gap-y-2 overflow-x-auto px-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-x-3 sm:gap-y-0 md:gap-x-4 [&::-webkit-scrollbar]:hidden'>
             {items.map((item) => (
               <li
                 key={item.label}
@@ -92,7 +84,7 @@ export function LandingStats({ copy, statsFromApi }: Props) {
                 >
                   <StatIcon icon={item.icon} />
                 </span>
-                <span className='font-display whitespace-nowrap text-left text-[0.6875rem] leading-snug font-medium tracking-tight text-[color:var(--color-text-muted)] sm:text-xs sm:leading-snug md:text-sm'>
+                <span className='font-display text-left text-[0.6875rem] leading-snug font-medium tracking-tight whitespace-nowrap text-[color:var(--color-text-muted)] sm:text-xs sm:leading-snug md:text-sm'>
                   {item.label}
                 </span>
               </li>
