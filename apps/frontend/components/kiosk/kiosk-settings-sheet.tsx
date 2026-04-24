@@ -43,6 +43,7 @@ import {
 
 const DEFAULT_IDLE_WARNING_SEC = 45;
 const DEFAULT_IDLE_COUNTDOWN_SEC = 15;
+const DEFAULT_TICKET_SUCCESS_AUTOCLOSE_SEC = 12;
 
 function KioskSettingsColorColumn({
   inputId,
@@ -324,6 +325,10 @@ function KioskSettingsForm({
     (k0 as KioskConfig | undefined)?.sessionIdleCountdownSec ??
       DEFAULT_IDLE_COUNTDOWN_SEC
   );
+  const [ticketSuccessAutoCloseSec, setTicketSuccessAutoCloseSec] = useState(
+    (k0 as KioskConfig | undefined)?.ticketSuccessAutoCloseSec ??
+      DEFAULT_TICKET_SUCCESS_AUTOCLOSE_SEC
+  );
   const [visitorSmsAfterTicket, setVisitorSmsAfterTicket] = useState(
     (k0 as KioskConfig | undefined)?.visitorSmsAfterTicket !== false
   );
@@ -457,6 +462,13 @@ function KioskSettingsForm({
       300,
       Math.max(5, sessionIdleCountdownSec || DEFAULT_IDLE_COUNTDOWN_SEC)
     );
+    const ticketCloseSec = Math.min(
+      120,
+      Math.max(
+        1,
+        ticketSuccessAutoCloseSec || DEFAULT_TICKET_SUCCESS_AUTOCLOSE_SEC
+      )
+    );
     if (isTauriKiosk()) {
       if (serialPath.trim()) {
         localStorage.setItem('kioskSerialPath', serialPath.trim());
@@ -486,6 +498,7 @@ function KioskSettingsForm({
         serviceGridColor,
         sessionIdleBeforeWarningSec: beforeSec,
         sessionIdleCountdownSec: countSec,
+        ticketSuccessAutoCloseSec: ticketCloseSec,
         visitorSmsAfterTicket,
         idOcrEnabled: idOcrEnabled,
         idOcrPreferNative: idOcrPreferNative,
@@ -870,6 +883,27 @@ function KioskSettingsForm({
               value={sessionIdleCountdownSec}
               onChange={(e) =>
                 setSessionIdleCountdownSec(Number(e.target.value) || 0)
+              }
+            />
+          </div>
+          <div className='flex items-center justify-between gap-2'>
+            <div>
+              <Label htmlFor='sheet-ticket-success-close'>
+                {tAdmin('ticket_success_auto_close_label')}
+              </Label>
+              <p className='text-muted-foreground text-sm'>
+                {tAdmin('ticket_success_auto_close_hint')}
+              </p>
+            </div>
+            <Input
+              id='sheet-ticket-success-close'
+              className='w-24'
+              type='number'
+              min={1}
+              max={120}
+              value={ticketSuccessAutoCloseSec}
+              onChange={(e) =>
+                setTicketSuccessAutoCloseSec(Number(e.target.value) || 0)
               }
             />
           </div>

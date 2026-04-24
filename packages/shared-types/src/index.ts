@@ -498,6 +498,11 @@ export const KioskConfigSchema = z
       .optional(),
     /** Countdown in seconds on the warning dialog before resetting to the kiosk home. Default 15. */
     sessionIdleCountdownSec: z.number().int().positive().max(300).optional(),
+    /**
+     * Seconds before the ticket success dialog auto-closes (when SMS capture is not blocking).
+     * Default 12 if unset (was a fixed 5s in the client before this setting existed).
+     */
+    ticketSuccessAutoCloseSec: z.number().int().positive().max(120).optional(),
     /** When false, skip mandatory post-ticket SMS step. Default true when unset. */
     visitorSmsAfterTicket: z.boolean().optional(),
     /**
@@ -1070,6 +1075,11 @@ export interface KioskConfig {
    * Countdown in seconds on the warning dialog before returning to the kiosk home. Defaults to 15 if unset.
    */
   sessionIdleCountdownSec?: number;
+  /**
+   * Auto-close delay for the ticket success dialog in seconds (ignored while post-ticket SMS step is active).
+   * Defaults to 12 if unset.
+   */
+  ticketSuccessAutoCloseSec?: number;
   /**
    * When false, the kiosk will not require the post-ticket SMS opt-in step. Defaults to true when unset
    * (enforced in the API for `smsPostTicketStepRequired`).

@@ -146,6 +146,20 @@ describe('KioskConfigSchema', () => {
     });
     expect(r.success).toBe(true);
   });
+
+  it('accepts ticketSuccessAutoCloseSec in range', () => {
+    const r = KioskConfigSchema.safeParse({ ticketSuccessAutoCloseSec: 20 });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.ticketSuccessAutoCloseSec).toBe(20);
+    }
+    expect(
+      KioskConfigSchema.safeParse({ ticketSuccessAutoCloseSec: 0 }).success
+    ).toBe(false);
+    expect(
+      KioskConfigSchema.safeParse({ ticketSuccessAutoCloseSec: 200 }).success
+    ).toBe(false);
+  });
 });
 
 describe('UserModelSchema', () => {

@@ -117,6 +117,9 @@ export function KioskSettings({
   const [sessionIdleCountdownSec, setSessionIdleCountdownSec] = useState(
     kioskConfig.sessionIdleCountdownSec ?? 15
   );
+  const [ticketSuccessAutoCloseSec, setTicketSuccessAutoCloseSec] = useState(
+    kioskConfig.ticketSuccessAutoCloseSec ?? 12
+  );
 
   // Sync state with currentConfig when it changes - REMOVED
   // We now use a key on the component to reset state when config changes.
@@ -129,6 +132,10 @@ export function KioskSettings({
       Math.max(15, sessionIdleBeforeWarningSec || 45)
     );
     const countSec = Math.min(300, Math.max(5, sessionIdleCountdownSec || 15));
+    const ticketCloseSec = Math.min(
+      120,
+      Math.max(1, ticketSuccessAutoCloseSec || 12)
+    );
     const newConfig = {
       ...(currentConfig || {}),
       kiosk: {
@@ -159,7 +166,8 @@ export function KioskSettings({
         bodyColor,
         serviceGridColor,
         sessionIdleBeforeWarningSec: beforeSec,
-        sessionIdleCountdownSec: countSec
+        sessionIdleCountdownSec: countSec,
+        ticketSuccessAutoCloseSec: ticketCloseSec
       }
     };
 
@@ -552,6 +560,27 @@ export function KioskSettings({
                   value={sessionIdleCountdownSec}
                   onChange={(e) =>
                     setSessionIdleCountdownSec(Number(e.target.value) || 0)
+                  }
+                />
+              </div>
+              <div className='flex flex-wrap items-start justify-between gap-2'>
+                <div>
+                  <Label htmlFor='admin-ticket-success-close'>
+                    {t('ticket_success_auto_close_label')}
+                  </Label>
+                  <p className='text-muted-foreground text-sm'>
+                    {t('ticket_success_auto_close_hint')}
+                  </p>
+                </div>
+                <Input
+                  id='admin-ticket-success-close'
+                  className='w-24'
+                  type='number'
+                  min={1}
+                  max={120}
+                  value={ticketSuccessAutoCloseSec}
+                  onChange={(e) =>
+                    setTicketSuccessAutoCloseSec(Number(e.target.value) || 0)
                   }
                 />
               </div>

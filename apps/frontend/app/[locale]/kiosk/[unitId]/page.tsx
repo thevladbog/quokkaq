@@ -89,7 +89,7 @@ export default function UnitKioskPage() {
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [autoCloseTimerId, setAutoCloseTimerId] =
     useState<NodeJS.Timeout | null>(null);
-  const [countdown, setCountdown] = useState<number>(5);
+  const [countdown, setCountdown] = useState<number>(12);
   const [successEtaMinutes, setSuccessEtaMinutes] = useState<number | null>(
     null
   );
@@ -404,6 +404,10 @@ export default function UnitKioskPage() {
       : '#f2ebe6';
 
   const kioskCfg = unit?.config?.kiosk;
+  const ticketSuccessAutoCloseSec = useMemo(
+    () => Math.min(120, Math.max(1, kioskCfg?.ticketSuccessAutoCloseSec ?? 12)),
+    [kioskCfg?.ticketSuccessAutoCloseSec]
+  );
   const appointmentCheckinEnabled = Boolean(
     kioskCfg?.isAppointmentCheckinEnabled ?? kioskCfg?.isPreRegistrationEnabled
   );
@@ -711,7 +715,7 @@ export default function UnitKioskPage() {
 
   const scheduleTicketModalAutoClose = useCallback(() => {
     setKioskSmsBlocking(false);
-    setCountdown(5);
+    setCountdown(ticketSuccessAutoCloseSec);
     if (autoCloseTimerId) {
       clearInterval(autoCloseTimerId);
     }
@@ -730,7 +734,7 @@ export default function UnitKioskPage() {
       });
     }, 1000);
     setAutoCloseTimerId(timer);
-  }, [autoCloseTimerId]);
+  }, [autoCloseTimerId, ticketSuccessAutoCloseSec]);
 
   // Visible services for the current breadcrumb level (recomputed only when tree or path changes)
   const visibleServices = useMemo(() => {
@@ -1284,6 +1288,8 @@ export default function UnitKioskPage() {
                   <KioskServiceTile
                     service={service}
                     locale={locale}
+                    tileKind={service.isLeaf ? 'leaf' : 'branch'}
+                    highContrast={useHcSurfaces}
                     onSelect={handleServiceSelection}
                     onA11yFocus={handleA11yTileVocalize}
                   />
@@ -1392,7 +1398,7 @@ export default function UnitKioskPage() {
             </DialogHeader>
 
             <div className='flex w-full flex-col items-center text-center'>
-              <div className='mb-4 text-7xl leading-none font-bold'>
+              <div className='mb-4 text-8xl leading-none font-bold tracking-tight sm:text-9xl'>
                 {createdTicket.queueNumber}
               </div>
               {successEtaMinutes != null && (
@@ -1423,7 +1429,7 @@ export default function UnitKioskPage() {
                 {/* QR code component will be dynamically imported to avoid SSR issues */}
                 <QRCode
                   value={`${baseAppUrl}/${locale}/ticket/${createdTicket.id}`}
-                  size={180}
+                  size={200}
                 />
               </div>
 
@@ -1482,7 +1488,7 @@ export default function UnitKioskPage() {
                       {kioskSmsError}
                     </p>
                   ) : null}
-                  <div className='mb-3 grid max-w-sm grid-cols-3 gap-1.5 sm:gap-2'>
+                  <div className='mb-3 grid max-w-sm grid-cols-3 gap-2 sm:gap-3'>
                     {[
                       '1',
                       '2',
@@ -1502,7 +1508,7 @@ export default function UnitKioskPage() {
                           <Button
                             type='button'
                             variant='outline'
-                            className='h-10 w-full min-w-0 px-0 text-base font-bold sm:h-12 sm:text-xl'
+                            className='h-[4.5rem] w-full min-w-0 px-0 text-xl font-bold sm:h-[5rem] sm:text-2xl'
                             disabled={kioskSmsBusy}
                             aria-label={
                               d === '⌫'
