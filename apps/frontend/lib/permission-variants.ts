@@ -11,6 +11,7 @@ export const PermUnitServicesManage = 'unit.services.manage';
 export const PermUnitTicketScreenManage = 'unit.ticket_screen.manage';
 export const PermUnitSignageManage = 'unit.signage.manage';
 export const PermUnitUsersManage = 'unit.users.manage';
+export const PermUnitEmployeeIdpManage = 'unit.employee_idp.manage';
 export const PermAccessStaffPanel = 'access.staff_panel';
 export const PermAccessSupervisorPanel = 'access.supervisor_panel';
 export const PermAccessKiosk = 'access.kiosk';

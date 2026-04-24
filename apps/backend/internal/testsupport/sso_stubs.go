@@ -61,6 +61,12 @@ func (PanicUserRepo) ListUsersForCompany(string, string, bool) ([]models.User, e
 func (PanicUserRepo) FindByID(context.Context, string) (*models.User, error)    { panic("unexpected") }
 func (PanicUserRepo) FindByIDTx(*gorm.DB, string) (*models.User, error)         { panic("unexpected") }
 func (PanicUserRepo) FindByEmail(context.Context, string) (*models.User, error) { panic("unexpected") }
+func (PanicUserRepo) FindUserInCompanyByEmail(string, string) (*models.User, error) {
+	panic("unexpected")
+}
+func (PanicUserRepo) CountUsersInCompanyByEmail(string, string) (int64, error) {
+	panic("unexpected")
+}
 func (PanicUserRepo) Update(*models.User) error                                 { panic("unexpected") }
 func (PanicUserRepo) UpdateTx(*gorm.DB, *models.User) error                     { panic("unexpected") }
 func (PanicUserRepo) Delete(string) error                                       { panic("unexpected") }

@@ -28,6 +28,7 @@ import { WorkplaceParentBanner } from '@/components/admin/units/workplace-parent
 import { UnitDisplaySettings } from '@/components/admin/units/unit-display-settings';
 import { UnitServicesManager } from '@/components/admin/units/unit-services-manager';
 import { KioskSettings } from '@/components/admin/units/kiosk-settings';
+import { UnitEmployeeIdpSettings } from '@/components/admin/units/unit-employee-idp-settings';
 import { Link } from '@/src/i18n/navigation';
 import { SlotConfiguration } from '@/components/admin/units/slot-configuration';
 import { UnitVisitorTagsSettings } from '@/components/admin/units/unit-visitor-tags-settings';
@@ -766,6 +767,9 @@ export default function UnitPage({ params }: UnitPageProps) {
               unitName={getUnitDisplayName(unit, locale)}
               currentConfig={unit.config || {}}
             />
+            <div className='mt-10'>
+              <UnitEmployeeIdpSettings unitId={unitId} />
+            </div>
           </PermissionGuard>
         </TabsContent>
         <TabsContent value='guest-survey' className='mt-6'>

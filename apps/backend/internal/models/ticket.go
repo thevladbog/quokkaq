@@ -33,10 +33,12 @@ type Ticket struct {
 	BookingID         *string `json:"bookingId,omitempty"`
 	CounterID         *string `json:"counterId,omitempty"`
 	PreRegistrationID *string `json:"preRegistrationId,omitempty"`
-	ClientID          *string `json:"clientId,omitempty"`
-	Status            string  `gorm:"default:'waiting'" json:"status"`
-	Priority          int     `gorm:"default:0" json:"priority"`
-	IsEOD             bool    `gorm:"default:false" json:"isEod"`
+	// KioskIdentifiedUserID is set when the ticket was issued after kiosk employee identification (badge / login) matched a user in the tenant.
+	KioskIdentifiedUserID *string `gorm:"column:kiosk_identified_user_id" json:"kioskIdentifiedUserId,omitempty"`
+	ClientID              *string `json:"clientId,omitempty"`
+	Status                string  `gorm:"default:'waiting'" json:"status"`
+	Priority              int     `gorm:"default:0" json:"priority"`
+	IsEOD                 bool    `gorm:"default:false" json:"isEod"`
 	// IsCredit marks a ticket issued when the monthly tickets_per_month quota was exhausted but
 	// the working day (EOD) was still open. Credit tickets are counted against the next billing period.
 	IsCredit bool    `gorm:"default:false;column:is_credit" json:"isCredit"`

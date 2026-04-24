@@ -72,10 +72,28 @@ func (s *serviceService) assertCalendarSlotKeyUnique(unitID string, key *string,
 	return nil
 }
 
+func syncServiceIdentificationFields(s *models.Service) {
+	if s == nil {
+		return
+	}
+	if s.IdentificationMode == "" {
+		if s.OfferIdentification {
+			s.IdentificationMode = models.IdentificationModePhone
+		} else {
+			s.IdentificationMode = models.IdentificationModeNone
+		}
+	}
+	if !models.IsValidIdentificationMode(s.IdentificationMode) {
+		s.IdentificationMode = models.IdentificationModeNone
+	}
+	s.OfferIdentification = s.IdentificationMode == models.IdentificationModePhone
+}
+
 func (s *serviceService) CreateService(service *models.Service) error {
 	if service.UnitID == "" {
 		return errors.New("unit ID is required")
 	}
+	syncServiceIdentificationFields(service)
 	service.CalendarSlotKey = normalizeCalendarSlotKeyPtr(service.CalendarSlotKey)
 	if err := s.assertCalendarSlotKeyUnique(service.UnitID, service.CalendarSlotKey, ""); err != nil {
 		return err
@@ -123,6 +141,7 @@ func (s *serviceService) UpdateService(service *models.Service) error {
 	}
 	// Never persist a caller-supplied unit change; keep the row's unit.
 	service.UnitID = existing.UnitID
+	syncServiceIdentificationFields(service)
 
 	key := effectiveCalendarSlotKeyForUpdate(service, existing)
 	if err := s.assertCalendarSlotKeyUnique(service.UnitID, key, service.ID); err != nil {

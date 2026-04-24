@@ -11,10 +11,33 @@ When an authenticated tenant admin calls **`GET /companies/me`**, the JSON inclu
 | `apiAccess` | Integration REST under **`/integrations/v1`** (API keys, OAuth-style scopes on keys). |
 | `outboundWebhooks` | Configure HTTPS webhook endpoints and receive signed payloads for ticket lifecycle events. |
 | `publicQueueWidget` | Embed a read-only queue status widget on your own site (browser `Origin` allowlist + short-lived JWT). |
+| `kioskEmployeeIdp` | **Employee badge / login (server-side IdP proxy)** — configure per-unit external HTTPS lookup, kiosk/staff call **`POST /units/{unitId}/employee-idp/resolve`**; secrets never leave the server. |
 
 The same response includes **`publicApiUrl`** — use this as the API base URL in snippets (do not hardcode a hostname from docs).
 
 If every flag is `false`, the product UI typically hides the Developer API / integrations sections until the subscription is upgraded.
+
+## Employee IdP (badge / login) — for your **HR or directory HTTP API** (not QuokkaQ’s REST)
+
+**Audience:** the team that hosts the **employee or card directory** that must answer *“who is this badge or this login?”* for a given unit.  
+QuokkaQ does **not** expose your API keys or HMAC material to the browser. The product calls **only from the QuokkaQ server** to an **HTTPS** URL you configure in unit settings. **Requires** `kioskEmployeeIdp` in **`planCapabilities`**; resolution from the kiosk uses a **terminal** session.
+
+**What you implement (your HTTPS endpoint):**
+
+- **URL:** one HTTPS URL per unit (e.g. `https://id.example.com/api/employee/resolve`). Only **`https`**; loopback, literal private IPs, and hostnames that resolve only to private addresses are **rejected** (SSRF hardening on the QuokkaQ side).
+- **Request:** built from a **JSON body template** in QuokkaQ (Go `text/template`) with this data: **`Raw`**, **`Login`**, **`Kind`** (`badge` or `login`), **`Ts`** (Unix seconds). For a badge reader, the kiosk sends the scanned string; for the on-screen keyboard, **`Kind`** is `login` and the typed value is in **`Raw`/`Login`**.
+- **Headers:** optional; values can reference stored secrets with **`${secret:NAME}`** (name matches a secret row in the unit; plaintext is only on the server after save).
+- **Response:** valid JSON. QuokkaQ reads the employee email with a **gjson path** you configure (e.g. `data.email`) and optionally a display name path. The email is matched to a **user in the same company**; there is no automatic directory sync—users must already exist in QuokkaQ.
+
+**What you must *not* log in your own systems (recommended):** the raw badge or login in clear text, or the full QuokkaQ user object; keep correlation IDs and outcomes only, in line with your DPA/152‑FЗ obligations.
+
+**QuokkaQ routes (from your side as a consumer, not the HR API):**
+
+- **`POST /units/{unitId}/employee-idp/resolve`** with body `{ "kind": "badge"|"login", "raw": "…" }` (terminal JWT + kiosk access). **OpenAPI** is the contract for **HTTP status codes** and the normalized **`matchStatus` / `userId`** view returned to the client.
+- **Admin:** **`GET`/`PATCH /units/{unitId}/employee-idp`** with permission **`unit.employee_idp.manage`** — no secret values in `GET` responses. **`PATCH`** accepts optional **`secretNamesToDelete`**: a string array of **named** secret keys to remove from the unit.
+- **Web (staff) vs badge:** the **browser** staff and admin apps use the normal product **SSO** session. **Employee IdP resolve** (badge/keyboard) is for **kiosk/terminal** sessions that call the route above — do not reimplement resolve from a plain staff browser; keep identity on SSO. **Badge** identification is a **kiosk (or counter)** app concern.
+- **`matchStatus`:** in addition to **`matched`** (with `userId`) and **`no_user`**, the API may return **`ambiguous`** when the upstream email matches **more than one** user in the company (tenant should fix duplicate people data). The resolve endpoint is **rate-limited** per client IP and unit (see operator runbook; HTTP **429** when exceeded).
+- **Services with `identificationMode: "qr"`** on the kiosk depend on **pre-registration / appointment check-in** being enabled; if not, the product should not leave users in a dead-end (see in-app help for mode matrix).
 
 ## Integration REST (`/integrations/v1`)
 

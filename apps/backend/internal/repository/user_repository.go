@@ -32,6 +32,10 @@ type UserRepository interface {
 	// ListUserRoleNamesTx returns global role names (roles.name) for the user within tx without loading units or full user graph.
 	ListUserRoleNamesTx(tx *gorm.DB, userID string) ([]string, error)
 	FindByEmail(ctx context.Context, email string) (*models.User, error)
+	// FindUserInCompanyByEmail returns a user with a matching email (case-insensitive) who has at least one user_unit in a unit of the company.
+	FindUserInCompanyByEmail(companyID, email string) (*models.User, error)
+	// CountUsersInCompanyByEmail returns how many users match the email in the company (same join rules as FindUserInCompanyByEmail).
+	CountUsersInCompanyByEmail(companyID, email string) (int64, error)
 	Update(user *models.User) error
 	UpdateTx(tx *gorm.DB, user *models.User) error
 	// UpdateFields applies partial column updates (e.g. SSO profile sync).
@@ -254,6 +258,47 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*models
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (r *userRepository) FindUserInCompanyByEmail(companyID, email string) (*models.User, error) {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+	emailLower := strings.ToLower(email)
+	var user models.User
+	err := r.db.
+		Joins("INNER JOIN user_units uu ON uu.user_id = users.id").
+		Joins("INNER JOIN units u ON u.id = uu.unit_id AND u.company_id = ?", companyID).
+		Where("LOWER(TRIM(COALESCE(users.email,''))) = ?", emailLower).
+		First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *userRepository) CountUsersInCompanyByEmail(companyID, email string) (int64, error) {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return 0, nil
+	}
+	emailLower := strings.ToLower(email)
+	var n int64
+	// One user can link to multiple company units; count distinct people matching the email in this tenant.
+	err := r.db.Raw(`
+		SELECT COUNT(*) FROM (
+			SELECT DISTINCT u.id
+			FROM users u
+			INNER JOIN user_units uu ON uu.user_id = u.id
+			INNER JOIN units un ON un.id = uu.unit_id AND un.company_id = ?
+			WHERE LOWER(TRIM(COALESCE(u.email,''))) = ?
+		) t
+	`, companyID, emailLower).Scan(&n).Error
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
 }
 
 func (r *userRepository) Update(user *models.User) error {

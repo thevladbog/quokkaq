@@ -619,13 +619,103 @@ export const unitsApi = {
     }
   },
 
+  /** POST /units/{unitId}/employee-idp/resolve — kiosk terminal session. */
+  resolveEmployeeIdp: async (
+    unitId: string,
+    payload: { kind: 'badge' | 'login'; raw: string }
+  ) => {
+    const res = await authenticatedApiFetch(
+      `${API_BASE_URL}/units/${unitId}/employee-idp/resolve`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }
+    );
+    if (!res.ok) {
+      await throwApiHttpErrorFromBody(res);
+    }
+    return (await res.json()) as {
+      matchStatus: string;
+      userId?: string;
+      email?: string;
+      displayName?: string;
+    };
+  },
+
+  getUnitEmployeeIdp: async (unitId: string) => {
+    const res = await authenticatedApiFetch(
+      `${API_BASE_URL}/units/${unitId}/employee-idp`
+    );
+    if (!res.ok) {
+      await throwApiHttpErrorFromBody(res);
+    }
+    return (await res.json()) as {
+      unitId: string;
+      enabled: boolean;
+      httpMethod: string;
+      upstreamUrl: string;
+      requestBodyTemplate: string;
+      responseEmailPath: string;
+      responseDisplayNamePath: string;
+      headerTemplatesJson: string;
+      timeoutMs: number;
+      secretNames: string[];
+    };
+  },
+
+  patchUnitEmployeeIdp: async (
+    unitId: string,
+    body: {
+      enabled?: boolean;
+      httpMethod?: string;
+      upstreamUrl?: string;
+      requestBodyTemplate?: string;
+      responseEmailPath?: string;
+      responseDisplayNamePath?: string;
+      headerTemplatesJson?: string;
+      timeoutMs?: number;
+      secretValues?: Record<string, string>;
+      secretNamesToDelete?: string[];
+    }
+  ) => {
+    const res = await authenticatedApiFetch(
+      `${API_BASE_URL}/units/${unitId}/employee-idp`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }
+    );
+    if (!res.ok) {
+      await throwApiHttpErrorFromBody(res);
+    }
+    return (await res.json()) as {
+      unitId: string;
+      enabled: boolean;
+      httpMethod: string;
+      upstreamUrl: string;
+      requestBodyTemplate: string;
+      responseEmailPath: string;
+      responseDisplayNamePath: string;
+      headerTemplatesJson: string;
+      timeoutMs: number;
+      secretNames: string[];
+    };
+  },
+
   createTicket: async (
     unitId: string,
     ticketData: CreateTicketRequestInput
   ) => {
     const normalized = createTicketRequestSchema.parse(ticketData);
     let body: orvalTc.HandlersCreateTicketRequest;
-    if (normalized.visitorPhone && normalized.visitorLocale) {
+    if (normalized.kioskIdentifiedUserId) {
+      body = {
+        serviceId: normalized.serviceId,
+        kioskIdentifiedUserId: normalized.kioskIdentifiedUserId
+      };
+    } else if (normalized.visitorPhone && normalized.visitorLocale) {
       body = {
         serviceId: normalized.serviceId,
         visitorPhone: normalized.visitorPhone,

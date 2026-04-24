@@ -111,6 +111,8 @@ export type ServiceModel = {
   maxServiceTime?: number | null;
   prebook?: boolean;
   offerIdentification?: boolean;
+  /** Kiosk identification step: none | phone | qr | login | badge */
+  identificationMode?: 'none' | 'phone' | 'qr' | 'login' | 'badge';
   isLeaf?: boolean;
   gridRow?: number | null;
   gridCol?: number | null;
@@ -146,6 +148,9 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
   maxServiceTime: z.number().nullable().optional(),
   prebook: z.boolean().optional(),
   offerIdentification: z.boolean().optional(),
+  identificationMode: z
+    .enum(['none', 'phone', 'qr', 'login', 'badge'])
+    .optional(),
   isLeaf: z.boolean().optional(),
   gridRow: z.number().nullable().optional(),
   gridCol: z.number().nullable().optional(),
@@ -1123,7 +1128,8 @@ export const createTicketRequestSchema = z
     serviceId: z.string().min(1),
     clientId: z.string().optional(),
     visitorPhone: z.string().optional(),
-    visitorLocale: kioskVisitorLocaleSchema.optional()
+    visitorLocale: kioskVisitorLocaleSchema.optional(),
+    kioskIdentifiedUserId: z.string().uuid().optional()
   })
   .superRefine((data, ctx) => {
     const cid = (data.clientId ?? '').trim();
@@ -1131,7 +1137,16 @@ export const createTicketRequestSchema = z
     const hasClient = cid.length > 0;
     const hasPhone = phone.length > 0;
     const hasLocale = data.visitorLocale !== undefined;
+    const hasKid = (data.kioskIdentifiedUserId ?? '').trim().length > 0;
 
+    if (hasKid && (hasClient || hasPhone)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'kioskIdentifiedUserId cannot be combined with clientId or visitor phone',
+        path: ['kioskIdentifiedUserId']
+      });
+    }
     if (hasClient && hasPhone) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -1158,11 +1173,13 @@ export const createTicketRequestSchema = z
     const serviceId = data.serviceId.trim();
     const cid = (data.clientId ?? '').trim();
     const phone = (data.visitorPhone ?? '').trim();
+    const kid = (data.kioskIdentifiedUserId ?? '').trim();
     const out: {
       serviceId: string;
       clientId?: string;
       visitorPhone?: string;
       visitorLocale?: z.infer<typeof kioskVisitorLocaleSchema>;
+      kioskIdentifiedUserId?: string;
     } = { serviceId };
     if (cid) {
       out.clientId = cid;
@@ -1170,6 +1187,9 @@ export const createTicketRequestSchema = z
     if (phone && data.visitorLocale) {
       out.visitorPhone = phone;
       out.visitorLocale = data.visitorLocale;
+    }
+    if (kid) {
+      out.kioskIdentifiedUserId = kid;
     }
     return out;
   });
@@ -1187,6 +1207,7 @@ export type CreateTicketInUnitMutationVariables =
       clientId?: never;
       visitorPhone?: never;
       visitorLocale?: never;
+      kioskIdentifiedUserId?: never;
     }
   | {
       unitId: string;
@@ -1194,6 +1215,7 @@ export type CreateTicketInUnitMutationVariables =
       clientId: string;
       visitorPhone?: never;
       visitorLocale?: never;
+      kioskIdentifiedUserId?: never;
     }
   | {
       unitId: string;
@@ -1201,6 +1223,15 @@ export type CreateTicketInUnitMutationVariables =
       visitorPhone: string;
       visitorLocale: z.infer<typeof kioskVisitorLocaleSchema>;
       clientId?: never;
+      kioskIdentifiedUserId?: never;
+    }
+  | {
+      unitId: string;
+      serviceId: string;
+      kioskIdentifiedUserId: string;
+      clientId?: never;
+      visitorPhone?: never;
+      visitorLocale?: never;
     };
 
 /** POST /units/{unitId}/call-next — matches backend handlers.CallNextRequest after trim/dedupe. */
@@ -1632,7 +1663,9 @@ export const CompanyMePlanCapabilitiesSchema = z.object({
   outboundWebhooks: z.boolean(),
   publicQueueWidget: z.boolean(),
   customScreenLayouts: z.boolean().optional(),
-  visitorNotifications: z.boolean().optional()
+  visitorNotifications: z.boolean().optional(),
+  /** Employee badge / login server-side IdP (per-unit config). */
+  kioskEmployeeIdp: z.boolean().optional()
 });
 
 export const CompanyMeResponseSchema = z.object({

@@ -58,6 +58,7 @@ import {
   type ServiceZoneFilter
 } from '@/lib/service-tree';
 import { cn, serviceTitleForLocale } from '@/lib/utils';
+import { getServiceIdentificationMode } from '@/lib/kiosk-service-identification';
 import type { Service } from '@quokkaq/shared-types';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -594,6 +595,7 @@ function buildInitialFormValues(
       maxServiceTime: editingService.maxServiceTime ?? undefined,
       prebook: editingService.prebook ?? false,
       offerIdentification: editingService.offerIdentification ?? false,
+      identificationMode: getServiceIdentificationMode(editingService),
       isLeaf: editingService.isLeaf ?? false,
       parentId: editingService.parentId ?? '',
       restrictedServiceZoneId: editingService.restrictedServiceZoneId ?? null,
@@ -622,6 +624,7 @@ function buildInitialFormValues(
       maxServiceTime: undefined,
       prebook: false,
       offerIdentification: false,
+      identificationMode: 'none' as const,
       isLeaf: false,
       parentId: '',
       restrictedServiceZoneId: null,
@@ -648,6 +651,7 @@ function snapshotServiceFormValues(v: Partial<Service>): string {
     maxServiceTime: v.maxServiceTime ?? null,
     prebook: !!v.prebook,
     offerIdentification: !!v.offerIdentification,
+    identificationMode: v.identificationMode ?? 'none',
     isLeaf: !!v.isLeaf,
     parentId: v.parentId ?? '',
     restrictedServiceZoneId: v.restrictedServiceZoneId ?? null,
@@ -784,12 +788,17 @@ function ServiceForm({
         : null;
       const payloadCalendarSlotKey =
         formValues.calendarSlotKey === '' ? null : formValues.calendarSlotKey;
+      const idMode =
+        formValues.identificationMode ??
+        getServiceIdentificationMode(formValues);
+      const offerIdent = idMode === 'phone';
       const payloadBase = {
         ...formValues,
         name: nameRuTrim,
         nameRu: nameRuTrim,
         prebook: formValues.prebook ?? false,
-        offerIdentification: formValues.offerIdentification ?? false,
+        identificationMode: idMode,
+        offerIdentification: offerIdent,
         isLeaf: formValues.isLeaf ?? false,
         restrictedServiceZoneId: restrictedPayload,
         calendarSlotKey: payloadCalendarSlotKey
@@ -799,10 +808,8 @@ function ServiceForm({
           id: editingService.id,
           ...payloadBase,
           prebook: formValues.prebook ?? editingService.prebook ?? false,
-          offerIdentification:
-            formValues.offerIdentification ??
-            editingService.offerIdentification ??
-            false,
+          identificationMode: idMode,
+          offerIdentification: offerIdent,
           isLeaf: formValues.isLeaf ?? editingService.isLeaf ?? false
         });
       } else {
@@ -1341,24 +1348,48 @@ function ServiceForm({
           </Label>
         </div>
 
-        <div className='flex items-start gap-2'>
-          <Checkbox
-            id='offerIdentification'
-            checked={!!formValues.offerIdentification}
-            onCheckedChange={(v) =>
+        <div className='space-y-1.5'>
+          <Label htmlFor='kiosk_identification_mode'>
+            {tRoot('forms.fields.kiosk_identification_mode')}
+          </Label>
+          <Select
+            value={getServiceIdentificationMode(formValues as Service)}
+            onValueChange={(v) => {
+              const mode = v as 'none' | 'phone' | 'qr' | 'login' | 'badge';
               setFormValues((prev) => ({
                 ...prev,
-                offerIdentification: v === true
-              }))
-            }
-            className='mt-0.5'
-          />
-          <Label
-            htmlFor='offerIdentification'
-            className='cursor-pointer font-normal'
+                identificationMode: mode,
+                offerIdentification: mode === 'phone'
+              }));
+            }}
           >
-            {tRoot('forms.fields.offer_identification')}
-          </Label>
+            <SelectTrigger
+              id='kiosk_identification_mode'
+              className='w-full max-w-md'
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='none'>
+                {tRoot('forms.fields.kiosk_identification_mode_none')}
+              </SelectItem>
+              <SelectItem value='phone'>
+                {tRoot('forms.fields.kiosk_identification_mode_phone')}
+              </SelectItem>
+              <SelectItem value='qr'>
+                {tRoot('forms.fields.kiosk_identification_mode_qr')}
+              </SelectItem>
+              <SelectItem value='login'>
+                {tRoot('forms.fields.kiosk_identification_mode_login')}
+              </SelectItem>
+              <SelectItem value='badge'>
+                {tRoot('forms.fields.kiosk_identification_mode_badge')}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p className='text-muted-foreground text-xs'>
+            {tRoot('forms.fields.kiosk_identification_mode_help')}
+          </p>
         </div>
 
         <div className='flex items-start gap-2'>

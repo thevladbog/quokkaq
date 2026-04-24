@@ -140,6 +140,12 @@ var ErrCustomerNameEmpty = errors.New("pre-registration customer name is empty")
 // ErrTicketCreateVisitorConflict is returned when both clientId and visitorPhone are set on ticket creation.
 var ErrTicketCreateVisitorConflict = errors.New("cannot provide both clientId and visitor phone")
 
+// ErrTicketKioskIdentifiedUserConflict is returned when kioskIdentifiedUserId is combined with other identification inputs.
+var ErrTicketKioskIdentifiedUserConflict = errors.New("cannot combine kioskIdentifiedUserId with visitor phone, client, or pre-registration")
+
+// ErrTicketKioskIdentifiedUserMode is returned when the service is not configured for employee badge/login identification.
+var ErrTicketKioskIdentifiedUserMode = errors.New("service does not use employee identification for this ticket")
+
 // ErrVisitorTagsCommentRequired is returned when operatorComment is empty after trim.
 var ErrVisitorTagsCommentRequired = errors.New("operatorComment is required")
 
@@ -207,9 +213,10 @@ type TransferTicketInput struct {
 type TicketService interface {
 	// optionalStaffClientID: when set, ticket is linked to this non-anonymous unit client; otherwise anonymous kiosk client is used.
 	// visitorPhone + visitorLocale: optional kiosk identification; locale must be en or ru when phone is set; mutually exclusive with optionalStaffClientID.
-	CreateTicket(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string) (*models.Ticket, error)
+	// kioskIdentifiedUserID: optional; when set, ticket links to a tenant user after employee IdP (badge/login). Mutually exclusive with visitor phone and pre-registration. Caller must validate the user belongs to the unit's company.
+	CreateTicket(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string, kioskIdentifiedUserID *string) (*models.Ticket, error)
 	// CreateTicketWithFunnelOverride is used when the create source must not be inferred (e.g. virtual queue).
-	CreateTicketWithFunnelOverride(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string, funnelSourceOverride *string) (*models.Ticket, error)
+	CreateTicketWithFunnelOverride(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string, funnelSourceOverride *string, kioskIdentifiedUserID *string) (*models.Ticket, error)
 	CreateTicketWithPreRegistration(unitID, serviceID, preRegID string, actorUserID *string) (*models.Ticket, error)
 	GetTicketByID(id string) (*models.Ticket, error)
 	GetTicketsByUnit(unitID string) ([]models.Ticket, error)
@@ -419,16 +426,16 @@ func (s *ticketService) incrementTicketUsage(unitID string) {
 	}
 }
 
-func (s *ticketService) CreateTicket(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string) (*models.Ticket, error) {
-	return s.CreateTicketWithFunnelOverride(unitID, serviceID, optionalStaffClientID, visitorPhone, visitorLocale, actorUserID, nil)
+func (s *ticketService) CreateTicket(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string, kioskIdentifiedUserID *string) (*models.Ticket, error) {
+	return s.CreateTicketWithFunnelOverride(unitID, serviceID, optionalStaffClientID, visitorPhone, visitorLocale, actorUserID, nil, kioskIdentifiedUserID)
 }
 
-func (s *ticketService) CreateTicketWithFunnelOverride(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string, funnelSourceOverride *string) (*models.Ticket, error) {
+func (s *ticketService) CreateTicketWithFunnelOverride(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string, funnelSourceOverride *string, kioskIdentifiedUserID *string) (*models.Ticket, error) {
 	isCredit, err := s.checkTicketQuota(unitID)
 	if err != nil {
 		return nil, err
 	}
-	ticket, err := s.createTicketInternal(unitID, serviceID, nil, optionalStaffClientID, visitorPhone, visitorLocale, actorUserID, isCredit, funnelSourceOverride)
+	ticket, err := s.createTicketInternal(unitID, serviceID, nil, optionalStaffClientID, visitorPhone, visitorLocale, actorUserID, isCredit, funnelSourceOverride, kioskIdentifiedUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +448,7 @@ func (s *ticketService) CreateTicketWithPreRegistration(unitID, serviceID, preRe
 	if err != nil {
 		return nil, err
 	}
-	ticket, err := s.createTicketInternal(unitID, serviceID, &preRegID, nil, nil, nil, actorUserID, isCredit, nil)
+	ticket, err := s.createTicketInternal(unitID, serviceID, &preRegID, nil, nil, nil, actorUserID, isCredit, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -449,7 +456,7 @@ func (s *ticketService) CreateTicketWithPreRegistration(unitID, serviceID, preRe
 	return ticket, nil
 }
 
-func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID *string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string, isCredit bool, funnelSourceOverride *string) (*models.Ticket, error) {
+func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID *string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string, isCredit bool, funnelSourceOverride *string, kioskIdentifiedUserID *string) (*models.Ticket, error) {
 	var preReg *models.PreRegistration
 	if preRegID != nil {
 		if s.preRegRepo == nil {
@@ -482,6 +489,28 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 		}
 		if service.UnitID != unitID {
 			return ErrTicketServiceNotInUnit
+		}
+
+		var kid *string
+		if kioskIdentifiedUserID != nil {
+			k := strings.TrimSpace(*kioskIdentifiedUserID)
+			if k != "" {
+				kid = &k
+			}
+		}
+		if preReg != nil && kid != nil {
+			return ErrTicketKioskIdentifiedUserConflict
+		}
+		if kid != nil {
+			if derefString(visitorPhone) != "" {
+				return ErrTicketKioskIdentifiedUserConflict
+			}
+			if optionalStaffClientID != nil && strings.TrimSpace(*optionalStaffClientID) != "" {
+				return ErrTicketKioskIdentifiedUserConflict
+			}
+			if service.IdentificationMode != models.IdentificationModeLogin && service.IdentificationMode != models.IdentificationModeBadge {
+				return ErrTicketKioskIdentifiedUserMode
+			}
 		}
 
 		queueNumber := fmt.Sprintf("%03d", seq)
@@ -520,6 +549,12 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 				return err
 			}
 			resolvedClientID = c.ID
+		} else if kid != nil {
+			anon, aerr := s.clientRepo.EnsureAnonymousForUnitTx(tx, unitID)
+			if aerr != nil {
+				return aerr
+			}
+			resolvedClientID = anon.ID
 		} else if kioskPhone := strings.TrimSpace(derefString(visitorPhone)); kioskPhone != "" {
 			if optionalStaffClientID != nil && strings.TrimSpace(*optionalStaffClientID) != "" {
 				return ErrTicketCreateVisitorConflict
@@ -579,17 +614,18 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 		}
 
 		ticket = &models.Ticket{
-			UnitID:            unitID,
-			ServiceZoneID:     service.RestrictedServiceZoneID,
-			ServiceID:         serviceID,
-			QueueNumber:       queueNumber,
-			Status:            "waiting",
-			CreatedAt:         time.Now(),
-			MaxWaitingTime:    service.MaxWaitingTime,
-			PreRegistrationID: preRegID,
-			ClientID:          &resolvedClientID,
-			IsCredit:          isCredit,
-			VisitorToken:      uuid.New().String(),
+			UnitID:                unitID,
+			ServiceZoneID:         service.RestrictedServiceZoneID,
+			ServiceID:             serviceID,
+			QueueNumber:           queueNumber,
+			Status:                "waiting",
+			CreatedAt:             time.Now(),
+			MaxWaitingTime:        service.MaxWaitingTime,
+			PreRegistrationID:     preRegID,
+			KioskIdentifiedUserID: kid,
+			ClientID:              &resolvedClientID,
+			IsCredit:              isCredit,
+			VisitorToken:          uuid.New().String(),
 		}
 		if preRegID != nil {
 			ticket.Priority = PriorityTicketFromPreRegistration
@@ -606,6 +642,9 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 			payload["source"] = "pre_registration_redeem"
 		} else if funnelSourceOverride != nil && strings.TrimSpace(*funnelSourceOverride) != "" {
 			payload["source"] = strings.TrimSpace(*funnelSourceOverride)
+		} else if kid != nil {
+			payload["source"] = "kiosk_employee_idp"
+			payload["kiosk_identified_user_id"] = *kid
 		} else if strings.TrimSpace(derefString(visitorPhone)) != "" {
 			payload["source"] = "public_issue_kiosk_phone"
 		} else if optionalStaffClientID != nil && strings.TrimSpace(*optionalStaffClientID) != "" {

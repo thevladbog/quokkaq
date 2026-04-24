@@ -35,6 +35,7 @@ CREATE TABLE tickets (
 	booking_id text,
 	counter_id text,
 	pre_registration_id text,
+	kiosk_identified_user_id text,
 	client_id text,
 	status text,
 	priority integer DEFAULT 0,

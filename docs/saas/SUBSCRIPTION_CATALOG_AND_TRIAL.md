@@ -22,7 +22,7 @@
 ## Триал и лимиты плана
 
 - Регистрация: [`apps/backend/internal/services/auth_service.go`](../../apps/backend/internal/services/auth_service.go) — подписка со статусом `trial`, **14 дней**, `PlanID` из `FindPlanByCode(planCode)`.
-- Проверки возможностей (например [`CompanyHasPlanFeature`](../../apps/backend/internal/services/plan_feature.go)) смотрят на **`subscription_plans.features`** привязанного плана; статус `trial` **не** отключает эти проверки отдельно.
+- Проверки возможностей (например [`CompanyHasPlanFeature`](../../apps/backend/internal/services/plan_feature.go)) смотрят на **`subscription_plans.features`** привязанного плана; статус `trial` **не** отключает эти проверки отдельно. Пример ключа: **`kiosk_employee_idp`** — прокси идентификации сотрудника по бейджу/логину (см. [`plan_feature.go`](../../apps/backend/internal/services/plan_feature.go), [runbook внешнего API](../operator/employee-idp-runbook.md)).
 - На триале действуют правила **выбранного тарифа** (как после оплаты), ограниченные сроком триала.
 
 ## Регистрация и параметр плана

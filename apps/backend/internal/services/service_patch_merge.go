@@ -124,6 +124,21 @@ func MergeServiceJSONPatch(dst *models.Service, raw map[string]json.RawMessage) 
 			if err := json.Unmarshal(v, &dst.OfferIdentification); err != nil {
 				return fmt.Errorf("offerIdentification: %w", err)
 			}
+			if dst.OfferIdentification {
+				dst.IdentificationMode = models.IdentificationModePhone
+			} else {
+				dst.IdentificationMode = models.IdentificationModeNone
+			}
+		case "identificationMode":
+			var s string
+			if err := json.Unmarshal(v, &s); err != nil {
+				return fmt.Errorf("identificationMode: %w", err)
+			}
+			if !models.IsValidIdentificationMode(s) {
+				return fmt.Errorf("identificationMode: invalid value %q", s)
+			}
+			dst.IdentificationMode = s
+			dst.OfferIdentification = s == models.IdentificationModePhone
 		case "isLeaf":
 			if err := json.Unmarshal(v, &dst.IsLeaf); err != nil {
 				return fmt.Errorf("isLeaf: %w", err)

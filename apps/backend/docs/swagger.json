@@ -1073,6 +1073,48 @@
                 },
                 "type": "object"
             },
+            "handlers.PatchUnitEmployeeIdpRequest": {
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "headerTemplatesJson": {
+                        "type": "string"
+                    },
+                    "httpMethod": {
+                        "type": "string"
+                    },
+                    "requestBodyTemplate": {
+                        "type": "string"
+                    },
+                    "responseDisplayNamePath": {
+                        "type": "string"
+                    },
+                    "responseEmailPath": {
+                        "type": "string"
+                    },
+                    "secretNamesToDelete": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "secretValues": {
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "Secrets: name -> plaintext; stored encrypted. Omitted names unchanged.",
+                        "type": "object"
+                    },
+                    "timeoutMs": {
+                        "type": "integer"
+                    },
+                    "upstreamUrl": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.PatchUnitKioskConfigRequest": {
                 "properties": {
                     "config": {
@@ -1786,6 +1828,10 @@
                     },
                     "isEod": {
                         "type": "boolean"
+                    },
+                    "kioskIdentifiedUserId": {
+                        "description": "KioskIdentifiedUserID is set when the ticket was issued after kiosk employee identification (badge / login) matched a user in the tenant.",
+                        "type": "string"
                     },
                     "lastCalledAt": {
                         "type": "string"
@@ -2568,6 +2614,9 @@
                     "customScreenLayouts": {
                         "type": "boolean"
                     },
+                    "kioskEmployeeIdp": {
+                        "type": "boolean"
+                    },
                     "outboundWebhooks": {
                         "type": "boolean"
                     },
@@ -2757,6 +2806,44 @@
                 "required": [
                     "email"
                 ],
+                "type": "object"
+            },
+            "handlers.unitEmployeeIdpSettingsDTO": {
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "headerTemplatesJson": {
+                        "type": "string"
+                    },
+                    "httpMethod": {
+                        "type": "string"
+                    },
+                    "requestBodyTemplate": {
+                        "type": "string"
+                    },
+                    "responseDisplayNamePath": {
+                        "type": "string"
+                    },
+                    "responseEmailPath": {
+                        "type": "string"
+                    },
+                    "secretNames": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "timeoutMs": {
+                        "type": "integer"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    },
+                    "upstreamUrl": {
+                        "type": "string"
+                    }
+                },
                 "type": "object"
             },
             "handlers.webhookDeliveryLogDTO": {
@@ -4200,6 +4287,10 @@
                     "id": {
                         "type": "string"
                     },
+                    "identificationMode": {
+                        "description": "IdentificationMode selects the kiosk identification step: none|phone|qr|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column.",
+                        "type": "string"
+                    },
                     "imageUrl": {
                         "type": "string"
                     },
@@ -4755,6 +4846,10 @@
                     },
                     "isEod": {
                         "type": "boolean"
+                    },
+                    "kioskIdentifiedUserId": {
+                        "description": "KioskIdentifiedUserID is set when the ticket was issued after kiosk employee identification (badge / login) matched a user in the tenant.",
+                        "type": "string"
                     },
                     "lastCalledAt": {
                         "type": "string"
@@ -5588,6 +5683,36 @@
                         "type": "string"
                     },
                     "trackerTypeSupport": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.EmployeeIdpResolveRequest": {
+                "properties": {
+                    "kind": {
+                        "description": "\"badge\" | \"login\"",
+                        "type": "string"
+                    },
+                    "raw": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.EmployeeIdpResolveResponse": {
+                "properties": {
+                    "displayName": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "matchStatus": {
+                        "description": "\"matched\" | \"no_user\" | \"ambiguous\"",
+                        "type": "string"
+                    },
+                    "userId": {
                         "type": "string"
                     }
                 },
@@ -21354,6 +21479,164 @@
                 "summary": "Create a new counter",
                 "tags": [
                     "counters"
+                ]
+            }
+        },
+        "/units/{unitId}/employee-idp": {
+            "patch": {
+                "description": "Authenticated; permission unit.employee_idp.manage. Optional secretValues (encrypted); secretNamesToDelete removes named stored secrets.",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.PatchUnitEmployeeIdpRequest"
+                            }
+                        }
+                    },
+                    "description": "Settings and secrets",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.unitEmployeeIdpSettingsDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Error message"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Error message"
+                    }
+                },
+                "summary": "Update unit external employee IdP (HTTPS) settings",
+                "tags": [
+                    "units"
+                ]
+            }
+        },
+        "/units/{unitId}/employee-idp/resolve": {
+            "post": {
+                "description": "Authenticated kiosk session (access.kiosk or terminal JWT). Resolves against unit HTTPS template; does not return raw upstream body.",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/services.EmployeeIdpResolveRequest"
+                            }
+                        }
+                    },
+                    "description": "kind + raw",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.EmployeeIdpResolveResponse"
+                                }
+                            }
+                        },
+                        "description": "matchStatus: matched|no_user|ambiguous (userId set only for matched; ambiguous when >1 user shares email in company)"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Error message; 429 = rate limit"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Error message; 429 = rate limit"
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Error message; 429 = rate limit"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Error message; 429 = rate limit"
+                    },
+                    "502": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Error message; 429 = rate limit"
+                    }
+                },
+                "summary": "Resolve employee badge or login against tenant IdP",
+                "tags": [
+                    "kiosk"
                 ]
             }
         },

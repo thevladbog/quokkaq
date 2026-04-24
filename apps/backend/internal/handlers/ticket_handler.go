@@ -32,6 +32,7 @@ type TicketHandler struct {
 	operational *services.OperationalService
 	eta         *services.ETAService
 	unitService services.UnitService
+	userRepo    repository.UserRepository
 	settingsSvc *services.DeploymentSaaSSettingsService
 	survey      services.SurveyService
 	notif       *services.NotificationService
@@ -164,6 +165,12 @@ func (h *TicketHandler) WithSurveyService(sv services.SurveyService) *TicketHand
 	return h
 }
 
+// WithUserRepository enables validation of kioskIdentifiedUserId on ticket create.
+func (h *TicketHandler) WithUserRepository(ur repository.UserRepository) *TicketHandler {
+	h.userRepo = ur
+	return h
+}
+
 func (h *TicketHandler) ticketVisitorPhoneKnown(ticket *models.Ticket) bool {
 	if ticket == nil || ticket.ClientID == nil {
 		return false
@@ -253,10 +260,13 @@ func (h *TicketHandler) PostVisitorSMSSkip(w http.ResponseWriter, r *http.Reques
 
 // CreateTicketRequest is the JSON body for POST /units/{unitId}/tickets (unit comes from the path).
 type CreateTicketRequest struct {
-	ServiceID     string  `json:"serviceId" binding:"required"`
-	ClientID      *string `json:"clientId,omitempty"`
+	ServiceID string  `json:"serviceId" binding:"required"`
+	ClientID  *string `json:"clientId,omitempty"`
+	// VisitorPhone + VisitorLocale: kiosk phone identification.
 	VisitorPhone  *string `json:"visitorPhone,omitempty"`
 	VisitorLocale *string `json:"visitorLocale,omitempty"`
+	// KioskIdentifiedUserID: optional; resolved user id after employee IdP (badge/login) for this unit's company.
+	KioskIdentifiedUserID *string `json:"kioskIdentifiedUserId,omitempty"`
 }
 
 // CreateTicket godoc
@@ -319,6 +329,32 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var kioskIdentifiedUser *string
+	if req.KioskIdentifiedUserID != nil {
+		x := strings.TrimSpace(*req.KioskIdentifiedUserID)
+		if x != "" {
+			if h.userRepo == nil || h.unitService == nil {
+				http.Error(w, "kioskIdentifiedUserId is not available", http.StatusInternalServerError)
+				return
+			}
+			uu, uerr := h.unitService.GetUnitByID(unitID)
+			if uerr != nil {
+				http.Error(w, uerr.Error(), http.StatusInternalServerError)
+				return
+			}
+			ok, verr := h.userRepo.IsUserMemberOfCompanyTenant(x, uu.CompanyID)
+			if verr != nil {
+				http.Error(w, verr.Error(), http.StatusInternalServerError)
+				return
+			}
+			if !ok {
+				http.Error(w, "kioskIdentifiedUserId is not a member of this organization", http.StatusBadRequest)
+				return
+			}
+			kioskIdentifiedUser = &x
+		}
+	}
+
 	idempotency := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if idempotency != "" {
 		var row models.KioskTicketIdempotency
@@ -333,7 +369,7 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actor := getActorFromRequest(r)
-	ticket, err := h.service.CreateTicket(unitID, serviceID, staffClientID, visitorPhone, visitorLocale, actor)
+	ticket, err := h.service.CreateTicket(unitID, serviceID, staffClientID, visitorPhone, visitorLocale, actor, kioskIdentifiedUser)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrTicketQuotaExhausted):
@@ -344,6 +380,8 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 			errors.Is(err, services.ErrTicketCreateClientNotInUnit),
 			errors.Is(err, services.ErrDuplicateClientPhone),
 			errors.Is(err, services.ErrTicketCreateVisitorConflict),
+			errors.Is(err, services.ErrTicketKioskIdentifiedUserConflict),
+			errors.Is(err, services.ErrTicketKioskIdentifiedUserMode),
 			errors.Is(err, localeutil.ErrKioskVisitorLocaleInvalid),
 			errors.Is(err, services.ErrVisitorPhoneInvalid):
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -1398,7 +1436,7 @@ func (h *TicketHandler) JoinVirtualQueue(w http.ResponseWriter, r *http.Request)
 	}
 
 	vq := "virtual_queue"
-	ticket, err := h.service.CreateTicketWithFunnelOverride(unitID, serviceID, nil, visitorPhone, visitorLocale, nil, &vq)
+	ticket, err := h.service.CreateTicketWithFunnelOverride(unitID, serviceID, nil, visitorPhone, visitorLocale, nil, &vq, nil)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrTicketQuotaExhausted):

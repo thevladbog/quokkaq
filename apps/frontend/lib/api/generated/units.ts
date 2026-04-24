@@ -176,6 +176,8 @@ export interface ModelsService {
   gridRow?: number;
   gridRowSpan?: number;
   id?: string;
+  /** IdentificationMode selects the kiosk identification step: none|phone|qr|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column. */
+  identificationMode?: string;
   imageUrl?: string;
   isLeaf?: boolean;
   /** In seconds (service-time SLA — copied to Ticket.MaxServiceTime on in_service) */
@@ -336,6 +338,8 @@ export interface ModelsTicket {
   the working day (EOD) was still open. Credit tickets are counted against the next billing period. */
   isCredit?: boolean;
   isEod?: boolean;
+  /** KioskIdentifiedUserID is set when the ticket was issued after kiosk employee identification (badge / login) matched a user in the tenant. */
+  kioskIdentifiedUserId?: string;
   lastCalledAt?: string;
   /** Snapshot from Service at in_service; cleared on transfer/return */
   maxServiceTime?: number;
@@ -823,6 +827,25 @@ export interface HandlersPatchUnitClientRequest {
   tagDefinitionIds?: string[];
 }
 
+/**
+ * Secrets: name -> plaintext; stored encrypted. Omitted names unchanged.
+ */
+export type HandlersPatchUnitEmployeeIdpRequestSecretValues = {[key: string]: string};
+
+export interface HandlersPatchUnitEmployeeIdpRequest {
+  enabled?: boolean;
+  headerTemplatesJson?: string;
+  httpMethod?: string;
+  requestBodyTemplate?: string;
+  responseDisplayNamePath?: string;
+  responseEmailPath?: string;
+  secretNamesToDelete?: string[];
+  /** Secrets: name -> plaintext; stored encrypted. Omitted names unchanged. */
+  secretValues?: HandlersPatchUnitEmployeeIdpRequestSecretValues;
+  timeoutMs?: number;
+  upstreamUrl?: string;
+}
+
 export type HandlersPatchUnitKioskConfigRequestConfigKiosk = { [key: string]: unknown };
 
 export type HandlersPatchUnitKioskConfigRequestConfig = {
@@ -1156,6 +1179,8 @@ export interface HandlersTicketWithExtras {
   the working day (EOD) was still open. Credit tickets are counted against the next billing period. */
   isCredit?: boolean;
   isEod?: boolean;
+  /** KioskIdentifiedUserID is set when the ticket was issued after kiosk employee identification (badge / login) matched a user in the tenant. */
+  kioskIdentifiedUserId?: string;
   lastCalledAt?: string;
   /** Snapshot from Service at in_service; cleared on transfer/return */
   maxServiceTime?: number;
@@ -1660,6 +1685,7 @@ export interface ModelsCompany {
 export interface HandlersPlanCapabilitiesDTO {
   apiAccess?: boolean;
   customScreenLayouts?: boolean;
+  kioskEmployeeIdp?: boolean;
   outboundWebhooks?: boolean;
   publicQueueWidget?: boolean;
   visitorNotifications?: boolean;
@@ -1876,6 +1902,19 @@ export interface HandlersSsoExchangeRequest {
 
 export interface HandlersTenantHintRequest {
   email: string;
+}
+
+export interface HandlersUnitEmployeeIdpSettingsDTO {
+  enabled?: boolean;
+  headerTemplatesJson?: string;
+  httpMethod?: string;
+  requestBodyTemplate?: string;
+  responseDisplayNamePath?: string;
+  responseEmailPath?: string;
+  secretNames?: string[];
+  timeoutMs?: number;
+  unitId?: string;
+  upstreamUrl?: string;
 }
 
 export interface HandlersWebhookDeliveryLogDTO {
@@ -2562,6 +2601,20 @@ export interface ServicesDeploymentSaaSSettingsPatch {
   trackerTypeRegistration?: string;
   trackerTypeRequest?: string;
   trackerTypeSupport?: string;
+}
+
+export interface ServicesEmployeeIdpResolveRequest {
+  /** "badge" | "login" */
+  kind?: string;
+  raw?: string;
+}
+
+export interface ServicesEmployeeIdpResolveResponse {
+  displayName?: string;
+  email?: string;
+  /** "matched" | "no_user" | "ambiguous" */
+  matchStatus?: string;
+  userId?: string;
 }
 
 export interface ServicesEmployeeRadarResponse {
@@ -4064,6 +4117,103 @@ export function useGetUnitsUnitIdChildWorkplaces<TData = Awaited<ReturnType<type
 
 
 
+
+/**
+ * Authenticated; permission unit.employee_idp.manage. Optional secretValues (encrypted); secretNamesToDelete removes named stored secrets.
+ * @summary Update unit external employee IdP (HTTPS) settings
+ */
+export type patchUnitsUnitIdEmployeeIdpResponse200 = {
+  data: HandlersUnitEmployeeIdpSettingsDTO
+  status: 200
+}
+
+export type patchUnitsUnitIdEmployeeIdpResponse400 = {
+  data: string
+  status: 400
+}
+
+export type patchUnitsUnitIdEmployeeIdpResponse500 = {
+  data: string
+  status: 500
+}
+
+export type patchUnitsUnitIdEmployeeIdpResponseSuccess = (patchUnitsUnitIdEmployeeIdpResponse200) & {
+  headers: Headers;
+};
+export type patchUnitsUnitIdEmployeeIdpResponseError = (patchUnitsUnitIdEmployeeIdpResponse400 | patchUnitsUnitIdEmployeeIdpResponse500) & {
+  headers: Headers;
+};
+
+export type patchUnitsUnitIdEmployeeIdpResponse = (patchUnitsUnitIdEmployeeIdpResponseSuccess | patchUnitsUnitIdEmployeeIdpResponseError)
+
+export const getPatchUnitsUnitIdEmployeeIdpUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/employee-idp`
+}
+
+export const patchUnitsUnitIdEmployeeIdp = async (unitId: string,
+    handlersPatchUnitEmployeeIdpRequest: HandlersPatchUnitEmployeeIdpRequest, options?: RequestInit): Promise<patchUnitsUnitIdEmployeeIdpResponse> => {
+
+  return orvalMutator<patchUnitsUnitIdEmployeeIdpResponse>(getPatchUnitsUnitIdEmployeeIdpUrl(unitId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersPatchUnitEmployeeIdpRequest,)
+  }
+);}
+
+
+
+
+export const getPatchUnitsUnitIdEmployeeIdpMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUnitsUnitIdEmployeeIdp>>, TError,{unitId: string;data: HandlersPatchUnitEmployeeIdpRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchUnitsUnitIdEmployeeIdp>>, TError,{unitId: string;data: HandlersPatchUnitEmployeeIdpRequest}, TContext> => {
+
+const mutationKey = ['patchUnitsUnitIdEmployeeIdp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchUnitsUnitIdEmployeeIdp>>, {unitId: string;data: HandlersPatchUnitEmployeeIdpRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  patchUnitsUnitIdEmployeeIdp(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PatchUnitsUnitIdEmployeeIdpMutationResult = NonNullable<Awaited<ReturnType<typeof patchUnitsUnitIdEmployeeIdp>>>
+    export type PatchUnitsUnitIdEmployeeIdpMutationBody = HandlersPatchUnitEmployeeIdpRequest
+    export type PatchUnitsUnitIdEmployeeIdpMutationError = string
+
+    /**
+ * @summary Update unit external employee IdP (HTTPS) settings
+ */
+export const usePatchUnitsUnitIdEmployeeIdp = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUnitsUnitIdEmployeeIdp>>, TError,{unitId: string;data: HandlersPatchUnitEmployeeIdpRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof patchUnitsUnitIdEmployeeIdp>>,
+        TError,
+        {unitId: string;data: HandlersPatchUnitEmployeeIdpRequest},
+        TContext
+      > => {
+      return useMutation(getPatchUnitsUnitIdEmployeeIdpMutationOptions(options), queryClient);
+    }
 
 export type listSignageFeedsResponse200 = {
   data: ModelsExternalFeed[]

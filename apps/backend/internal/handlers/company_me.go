@@ -31,6 +31,7 @@ type planCapabilitiesDTO struct {
 	PublicQueueWidget    bool `json:"publicQueueWidget"`
 	CustomScreenLayouts  bool `json:"customScreenLayouts"`
 	VisitorNotifications bool `json:"visitorNotifications"`
+	KioskEmployeeIdp     bool `json:"kioskEmployeeIdp"`
 }
 
 // companyMeResponse is returned by GET /companies/me.
@@ -120,6 +121,7 @@ func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 	pubWidget, _ := subscriptionfeatures.CompanyHasPublicQueueWidget(r.Context(), h.db, companyID)
 	customLayouts, _ := subscriptionfeatures.CompanyHasCustomScreenLayouts(r.Context(), h.db, companyID)
 	visitorNotif, _ := services.CompanyHasPlanFeature(companyID, "visitor_notifications")
+	kioskEmpIdp, _ := services.CompanyHasPlanFeature(companyID, services.PlanFeatureKioskEmployeeIdp)
 
 	w.Header().Set("Content-Type", "application/json")
 	RespondJSON(w, companyMeResponse{
@@ -134,6 +136,7 @@ func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 			PublicQueueWidget:    pubWidget,
 			CustomScreenLayouts:  customLayouts,
 			VisitorNotifications: visitorNotif,
+			KioskEmployeeIdp:     kioskEmpIdp,
 		},
 		PublicAPIURL: services.APIPublicURL(),
 		PublicAppURL: services.PublicAppURL(),

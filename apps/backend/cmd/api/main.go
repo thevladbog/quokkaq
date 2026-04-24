@@ -320,7 +320,10 @@ func run() error {
 	})
 	services.WireTicketServiceETAScheduler(ticketService, etaBroadcaster)
 	services.WireCounterServiceETAScheduler(counterService, etaBroadcaster)
-	ticketHandler := handlers.NewTicketHandlerFull(ticketService, operationalService, etaService, unitService, database.DB).WithSettingsService(deploymentSaaSSettingsService).WithSurveyService(surveyService).WithNotificationService(notificationService)
+	employeeIdpRepo := repository.NewEmployeeIdpRepository(database.DB)
+	employeeIdpService := services.NewEmployeeIdpService(unitRepo, userRepo, employeeIdpRepo)
+	employeeIdpHandler := handlers.NewEmployeeIdpHandler(employeeIdpService, employeeIdpRepo, database.DB)
+	ticketHandler := handlers.NewTicketHandlerFull(ticketService, operationalService, etaService, unitService, database.DB).WithSettingsService(deploymentSaaSSettingsService).WithSurveyService(surveyService).WithNotificationService(notificationService).WithUserRepository(userRepo)
 	publicShortTicketHandler := handlers.NewPublicShortTicketHandler(ticketShortLinkRepo)
 	serviceHandler := handlers.NewServiceHandler(serviceService, userRepo)
 	counterHandler := handlers.NewCounterHandler(counterService, counterRepo, operationalService, userRepo, unitRepo)
@@ -577,6 +580,7 @@ func run() error {
 			r.Get("/{unitId}/services-tree", serviceHandler.GetServicesByUnit)
 			r.Post("/{unitId}/kiosk-printer-telemetry", unitHandler.PostKioskPrinterTelemetry)
 			r.Post("/{unitId}/kiosk-telemetry", kioskHandler.PostKioskTelemetry)
+			r.With(authmiddleware.EmployeeIdpResolveRateLimit).Post("/{unitId}/employee-idp/resolve", employeeIdpHandler.PostPublicEmployeeIdpResolve)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
@@ -616,6 +620,12 @@ func run() error {
 			r.Delete("/{unitId}/screen-announcements/{annId}", signageHandler.DeleteAnnouncement)
 		})
 
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermUnitEmployeeIdpManage))
+			r.Get("/{unitId}/employee-idp", employeeIdpHandler.GetUnitEmployeeIdp)
+			r.Patch("/{unitId}/employee-idp", employeeIdpHandler.PatchUnitEmployeeIdp)
+		})
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Use(authmiddleware.RequireUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermUnitSettingsManage))

@@ -76,5 +76,7 @@ func AllMigratableModels() []any {
 		&models.WebhookEndpoint{},
 		&models.WebhookDeliveryLog{},
 		&models.WebhookOutbox{},
+		&models.UnitEmployeeIdpSetting{},
+		&models.UnitEmployeeIdpSecret{},
 	}
 }

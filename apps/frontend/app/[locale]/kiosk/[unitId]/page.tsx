@@ -56,6 +56,8 @@ import { reportKioskPrinterTelemetry } from '@/lib/kiosk-printer-telemetry';
 import { socketClient, type UnitETASnapshot } from '@/lib/socket';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { isQuotaExceededError } from '@/lib/quota-error';
+import { getServiceIdentificationMode } from '@/lib/kiosk-service-identification';
+import { KioskEmployeeIdFlow } from '@/components/kiosk/kiosk-employee-id-flow';
 import {
   GRID_ZONE_SCOPE_NONE,
   SERVICE_GRID_CELL_COUNT,
@@ -108,6 +110,7 @@ export default function UnitKioskPage() {
   const locale = useLocale();
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
   const t = useTranslations('kiosk');
+  const tEmployee = useTranslations('kiosk.employee_id');
   const tA11y = useTranslations('kiosk.a11y');
   const a11y = useKioskA11y();
   const kioskAudio = useKioskA11yAudio({ ttsEnabled: a11y.ttsEnabled });
@@ -317,6 +320,12 @@ export default function UnitKioskPage() {
   const [isLocked, setIsLocked] = useState(false);
   const [, setClockClicks] = useState(0);
   const [isRedemptionModalOpen, setIsRedemptionModalOpen] = useState(false);
+  /** When user picks a service with identificationMode=qr — same modal as pre-reg, no deeplink. */
+  const [isKioskQrIdentificationOpen, setIsKioskQrIdentificationOpen] =
+    useState(false);
+  const [isKioskQrCheckinDisabledOpen, setIsKioskQrCheckinDisabledOpen] =
+    useState(false);
+  const [kioskPrIdentModalKey, setKioskPrIdentModalKey] = useState(0);
   const [redeemModalKey, setRedeemModalKey] = useState(0);
   const [isPhoneIdentificationOpen, setIsPhoneIdentificationOpen] =
     useState(false);
@@ -325,6 +334,15 @@ export default function UnitKioskPage() {
   const [phoneIdentificationError, setPhoneIdentificationError] = useState('');
   const [phoneIdentificationSessionKey, setPhoneIdentificationSessionKey] =
     useState(0);
+  const [isEmployeeIdentificationOpen, setIsEmployeeIdentificationOpen] =
+    useState(false);
+  const [pendingEmployeeService, setPendingEmployeeService] =
+    useState<Service | null>(null);
+  const [employeeIdSubmode, setEmployeeIdSubmode] = useState<'badge' | 'login'>(
+    'badge'
+  );
+  const [employeeCreateTicketError, setEmployeeCreateTicketError] =
+    useState('');
   const beforeIdleSec = unit?.config?.kiosk?.sessionIdleBeforeWarningSec ?? 45;
   const idleCountdownSec = unit?.config?.kiosk?.sessionIdleCountdownSec ?? 15;
   const sessionIdleEnabled = Boolean(
@@ -336,13 +354,20 @@ export default function UnitKioskPage() {
     !isLocked &&
     !isPinModalOpen &&
     !isRedemptionModalOpen &&
-    !isPhoneIdentificationOpen
+    !isKioskQrIdentificationOpen &&
+    !isKioskQrCheckinDisabledOpen &&
+    !isPhoneIdentificationOpen &&
+    !isEmployeeIdentificationOpen
   );
   const onIdleSessionEnd = useCallback(() => {
     setSelectedServicePath([]);
     setIsPhoneIdentificationOpen(false);
     setPhoneIdentificationError('');
     setPendingPhoneService(null);
+    setIsEmployeeIdentificationOpen(false);
+    setPendingEmployeeService(null);
+    setIsKioskQrIdentificationOpen(false);
+    setIsKioskQrCheckinDisabledOpen(false);
     setIsRedemptionModalOpen(false);
     setIsPinModalOpen(false);
     setMessage('');
@@ -437,7 +462,10 @@ export default function UnitKioskPage() {
     !isLocked &&
     !isPinModalOpen &&
     !isRedemptionModalOpen &&
-    !isPhoneIdentificationOpen
+    !isKioskQrIdentificationOpen &&
+    !isKioskQrCheckinDisabledOpen &&
+    !isPhoneIdentificationOpen &&
+    !isEmployeeIdentificationOpen
   );
   useKioskPrinterPaperOutPoll({
     unitId: kioskApiUnitId,
@@ -593,14 +621,24 @@ export default function UnitKioskPage() {
       pathLeaf?.id ?? 'root',
       successEtaMinutes ?? 'x',
       successPeopleAhead ?? 'x',
-      isPhoneIdentificationOpen
+      isPhoneIdentificationOpen,
+      isEmployeeIdentificationOpen,
+      isKioskQrIdentificationOpen
     ].join(':');
     if (key === ttsKeyRef.current) {
       return;
     }
     ttsKeyRef.current = key;
+    if (isKioskQrIdentificationOpen) {
+      tts.speak(tA11y('screen_qr_checkin'));
+      return;
+    }
     if (isPhoneIdentificationOpen) {
       tts.speak(tA11y('screen_phone'));
+      return;
+    }
+    if (isEmployeeIdentificationOpen) {
+      tts.speak(tA11y('screen_employee'));
       return;
     }
     if (isTicketModalOpen && createdTicket) {
@@ -633,7 +671,9 @@ export default function UnitKioskPage() {
     successPeopleAhead,
     heroTitle,
     tA11y,
-    isPhoneIdentificationOpen
+    isPhoneIdentificationOpen,
+    isEmployeeIdentificationOpen,
+    isKioskQrIdentificationOpen
   ]);
 
   const handleClockClick = () => {
@@ -759,27 +799,40 @@ export default function UnitKioskPage() {
 
   const createTicketForService = async (
     service: Service,
-    opts?: { visitorPhone: string; visitorLocale: 'en' | 'ru' },
-    failTarget?: 'phoneModal' | 'page'
+    opts?:
+      | { visitorPhone: string; visitorLocale: 'en' | 'ru' }
+      | { kioskIdentifiedUserId: string },
+    failTarget?: 'phoneModal' | 'page' | 'employeeModal'
   ) => {
     setMessage('');
+    setEmployeeCreateTicketError('');
     try {
-      const ticket = await createTicketMutation.mutateAsync(
-        opts
-          ? {
-              unitId: kioskApiUnitId!,
-              serviceId: service.id,
-              visitorPhone: opts.visitorPhone,
-              visitorLocale: opts.visitorLocale
-            }
-          : {
-              unitId: kioskApiUnitId!,
-              serviceId: service.id
-            }
-      );
+      let ticket;
+      if (opts && 'kioskIdentifiedUserId' in opts) {
+        ticket = await createTicketMutation.mutateAsync({
+          unitId: kioskApiUnitId!,
+          serviceId: service.id,
+          kioskIdentifiedUserId: opts.kioskIdentifiedUserId
+        });
+      } else if (opts && 'visitorPhone' in opts) {
+        ticket = await createTicketMutation.mutateAsync({
+          unitId: kioskApiUnitId!,
+          serviceId: service.id,
+          visitorPhone: opts.visitorPhone,
+          visitorLocale: opts.visitorLocale
+        });
+      } else {
+        ticket = await createTicketMutation.mutateAsync({
+          unitId: kioskApiUnitId!,
+          serviceId: service.id
+        });
+      }
       setPhoneIdentificationError('');
       setIsPhoneIdentificationOpen(false);
       setPendingPhoneService(null);
+      setIsEmployeeIdentificationOpen(false);
+      setPendingEmployeeService(null);
+      setEmployeeIdSubmode('badge');
       openTicketSuccessFlow(ticket, service);
     } catch (error) {
       console.error('Failed to create ticket:', error);
@@ -787,6 +840,8 @@ export default function UnitKioskPage() {
         const quotaMsg = t('ticketQuotaExceeded');
         if (failTarget === 'phoneModal') {
           setPhoneIdentificationError(quotaMsg);
+        } else if (failTarget === 'employeeModal') {
+          setEmployeeCreateTicketError(quotaMsg);
         } else {
           setMessage(quotaMsg);
         }
@@ -801,6 +856,10 @@ export default function UnitKioskPage() {
             defaultValue: failDefault
           })
         );
+      } else if (failTarget === 'employeeModal') {
+        setEmployeeCreateTicketError(
+          tEmployee('ticket_create_failed', { defaultValue: failDefault })
+        );
       } else {
         setMessage(failDefault);
       }
@@ -809,11 +868,28 @@ export default function UnitKioskPage() {
 
   const handleServiceSelection = async (service: Service) => {
     if (service.isLeaf) {
-      if (service.offerIdentification) {
+      const mode = getServiceIdentificationMode(service);
+      if (mode === 'phone') {
         setPhoneIdentificationError('');
         setPendingPhoneService(service);
         setPhoneIdentificationSessionKey((k) => k + 1);
         setIsPhoneIdentificationOpen(true);
+        return;
+      }
+      if (mode === 'qr') {
+        if (!appointmentCheckinEnabled) {
+          setIsKioskQrCheckinDisabledOpen(true);
+          return;
+        }
+        setKioskPrIdentModalKey((k) => k + 1);
+        setIsKioskQrIdentificationOpen(true);
+        return;
+      }
+      if (mode === 'login' || mode === 'badge') {
+        setEmployeeCreateTicketError('');
+        setPendingEmployeeService(service);
+        setEmployeeIdSubmode(mode === 'login' ? 'login' : 'badge');
+        setIsEmployeeIdentificationOpen(true);
         return;
       }
       await createTicketForService(service);
@@ -1584,6 +1660,87 @@ export default function UnitKioskPage() {
         errorMessage={phoneIdentificationError || undefined}
       />
 
+      <Dialog
+        open={isEmployeeIdentificationOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsEmployeeIdentificationOpen(false);
+            setPendingEmployeeService(null);
+            setEmployeeIdSubmode('badge');
+            setEmployeeCreateTicketError('');
+          }
+        }}
+      >
+        <DialogContent
+          className='max-w-lg'
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>{tEmployee('dialog_title')}</DialogTitle>
+          </DialogHeader>
+          {employeeCreateTicketError ? (
+            <p className='text-destructive text-sm' role='alert'>
+              {employeeCreateTicketError}
+            </p>
+          ) : null}
+          {kioskApiUnitId && pendingEmployeeService ? (
+            <KioskEmployeeIdFlow
+              unitId={kioskApiUnitId}
+              service={pendingEmployeeService}
+              mode={employeeIdSubmode}
+              onBack={() => {
+                setIsEmployeeIdentificationOpen(false);
+                setPendingEmployeeService(null);
+                setEmployeeIdSubmode('badge');
+                setEmployeeCreateTicketError('');
+              }}
+              onIdentified={(userId) => {
+                const svc = pendingEmployeeService;
+                if (!svc) {
+                  return;
+                }
+                void createTicketForService(
+                  svc,
+                  { kioskIdentifiedUserId: userId },
+                  'employeeModal'
+                );
+              }}
+              onUseKeyboard={
+                getServiceIdentificationMode(pendingEmployeeService) === 'badge'
+                  ? () => setEmployeeIdSubmode('login')
+                  : undefined
+              }
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isKioskQrCheckinDisabledOpen}
+        onOpenChange={setIsKioskQrCheckinDisabledOpen}
+      >
+        <DialogContent className='max-w-md'>
+          <DialogHeader>
+            <DialogTitle>{t('pre_registration.title_appointment')}</DialogTitle>
+          </DialogHeader>
+          <p className='text-kiosk-ink-muted text-sm leading-relaxed'>
+            {t('qr_checkin_unavailable')}
+          </p>
+          <DialogFooter className='sm:justify-end'>
+            <Button
+              type='button'
+              onClick={() => {
+                setIsKioskQrCheckinDisabledOpen(false);
+                setSelectedServicePath([]);
+              }}
+            >
+              {t('qr_checkin_unavailable_ok')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {showKioskIdOcr ? (
         <KioskIdOcrDialog
           open={idOcrOpen}
@@ -1610,16 +1767,23 @@ export default function UnitKioskPage() {
       ) : null}
 
       <PreRegRedemptionModal
-        key={redeemModalKey}
-        isOpen={isRedemptionModalOpen}
+        key={
+          isKioskQrIdentificationOpen
+            ? `kiosk-qr-${kioskPrIdentModalKey}`
+            : redeemModalKey
+        }
+        isOpen={isRedemptionModalOpen || isKioskQrIdentificationOpen}
         onClose={() => {
           setIsRedemptionModalOpen(false);
+          setIsKioskQrIdentificationOpen(false);
           setRedeemAutoFromDeeplink(false);
         }}
         unitId={kioskApiUnitId ?? unitId!}
-        initialCode={deeplinkPrCode}
+        initialCode={isKioskQrIdentificationOpen ? undefined : deeplinkPrCode}
         showPhoneTab={showPhoneForAppointment}
-        autoRedeemFromDeeplink={redeemAutoFromDeeplink}
+        autoRedeemFromDeeplink={
+          redeemAutoFromDeeplink && !isKioskQrIdentificationOpen
+        }
         onSuccess={async (ticket) => {
           let full: Ticket = ticket;
           try {

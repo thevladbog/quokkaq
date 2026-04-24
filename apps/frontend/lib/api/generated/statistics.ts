@@ -149,6 +149,8 @@ export interface ModelsService {
   gridRow?: number;
   gridRowSpan?: number;
   id?: string;
+  /** IdentificationMode selects the kiosk identification step: none|phone|qr|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column. */
+  identificationMode?: string;
   imageUrl?: string;
   isLeaf?: boolean;
   /** In seconds (service-time SLA — copied to Ticket.MaxServiceTime on in_service) */
@@ -309,6 +311,8 @@ export interface ModelsTicket {
   the working day (EOD) was still open. Credit tickets are counted against the next billing period. */
   isCredit?: boolean;
   isEod?: boolean;
+  /** KioskIdentifiedUserID is set when the ticket was issued after kiosk employee identification (badge / login) matched a user in the tenant. */
+  kioskIdentifiedUserId?: string;
   lastCalledAt?: string;
   /** Snapshot from Service at in_service; cleared on transfer/return */
   maxServiceTime?: number;
@@ -796,6 +800,25 @@ export interface HandlersPatchUnitClientRequest {
   tagDefinitionIds?: string[];
 }
 
+/**
+ * Secrets: name -> plaintext; stored encrypted. Omitted names unchanged.
+ */
+export type HandlersPatchUnitEmployeeIdpRequestSecretValues = {[key: string]: string};
+
+export interface HandlersPatchUnitEmployeeIdpRequest {
+  enabled?: boolean;
+  headerTemplatesJson?: string;
+  httpMethod?: string;
+  requestBodyTemplate?: string;
+  responseDisplayNamePath?: string;
+  responseEmailPath?: string;
+  secretNamesToDelete?: string[];
+  /** Secrets: name -> plaintext; stored encrypted. Omitted names unchanged. */
+  secretValues?: HandlersPatchUnitEmployeeIdpRequestSecretValues;
+  timeoutMs?: number;
+  upstreamUrl?: string;
+}
+
 export type HandlersPatchUnitKioskConfigRequestConfigKiosk = { [key: string]: unknown };
 
 export type HandlersPatchUnitKioskConfigRequestConfig = {
@@ -1129,6 +1152,8 @@ export interface HandlersTicketWithExtras {
   the working day (EOD) was still open. Credit tickets are counted against the next billing period. */
   isCredit?: boolean;
   isEod?: boolean;
+  /** KioskIdentifiedUserID is set when the ticket was issued after kiosk employee identification (badge / login) matched a user in the tenant. */
+  kioskIdentifiedUserId?: string;
   lastCalledAt?: string;
   /** Snapshot from Service at in_service; cleared on transfer/return */
   maxServiceTime?: number;
@@ -1633,6 +1658,7 @@ export interface ModelsCompany {
 export interface HandlersPlanCapabilitiesDTO {
   apiAccess?: boolean;
   customScreenLayouts?: boolean;
+  kioskEmployeeIdp?: boolean;
   outboundWebhooks?: boolean;
   publicQueueWidget?: boolean;
   visitorNotifications?: boolean;
@@ -1849,6 +1875,19 @@ export interface HandlersSsoExchangeRequest {
 
 export interface HandlersTenantHintRequest {
   email: string;
+}
+
+export interface HandlersUnitEmployeeIdpSettingsDTO {
+  enabled?: boolean;
+  headerTemplatesJson?: string;
+  httpMethod?: string;
+  requestBodyTemplate?: string;
+  responseDisplayNamePath?: string;
+  responseEmailPath?: string;
+  secretNames?: string[];
+  timeoutMs?: number;
+  unitId?: string;
+  upstreamUrl?: string;
 }
 
 export interface HandlersWebhookDeliveryLogDTO {
@@ -2535,6 +2574,20 @@ export interface ServicesDeploymentSaaSSettingsPatch {
   trackerTypeRegistration?: string;
   trackerTypeRequest?: string;
   trackerTypeSupport?: string;
+}
+
+export interface ServicesEmployeeIdpResolveRequest {
+  /** "badge" | "login" */
+  kind?: string;
+  raw?: string;
+}
+
+export interface ServicesEmployeeIdpResolveResponse {
+  displayName?: string;
+  email?: string;
+  /** "matched" | "no_user" | "ambiguous" */
+  matchStatus?: string;
+  userId?: string;
 }
 
 export interface ServicesEmployeeRadarResponse {

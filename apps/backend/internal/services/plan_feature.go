@@ -24,6 +24,8 @@ const (
 	PlanFeatureKioskIDOCR               = "kiosk_id_ocr"
 	PlanFeatureKioskOfflineMode         = "kiosk_offline_mode"
 	PlanFeatureKioskVisitorPayment      = "kiosk_visitor_payment" // reserved: separate initiative, not in phase 5.1–5.5 delivery
+	// PlanFeatureKioskEmployeeIdp enables external HTTPS IdP for kiosk/staff employee identification (badge/login).
+	PlanFeatureKioskEmployeeIdp = "kiosk_employee_idp"
 )
 
 // CompanyHasCounterBoardFeature is true when the plan enables counter_board, or when it has websocket_updates

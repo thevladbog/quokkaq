@@ -2683,6 +2683,47 @@ WHERE code = 'starter' AND (features->>'kiosk_operations_analytics') IS NULL;`).
 		return fmt.Errorf("failed to run v1.8.11_kiosk_eta_p95 migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.8.12_employee_idp_and_identification_mode", func(db *gorm.DB) error {
+		if err := db.Exec(`ALTER TABLE services ADD COLUMN IF NOT EXISTS identification_mode text NOT NULL DEFAULT 'none';`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`UPDATE services SET identification_mode = CASE WHEN offer_identification THEN 'phone' ELSE 'none' END;`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`ALTER TABLE services DROP CONSTRAINT IF EXISTS chk_services_identification_mode;`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`ALTER TABLE services ADD CONSTRAINT chk_services_identification_mode CHECK (identification_mode IN ('none','phone','qr','login','badge'));`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS kiosk_identified_user_id uuid NULL;`).Error; err != nil {
+			return err
+		}
+		if err := db.AutoMigrate(
+			&dbmodels.UnitEmployeeIdpSetting{},
+			&dbmodels.UnitEmployeeIdpSecret{},
+		); err != nil {
+			return err
+		}
+		//nolint:gosec // static JSON feature flags
+		if err := db.Exec(`
+UPDATE subscription_plans
+SET features = COALESCE(features, '{}'::jsonb) || '{"kiosk_employee_idp": true}'::jsonb
+WHERE code IN ('professional', 'enterprise', 'grandfathered') AND (features->>'kiosk_employee_idp') IS NULL;`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+UPDATE subscription_plans
+SET features = COALESCE(features, '{}'::jsonb) || '{"kiosk_employee_idp": false}'::jsonb
+WHERE code = 'starter' AND (features->>'kiosk_employee_idp') IS NULL;`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.12_employee_idp_and_identification_mode migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }
