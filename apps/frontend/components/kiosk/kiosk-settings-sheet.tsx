@@ -329,6 +329,21 @@ function KioskSettingsForm({
   const [visitorSmsAfterTicket, setVisitorSmsAfterTicket] = useState(
     (k0 as KioskConfig | undefined)?.visitorSmsAfterTicket !== false
   );
+  const [idOcrEnabled, setIdOcrEnabled] = useState(
+    Boolean((k0 as KioskConfig | undefined)?.idOcrEnabled)
+  );
+  const [idOcrPreferNative, setIdOcrPreferNative] = useState(
+    (k0 as KioskConfig | undefined)?.idOcrPreferNative !== false
+  );
+  const [idOcrWedgeMrz, setIdOcrWedgeMrz] = useState(
+    (k0 as KioskConfig | undefined)?.idOcrWedgeMrz !== false
+  );
+  const [idOcrWedgeRuDriverLicense, setIdOcrWedgeRuDriverLicense] = useState(
+    (k0 as KioskConfig | undefined)?.idOcrWedgeRuDriverLicense !== false
+  );
+  const [offlineModeEnabled, setOfflineModeEnabled] = useState(
+    Boolean((k0 as KioskConfig | undefined)?.offlineModeEnabled)
+  );
 
   const [appVersionLabel, setAppVersionLabel] = useState<string>('');
   const [browserOnline, setBrowserOnline] = useState(() =>
@@ -474,6 +489,11 @@ function KioskSettingsForm({
         sessionIdleBeforeWarningSec: beforeSec,
         sessionIdleCountdownSec: countSec,
         visitorSmsAfterTicket,
+        idOcrEnabled: idOcrEnabled,
+        idOcrPreferNative: idOcrPreferNative,
+        idOcrWedgeMrz: idOcrWedgeMrz,
+        idOcrWedgeRuDriverLicense: idOcrWedgeRuDriverLicense,
+        offlineModeEnabled: offlineModeEnabled,
         printerConnection,
         systemPrinterName:
           printerConnection === 'system'
@@ -871,6 +891,93 @@ function KioskSettingsForm({
               id='sheet-visitor-sms'
               checked={visitorSmsAfterTicket}
               onCheckedChange={setVisitorSmsAfterTicket}
+            />
+          </div>
+        </div>
+
+        <div className='border-t pt-4'>
+          <div className='flex items-center justify-between gap-2'>
+            <div>
+              <Label htmlFor='sheet-id-ocr'>{tAdmin('id_ocr_enable')}</Label>
+              <p className='text-muted-foreground text-sm'>
+                {tAdmin('id_ocr_enable_hint')}
+              </p>
+            </div>
+            <Switch
+              id='sheet-id-ocr'
+              checked={idOcrEnabled}
+              onCheckedChange={setIdOcrEnabled}
+            />
+          </div>
+        </div>
+
+        {idOcrEnabled && isTauriKiosk() ? (
+          <div className='flex items-center justify-between border-t pt-2'>
+            <div>
+              <Label htmlFor='sheet-id-ocr-native'>
+                {tAdmin('id_ocr_prefer_native')}
+              </Label>
+              <p className='text-muted-foreground text-sm'>
+                {tAdmin('id_ocr_prefer_native_hint')}
+              </p>
+            </div>
+            <Switch
+              id='sheet-id-ocr-native'
+              checked={idOcrPreferNative}
+              onCheckedChange={setIdOcrPreferNative}
+            />
+          </div>
+        ) : null}
+
+        {idOcrEnabled ? (
+          <div className='space-y-2 border-t pt-2'>
+            <div className='flex items-center justify-between gap-2'>
+              <div>
+                <Label htmlFor='sheet-id-ocr-mrz'>
+                  {tAdmin('id_ocr_wedge_mrz')}
+                </Label>
+                <p className='text-muted-foreground text-sm'>
+                  {tAdmin('id_ocr_wedge_mrz_hint')}
+                </p>
+              </div>
+              <Switch
+                id='sheet-id-ocr-mrz'
+                checked={idOcrWedgeMrz}
+                onCheckedChange={setIdOcrWedgeMrz}
+              />
+            </div>
+            <div className='flex items-center justify-between gap-2'>
+              <div>
+                <Label htmlFor='sheet-id-ocr-ru'>
+                  {tAdmin('id_ocr_wedge_ru')}
+                </Label>
+                <p className='text-muted-foreground text-sm'>
+                  {tAdmin('id_ocr_wedge_ru_hint')}
+                </p>
+              </div>
+              <Switch
+                id='sheet-id-ocr-ru'
+                checked={idOcrWedgeRuDriverLicense}
+                onCheckedChange={setIdOcrWedgeRuDriverLicense}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        <div className='border-t pt-4'>
+          <div className='flex items-center justify-between gap-2'>
+            <div>
+              <Label htmlFor='sheet-offline'>
+                {tAdmin('offline_mode_enable')}
+              </Label>
+              <p className='text-muted-foreground text-sm'>
+                {tAdmin('offline_mode_hint')}
+              </p>
+            </div>
+            <Switch
+              id='sheet-offline'
+              checked={offlineModeEnabled}
+              onCheckedChange={setOfflineModeEnabled}
             />
           </div>
         </div>

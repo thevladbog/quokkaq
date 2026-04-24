@@ -3,11 +3,13 @@
 use std::collections::HashSet;
 use std::io::Write;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::process::Command;
 use std::sync::Mutex;
 use std::time::Duration;
 
 use base64::Engine;
 use cpal::traits::{DeviceTrait, HostTrait};
+use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, Url};
 use tauri::webview::PageLoadEvent;
@@ -410,6 +412,59 @@ fn kiosk_get_audio_output_state() -> Result<KioskAudioOutputState, String> {
     Ok(kiosk_audio_output_state_inner())
 }
 
+/// One-shot Tesseract on a camera frame (5.4). Decodes a PNG or JPEG, writes a temp file, calls `tesseract` from PATH, then deletes the temp.
+/// No durable storage of the image. System package: `tesseract` (+ `eng`/`rus` traineddata) must be on PATH.
+#[tauri::command]
+fn kiosk_tesseract_ocr_from_image(
+    image_base64: String,
+) -> Result<serde_json::Value, String> {
+    let raw = base64::engine::general_purpose::STANDARD
+        .decode(image_base64.trim().as_bytes())
+        .map_err(|e| format!("invalid base64: {e}"))?;
+    if raw.len() < 32 {
+        return Err("image data too small".to_string());
+    }
+    if raw.len() > 20 * 1024 * 1024 {
+        return Err("image too large (max 20MB)".to_string());
+    }
+    let ext = if raw.get(0..2) == Some(&[0xff, 0xd8]) {
+        "jpg"
+    } else {
+        "png"
+    };
+    let d = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| e.to_string())?;
+    let name = format!("qq_ocr_{}_{}.{}", d.as_millis(), d.subsec_nanos(), ext);
+    let path = std::env::temp_dir().join(name);
+    std::fs::write(&path, &raw).map_err(|e| e.to_string())?;
+    let out = Command::new("tesseract")
+        .arg(&path)
+        .arg("-")
+        .arg("-l")
+        .arg("eng+rus")
+        .arg("--psm")
+        .arg("6")
+        .output();
+    let _ = std::fs::remove_file(&path);
+    let o = out.map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "tesseract not found on PATH (install Tesseract, e.g. Homebrew: brew install tesseract tesseract-lang)".to_string()
+        } else {
+            e.to_string()
+        }
+    })?;
+    if !o.status.success() {
+        let err = String::from_utf8_lossy(&o.stderr);
+        return Err(format!("tesseract failed: {err}"));
+    }
+    let text = String::from_utf8(o.stdout)
+        .map_err(|e| e.to_string())?
+        .trim()
+        .to_string();
+    Ok(serde_json::json!({ "text": text, "source": "tesseract_cli" }))
+}
+
 /// JSON string: `{ "printers": [...], "error"?: string }` from the local agent.
 #[tauri::command]
 fn list_printers() -> Result<String, String> {
@@ -546,7 +601,8 @@ pub fn run() {
             list_printers,
             pair_terminal,
             reset_desktop_pairing,
-            kiosk_get_audio_output_state
+            kiosk_get_audio_output_state,
+            kiosk_tesseract_ocr_from_image
         ])
         .setup(|app| {
             let handle = app.handle().clone();

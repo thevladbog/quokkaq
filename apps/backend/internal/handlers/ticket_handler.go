@@ -33,6 +33,7 @@ type TicketHandler struct {
 	eta         *services.ETAService
 	unitService services.UnitService
 	settingsSvc *services.DeploymentSaaSSettingsService
+	survey      services.SurveyService
 	notif       *services.NotificationService
 	db          *gorm.DB
 }
@@ -154,6 +155,12 @@ func (h *TicketHandler) WithSettingsService(svc *services.DeploymentSaaSSettings
 // WithNotificationService records funnel events on some public routes and enables tenant-SMS gating in Attach.
 func (h *TicketHandler) WithNotificationService(ns *services.NotificationService) *TicketHandler {
 	h.notif = ns
+	return h
+}
+
+// WithSurveyService enables kiosk post-service survey persistence (survey_responses).
+func (h *TicketHandler) WithSurveyService(sv services.SurveyService) *TicketHandler {
+	h.survey = sv
 	return h
 }
 
@@ -312,6 +319,19 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	idempotency := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if idempotency != "" {
+		var row models.KioskTicketIdempotency
+		if err := database.DB.Where("unit_id = ? AND idempotency_key = ?", unitID, idempotency).First(&row).Error; err == nil {
+			if prev, perr := h.service.GetTicketByID(row.TicketID); perr == nil {
+				h.enrichTicketQueuePositionAndZone(prev)
+				w.WriteHeader(http.StatusOK)
+				RespondJSON(w, h.publicTicketView(r.Context(), prev))
+				return
+			}
+		}
+	}
+
 	actor := getActorFromRequest(r)
 	ticket, err := h.service.CreateTicket(unitID, serviceID, staffClientID, visitorPhone, visitorLocale, actor)
 	if err != nil {
@@ -332,6 +352,11 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+	}
+
+	if idempotency != "" {
+		row := models.KioskTicketIdempotency{UnitID: unitID, IdempotencyKey: idempotency, TicketID: ticket.ID}
+		_ = database.DB.Create(&row).Error
 	}
 
 	if h.operational != nil {
@@ -1206,6 +1231,85 @@ func (h *TicketHandler) GetIntegrationUnitQueueSummary(w http.ResponseWriter, r 
 	RespondJSON(w, summary)
 }
 
+// KioskVisitorSurveyRequest is POST /units/{unitId}/kiosk-visitor-survey.
+type KioskVisitorSurveyRequest struct {
+	TicketID string `json:"ticketId"`
+	Score    int    `json:"score"`
+	Emoji    string `json:"emoji,omitempty"`
+}
+
+// PostKioskVisitorSurvey records post-service feedback (5.3). Public; X-Visitor-Token; plan post_service_survey.
+// @Tags         units
+// @Param        unitId   path  string  true  "Unit ID"
+// @Param        X-Visitor-Token  header  string  true  "Visitor ownership token (same as ticket page)"
+// @Param        body     body  KioskVisitorSurveyRequest  true  "Score and optional emoji"
+// @Success      204  {object}  nil
+// @Router /units/{unitId}/kiosk-visitor-survey [post]
+func (h *TicketHandler) PostKioskVisitorSurvey(w http.ResponseWriter, r *http.Request) {
+	unitID := strings.TrimSpace(chi.URLParam(r, "unitId"))
+	if unitID == "" {
+		http.Error(w, "unitId required", http.StatusBadRequest)
+		return
+	}
+	var req KioskVisitorSurveyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	tid := strings.TrimSpace(req.TicketID)
+	if tid == "" || req.Score < 1 || req.Score > 5 {
+		http.Error(w, "ticketId and score 1-5 required", http.StatusBadRequest)
+		return
+	}
+	if !h.validateVisitorToken(w, r, tid) {
+		return
+	}
+	ticket, err := h.service.GetTicketByID(tid)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !strings.EqualFold(ticket.UnitID, unitID) {
+		http.Error(w, "unit mismatch", http.StatusBadRequest)
+		return
+	}
+	if h.survey == nil {
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	err = h.survey.SubmitKioskPostServiceResponse(r.Context(), unitID, ticket, req.Score, req.Emoji)
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrSurveyFeatureLocked):
+			http.Error(w, "post-service survey not available on plan", http.StatusForbidden)
+		case errors.Is(err, services.ErrSurveyForbidden):
+			http.Error(w, "forbidden", http.StatusForbidden)
+		case errors.Is(err, services.ErrSurveyNotFound):
+			http.Error(w, "not found", http.StatusNotFound)
+		case errors.Is(err, services.ErrSurveyBadRequest):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	if h.notif != nil {
+		meta := map[string]any{
+			"score":  req.Score,
+			"unitId": unitID,
+		}
+		if strings.TrimSpace(req.Emoji) != "" {
+			meta["emoji"] = strings.TrimSpace(req.Emoji)
+		}
+		h.notif.RecordFunnelEvent(ticket, "kiosk_post_service_survey", "kiosk", meta)
+		if req.Score <= 2 {
+			m2 := map[string]any{"score": req.Score, "unitId": unitID, "ticketId": ticket.ID}
+			h.notif.RecordFunnelEvent(ticket, "kiosk_survey_low_score", "kiosk", m2)
+		}
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // VirtualQueueJoinRequest is the body for POST /units/{unitId}/virtual-queue.
 type VirtualQueueJoinRequest struct {
 	ServiceID string `json:"serviceId"`
@@ -1293,7 +1397,8 @@ func (h *TicketHandler) JoinVirtualQueue(w http.ResponseWriter, r *http.Request)
 		visitorLocale = &locale
 	}
 
-	ticket, err := h.service.CreateTicket(unitID, serviceID, nil, visitorPhone, visitorLocale, nil)
+	vq := "virtual_queue"
+	ticket, err := h.service.CreateTicketWithFunnelOverride(unitID, serviceID, nil, visitorPhone, visitorLocale, nil, &vq)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrTicketQuotaExhausted):
@@ -1312,7 +1417,10 @@ func (h *TicketHandler) JoinVirtualQueue(w http.ResponseWriter, r *http.Request)
 	}
 	if h.notif != nil {
 		if full, gErr := h.service.GetTicketByID(ticket.ID); gErr == nil {
-			h.notif.RecordFunnelEvent(full, "public_virtual_queue_joined", "virtual_queue", nil)
+			h.notif.RecordFunnelEvent(full, "public_virtual_queue_joined", "virtual_queue", map[string]any{
+				"serviceId": full.ServiceID,
+				"channel":   "virtual_queue",
+			})
 		}
 	}
 

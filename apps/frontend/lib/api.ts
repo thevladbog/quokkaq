@@ -639,7 +639,13 @@ export const unitsApi = {
     } else {
       body = { serviceId: normalized.serviceId };
     }
-    const res = await orvalTc.createUnitTicket(unitId, body);
+    const idem =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+    const res = await orvalTc.createUnitTicket(unitId, body, {
+      headers: { 'Idempotency-Key': idem }
+    });
     return TicketModelSchema.parse(res.data);
   },
 

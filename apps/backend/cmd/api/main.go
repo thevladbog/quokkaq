@@ -256,6 +256,40 @@ func run() error {
 			}
 		}
 	}()
+	kioskETACal := services.NewKioskETACalibrationService(database.DB, unitRepo)
+	go func() {
+		tick := time.NewTicker(4 * time.Hour)
+		defer tick.Stop()
+		for {
+			select {
+			case <-refreshCtx.Done():
+				return
+			case <-tick.C:
+				var uids []string
+				if err := database.DB.Table("units").Pluck("id", &uids).Error; err != nil {
+					slog.Error("kiosk smart eta cron: list units", "err", err)
+					continue
+				}
+				for _, uid := range uids {
+					u, err := unitRepo.FindByIDLight(uid)
+					if err != nil || u == nil {
+						continue
+					}
+					ok, perr := services.CompanyHasPlanFeature(u.CompanyID, services.PlanFeatureKioskSmartETA)
+					if perr != nil {
+						slog.Error("kiosk smart eta cron: plan", "unit", uid, "err", perr)
+						continue
+					}
+					if !ok {
+						continue
+					}
+					if err := kioskETACal.RefreshForUnit(uid); err != nil {
+						slog.Error("kiosk smart eta refresh", "unit", uid, "err", err)
+					}
+				}
+			}
+		}
+	}()
 	shiftService := services.NewShiftService(ticketRepo, counterRepo, serviceRepo, auditLogRepo, operatorIntervalRepo, hub, userRepo)
 	templateService := services.NewTemplateService(templateRepo)
 	invitationService := services.NewInvitationServiceWithQuota(invitationRepo, mailService, userRepo, unitRepo, templateService, quotaService)
@@ -263,7 +297,7 @@ func run() error {
 	preRegService := services.NewPreRegistrationService(preRegRepo, slotRepo, ticketRepo, serviceRepo, calendarIntegrationService)
 	desktopTerminalService := services.NewDesktopTerminalService(desktopTerminalRepo, unitRepo, counterRepo)
 	surveyRepo := repository.NewSurveyRepository()
-	surveyService := services.NewSurveyService(surveyRepo, unitRepo, userRepo, ticketRepo, desktopTerminalRepo, counterRepo, storageService)
+	surveyService := services.NewSurveyService(surveyRepo, unitRepo, userRepo, ticketRepo, desktopTerminalRepo, counterRepo, storageService, hub)
 	userHandler := handlers.NewUserHandler(userService, userRepo, unitRepo, deploymentSetupService, storageService)
 	authHandler := handlers.NewAuthHandlerWithSubscription(authService, userService, userRepo, tenantRBACRepo, leadIssueService, subscriptionRepo)
 	integrationsHandler := handlers.NewIntegrationsHandler(deploymentSaaSSettingsService)
@@ -273,7 +307,7 @@ func run() error {
 	tenantRBACHTTP := handlers.NewTenantRBACHTTP(tenantRBACRepo, userRepo, ssoService)
 	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService, userRepo).WithWebSocketHub(hub)
 	signageHandler := handlers.NewSignageHandler(signageService, unitRepo)
-	etaService := services.NewETAServiceFull(ticketRepo, counterRepo, serviceRepo, unitRepo, statsRepo)
+	etaService := services.NewETAServiceFull(ticketRepo, counterRepo, serviceRepo, unitRepo, statsRepo).WithGormDB(database.DB)
 	predictionService := services.NewPredictionService(database.DB, hub, etaService, unitRepo, ticketRepo)
 	etaBroadcaster := services.NewETABroadcaster(etaService, hub, 0)
 	etaBroadcaster.SetAfterFlush(func(unitID string) {
@@ -286,7 +320,7 @@ func run() error {
 	})
 	services.WireTicketServiceETAScheduler(ticketService, etaBroadcaster)
 	services.WireCounterServiceETAScheduler(counterService, etaBroadcaster)
-	ticketHandler := handlers.NewTicketHandlerFull(ticketService, operationalService, etaService, unitService, database.DB).WithSettingsService(deploymentSaaSSettingsService).WithNotificationService(notificationService)
+	ticketHandler := handlers.NewTicketHandlerFull(ticketService, operationalService, etaService, unitService, database.DB).WithSettingsService(deploymentSaaSSettingsService).WithSurveyService(surveyService).WithNotificationService(notificationService)
 	publicShortTicketHandler := handlers.NewPublicShortTicketHandler(ticketShortLinkRepo)
 	serviceHandler := handlers.NewServiceHandler(serviceService, userRepo)
 	counterHandler := handlers.NewCounterHandler(counterService, counterRepo, operationalService, userRepo, unitRepo)
@@ -294,6 +328,7 @@ func run() error {
 	shiftHandler := handlers.NewShiftHandler(shiftService, operationalService)
 	statisticsHandler := handlers.NewStatisticsHandler(statsService, userRepo, unitRepo)
 	statisticsExportHandler := handlers.NewStatisticsExportHandler(statsService, userRepo, unitRepo)
+	kioskHandler := handlers.NewKioskHandler(database.DB, unitRepo)
 	operatorSkillHandler := handlers.NewOperatorSkillHandler(operatorSkillRepo, userRepo, serviceRepo)
 	operationsHandler := handlers.NewOperationsHandler(operationalService, userRepo, auditLogRepo)
 	templateHandler := handlers.NewTemplateHandler(templateService, userRepo)
@@ -541,6 +576,7 @@ func run() error {
 			r.Get("/{unitId}/services", serviceHandler.GetServicesByUnit)
 			r.Get("/{unitId}/services-tree", serviceHandler.GetServicesByUnit)
 			r.Post("/{unitId}/kiosk-printer-telemetry", unitHandler.PostKioskPrinterTelemetry)
+			r.Post("/{unitId}/kiosk-telemetry", kioskHandler.PostKioskTelemetry)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
@@ -554,6 +590,7 @@ func run() error {
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/feeds/{feedId}/data", signageHandler.PublicFeedData)
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/queue-status", ticketHandler.GetUnitQueueStatus)
 		r.With(authmiddleware.VirtualQueueJoinRateLimit, authmiddleware.PublicAPIRateLimit).Post("/{unitId}/virtual-queue", ticketHandler.JoinVirtualQueue)
+		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/kiosk-visitor-survey", ticketHandler.PostKioskVisitorSurvey)
 
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
@@ -716,6 +753,8 @@ func run() error {
 			r.Get("/{unitId}/statistics/staffing-forecast", statisticsHandler.GetStaffingForecast)
 			r.Get("/{unitId}/statistics/anomaly-alerts", statisticsHandler.GetAnomalyAlerts)
 			r.Get("/{unitId}/statistics/export/pdf", statisticsExportHandler.ExportPDF)
+			r.Get("/{unitId}/kiosk-analytics", kioskHandler.GetKioskAnalytics)
+			r.Post("/{unitId}/kiosk-eta-refresh", kioskHandler.PostKioskETARefresh)
 		})
 
 		r.Group(func(r chi.Router) {

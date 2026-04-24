@@ -66,6 +66,13 @@ import {
 } from '@/lib/service-grid';
 import { useKioskSessionIdle } from '@/hooks/use-kiosk-session-idle';
 import { useKioskPrinterPaperOutPoll } from '@/hooks/use-kiosk-printer-paper-poll';
+import { KioskIdOcrDialog } from '@/components/kiosk/kiosk-id-ocr-dialog';
+import { useKioskTelemetryPing } from '@/hooks/use-kiosk-telemetry-ping';
+import {
+  persistKioskServiceTreeSnapshot,
+  persistKioskUnitSnapshot
+} from '@/lib/kiosk-snapshot-cache';
+import { toast } from 'sonner';
 
 export default function UnitKioskPage() {
   const queryClient = useQueryClient();
@@ -93,6 +100,10 @@ export default function UnitKioskPage() {
   const [kioskSmsDigits, setKioskSmsDigits] = useState('');
   const [kioskSmsError, setKioskSmsError] = useState<string | null>(null);
   const [kioskSmsBusy, setKioskSmsBusy] = useState(false);
+  const [idOcrOpen, setIdOcrOpen] = useState(false);
+  const [browserOnline, setBrowserOnline] = useState(
+    () => typeof window === 'undefined' || navigator.onLine
+  );
   const router = useRouter();
   const locale = useLocale();
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
@@ -120,10 +131,22 @@ export default function UnitKioskPage() {
       return u?.operations?.kioskFrozen ? 10_000 : 120_000;
     },
     // Desktop WebView + React Query cache: always pick up fresh kiosk PIN / config.
-    refetchOnMount: 'always'
+    refetchOnMount: 'always',
+    kioskReadCache: true
   });
 
   const serverKioskFrozen = Boolean(unit?.operations?.kioskFrozen);
+
+  useEffect(() => {
+    const up = () => setBrowserOnline(true);
+    const down = () => setBrowserOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => {
+      window.removeEventListener('online', up);
+      window.removeEventListener('offline', down);
+    };
+  }, []);
 
   const invalidateUnitQuery = useCallback(() => {
     if (!unitId) {
@@ -163,6 +186,11 @@ export default function UnitKioskPage() {
     return unit.id;
   }, [unit]);
 
+  useKioskTelemetryPing(
+    kioskApiUnitId,
+    Boolean(kioskApiUnitId) && !serverKioskFrozen
+  );
+
   useEffect(() => {
     if (!isTicketModalOpen || !createdTicket || !kioskApiUnitId) {
       return;
@@ -199,8 +227,21 @@ export default function UnitKioskPage() {
     isError: servicesQueryError,
     refetch: refetchServicesTree
   } = useUnitServicesTree(kioskApiUnitId ?? '', {
-    enabled: Boolean(kioskApiUnitId)
+    enabled: Boolean(kioskApiUnitId),
+    kioskReadCache: true
   });
+
+  useEffect(() => {
+    if (unitId && unit) {
+      persistKioskUnitSnapshot(unitId, unit);
+    }
+  }, [unitId, unit]);
+
+  useEffect(() => {
+    if (kioskApiUnitId && unitServicesTree) {
+      persistKioskServiceTreeSnapshot(kioskApiUnitId, unitServicesTree);
+    }
+  }, [kioskApiUnitId, unitServicesTree]);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => {
@@ -417,6 +458,13 @@ export default function UnitKioskPage() {
     'kiosk-touch-min text-kiosk-ink h-12 min-w-[3.5rem] rounded-full border-0 bg-[#f2ede8] px-4 text-base font-semibold shadow-sm hover:bg-[#ebe4de]'
   );
 
+  const showKioskIdOcr = Boolean(
+    unit?.operations?.kioskIdOcr && kioskCfg?.idOcrEnabled
+  );
+  const showOfflineShell = Boolean(
+    unit?.operations?.kioskOfflineMode && kioskCfg?.offlineModeEnabled
+  );
+
   const topBarLeading = (
     <>
       {kioskCfg?.logoUrl ? (
@@ -455,6 +503,30 @@ export default function UnitKioskPage() {
   const topBarBeforeClock = (
     <>
       <KioskAccessibilityToolbar audio={kioskAudio} />
+      {showOfflineShell ? (
+        <span
+          className={cn(
+            'kiosk-touch-min flex h-10 max-w-[11rem] shrink-0 items-center justify-center rounded-full px-2.5 text-center text-xs font-semibold sm:max-w-none sm:px-3 sm:text-sm',
+            browserOnline
+              ? 'bg-emerald-600/15 text-emerald-900'
+              : 'bg-amber-600/25 text-amber-950'
+          )}
+        >
+          {browserOnline
+            ? t('network.online', { defaultValue: 'Online' })
+            : t('network.offline', { defaultValue: 'No network' })}
+        </span>
+      ) : null}
+      {showKioskIdOcr ? (
+        <Button
+          type='button'
+          variant='secondary'
+          className='text-kiosk-ink kiosk-touch-min h-12 shrink-0 rounded-full px-4 text-base font-semibold shadow-sm'
+          onClick={() => setIdOcrOpen(true)}
+        >
+          {t('id_ocr.action', { defaultValue: 'Scan document' })}
+        </Button>
+      ) : null}
       {appointmentCheckinEnabled ? (
         <Button
           variant='secondary'
@@ -1511,6 +1583,31 @@ export default function UnitKioskPage() {
         isPending={createTicketMutation.isPending}
         errorMessage={phoneIdentificationError || undefined}
       />
+
+      {showKioskIdOcr ? (
+        <KioskIdOcrDialog
+          open={idOcrOpen}
+          onOpenChange={setIdOcrOpen}
+          preferNative={kioskCfg?.idOcrPreferNative !== false}
+          wedgeMrz={kioskCfg?.idOcrWedgeMrz !== false}
+          wedgeRu={kioskCfg?.idOcrWedgeRuDriverLicense !== false}
+          onUseText={(text) => {
+            void (async () => {
+              try {
+                await navigator.clipboard.writeText(text);
+                toast.success(
+                  t('id_ocr.pasted', {
+                    defaultValue:
+                      'OCR text copied. Paste where needed (long-press or Ctrl+V).'
+                  })
+                );
+              } catch {
+                toast.info(text.slice(0, 800));
+              }
+            })();
+          }}
+        />
+      ) : null}
 
       <PreRegRedemptionModal
         key={redeemModalKey}

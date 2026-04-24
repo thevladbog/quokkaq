@@ -152,6 +152,10 @@ export interface ModelsUserRole {
 export interface ModelsUnitOperationsPublic {
   counterLoginBlocked?: boolean;
   kioskFrozen?: boolean;
+  /** KioskIdOCR: plan includes 5.4 (ID document OCR on kiosk). UI also requires UnitConfig.kiosk.idOcrEnabled. */
+  kioskIdOcr?: boolean;
+  /** KioskOfflineMode: plan includes 5.5 (read cache + outbox). UI also needs UnitConfig.kiosk.offlineModeEnabled. */
+  kioskOfflineMode?: boolean;
   phase?: string;
 }
 
@@ -720,6 +724,12 @@ export interface HandlersKioskPrinterTelemetryRequest {
   message?: string;
 }
 
+export interface HandlersKioskVisitorSurveyRequest {
+  emoji?: string;
+  score?: number;
+  ticketId?: string;
+}
+
 export interface HandlersLoginLinkResponse {
   /** Example full login URL including the token query parameter */
   exampleUrl: string;
@@ -991,6 +1001,14 @@ export type HandlersPlatformUpdateSubscriptionPlanBody = unknown & {
   enums: flat,per_unit */
   pricingModel?: HandlersPlatformUpdateSubscriptionPlanBodyPricingModel;
 };
+
+export type HandlersPostKioskTelemetryRequestMeta = {[key: string]: unknown};
+
+export interface HandlersPostKioskTelemetryRequest {
+  /** api_ping | print_error | paper_out | heartbeat */
+  kind?: string;
+  meta?: HandlersPostKioskTelemetryRequestMeta;
+}
 
 export type HandlersPublicLeadRequestBodyBillingPeriod = typeof HandlersPublicLeadRequestBodyBillingPeriod[keyof typeof HandlersPublicLeadRequestBodyBillingPeriod];
 
@@ -2995,6 +3013,21 @@ export type PatchUnitsUnitIdAdSettingsBody = { [key: string]: unknown };
 
 export type PatchUnitsUnitIdAdSettings200 = {[key: string]: boolean};
 
+export type GetUnitsUnitIdKioskAnalyticsParams = {
+/**
+ * RFC3339 or YYYY-MM-DD (default: 7d ago)
+ */
+from?: string;
+/**
+ * RFC3339 or YYYY-MM-DD (default: now)
+ */
+to?: string;
+/**
+ * json (default) or csv
+ */
+format?: string;
+};
+
 export type ListUnitOperatorSkillsParams = {
 /**
  * Filter by operator user ID
@@ -4491,6 +4524,142 @@ export function useGetSignageFeedDataPublic<TData = Awaited<ReturnType<typeof ge
 
 
 /**
+ * Aggregated tickets, funnel, telemetry for a unit. Requires plan feature kiosk_operations_analytics and statistics access.
+ * @summary Kiosk operations analytics
+ */
+export type getUnitsUnitIdKioskAnalyticsResponse200 = {
+  data: void
+  status: 200
+}
+
+export type getUnitsUnitIdKioskAnalyticsResponse403 = {
+  data: void
+  status: 403
+}
+
+export type getUnitsUnitIdKioskAnalyticsResponseSuccess = (getUnitsUnitIdKioskAnalyticsResponse200) & {
+  headers: Headers;
+};
+export type getUnitsUnitIdKioskAnalyticsResponseError = (getUnitsUnitIdKioskAnalyticsResponse403) & {
+  headers: Headers;
+};
+
+export type getUnitsUnitIdKioskAnalyticsResponse = (getUnitsUnitIdKioskAnalyticsResponseSuccess | getUnitsUnitIdKioskAnalyticsResponseError)
+
+export const getGetUnitsUnitIdKioskAnalyticsUrl = (unitId: string,
+    params?: GetUnitsUnitIdKioskAnalyticsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/units/${unitId}/kiosk-analytics?${stringifiedParams}` : `/units/${unitId}/kiosk-analytics`
+}
+
+export const getUnitsUnitIdKioskAnalytics = async (unitId: string,
+    params?: GetUnitsUnitIdKioskAnalyticsParams, options?: RequestInit): Promise<getUnitsUnitIdKioskAnalyticsResponse> => {
+
+  return orvalMutator<getUnitsUnitIdKioskAnalyticsResponse>(getGetUnitsUnitIdKioskAnalyticsUrl(unitId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUnitsUnitIdKioskAnalyticsQueryKey = (unitId: string,
+    params?: GetUnitsUnitIdKioskAnalyticsParams,) => {
+    return [
+    `/units/${unitId}/kiosk-analytics`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetUnitsUnitIdKioskAnalyticsQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError = void>(unitId: string,
+    params?: GetUnitsUnitIdKioskAnalyticsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdKioskAnalyticsQueryKey(unitId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>> = ({ signal }) => getUnitsUnitIdKioskAnalytics(unitId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetUnitsUnitIdKioskAnalyticsQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>>
+export type GetUnitsUnitIdKioskAnalyticsQueryError = void
+
+
+export function useGetUnitsUnitIdKioskAnalytics<TData = Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError = void>(
+ unitId: string,
+    params: undefined |  GetUnitsUnitIdKioskAnalyticsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitsUnitIdKioskAnalytics<TData = Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError = void>(
+ unitId: string,
+    params?: GetUnitsUnitIdKioskAnalyticsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitsUnitIdKioskAnalytics<TData = Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError = void>(
+ unitId: string,
+    params?: GetUnitsUnitIdKioskAnalyticsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Kiosk operations analytics
+ */
+
+export function useGetUnitsUnitIdKioskAnalytics<TData = Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError = void>(
+ unitId: string,
+    params?: GetUnitsUnitIdKioskAnalyticsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdKioskAnalytics>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetUnitsUnitIdKioskAnalyticsQueryOptions(unitId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
  * Body must be {"config":{"kiosk":{...}}}. Updates only config.kiosk (other config keys unchanged). Allowed for desktop terminal JWT bound to this unit, unit members, and admins.
  * @summary Merge kiosk settings into unit config
  */
@@ -4602,6 +4771,82 @@ export const usePatchUnitKioskConfig = <TError = string,
       return useMutation(getPatchUnitKioskConfigMutationOptions(options), queryClient);
     }
 
+export type postUnitsUnitIdKioskEtaRefreshResponse204 = {
+  data: void
+  status: 204
+}
+
+export type postUnitsUnitIdKioskEtaRefreshResponseSuccess = (postUnitsUnitIdKioskEtaRefreshResponse204) & {
+  headers: Headers;
+};
+;
+
+export type postUnitsUnitIdKioskEtaRefreshResponse = (postUnitsUnitIdKioskEtaRefreshResponseSuccess)
+
+export const getPostUnitsUnitIdKioskEtaRefreshUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/kiosk-eta-refresh`
+}
+
+export const postUnitsUnitIdKioskEtaRefresh = async (unitId: string, options?: RequestInit): Promise<postUnitsUnitIdKioskEtaRefreshResponse> => {
+
+  return orvalMutator<postUnitsUnitIdKioskEtaRefreshResponse>(getPostUnitsUnitIdKioskEtaRefreshUrl(unitId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostUnitsUnitIdKioskEtaRefreshMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskEtaRefresh>>, TError,{unitId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskEtaRefresh>>, TError,{unitId: string}, TContext> => {
+
+const mutationKey = ['postUnitsUnitIdKioskEtaRefresh'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdKioskEtaRefresh>>, {unitId: string}> = (props) => {
+          const {unitId} = props ?? {};
+
+          return  postUnitsUnitIdKioskEtaRefresh(unitId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostUnitsUnitIdKioskEtaRefreshMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdKioskEtaRefresh>>>
+
+    export type PostUnitsUnitIdKioskEtaRefreshMutationError = unknown
+
+    export const usePostUnitsUnitIdKioskEtaRefresh = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskEtaRefresh>>, TError,{unitId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postUnitsUnitIdKioskEtaRefresh>>,
+        TError,
+        {unitId: string},
+        TContext
+      > => {
+      return useMutation(getPostUnitsUnitIdKioskEtaRefreshMutationOptions(options), queryClient);
+    }
+
 /**
  * Terminal-authenticated. Emits `unit.kiosk_printer` to the unit room for supervisor dashboards. No response body.
  * @summary Report a kiosk printer issue (broadcast to unit WebSocket)
@@ -4692,6 +4937,162 @@ export const usePostUnitsUnitIdKioskPrinterTelemetry = <TError = string,
         TContext
       > => {
       return useMutation(getPostUnitsUnitIdKioskPrinterTelemetryMutationOptions(options), queryClient);
+    }
+
+export type postUnitsUnitIdKioskTelemetryResponse204 = {
+  data: void
+  status: 204
+}
+
+export type postUnitsUnitIdKioskTelemetryResponseSuccess = (postUnitsUnitIdKioskTelemetryResponse204) & {
+  headers: Headers;
+};
+;
+
+export type postUnitsUnitIdKioskTelemetryResponse = (postUnitsUnitIdKioskTelemetryResponseSuccess)
+
+export const getPostUnitsUnitIdKioskTelemetryUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/kiosk-telemetry`
+}
+
+export const postUnitsUnitIdKioskTelemetry = async (unitId: string,
+    handlersPostKioskTelemetryRequest: HandlersPostKioskTelemetryRequest, options?: RequestInit): Promise<postUnitsUnitIdKioskTelemetryResponse> => {
+
+  return orvalMutator<postUnitsUnitIdKioskTelemetryResponse>(getPostUnitsUnitIdKioskTelemetryUrl(unitId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': '*/*', ...options?.headers },
+    body: JSON.stringify(
+      handlersPostKioskTelemetryRequest,)
+  }
+);}
+
+
+
+
+export const getPostUnitsUnitIdKioskTelemetryMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskTelemetry>>, TError,{unitId: string;data: HandlersPostKioskTelemetryRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskTelemetry>>, TError,{unitId: string;data: HandlersPostKioskTelemetryRequest}, TContext> => {
+
+const mutationKey = ['postUnitsUnitIdKioskTelemetry'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdKioskTelemetry>>, {unitId: string;data: HandlersPostKioskTelemetryRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  postUnitsUnitIdKioskTelemetry(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostUnitsUnitIdKioskTelemetryMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdKioskTelemetry>>>
+    export type PostUnitsUnitIdKioskTelemetryMutationBody = HandlersPostKioskTelemetryRequest
+    export type PostUnitsUnitIdKioskTelemetryMutationError = unknown
+
+    export const usePostUnitsUnitIdKioskTelemetry = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskTelemetry>>, TError,{unitId: string;data: HandlersPostKioskTelemetryRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postUnitsUnitIdKioskTelemetry>>,
+        TError,
+        {unitId: string;data: HandlersPostKioskTelemetryRequest},
+        TContext
+      > => {
+      return useMutation(getPostUnitsUnitIdKioskTelemetryMutationOptions(options), queryClient);
+    }
+
+export type postUnitsUnitIdKioskVisitorSurveyResponse204 = {
+  data: void
+  status: 204
+}
+
+export type postUnitsUnitIdKioskVisitorSurveyResponseSuccess = (postUnitsUnitIdKioskVisitorSurveyResponse204) & {
+  headers: Headers;
+};
+;
+
+export type postUnitsUnitIdKioskVisitorSurveyResponse = (postUnitsUnitIdKioskVisitorSurveyResponseSuccess)
+
+export const getPostUnitsUnitIdKioskVisitorSurveyUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/kiosk-visitor-survey`
+}
+
+export const postUnitsUnitIdKioskVisitorSurvey = async (unitId: string,
+    handlersKioskVisitorSurveyRequest: HandlersKioskVisitorSurveyRequest, options?: RequestInit): Promise<postUnitsUnitIdKioskVisitorSurveyResponse> => {
+
+  return orvalMutator<postUnitsUnitIdKioskVisitorSurveyResponse>(getPostUnitsUnitIdKioskVisitorSurveyUrl(unitId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': '*/*', ...options?.headers },
+    body: JSON.stringify(
+      handlersKioskVisitorSurveyRequest,)
+  }
+);}
+
+
+
+
+export const getPostUnitsUnitIdKioskVisitorSurveyMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskVisitorSurvey>>, TError,{unitId: string;data: HandlersKioskVisitorSurveyRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskVisitorSurvey>>, TError,{unitId: string;data: HandlersKioskVisitorSurveyRequest}, TContext> => {
+
+const mutationKey = ['postUnitsUnitIdKioskVisitorSurvey'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdKioskVisitorSurvey>>, {unitId: string;data: HandlersKioskVisitorSurveyRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  postUnitsUnitIdKioskVisitorSurvey(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostUnitsUnitIdKioskVisitorSurveyMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdKioskVisitorSurvey>>>
+    export type PostUnitsUnitIdKioskVisitorSurveyMutationBody = HandlersKioskVisitorSurveyRequest
+    export type PostUnitsUnitIdKioskVisitorSurveyMutationError = unknown
+
+    export const usePostUnitsUnitIdKioskVisitorSurvey = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdKioskVisitorSurvey>>, TError,{unitId: string;data: HandlersKioskVisitorSurveyRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postUnitsUnitIdKioskVisitorSurvey>>,
+        TError,
+        {unitId: string;data: HandlersKioskVisitorSurveyRequest},
+        TContext
+      > => {
+      return useMutation(getPostUnitsUnitIdKioskVisitorSurveyMutationOptions(options), queryClient);
     }
 
 /**

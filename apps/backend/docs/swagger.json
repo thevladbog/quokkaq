@@ -832,6 +832,20 @@
                 },
                 "type": "object"
             },
+            "handlers.KioskVisitorSurveyRequest": {
+                "properties": {
+                    "emoji": {
+                        "type": "string"
+                    },
+                    "score": {
+                        "type": "integer"
+                    },
+                    "ticketId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.LoginLinkResponse": {
                 "properties": {
                     "exampleUrl": {
@@ -1427,6 +1441,19 @@
                         "description": "YYYY-MM-DD, optional; inclusive",
                         "example": "2025-12-31",
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.PostKioskTelemetryRequest": {
+                "properties": {
+                    "kind": {
+                        "description": "api_ping | print_error | paper_out | heartbeat",
+                        "type": "string"
+                    },
+                    "meta": {
+                        "additionalProperties": {},
+                        "type": "object"
                     }
                 },
                 "type": "object"
@@ -4976,6 +5003,14 @@
                         "type": "boolean"
                     },
                     "kioskFrozen": {
+                        "type": "boolean"
+                    },
+                    "kioskIdOcr": {
+                        "description": "KioskIdOCR: plan includes 5.4 (ID document OCR on kiosk). UI also requires UnitConfig.kiosk.idOcrEnabled.",
+                        "type": "boolean"
+                    },
+                    "kioskOfflineMode": {
+                        "description": "KioskOfflineMode: plan includes 5.5 (read cache + outbox). UI also needs UnitConfig.kiosk.offlineModeEnabled.",
                         "type": "boolean"
                     },
                     "phase": {
@@ -22073,6 +22108,58 @@
                 ]
             }
         },
+        "/units/{unitId}/kiosk-analytics": {
+            "get": {
+                "description": "Aggregated tickets, funnel, telemetry for a unit. Requires plan feature kiosk_operations_analytics and statistics access.",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "RFC3339 or YYYY-MM-DD (default: 7d ago)",
+                        "in": "query",
+                        "name": "from",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "RFC3339 or YYYY-MM-DD (default: now)",
+                        "in": "query",
+                        "name": "to",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "json (default) or csv",
+                        "in": "query",
+                        "name": "format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    }
+                },
+                "summary": "Kiosk operations analytics",
+                "tags": [
+                    "units"
+                ]
+            }
+        },
         "/units/{unitId}/kiosk-config": {
             "patch": {
                 "description": "Body must be {\"config\":{\"kiosk\":{...}}}. Updates only config.kiosk (other config keys unchanged). Allowed for desktop terminal JWT bound to this unit, unit members, and admins.",
@@ -22168,6 +22255,29 @@
                 ]
             }
         },
+        "/units/{unitId}/kiosk-eta-refresh": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "units"
+                ]
+            }
+        },
         "/units/{unitId}/kiosk-printer-telemetry": {
             "post": {
                 "description": "Terminal-authenticated. Emits `unit.kiosk_printer` to the unit room for supervisor dashboards. No response body.",
@@ -22210,6 +22320,85 @@
                     }
                 },
                 "summary": "Report a kiosk printer issue (broadcast to unit WebSocket)",
+                "tags": [
+                    "units"
+                ]
+            }
+        },
+        "/units/{unitId}/kiosk-telemetry": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "*/*": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.PostKioskTelemetryRequest"
+                            }
+                        }
+                    },
+                    "description": "Sample",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "tags": [
+                    "units"
+                ]
+            }
+        },
+        "/units/{unitId}/kiosk-visitor-survey": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Visitor ownership token (same as ticket page)",
+                        "in": "header",
+                        "name": "X-Visitor-Token",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "*/*": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.KioskVisitorSurveyRequest"
+                            }
+                        }
+                    },
+                    "description": "Score and optional emoji",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
                 "tags": [
                     "units"
                 ]

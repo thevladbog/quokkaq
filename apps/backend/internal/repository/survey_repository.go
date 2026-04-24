@@ -17,6 +17,8 @@ type SurveyRepository interface {
 	FindDefinitionByID(ctx context.Context, id string) (*models.SurveyDefinition, error)
 	ListDefinitionsByScopeUnit(ctx context.Context, scopeUnitID string) ([]models.SurveyDefinition, error)
 	FindActiveDefinitionByScopeUnit(ctx context.Context, scopeUnitID string) (*models.SurveyDefinition, error)
+	// FindByScopeUnitAndTitle returns a non-active template used for kiosk post-service (does not participate in "active" guest survey).
+	FindByScopeUnitAndTitle(ctx context.Context, scopeUnitID, title string) (*models.SurveyDefinition, error)
 	SetActiveDefinition(ctx context.Context, scopeUnitID, surveyID string) error
 	// CountDefinitionsReferencingIdleMediaFile counts survey definitions in company whose idle_screen JSON references fileName (substring match).
 	CountDefinitionsReferencingIdleMediaFile(ctx context.Context, companyID, fileName string) (int64, error)
@@ -61,6 +63,20 @@ func (r *surveyRepository) ListDefinitionsByScopeUnit(ctx context.Context, scope
 func (r *surveyRepository) FindActiveDefinitionByScopeUnit(ctx context.Context, scopeUnitID string) (*models.SurveyDefinition, error) {
 	var d models.SurveyDefinition
 	err := r.db.WithContext(ctx).Where("scope_unit_id = ? AND is_active = ?", scopeUnitID, true).First(&d).Error
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func (r *surveyRepository) FindByScopeUnitAndTitle(ctx context.Context, scopeUnitID, title string) (*models.SurveyDefinition, error) {
+	title = strings.TrimSpace(title)
+	scopeUnitID = strings.TrimSpace(scopeUnitID)
+	if title == "" || scopeUnitID == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+	var d models.SurveyDefinition
+	err := r.db.WithContext(ctx).Where("scope_unit_id = ? AND title = ?", scopeUnitID, title).First(&d).Error
 	if err != nil {
 		return nil, err
 	}

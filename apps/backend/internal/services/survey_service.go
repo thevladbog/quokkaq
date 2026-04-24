@@ -88,6 +88,11 @@ var surveyIdleImageFileRe = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-
 // surveyIdleVideoFileRe matches idle video object names.
 var surveyIdleVideoFileRe = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(mp4|webm|mov|m4v)$`)
 
+const kioskPostServiceSurveyTitle = "Kiosk post-service"
+
+// kiosk post-service: stars 1–5 + optional mood emoji (text; excluded from numeric score aggregates in statistics).
+var kioskPostServiceQuestions = json.RawMessage(`[{"id":"kiosk_satisfaction","type":"stars","min":1,"max":5},{"id":"kiosk_emoji_mood","type":"text"}]`)
+
 var surveyDisplayThemeHexRe = regexp.MustCompile(`(?i)^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$`)
 
 func validateCompletionMessage(raw json.RawMessage) error {
@@ -372,6 +377,8 @@ type SurveyService interface {
 	// CounterBoardSession: above-counter ticket display only — no survey definitions (independent of guest survey feature).
 	CounterBoardSession(ctx context.Context, unitID, terminalID string) (*CounterBoardSession, error)
 	SubmitGuestResponse(ctx context.Context, unitID, terminalID, ticketID, surveyID string, answers json.RawMessage) error
+	// SubmitKioskPostServiceResponse stores 5.3 post-close survey (visitor token validated by caller). Persists to survey_responses; IsActive guest survey is untouched.
+	SubmitKioskPostServiceResponse(ctx context.Context, unitID string, ticket *models.Ticket, score int, emoji string) error
 
 	CompanyIDForUnit(unitID string) (string, error)
 	EnsureGuestSurveyUploadAccess(actorUserID, unitID string) error
@@ -389,6 +396,13 @@ type surveyService struct {
 	terminalRepo repository.DesktopTerminalRepository
 	counterRepo  repository.CounterRepository
 	storage      StorageService
+	// Optional: low kiosk survey score → WebSocket to staff.
+	hub HubBroadcaster
+}
+
+// HubBroadcaster is satisfied by *ws.Hub.
+type HubBroadcaster interface {
+	BroadcastEvent(event string, data interface{}, roomID string)
 }
 
 func NewSurveyService(
@@ -399,6 +413,7 @@ func NewSurveyService(
 	terminalRepo repository.DesktopTerminalRepository,
 	counterRepo repository.CounterRepository,
 	storage StorageService,
+	hub HubBroadcaster,
 ) SurveyService {
 	return &surveyService{
 		surveyRepo:   surveyRepo,
@@ -408,6 +423,7 @@ func NewSurveyService(
 		terminalRepo: terminalRepo,
 		counterRepo:  counterRepo,
 		storage:      storage,
+		hub:          hub,
 	}
 }
 
@@ -991,4 +1007,139 @@ func (s *surveyService) SubmitGuestResponse(ctx context.Context, unitID, termina
 		row.ClientID = ticket.ClientID
 	}
 	return s.surveyRepo.UpsertResponse(ctx, row)
+}
+
+func (s *surveyService) getOrCreateKioskPostServiceDef(ctx context.Context, scopeUnitID string) (*models.SurveyDefinition, error) {
+	scopeUnitID = strings.TrimSpace(scopeUnitID)
+	if scopeUnitID == "" {
+		return nil, ErrSurveyBadRequest
+	}
+	def, err := s.surveyRepo.FindByScopeUnitAndTitle(ctx, scopeUnitID, kioskPostServiceSurveyTitle)
+	if err == nil {
+		return def, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	u, err := s.unitRepo.FindByIDLight(scopeUnitID)
+	if err != nil {
+		if repository.IsNotFound(err) {
+			return nil, ErrSurveyNotFound
+		}
+		return nil, err
+	}
+	d := &models.SurveyDefinition{
+		CompanyID:   u.CompanyID,
+		ScopeUnitID: scopeUnitID,
+		Title:       kioskPostServiceSurveyTitle,
+		Questions:   kioskPostServiceQuestions,
+		IsActive:    false,
+	}
+	if err := s.surveyRepo.CreateDefinition(ctx, d); err != nil {
+		def2, err2 := s.surveyRepo.FindByScopeUnitAndTitle(ctx, scopeUnitID, kioskPostServiceSurveyTitle)
+		if err2 == nil {
+			return def2, nil
+		}
+		return nil, err
+	}
+	return d, nil
+}
+
+func (s *surveyService) ensureKioskPostServiceDefinitionForTicket(ctx context.Context, ticket *models.Ticket) (*models.SurveyDefinition, error) {
+	if ticket.ServiceZoneID != nil {
+		z := strings.TrimSpace(*ticket.ServiceZoneID)
+		if z != "" {
+			return s.getOrCreateKioskPostServiceDef(ctx, z)
+		}
+	}
+	return s.getOrCreateKioskPostServiceDef(ctx, ticket.UnitID)
+}
+
+func (s *surveyService) resolveCounterIDForKioskSurvey(ticket *models.Ticket) (string, error) {
+	if ticket.CounterID != nil {
+		if cid := strings.TrimSpace(*ticket.CounterID); cid != "" {
+			return cid, nil
+		}
+	}
+	cs, err := s.counterRepo.FindAllByUnit(ticket.UnitID)
+	if err != nil {
+		return "", err
+	}
+	if len(cs) == 0 {
+		return "", ErrSurveyBadRequest
+	}
+	return cs[0].ID, nil
+}
+
+// SubmitKioskPostServiceResponse persists kiosk post-service feedback; ticket must be served and belong to unitID.
+func (s *surveyService) SubmitKioskPostServiceResponse(ctx context.Context, unitID string, ticket *models.Ticket, score int, emoji string) error {
+	if ticket == nil {
+		return ErrSurveyBadRequest
+	}
+	if score < 1 || score > 5 {
+		return ErrSurveyBadRequest
+	}
+	unitID = strings.ToLower(strings.TrimSpace(unitID))
+	if unitID == "" {
+		return ErrSurveyBadRequest
+	}
+	if strings.ToLower(strings.TrimSpace(ticket.UnitID)) != unitID {
+		return ErrSurveyForbidden
+	}
+	u, err := s.unitRepo.FindByIDLight(unitID)
+	if err != nil {
+		if repository.IsNotFound(err) {
+			return ErrSurveyNotFound
+		}
+		return err
+	}
+	ok, err := CompanyHasPlanFeature(u.CompanyID, PlanFeatureKioskPostServiceSurvey)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrSurveyFeatureLocked
+	}
+	if strings.TrimSpace(ticket.Status) != "served" {
+		return ErrSurveyBadRequest
+	}
+	def, err := s.ensureKioskPostServiceDefinitionForTicket(ctx, ticket)
+	if err != nil {
+		return err
+	}
+	counterID, err := s.resolveCounterIDForKioskSurvey(ticket)
+	if err != nil {
+		return err
+	}
+	ans := map[string]any{"kiosk_satisfaction": float64(score)}
+	if e := strings.TrimSpace(emoji); e != "" {
+		ans["kiosk_emoji_mood"] = e
+	}
+	answers, err := json.Marshal(ans)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	row := &models.SurveyResponse{
+		SurveyDefinitionID: def.ID,
+		TicketID:           ticket.ID,
+		CounterID:          counterID,
+		UnitID:             ticket.UnitID,
+		Answers:            answers,
+		SubmittedAt:        now,
+	}
+	if ticket.ClientID != nil && *ticket.ClientID != "" {
+		row.ClientID = ticket.ClientID
+	}
+	if err := s.surveyRepo.UpsertResponse(ctx, row); err != nil {
+		return err
+	}
+	if s.hub != nil && score <= 2 {
+		s.hub.BroadcastEvent("unit.kiosk_survey_low", map[string]any{
+			"unitId":   unitID,
+			"ticketId": ticket.ID,
+			"score":    score,
+		}, unitID)
+	}
+	return nil
 }

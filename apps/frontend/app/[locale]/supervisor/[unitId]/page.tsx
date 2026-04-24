@@ -77,11 +77,23 @@ export default function ShiftDashboardPage({
       if (a.unitId !== unitId) return;
       toast.error(a.message);
     };
+    const onKioskSurvey = (d: {
+      unitId: string;
+      ticketId: string;
+      score: number;
+    }) => {
+      if (d.unitId !== unitId) return;
+      toast.warning(
+        t('kiosk_survey_low', { score: d.score, ticket: d.ticketId })
+      );
+    };
     socketClient.onStaffingAlert(onStaff);
     socketClient.onAnomalyAlert(onAnom);
+    socketClient.onKioskSurveyLow(onKioskSurvey);
     return () => {
       socketClient.offStaffingAlert(onStaff);
       socketClient.offAnomalyAlert(onAnom);
+      socketClient.offKioskSurveyLow(onKioskSurvey);
     };
   }, [unitId, t]);
 

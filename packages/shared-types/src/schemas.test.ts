@@ -137,6 +137,15 @@ describe('KioskConfigSchema', () => {
     const r = KioskConfigSchema.safeParse({});
     expect(r.success).toBe(true);
   });
+
+  it('accepts 5.4/5.5 optional kiosk feature flags', () => {
+    const r = KioskConfigSchema.safeParse({
+      idOcrEnabled: true,
+      idOcrPreferNative: true,
+      offlineModeEnabled: true
+    });
+    expect(r.success).toBe(true);
+  });
 });
 
 describe('UserModelSchema', () => {

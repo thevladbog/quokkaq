@@ -494,7 +494,26 @@ export const KioskConfigSchema = z
     /** Countdown in seconds on the warning dialog before resetting to the kiosk home. Default 15. */
     sessionIdleCountdownSec: z.number().int().positive().max(300).optional(),
     /** When false, skip mandatory post-ticket SMS step. Default true when unset. */
-    visitorSmsAfterTicket: z.boolean().optional()
+    visitorSmsAfterTicket: z.boolean().optional(),
+    /**
+     * When true (and the tenant plan has `kiosk_id_ocr`), kiosk may offer in-session ID scan (camera / Tesseract).
+     * No raw image or OCR text is persisted in local storage; processing is in-memory / Tauri temp only.
+     */
+    idOcrEnabled: z.boolean().optional(),
+    /** In Tauri: prefer the native `tesseract` CLI. When false or in browser, use tesseract.js (5.4). */
+    idOcrPreferNative: z.boolean().optional(),
+    /**
+     * HID / serial: ICAO MRZ (2–3 lines) when false disables the MRZ sub-mode in the ID dialog; unset = on (with id OCR).
+     */
+    idOcrWedgeMrz: z.boolean().optional(),
+    /**
+     * HID / serial: RU driver’s license (PDF417 open or base64); when false disables. Unset = on.
+     */
+    idOcrWedgeRuDriverLicense: z.boolean().optional(),
+    /**
+     * When true and plan `kiosk_offline_mode` is on, the kiosk uses cached unit/services and may queue creates (5.5).
+     */
+    offlineModeEnabled: z.boolean().optional()
   })
   .passthrough();
 
@@ -1049,6 +1068,11 @@ export interface KioskConfig {
    * (enforced in the API for `smsPostTicketStepRequired`).
    */
   visitorSmsAfterTicket?: boolean;
+  idOcrEnabled?: boolean;
+  idOcrPreferNative?: boolean;
+  idOcrWedgeMrz?: boolean;
+  idOcrWedgeRuDriverLicense?: boolean;
+  offlineModeEnabled?: boolean;
 }
 
 export interface UnitConfig {

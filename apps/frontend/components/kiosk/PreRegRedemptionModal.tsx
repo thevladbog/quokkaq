@@ -161,11 +161,11 @@ export function PreRegRedemptionModal({
 
   const startCameraScan = async () => {
     // BarcodeDetector is Chromium-only; not in all TypeScript DOM libs.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const BD =
-      typeof window !== 'undefined'
-        ? (window as any).BarcodeDetector
-        : undefined;
+    type BarCtor = new (opts: { formats: string[] }) => {
+      detect: (src: ImageBitmapSource) => Promise<unknown[]>;
+    };
+    const w = window as unknown as { BarcodeDetector?: BarCtor };
+    const BD = typeof window !== 'undefined' ? w.BarcodeDetector : undefined;
     if (!BD) {
       setError(
         t('scan_no_api', { defaultValue: 'Camera scan is not available here.' })

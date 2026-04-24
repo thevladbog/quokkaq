@@ -106,6 +106,10 @@ export interface ModelsUserRole {
 export interface ModelsUnitOperationsPublic {
   counterLoginBlocked?: boolean;
   kioskFrozen?: boolean;
+  /** KioskIdOCR: plan includes 5.4 (ID document OCR on kiosk). UI also requires UnitConfig.kiosk.idOcrEnabled. */
+  kioskIdOcr?: boolean;
+  /** KioskOfflineMode: plan includes 5.5 (read cache + outbox). UI also needs UnitConfig.kiosk.offlineModeEnabled. */
+  kioskOfflineMode?: boolean;
   phase?: string;
 }
 
@@ -674,6 +678,12 @@ export interface HandlersKioskPrinterTelemetryRequest {
   message?: string;
 }
 
+export interface HandlersKioskVisitorSurveyRequest {
+  emoji?: string;
+  score?: number;
+  ticketId?: string;
+}
+
 export interface HandlersLoginLinkResponse {
   /** Example full login URL including the token query parameter */
   exampleUrl: string;
@@ -945,6 +955,14 @@ export type HandlersPlatformUpdateSubscriptionPlanBody = unknown & {
   enums: flat,per_unit */
   pricingModel?: HandlersPlatformUpdateSubscriptionPlanBodyPricingModel;
 };
+
+export type HandlersPostKioskTelemetryRequestMeta = {[key: string]: unknown};
+
+export interface HandlersPostKioskTelemetryRequest {
+  /** api_ping | print_error | paper_out | heartbeat */
+  kind?: string;
+  meta?: HandlersPostKioskTelemetryRequestMeta;
+}
 
 export type HandlersPublicLeadRequestBodyBillingPeriod = typeof HandlersPublicLeadRequestBodyBillingPeriod[keyof typeof HandlersPublicLeadRequestBodyBillingPeriod];
 

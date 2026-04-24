@@ -21,6 +21,9 @@ type postVisitorSkipTicketSvc struct {
 func (m *postVisitorSkipTicketSvc) CreateTicket(string, string, *string, *string, *string, *string) (*models.Ticket, error) {
 	return nil, errors.New("unimplemented")
 }
+func (m *postVisitorSkipTicketSvc) CreateTicketWithFunnelOverride(string, string, *string, *string, *string, *string, *string) (*models.Ticket, error) {
+	return nil, errors.New("unimplemented")
+}
 func (m *postVisitorSkipTicketSvc) CreateTicketWithPreRegistration(string, string, string, *string) (*models.Ticket, error) {
 	return nil, errors.New("unimplemented")
 }

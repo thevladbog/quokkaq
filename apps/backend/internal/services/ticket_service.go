@@ -208,6 +208,8 @@ type TicketService interface {
 	// optionalStaffClientID: when set, ticket is linked to this non-anonymous unit client; otherwise anonymous kiosk client is used.
 	// visitorPhone + visitorLocale: optional kiosk identification; locale must be en or ru when phone is set; mutually exclusive with optionalStaffClientID.
 	CreateTicket(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string) (*models.Ticket, error)
+	// CreateTicketWithFunnelOverride is used when the create source must not be inferred (e.g. virtual queue).
+	CreateTicketWithFunnelOverride(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string, funnelSourceOverride *string) (*models.Ticket, error)
 	CreateTicketWithPreRegistration(unitID, serviceID, preRegID string, actorUserID *string) (*models.Ticket, error)
 	GetTicketByID(id string) (*models.Ticket, error)
 	GetTicketsByUnit(unitID string) ([]models.Ticket, error)
@@ -418,11 +420,15 @@ func (s *ticketService) incrementTicketUsage(unitID string) {
 }
 
 func (s *ticketService) CreateTicket(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string) (*models.Ticket, error) {
+	return s.CreateTicketWithFunnelOverride(unitID, serviceID, optionalStaffClientID, visitorPhone, visitorLocale, actorUserID, nil)
+}
+
+func (s *ticketService) CreateTicketWithFunnelOverride(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string, funnelSourceOverride *string) (*models.Ticket, error) {
 	isCredit, err := s.checkTicketQuota(unitID)
 	if err != nil {
 		return nil, err
 	}
-	ticket, err := s.createTicketInternal(unitID, serviceID, nil, optionalStaffClientID, visitorPhone, visitorLocale, actorUserID, isCredit)
+	ticket, err := s.createTicketInternal(unitID, serviceID, nil, optionalStaffClientID, visitorPhone, visitorLocale, actorUserID, isCredit, funnelSourceOverride)
 	if err != nil {
 		return nil, err
 	}
@@ -435,7 +441,7 @@ func (s *ticketService) CreateTicketWithPreRegistration(unitID, serviceID, preRe
 	if err != nil {
 		return nil, err
 	}
-	ticket, err := s.createTicketInternal(unitID, serviceID, &preRegID, nil, nil, nil, actorUserID, isCredit)
+	ticket, err := s.createTicketInternal(unitID, serviceID, &preRegID, nil, nil, nil, actorUserID, isCredit, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -443,7 +449,7 @@ func (s *ticketService) CreateTicketWithPreRegistration(unitID, serviceID, preRe
 	return ticket, nil
 }
 
-func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID *string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string, isCredit bool) (*models.Ticket, error) {
+func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID *string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string, isCredit bool, funnelSourceOverride *string) (*models.Ticket, error) {
 	var preReg *models.PreRegistration
 	if preRegID != nil {
 		if s.preRegRepo == nil {
@@ -464,6 +470,7 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 
 	date := time.Now().Format("2006-01-02")
 	var ticket *models.Ticket
+	var createdSource string
 	if err := s.repo.Transaction(func(tx *gorm.DB) error {
 		seq, err := s.repo.GetNextSequenceTx(tx, unitID, serviceID, date)
 		if err != nil {
@@ -597,12 +604,17 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 		if preRegID != nil {
 			payload["pre_registration_id"] = *preRegID
 			payload["source"] = "pre_registration_redeem"
+		} else if funnelSourceOverride != nil && strings.TrimSpace(*funnelSourceOverride) != "" {
+			payload["source"] = strings.TrimSpace(*funnelSourceOverride)
 		} else if strings.TrimSpace(derefString(visitorPhone)) != "" {
 			payload["source"] = "public_issue_kiosk_phone"
 		} else if optionalStaffClientID != nil && strings.TrimSpace(*optionalStaffClientID) != "" {
 			payload["source"] = "staff_issue_named"
 		} else {
 			payload["source"] = "public_issue"
+		}
+		if s, ok := payload["source"].(string); ok {
+			createdSource = s
 		}
 		if err := s.repo.CreateTx(tx, ticket); err != nil {
 			return err
@@ -636,11 +648,50 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 	s.scheduleETA(ticket.UnitID)
 	if s.notifService != nil {
 		if full, ferr := s.repo.FindByID(ticket.ID); ferr == nil {
-			s.notifService.RecordFunnelEvent(full, "ticket_created", "ticketing", nil)
+			meta := ticketFunnelCreateMetaFromSourceAndTicket(createdSource, full)
+			s.notifService.RecordFunnelEvent(full, "ticket_created", "ticketing", meta)
 			go s.notifService.SendTicketCreatedSMS(full)
 		}
 	}
 	return ticket, nil
+}
+
+// ticketFunnelCreateMetaFromSourceAndTicket enriches queue_funnel analytics (5.1).
+func ticketFunnelCreateMetaFromSourceAndTicket(issueSource string, t *models.Ticket) map[string]any {
+	if t == nil {
+		return nil
+	}
+	src := strings.TrimSpace(issueSource)
+	m := map[string]any{
+		"serviceId": t.ServiceID,
+		"source":    src,
+		"channel":   mapFunnelChannelFromIssueSource(src),
+	}
+	if t.BookingID != nil && strings.TrimSpace(*t.BookingID) != "" {
+		m["fromBooking"] = true
+	}
+	if t.PreRegistrationID != nil && strings.TrimSpace(*t.PreRegistrationID) != "" {
+		m["fromPreRegistration"] = true
+	}
+	if src == "public_issue_kiosk_phone" || src == "public_issue" || src == "virtual_queue" {
+		m["kioskContext"] = true
+	}
+	return m
+}
+
+func mapFunnelChannelFromIssueSource(src string) string {
+	switch strings.TrimSpace(src) {
+	case "virtual_queue":
+		return "virtual_queue"
+	case "staff_issue_named":
+		return "staff"
+	case "public_issue", "public_issue_kiosk_phone":
+		return "kiosk"
+	case "pre_registration_redeem":
+		return "pre_registration"
+	default:
+		return "other"
+	}
 }
 
 func derefString(p *string) string {
@@ -893,6 +944,7 @@ func (s *ticketService) notifyNextInLine(unitID string, serviceIDs []string, zon
 
 func (s *ticketService) UpdateStatus(ticketID, status string, actorUserID *string) (*models.Ticket, error) {
 	var ticket *models.Ticket
+	var prevStatus string
 	err := s.repo.Transaction(func(tx *gorm.DB) error {
 		t, err := s.repo.FindByIDForUpdateTx(tx, ticketID)
 		if err != nil {
@@ -900,6 +952,7 @@ func (s *ticketService) UpdateStatus(ticketID, status string, actorUserID *strin
 		}
 		ticket = t
 		fromStatus := ticket.Status
+		prevStatus = fromStatus
 		ticket.Status = status
 		now := time.Now()
 
@@ -950,6 +1003,19 @@ func (s *ticketService) UpdateStatus(ticketID, status string, actorUserID *strin
 
 	s.hub.BroadcastEvent("ticket.updated", ticket, ticket.UnitID)
 	s.scheduleETA(ticket.UnitID)
+	if s.notifService != nil {
+		if full, ferr := s.repo.FindByID(ticketID); ferr == nil {
+			om := map[string]any{
+				"outcome":    status,
+				"fromStatus": prevStatus,
+				"serviceId":  full.ServiceID,
+			}
+			if status == "served" || status == "no_show" {
+				om["terminal"] = true
+			}
+			s.notifService.RecordFunnelEvent(full, "ticket_outcome", "ticketing", om)
+		}
+	}
 	return ticket, nil
 }
 
@@ -983,6 +1049,16 @@ func (s *ticketService) VisitorCancelTicket(ticketID string) (*models.Ticket, er
 	}
 	s.hub.BroadcastEvent("ticket.updated", ticket, ticket.UnitID)
 	s.scheduleETA(ticket.UnitID)
+	if s.notifService != nil {
+		if full, ferr := s.repo.FindByID(ticketID); ferr == nil {
+			s.notifService.RecordFunnelEvent(full, "ticket_outcome", "ticketing", map[string]any{
+				"outcome":     "no_show",
+				"fromStatus":  "waiting",
+				"serviceId":   full.ServiceID,
+				"visitorExit": "cancel",
+			})
+		}
+	}
 	return ticket, nil
 }
 

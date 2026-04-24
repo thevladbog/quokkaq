@@ -81,6 +81,7 @@ import {
 } from '@/components/statistics/StaffLeaderboard';
 import { StaffOperatorDetailCard } from '@/components/statistics/StaffOperatorDetailCard';
 import { StaffingForecastPanel } from '@/components/statistics/StaffingForecastPanel';
+import { KioskOperationsAnalyticsCard } from '@/components/statistics/kiosk-operations-analytics-card';
 import { useGetUnitsUnitIdShiftActivityActors } from '@/lib/api/generated/shift';
 import { useGetUnitsUnitIdServices } from '@/lib/api/generated/services';
 import { isApiHttpError } from '@/lib/api-errors';
@@ -1516,6 +1517,14 @@ export default function StatisticsPage() {
               )}
             </div>
           </div>
+
+          {statsSubdivisionId ? (
+            <KioskOperationsAnalyticsCard
+              unitId={statsSubdivisionId}
+              from={from}
+              to={dateToForApi}
+            />
+          ) : null}
 
           <div className='grid gap-6 lg:grid-cols-2'>
             <Card>

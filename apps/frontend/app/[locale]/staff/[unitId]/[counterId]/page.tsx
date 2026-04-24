@@ -349,13 +349,26 @@ export default function StaffWorkspacePage({
     socketClient.onTicketUpdated(handleTicketUpdate);
     socketClient.onTicketCalled(handleTicketUpdate);
 
+    const onKioskSurveyLow = (d: {
+      unitId: string;
+      ticketId: string;
+      score: number;
+    }) => {
+      if (d.unitId !== unitId) return;
+      toast.warning(
+        t('kiosk_survey_low', { score: d.score, ticket: d.ticketId })
+      );
+    };
+    socketClient.onKioskSurveyLow(onKioskSurveyLow);
+
     return () => {
       socketClient.off('ticket.created', handleTicketUpdate);
       socketClient.off('ticket.updated', handleTicketUpdate);
       socketClient.off('ticket.called', handleTicketUpdate);
+      socketClient.offKioskSurveyLow(onKioskSurveyLow);
       socketClient.disconnect();
     };
-  }, [unitId]);
+  }, [unitId, t]);
 
   const leafServicesForScope = useMemo(() => {
     return leafServiceIds
