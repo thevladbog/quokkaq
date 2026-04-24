@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/dialog';
 import { ArrowLeft, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -33,7 +32,11 @@ import { useKioskA11yAudio } from '@/hooks/use-kiosk-a11y-audio';
 import { useKioskSpeech } from '@/hooks/use-kiosk-speech';
 import KioskLanguageSwitcher from '@/components/KioskLanguageSwitcher';
 import { useUnit } from '@/lib/hooks';
-import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
+import {
+  getGetUnitByIDQueryKey,
+  getGetUnitsUnitIdMaterialsQueryKey
+} from '@/lib/api/generated/units';
+import type { KioskConfig } from '@quokkaq/shared-types';
 import { PinCodeModal } from '@/components/kiosk/pin-code-modal';
 import { KioskSettingsSheet } from '@/components/kiosk/kiosk-settings-sheet';
 import { LockScreen } from '@/components/kiosk/lock-screen';
@@ -43,6 +46,12 @@ import { KioskTopBar } from '@/components/kiosk/kiosk-top-bar';
 import { KioskWelcomeHero } from '@/components/kiosk/kiosk-welcome-hero';
 import { KioskServiceTile } from '@/components/kiosk/kiosk-service-tile';
 import { KioskTicketSuccessOverlay } from '@/components/kiosk/kiosk-ticket-success-overlay';
+import { KioskSessionIdleBar } from '@/components/kiosk/kiosk-session-idle-bar';
+import { KioskAttractScreen } from '@/components/kiosk/kiosk-attract-screen';
+import {
+  KioskBuildStatusBar,
+  type KioskRuntimeStatus
+} from '@/components/kiosk/kiosk-build-status-bar';
 import {
   buildKioskTicketEscPos,
   hasKioskPrintTarget,
@@ -67,6 +76,16 @@ import {
   serviceMatchesGridZoneScope
 } from '@/lib/service-grid';
 import { useKioskSessionIdle } from '@/hooks/use-kiosk-session-idle';
+import { useKioskAttractInactivity } from '@/hooks/use-kiosk-attract-inactivity';
+import { useSignageContentSlides } from '@/hooks/use-signage-content-slides';
+import { getSignageActivePlaylistQueryKey } from '@/lib/signage-content-slides';
+import {
+  getKioskAttractMode,
+  getShowAttractAfterSessionEnd,
+  getAttractIdleSec,
+  getShowQueueDepthOnAttract,
+  resolveKioskAttractSignageMode
+} from '@/lib/kiosk-attract-config';
 import { useKioskPrinterPaperOutPoll } from '@/hooks/use-kiosk-printer-paper-poll';
 import { KioskIdOcrDialog } from '@/components/kiosk/kiosk-id-ocr-dialog';
 import { useKioskTelemetryPing } from '@/hooks/use-kiosk-telemetry-ping';
@@ -103,6 +122,11 @@ export default function UnitKioskPage() {
   const [kioskSmsDigits, setKioskSmsDigits] = useState('');
   const [kioskSmsError, setKioskSmsError] = useState<string | null>(null);
   const [kioskSmsBusy, setKioskSmsBusy] = useState(false);
+  const [showAttract, setShowAttract] = useState(false);
+  const [unitEtaSnapshot, setUnitEtaSnapshot] =
+    useState<UnitETASnapshot | null>(null);
+  const isTicketModalOpenRef = useRef(false);
+  const createdTicketRef = useRef<Ticket | null>(null);
   const [idOcrOpen, setIdOcrOpen] = useState(false);
   const [browserOnline, setBrowserOnline] = useState(
     () => typeof window === 'undefined' || navigator.onLine
@@ -192,33 +216,95 @@ export default function UnitKioskPage() {
     return unit.id;
   }, [unit]);
 
+  const { contentSlides, defaultImageSeconds } = useSignageContentSlides(
+    kioskApiUnitId,
+    unit
+  );
+
   useKioskTelemetryPing(
     kioskApiUnitId,
     Boolean(kioskApiUnitId) && !serverKioskFrozen
   );
 
   useEffect(() => {
-    if (!isTicketModalOpen || !createdTicket || !kioskApiUnitId) {
+    isTicketModalOpenRef.current = isTicketModalOpen;
+    createdTicketRef.current = createdTicket;
+  }, [isTicketModalOpen, createdTicket]);
+
+  useEffect(() => {
+    if (!kioskApiUnitId) {
       return;
     }
     socketClient.connect(kioskApiUnitId);
     const h = (snap: UnitETASnapshot) => {
-      const row = snap.tickets?.find((x) => x.ticketId === createdTicket.id);
-      if (row && row.estimatedWaitSeconds > 0) {
-        setSuccessEtaMinutes(
-          Math.max(1, Math.round(row.estimatedWaitSeconds / 60))
-        );
+      setUnitEtaSnapshot(snap);
+      const open = isTicketModalOpenRef.current;
+      const ticket = createdTicketRef.current;
+      if (open && ticket) {
+        const row = snap.tickets?.find((x) => x.ticketId === ticket.id);
+        if (row && row.estimatedWaitSeconds > 0) {
+          setSuccessEtaMinutes(
+            Math.max(1, Math.round(row.estimatedWaitSeconds / 60))
+          );
+        }
+        if (row && row.queuePosition > 0) {
+          setSuccessPeopleAhead(Math.max(0, row.queuePosition - 1));
+        }
       }
-      if (row && row.queuePosition > 0) {
-        setSuccessPeopleAhead(Math.max(0, row.queuePosition - 1));
+    };
+    const signageDebounce = {
+      t: null as ReturnType<typeof setTimeout> | null
+    };
+    const onSignageFeed = () => {
+      if (signageDebounce.t) {
+        clearTimeout(signageDebounce.t);
       }
+      signageDebounce.t = setTimeout(() => {
+        signageDebounce.t = null;
+        void queryClient.invalidateQueries({
+          queryKey: getSignageActivePlaylistQueryKey(kioskApiUnitId)
+        });
+        void queryClient.invalidateQueries({
+          queryKey: getGetUnitsUnitIdMaterialsQueryKey(kioskApiUnitId)
+        });
+        const cached = queryClient.getQueryData<{
+          config?: { kiosk?: KioskConfig };
+        }>(getGetUnitByIDQueryKey(unitId ?? ''));
+        const k = cached?.config?.kiosk;
+        if (
+          resolveKioskAttractSignageMode(k) === 'playlist' &&
+          k?.kioskAttractPlaylistId
+        ) {
+          void queryClient.invalidateQueries({
+            queryKey: [
+              'signage',
+              'playlist-public',
+              kioskApiUnitId,
+              k.kioskAttractPlaylistId
+            ]
+          });
+        }
+        if (unitId) {
+          void queryClient.invalidateQueries({
+            queryKey: getGetUnitByIDQueryKey(unitId)
+          });
+        }
+      }, 300);
     };
     socketClient.onEtaUpdate(h);
+    socketClient.on('screen.content_updated', onSignageFeed);
+    socketClient.on('feed.updated', onSignageFeed);
     return () => {
+      if (signageDebounce.t) {
+        clearTimeout(signageDebounce.t);
+        signageDebounce.t = null;
+      }
       socketClient.offEtaUpdate(h);
+      socketClient.off('screen.content_updated', onSignageFeed);
+      socketClient.off('feed.updated', onSignageFeed);
       socketClient.disconnect();
     };
-  }, [isTicketModalOpen, createdTicket, kioskApiUnitId]);
+  }, [kioskApiUnitId, queryClient, unitId]);
 
   /** Which grid column (pool) the kiosk shows: subdivision-wide vs this zone. */
   const kioskGridZoneScope = useMemo(() => {
@@ -351,9 +437,14 @@ export default function UnitKioskPage() {
   );
   const [employeeCreateTicketError, setEmployeeCreateTicketError] =
     useState('');
-  const beforeIdleSec = unit?.config?.kiosk?.sessionIdleBeforeWarningSec ?? 45;
-  const idleCountdownSec = unit?.config?.kiosk?.sessionIdleCountdownSec ?? 15;
-  const sessionIdleEnabled = Boolean(
+  const kioskCfg = unit?.config?.kiosk;
+  const attractMode = getKioskAttractMode(kioskCfg);
+  const beforeIdleSec = kioskCfg?.sessionIdleBeforeWarningSec ?? 45;
+  const idleCountdownSec = kioskCfg?.sessionIdleCountdownSec ?? 15;
+  const idOcrBlocking =
+    Boolean(unit?.operations?.kioskIdOcr && kioskCfg?.idOcrEnabled) &&
+    idOcrOpen;
+  const kioskNoModalBlockers = Boolean(
     unit &&
     !unitQueryError &&
     !serverKioskFrozen &&
@@ -365,9 +456,14 @@ export default function UnitKioskPage() {
     !isKioskQrIdentificationOpen &&
     !isKioskQrCheckinDisabledOpen &&
     !isPhoneIdentificationOpen &&
-    !isEmployeeIdentificationOpen
+    !isEmployeeIdentificationOpen &&
+    !idOcrBlocking
   );
+  const sessionIdleBaseEnabled = kioskNoModalBlockers && !showAttract;
+  const sessionIdleEnabled =
+    sessionIdleBaseEnabled && attractMode !== 'attract_only';
   const onIdleSessionEnd = useCallback(() => {
+    setShowAttract(false);
     setSelectedServicePath([]);
     setIsPhoneIdentificationOpen(false);
     setPhoneIdentificationError('');
@@ -380,6 +476,15 @@ export default function UnitKioskPage() {
     setIsPinModalOpen(false);
     setMessage('');
   }, []);
+  const handleSessionIdleCountdownEnd = useCallback(() => {
+    onIdleSessionEnd();
+    if (
+      attractMode === 'session_then_attract' &&
+      getShowAttractAfterSessionEnd(kioskCfg)
+    ) {
+      setShowAttract(true);
+    }
+  }, [attractMode, kioskCfg, onIdleSessionEnd]);
   const {
     showWarning: showIdleWarning,
     remainingSec: idleRemainingSec,
@@ -389,8 +494,33 @@ export default function UnitKioskPage() {
     requireFirstUserActivity: true,
     beforeWarningSec: beforeIdleSec,
     countdownSec: idleCountdownSec,
-    onSessionEnd: onIdleSessionEnd
+    onSessionEnd: handleSessionIdleCountdownEnd
   });
+  const handleAttractOnlyFire = useCallback(() => {
+    onIdleSessionEnd();
+    setShowAttract(true);
+  }, [onIdleSessionEnd]);
+  useKioskAttractInactivity({
+    enabled:
+      sessionIdleBaseEnabled && attractMode === 'attract_only' && !showAttract,
+    requireFirstUserActivity: true,
+    inactivitySec: getAttractIdleSec(kioskCfg),
+    onAttract: handleAttractOnlyFire
+  });
+  const BOTTOM_STATUS_STRIP_PX = 40;
+  const appVersion =
+    (typeof process !== 'undefined' &&
+      process.env.NEXT_PUBLIC_APP_VERSION?.trim()) ||
+    '0.0.0';
+  const buildStatus: KioskRuntimeStatus = serverKioskFrozen
+    ? 'frozen'
+    : !browserOnline
+      ? 'offline'
+      : unitPending && !unit
+        ? 'loading'
+        : 'ok';
+  const attractScreenVisible =
+    showAttract && kioskNoModalBlockers && attractMode !== 'off';
 
   const isCustomColorsEnabled =
     unit?.config?.kiosk?.isCustomColorsEnabled || false;
@@ -411,8 +541,6 @@ export default function UnitKioskPage() {
     : isCustomColorsEnabled
       ? kcKiosk?.serviceGridColor || '#f2ebe6'
       : '#f2ebe6';
-
-  const kioskCfg = unit?.config?.kiosk;
 
   const successTicketServiceLabel = useMemo(() => {
     if (!createdTicket) {
@@ -1623,49 +1751,38 @@ export default function UnitKioskPage() {
         }}
       />
 
-      <Dialog
+      <KioskSessionIdleBar
         open={showIdleWarning}
-        onOpenChange={() => {
-          /* reset only via Continue; backdrop close calls continue */
-        }}
-      >
-        <DialogContent
-          className='max-w-[min(100vw-2rem,40rem)] gap-6 p-6 sm:max-w-2xl sm:p-10'
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-        >
-          <DialogHeader className='gap-3 text-left'>
-            <DialogTitle className='text-2xl font-bold tracking-tight sm:text-3xl sm:leading-tight'>
-              {t('settings.session_idle_title')}
-            </DialogTitle>
-          </DialogHeader>
-          <p className='text-foreground/90 text-lg leading-relaxed sm:text-xl'>
-            {t('settings.session_idle_body')}
-          </p>
-          <div className='flex flex-col items-center gap-2'>
-            <span
-              className='text-foreground w-full text-center text-5xl font-bold tabular-nums sm:text-6xl'
-              aria-label={t('settings.session_idle_body_aria', {
-                seconds: idleRemainingSec
-              })}
-            >
-              {idleRemainingSec}
-            </span>
-            <Progress
-              className='h-3.5 w-full sm:h-4'
-              value={(idleRemainingSec / Math.max(1, idleCountdownSec)) * 100}
-              indicatorClassName='bg-foreground'
-            />
-          </div>
-          <Button
-            type='button'
-            className='kiosk-touch-min mt-1 min-h-14 w-full text-lg font-semibold sm:min-h-16 sm:text-xl'
-            onClick={() => continueIdleSession()}
-          >
-            {t('settings.session_idle_continue')}
-          </Button>
-        </DialogContent>
-      </Dialog>
+        remainingSec={idleRemainingSec}
+        countdownSec={idleCountdownSec}
+        onContinue={continueIdleSession}
+        highContrast={a11y.highContrast}
+        bottomOffset={BOTTOM_STATUS_STRIP_PX}
+      />
+
+      <KioskBuildStatusBar
+        appVersion={appVersion}
+        status={buildStatus}
+        highContrast={a11y.highContrast}
+      />
+
+      {attractScreenVisible ? (
+        <KioskAttractScreen
+          onDismiss={() => {
+            setShowAttract(false);
+            continueIdleSession();
+          }}
+          intlLocale={intlLocale}
+          currentTime={currentTime}
+          logoUrl={kioskCfg?.logoUrl}
+          highContrast={a11y.highContrast}
+          bodyBackground={bodyColor}
+          showQueueDepth={getShowQueueDepthOnAttract(kioskCfg)}
+          eta={unitEtaSnapshot}
+          contentSlides={contentSlides}
+          defaultImageSeconds={defaultImageSeconds}
+        />
+      ) : null}
 
       {serverKioskFrozen ? (
         <div

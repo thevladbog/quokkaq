@@ -101,6 +101,27 @@ func (h *SignageHandler) GetPlaylist(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, out)
 }
 
+// GetPlaylistPublic is the unauthenticated read used by the kiosk and public screens
+// to resolve a specific playlist by id (same payload as [SignageHandler.GetPlaylist]).
+func (h *SignageHandler) GetPlaylistPublic(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
+	id := chi.URLParam(r, "playlistId")
+	out, err := h.svc.GetPlaylist(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if out.UnitID != unitID {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	RespondJSON(w, out)
+}
+
 // CreatePlaylist godoc
 // @ID           CreateSignagePlaylist
 // @Summary      Create a playlist

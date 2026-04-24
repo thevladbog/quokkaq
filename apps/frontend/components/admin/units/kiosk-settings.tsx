@@ -8,6 +8,13 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import {
   Card,
   CardContent,
   CardDescription,
@@ -17,22 +24,69 @@ import {
 import { usePatchKioskConfig } from '@/lib/hooks';
 import { toast } from 'sonner';
 import { LogoUpload } from '@/components/ui/logo-upload';
-import type { KioskConfig } from '@quokkaq/shared-types';
+import type {
+  KioskAttractInactivityMode,
+  KioskConfig
+} from '@quokkaq/shared-types';
 import { useKioskHeaderFields } from '@/hooks/use-kiosk-header-fields';
 import { isTauriKiosk, printKioskJob, testPrintLines } from '@/lib/kiosk-print';
 import { KIOSK_FEEDBACK_URL_EXAMPLE } from '@/lib/kiosk-feedback-url';
+import { KioskAttractSignageAdminBlock } from '@/components/admin/units/kiosk-attract-signage-admin';
+import { Link } from '@/src/i18n/navigation';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Info } from 'lucide-react';
+import type { KioskAttractSignageMode } from '@/lib/kiosk-attract-config';
 
 interface KioskSettingsProps {
   unitId: string;
   /** Default header label when kiosk unit label is empty. */
   unitName: string;
   currentConfig: Record<string, unknown>;
+  /**
+   * Branch (subdivision) id used to list playlists and media for kiosk attract overrides.
+   * For a service zone, pass the parent subdivision id; otherwise the unit id.
+   */
+  branchUnitIdForSignage: string;
+}
+
+function attractSignageInit(k: KioskConfig): {
+  mode: KioskAttractSignageMode;
+  playlistId: string;
+  materialIds: string[];
+  slideDurationSec: number | '';
+} {
+  if (k.kioskAttractSignageMode === 'materials') {
+    return {
+      mode: 'materials',
+      playlistId: k.kioskAttractPlaylistId?.trim() ?? '',
+      materialIds: [...(k.kioskAttractActiveMaterialIds ?? [])],
+      slideDurationSec: k.kioskAttractSlideDurationSec ?? ''
+    };
+  }
+  if (
+    k.kioskAttractSignageMode === 'playlist' &&
+    (k.kioskAttractPlaylistId?.trim() ?? '') !== ''
+  ) {
+    return {
+      mode: 'playlist',
+      playlistId: k.kioskAttractPlaylistId?.trim() ?? '',
+      materialIds: [...(k.kioskAttractActiveMaterialIds ?? [])],
+      slideDurationSec: k.kioskAttractSlideDurationSec ?? ''
+    };
+  }
+  return {
+    mode: 'inherit',
+    playlistId: k.kioskAttractPlaylistId?.trim() ?? '',
+    materialIds: [...(k.kioskAttractActiveMaterialIds ?? [])],
+    slideDurationSec: k.kioskAttractSlideDurationSec ?? ''
+  };
 }
 
 export function KioskSettings({
   unitId,
   unitName,
-  currentConfig
+  currentConfig,
+  branchUnitIdForSignage
 }: KioskSettingsProps) {
   const t = useTranslations('admin.kiosk_settings');
   const patchKioskMutation = usePatchKioskConfig();
@@ -121,6 +175,22 @@ export function KioskSettings({
   const [sessionIdleCountdownSec, setSessionIdleCountdownSec] = useState(
     kioskConfig.sessionIdleCountdownSec ?? 15
   );
+  const [kioskAttractInactivityMode, setKioskAttractInactivityMode] =
+    useState<KioskAttractInactivityMode>(
+      kioskConfig.kioskAttractInactivityMode ?? 'session_then_attract'
+    );
+  const [showAttractAfterSessionEnd, setShowAttractAfterSessionEnd] = useState(
+    kioskConfig.showAttractAfterSessionEnd !== false
+  );
+  const [attractIdleSec, setAttractIdleSec] = useState(
+    Math.min(600, Math.max(10, kioskConfig.attractIdleSec ?? 60))
+  );
+  const [showQueueDepthOnAttract, setShowQueueDepthOnAttract] = useState(
+    kioskConfig.showQueueDepthOnAttract !== false
+  );
+  const [attractSignage, setAttractSignage] = useState(() =>
+    attractSignageInit(kioskConfig)
+  );
   const [ticketSuccessAutoCloseSec, setTicketSuccessAutoCloseSec] = useState(
     kioskConfig.ticketSuccessAutoCloseSec ?? 12
   );
@@ -130,12 +200,20 @@ export function KioskSettings({
   // This avoids "setState in useEffect" warnings and potential loops.
 
   const handleSave = () => {
+    if (
+      attractSignage.mode === 'playlist' &&
+      !attractSignage.playlistId.trim()
+    ) {
+      toast.error(t('attract_signage_playlist_required'));
+      return;
+    }
     const typedConfig = currentConfig as { kiosk?: KioskConfig };
     const beforeSec = Math.min(
       3600,
       Math.max(15, sessionIdleBeforeWarningSec || 45)
     );
     const countSec = Math.min(300, Math.max(5, sessionIdleCountdownSec || 15));
+    const attractSec = Math.min(600, Math.max(10, attractIdleSec || 60));
     const ticketCloseSec = Math.min(
       120,
       Math.max(1, ticketSuccessAutoCloseSec || 12)
@@ -172,7 +250,24 @@ export function KioskSettings({
         serviceGridColor,
         sessionIdleBeforeWarningSec: beforeSec,
         sessionIdleCountdownSec: countSec,
-        ticketSuccessAutoCloseSec: ticketCloseSec
+        kioskAttractInactivityMode,
+        showAttractAfterSessionEnd,
+        attractIdleSec: attractSec,
+        showQueueDepthOnAttract,
+        ticketSuccessAutoCloseSec: ticketCloseSec,
+        kioskAttractSignageMode: attractSignage.mode,
+        kioskAttractPlaylistId:
+          attractSignage.mode === 'playlist' && attractSignage.playlistId.trim()
+            ? attractSignage.playlistId.trim()
+            : undefined,
+        kioskAttractActiveMaterialIds:
+          attractSignage.mode === 'materials'
+            ? attractSignage.materialIds
+            : undefined,
+        kioskAttractSlideDurationSec:
+          attractSignage.slideDurationSec === ''
+            ? undefined
+            : attractSignage.slideDurationSec
       }
     };
 
@@ -243,6 +338,25 @@ export function KioskSettings({
           <CardDescription>{t('description')}</CardDescription>
         </CardHeader>
         <CardContent className='space-y-4'>
+          <Alert>
+            <Info className='h-4 w-4' />
+            <AlertTitle>{t('attract_signage_info_title')}</AlertTitle>
+            <AlertDescription className='text-muted-foreground'>
+              {t('attract_signage_info_description')}{' '}
+              <Link
+                href={`/settings/units/${unitId}?display=content`}
+                className='text-foreground font-medium underline underline-offset-2'
+              >
+                {t('attract_signage_info_link')}
+              </Link>
+            </AlertDescription>
+          </Alert>
+          <KioskAttractSignageAdminBlock
+            branchUnitId={branchUnitIdForSignage}
+            linkUnitId={unitId}
+            value={attractSignage}
+            onChange={setAttractSignage}
+          />
           <div className='space-y-2'>
             <LogoUpload
               label={t('logo_screen')}
@@ -545,69 +659,208 @@ export function KioskSettings({
               </div>
             </div>
 
-            <div className='space-y-3 border-t py-2'>
-              <div className='flex flex-wrap items-start justify-between gap-2'>
-                <div>
-                  <Label htmlFor='admin-sess-warn'>
+            <div className='space-y-0 border-t py-2'>
+              <div className='border-b pb-3'>
+                <p className='text-foreground text-sm font-medium'>
+                  {t('session_and_timing_group_label')}
+                </p>
+                <p className='text-muted-foreground mt-2 text-sm leading-relaxed'>
+                  {t('session_and_timing_explain')}
+                </p>
+              </div>
+              <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
+                <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
+                  <Label
+                    htmlFor='admin-sess-warn'
+                    className='text-sm font-medium'
+                  >
                     {t('session_idle_before_label')}
                   </Label>
-                  <p className='text-muted-foreground text-sm'>
+                  <p className='text-muted-foreground text-sm leading-snug'>
                     {t('session_idle_before_hint')}
                   </p>
                 </div>
-                <Input
-                  id='admin-sess-warn'
-                  className='w-24'
-                  type='number'
-                  min={15}
-                  max={3600}
-                  value={sessionIdleBeforeWarningSec}
-                  onChange={(e) =>
-                    setSessionIdleBeforeWarningSec(Number(e.target.value) || 0)
-                  }
-                />
+                <div className='flex w-full max-w-48 min-w-0 justify-end sm:shrink-0 sm:pt-0.5'>
+                  <Input
+                    id='admin-sess-warn'
+                    className='h-10 w-24'
+                    type='number'
+                    min={15}
+                    max={3600}
+                    value={sessionIdleBeforeWarningSec}
+                    onChange={(e) =>
+                      setSessionIdleBeforeWarningSec(
+                        Number(e.target.value) || 0
+                      )
+                    }
+                  />
+                </div>
               </div>
-              <div className='flex flex-wrap items-start justify-between gap-2'>
-                <div>
-                  <Label htmlFor='admin-sess-count'>
+              <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
+                <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
+                  <Label
+                    htmlFor='admin-sess-count'
+                    className='text-sm font-medium'
+                  >
                     {t('session_idle_countdown_label')}
                   </Label>
-                  <p className='text-muted-foreground text-sm'>
+                  <p className='text-muted-foreground text-sm leading-snug'>
                     {t('session_idle_countdown_hint')}
                   </p>
                 </div>
-                <Input
-                  id='admin-sess-count'
-                  className='w-24'
-                  type='number'
-                  min={5}
-                  max={300}
-                  value={sessionIdleCountdownSec}
-                  onChange={(e) =>
-                    setSessionIdleCountdownSec(Number(e.target.value) || 0)
-                  }
-                />
+                <div className='flex w-full max-w-48 min-w-0 justify-end sm:shrink-0 sm:pt-0.5'>
+                  <Input
+                    id='admin-sess-count'
+                    className='h-10 w-24'
+                    type='number'
+                    min={5}
+                    max={300}
+                    value={sessionIdleCountdownSec}
+                    onChange={(e) =>
+                      setSessionIdleCountdownSec(Number(e.target.value) || 0)
+                    }
+                  />
+                </div>
               </div>
-              <div className='flex flex-wrap items-start justify-between gap-2'>
-                <div>
-                  <Label htmlFor='admin-ticket-success-close'>
+              <p className='text-muted-foreground border-b py-3 text-sm font-medium'>
+                {t('attract_section_label')}
+              </p>
+              <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
+                <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
+                  <Label
+                    htmlFor='kiosk-attract-mode'
+                    className='text-sm font-medium'
+                  >
+                    {t('kiosk_attract_inactivity_mode_label')}
+                  </Label>
+                  <p className='text-muted-foreground text-sm leading-snug'>
+                    {t('kiosk_attract_inactivity_mode_hint')}
+                  </p>
+                </div>
+                <div className='w-full min-w-0 sm:shrink-0 sm:pt-0.5'>
+                  <Select
+                    value={kioskAttractInactivityMode}
+                    onValueChange={(v) =>
+                      setKioskAttractInactivityMode(
+                        v as KioskAttractInactivityMode
+                      )
+                    }
+                  >
+                    <SelectTrigger
+                      className='h-10 w-full min-w-0 sm:max-w-[12rem]'
+                      id='kiosk-attract-mode'
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='session_then_attract'>
+                        {t('kiosk_attract_mode_session_then_attract')}
+                      </SelectItem>
+                      <SelectItem value='attract_only'>
+                        {t('kiosk_attract_mode_attract_only')}
+                      </SelectItem>
+                      <SelectItem value='off'>
+                        {t('kiosk_attract_mode_off')}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
+                <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
+                  <Label
+                    htmlFor='kiosk-show-attract-after-session'
+                    className='text-sm font-medium'
+                  >
+                    {t('show_attract_after_session_end_label')}
+                  </Label>
+                  <p className='text-muted-foreground text-sm leading-snug'>
+                    {t('show_attract_after_session_end_hint')}
+                  </p>
+                </div>
+                <div className='flex h-10 w-full max-w-48 min-w-0 items-center justify-end sm:shrink-0 sm:pt-0.5'>
+                  <Switch
+                    id='kiosk-show-attract-after-session'
+                    disabled={
+                      kioskAttractInactivityMode !== 'session_then_attract'
+                    }
+                    checked={showAttractAfterSessionEnd}
+                    onCheckedChange={setShowAttractAfterSessionEnd}
+                  />
+                </div>
+              </div>
+              <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
+                <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
+                  <Label
+                    htmlFor='kiosk-attract-idle-sec'
+                    className='text-sm font-medium'
+                  >
+                    {t('attract_idle_sec_label')}
+                  </Label>
+                  <p className='text-muted-foreground text-sm leading-snug'>
+                    {t('attract_idle_sec_hint')}
+                  </p>
+                </div>
+                <div className='flex w-full max-w-48 min-w-0 justify-end sm:shrink-0 sm:pt-0.5'>
+                  <Input
+                    id='kiosk-attract-idle-sec'
+                    className='h-10 w-24'
+                    type='number'
+                    min={10}
+                    max={600}
+                    disabled={kioskAttractInactivityMode !== 'attract_only'}
+                    value={attractIdleSec}
+                    onChange={(e) =>
+                      setAttractIdleSec(Number(e.target.value) || 0)
+                    }
+                  />
+                </div>
+              </div>
+              <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
+                <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
+                  <Label
+                    htmlFor='kiosk-show-queue-on-attract'
+                    className='text-sm font-medium'
+                  >
+                    {t('show_queue_depth_on_attract_label')}
+                  </Label>
+                  <p className='text-muted-foreground text-sm leading-snug'>
+                    {t('show_queue_depth_on_attract_hint')}
+                  </p>
+                </div>
+                <div className='flex h-10 w-full max-w-48 min-w-0 items-center justify-end sm:shrink-0 sm:pt-0.5'>
+                  <Switch
+                    id='kiosk-show-queue-on-attract'
+                    checked={showQueueDepthOnAttract}
+                    onCheckedChange={setShowQueueDepthOnAttract}
+                  />
+                </div>
+              </div>
+              <div className='grid grid-cols-1 gap-x-4 gap-y-1 py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
+                <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
+                  <Label
+                    htmlFor='admin-ticket-success-close'
+                    className='text-sm font-medium'
+                  >
                     {t('ticket_success_auto_close_label')}
                   </Label>
-                  <p className='text-muted-foreground text-sm'>
+                  <p className='text-muted-foreground text-sm leading-snug'>
                     {t('ticket_success_auto_close_hint')}
                   </p>
                 </div>
-                <Input
-                  id='admin-ticket-success-close'
-                  className='w-24'
-                  type='number'
-                  min={1}
-                  max={120}
-                  value={ticketSuccessAutoCloseSec}
-                  onChange={(e) =>
-                    setTicketSuccessAutoCloseSec(Number(e.target.value) || 0)
-                  }
-                />
+                <div className='flex w-full max-w-48 min-w-0 justify-end sm:shrink-0 sm:pt-0.5'>
+                  <Input
+                    id='admin-ticket-success-close'
+                    className='h-10 w-24'
+                    type='number'
+                    min={1}
+                    max={120}
+                    value={ticketSuccessAutoCloseSec}
+                    onChange={(e) =>
+                      setTicketSuccessAutoCloseSec(Number(e.target.value) || 0)
+                    }
+                  />
+                </div>
               </div>
             </div>
 

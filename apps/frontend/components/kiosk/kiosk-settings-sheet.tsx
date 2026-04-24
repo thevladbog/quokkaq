@@ -7,6 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 import { RefreshCw, Lock } from 'lucide-react';
 import {
   Sheet,
@@ -34,7 +41,10 @@ import {
   type PrinterInfo
 } from '@/lib/kiosk-print';
 import { useKioskHeaderFields } from '@/hooks/use-kiosk-header-fields';
-import type { KioskConfig } from '@quokkaq/shared-types';
+import type {
+  KioskAttractInactivityMode,
+  KioskConfig
+} from '@quokkaq/shared-types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   evaluateKioskConfigSurfaces,
@@ -330,6 +340,23 @@ function KioskSettingsForm({
     (k0 as KioskConfig | undefined)?.sessionIdleCountdownSec ??
       DEFAULT_IDLE_COUNTDOWN_SEC
   );
+  const [kioskAttractInactivityMode, setKioskAttractInactivityMode] =
+    useState<KioskAttractInactivityMode>(
+      (k0 as KioskConfig | undefined)?.kioskAttractInactivityMode ??
+        'session_then_attract'
+    );
+  const [showAttractAfterSessionEnd, setShowAttractAfterSessionEnd] = useState(
+    (k0 as KioskConfig | undefined)?.showAttractAfterSessionEnd !== false
+  );
+  const [attractIdleSec, setAttractIdleSec] = useState(
+    Math.min(
+      600,
+      Math.max(10, (k0 as KioskConfig | undefined)?.attractIdleSec ?? 60)
+    )
+  );
+  const [showQueueDepthOnAttract, setShowQueueDepthOnAttract] = useState(
+    (k0 as KioskConfig | undefined)?.showQueueDepthOnAttract !== false
+  );
   const [ticketSuccessAutoCloseSec, setTicketSuccessAutoCloseSec] = useState(
     (k0 as KioskConfig | undefined)?.ticketSuccessAutoCloseSec ??
       DEFAULT_TICKET_SUCCESS_AUTOCLOSE_SEC
@@ -467,6 +494,7 @@ function KioskSettingsForm({
       300,
       Math.max(5, sessionIdleCountdownSec || DEFAULT_IDLE_COUNTDOWN_SEC)
     );
+    const attractSec = Math.min(600, Math.max(10, attractIdleSec || 60));
     const ticketCloseSec = Math.min(
       120,
       Math.max(
@@ -503,6 +531,10 @@ function KioskSettingsForm({
         serviceGridColor,
         sessionIdleBeforeWarningSec: beforeSec,
         sessionIdleCountdownSec: countSec,
+        kioskAttractInactivityMode,
+        showAttractAfterSessionEnd,
+        attractIdleSec: attractSec,
+        showQueueDepthOnAttract,
         ticketSuccessAutoCloseSec: ticketCloseSec,
         visitorSmsAfterTicket,
         idOcrEnabled: idOcrEnabled,
@@ -849,69 +881,194 @@ function KioskSettingsForm({
           </p>
         </div>
 
-        <div className='space-y-4 border-t pt-4'>
-          <div className='flex items-center justify-between gap-2'>
-            <div>
-              <Label htmlFor='sheet-idle-warn'>
+        <div className='space-y-0 border-t pt-4'>
+          <div className='border-b pb-3'>
+            <p className='text-foreground text-sm font-medium'>
+              {t('session_and_timing_group_label')}
+            </p>
+            <p className='text-muted-foreground mt-2 text-sm leading-relaxed'>
+              {t('session_and_timing_explain')}
+            </p>
+          </div>
+          <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
+            <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
+              <Label htmlFor='sheet-idle-warn' className='text-sm font-medium'>
                 {t('session_idle_before_label')}
               </Label>
-              <p className='text-muted-foreground text-sm'>
+              <p className='text-muted-foreground text-sm leading-snug'>
                 {t('session_idle_before_hint')}
               </p>
             </div>
-            <Input
-              id='sheet-idle-warn'
-              className='w-24'
-              type='number'
-              min={15}
-              max={3600}
-              value={sessionIdleBeforeWarningSec}
-              onChange={(e) =>
-                setSessionIdleBeforeWarningSec(Number(e.target.value) || 0)
-              }
-            />
+            <div className='flex w-full max-w-48 min-w-0 justify-end sm:shrink-0 sm:pt-0.5'>
+              <Input
+                id='sheet-idle-warn'
+                className='h-10 w-24'
+                type='number'
+                min={15}
+                max={3600}
+                value={sessionIdleBeforeWarningSec}
+                onChange={(e) =>
+                  setSessionIdleBeforeWarningSec(Number(e.target.value) || 0)
+                }
+              />
+            </div>
           </div>
-          <div className='flex items-center justify-between gap-2'>
-            <div>
-              <Label htmlFor='sheet-idle-count'>
+          <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
+            <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
+              <Label htmlFor='sheet-idle-count' className='text-sm font-medium'>
                 {t('session_idle_countdown_label')}
               </Label>
-              <p className='text-muted-foreground text-sm'>
+              <p className='text-muted-foreground text-sm leading-snug'>
                 {t('session_idle_countdown_hint')}
               </p>
             </div>
-            <Input
-              id='sheet-idle-count'
-              className='w-24'
-              type='number'
-              min={5}
-              max={300}
-              value={sessionIdleCountdownSec}
-              onChange={(e) =>
-                setSessionIdleCountdownSec(Number(e.target.value) || 0)
-              }
-            />
+            <div className='flex w-full max-w-48 min-w-0 justify-end sm:shrink-0 sm:pt-0.5'>
+              <Input
+                id='sheet-idle-count'
+                className='h-10 w-24'
+                type='number'
+                min={5}
+                max={300}
+                value={sessionIdleCountdownSec}
+                onChange={(e) =>
+                  setSessionIdleCountdownSec(Number(e.target.value) || 0)
+                }
+              />
+            </div>
           </div>
-          <div className='flex items-center justify-between gap-2'>
-            <div>
-              <Label htmlFor='sheet-ticket-success-close'>
+          <p className='text-muted-foreground border-b py-3 text-sm font-medium'>
+            {tAdmin('attract_section_label')}
+          </p>
+          <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
+            <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
+              <Label
+                htmlFor='sheet-attract-mode'
+                className='text-sm font-medium'
+              >
+                {tAdmin('kiosk_attract_inactivity_mode_label')}
+              </Label>
+              <p className='text-muted-foreground text-sm leading-snug'>
+                {tAdmin('kiosk_attract_inactivity_mode_hint')}
+              </p>
+            </div>
+            <div className='w-full min-w-0 sm:shrink-0 sm:pt-0.5'>
+              <Select
+                value={kioskAttractInactivityMode}
+                onValueChange={(v) =>
+                  setKioskAttractInactivityMode(v as KioskAttractInactivityMode)
+                }
+              >
+                <SelectTrigger
+                  className='h-10 w-full min-w-0 sm:max-w-[12rem]'
+                  id='sheet-attract-mode'
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='session_then_attract'>
+                    {tAdmin('kiosk_attract_mode_session_then_attract')}
+                  </SelectItem>
+                  <SelectItem value='attract_only'>
+                    {tAdmin('kiosk_attract_mode_attract_only')}
+                  </SelectItem>
+                  <SelectItem value='off'>
+                    {tAdmin('kiosk_attract_mode_off')}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
+            <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
+              <Label
+                htmlFor='sheet-show-attract-after-session'
+                className='text-sm font-medium'
+              >
+                {tAdmin('show_attract_after_session_end_label')}
+              </Label>
+              <p className='text-muted-foreground text-sm leading-snug'>
+                {tAdmin('show_attract_after_session_end_hint')}
+              </p>
+            </div>
+            <div className='flex h-10 w-full max-w-48 min-w-0 items-center justify-end sm:shrink-0 sm:pt-0.5'>
+              <Switch
+                id='sheet-show-attract-after-session'
+                disabled={kioskAttractInactivityMode !== 'session_then_attract'}
+                checked={showAttractAfterSessionEnd}
+                onCheckedChange={setShowAttractAfterSessionEnd}
+              />
+            </div>
+          </div>
+          <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
+            <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
+              <Label
+                htmlFor='sheet-attract-idle-sec'
+                className='text-sm font-medium'
+              >
+                {tAdmin('attract_idle_sec_label')}
+              </Label>
+              <p className='text-muted-foreground text-sm leading-snug'>
+                {tAdmin('attract_idle_sec_hint')}
+              </p>
+            </div>
+            <div className='flex w-full max-w-48 min-w-0 justify-end sm:shrink-0 sm:pt-0.5'>
+              <Input
+                id='sheet-attract-idle-sec'
+                className='h-10 w-24'
+                type='number'
+                min={10}
+                max={600}
+                disabled={kioskAttractInactivityMode !== 'attract_only'}
+                value={attractIdleSec}
+                onChange={(e) => setAttractIdleSec(Number(e.target.value) || 0)}
+              />
+            </div>
+          </div>
+          <div className='grid grid-cols-1 gap-x-4 gap-y-1 border-b py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
+            <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
+              <Label
+                htmlFor='sheet-show-queue-on-attract'
+                className='text-sm font-medium'
+              >
+                {tAdmin('show_queue_depth_on_attract_label')}
+              </Label>
+              <p className='text-muted-foreground text-sm leading-snug'>
+                {tAdmin('show_queue_depth_on_attract_hint')}
+              </p>
+            </div>
+            <div className='flex h-10 w-full max-w-48 min-w-0 items-center justify-end sm:shrink-0 sm:pt-0.5'>
+              <Switch
+                id='sheet-show-queue-on-attract'
+                checked={showQueueDepthOnAttract}
+                onCheckedChange={setShowQueueDepthOnAttract}
+              />
+            </div>
+          </div>
+          <div className='grid grid-cols-1 gap-x-4 gap-y-1 py-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start'>
+            <div className='min-w-0 space-y-0.5 pr-0 sm:pr-2'>
+              <Label
+                htmlFor='sheet-ticket-success-close'
+                className='text-sm font-medium'
+              >
                 {tAdmin('ticket_success_auto_close_label')}
               </Label>
-              <p className='text-muted-foreground text-sm'>
+              <p className='text-muted-foreground text-sm leading-snug'>
                 {tAdmin('ticket_success_auto_close_hint')}
               </p>
             </div>
-            <Input
-              id='sheet-ticket-success-close'
-              className='w-24'
-              type='number'
-              min={1}
-              max={120}
-              value={ticketSuccessAutoCloseSec}
-              onChange={(e) =>
-                setTicketSuccessAutoCloseSec(Number(e.target.value) || 0)
-              }
-            />
+            <div className='flex w-full max-w-48 min-w-0 justify-end sm:shrink-0 sm:pt-0.5'>
+              <Input
+                id='sheet-ticket-success-close'
+                className='h-10 w-24'
+                type='number'
+                min={1}
+                max={120}
+                value={ticketSuccessAutoCloseSec}
+                onChange={(e) =>
+                  setTicketSuccessAutoCloseSec(Number(e.target.value) || 0)
+                }
+              />
+            </div>
           </div>
         </div>
 

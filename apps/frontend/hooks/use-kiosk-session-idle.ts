@@ -50,6 +50,8 @@ export function useKioskSessionIdle({
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
     null
   );
+  /** After the first user interaction, we may auto-arm when `enabled` turns on again (e.g. after ticket success). */
+  const hasUserInteractedRef = useRef(false);
 
   const clearTimers = useCallback(() => {
     if (warningTimeoutRef.current) {
@@ -115,7 +117,7 @@ export function useKioskSessionIdle({
     if (showWarning) {
       return;
     }
-    if (requireFirstUserActivity) {
+    if (requireFirstUserActivity && !hasUserInteractedRef.current) {
       return;
     }
     scheduleWarning();
@@ -137,6 +139,7 @@ export function useKioskSessionIdle({
       return;
     }
     const onActivity = () => {
+      hasUserInteractedRef.current = true;
       if (showWarning) {
         return;
       }

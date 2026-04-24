@@ -303,6 +303,8 @@ ACTIVE ──(60s бездействия)──→ WARNING (15s обратный
 - Опционально: цветовой индикатор загруженности (зелёный/жёлтый/красный) в топ-баре
 - KioskConfig: `showQueueDepthOnAttract: boolean` (дефолт `true`)
 
+**Реализовано (фаза B):** В `KioskConfig` зафиксированы `kioskAttractInactivityMode` (`session_then_attract` | `attract_only` | `off`, по умолчанию `session_then_attract`), `showAttractAfterSessionEnd` (по умолчанию `true`), `attractIdleSec` (10–600, по умолчанию 60, для `attract_only`) и `showQueueDepthOnAttract` (по умолчанию `true`). Сессия: нижняя полоса предупреждения вместо модалки; при `session_then_attract` после отсчёта — attract при необходимости. Нижняя полоса: `NEXT_PUBLIC_APP_VERSION` + бейдж сети/заморозки. **Attract+signage:** экран в шапка (лого + время) / центр / CTA; контент слайдера — тот же источник, что публичный дисплей очереди: активный плейлист `getActivePlaylist` иначе `adScreen.activeMaterialIds` + `ContentPlayer`; при отсутствии слайдов — в центре ETA (если включено) и кнопка; тап на весь экран — только без рекламы, со слайдами — выход по кнопке.
+
 ---
 
 ## Матрица приоритетов

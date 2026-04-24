@@ -454,6 +454,16 @@ export function safeParseGuestSurveyIdleScreen(
   };
 }
 
+const KioskAttractInactivityModeField = z.enum([
+  'session_then_attract',
+  'attract_only',
+  'off'
+]);
+export const KioskAttractInactivityModeSchema = KioskAttractInactivityModeField;
+export type KioskAttractInactivityMode = z.infer<
+  typeof KioskAttractInactivityModeField
+>;
+
 /** Runtime shape for `UnitConfig.kiosk` (matches {@link KioskConfig}). */
 export const KioskConfigSchema = z
   .object({
@@ -529,7 +539,41 @@ export const KioskConfigSchema = z
     /**
      * When true and plan `kiosk_offline_mode` is on, the kiosk uses cached unit/services and may queue creates (5.5).
      */
-    offlineModeEnabled: z.boolean().optional()
+    offlineModeEnabled: z.boolean().optional(),
+    /**
+     * How the kiosk returns to a full-screen attract state after inactivity. Default: session idle bar then
+     * optional attract; `attract_only` uses only the {@link attractIdleSec} timer; `off` never shows attract.
+     */
+    kioskAttractInactivityMode: KioskAttractInactivityModeField.optional(),
+    /**
+     * After the session idle bar countdown, show attract when mode is `session_then_attract`. Default true.
+     */
+    showAttractAfterSessionEnd: z.boolean().optional(),
+    /**
+     * Inactivity (seconds) before full-screen attract when `kioskAttractInactivityMode` is `attract_only`. Default 60.
+     */
+    attractIdleSec: z.number().int().positive().max(600).optional(),
+    /**
+     * When not false, attract screen may show live queue length / wait from unit ETA. Default true when unset.
+     */
+    showQueueDepthOnAttract: z.boolean().optional(),
+    /**
+     * Source for full-screen attract slides. `inherit` = same as queue/ticket display (active playlist
+     * or ad fallback). `playlist` = fixed branch playlist. `materials` = only selected media from the library.
+     */
+    kioskAttractSignageMode: z
+      .enum(['inherit', 'playlist', 'materials'] as const)
+      .optional(),
+    /** When {@link kioskAttractSignageMode} is `playlist`, use this branch playlist id. */
+    kioskAttractPlaylistId: z.string().optional(),
+    /**
+     * When mode is `materials`, these material ids (branch library) in order. Ignored in other modes.
+     */
+    kioskAttractActiveMaterialIds: z.array(z.string()).optional(),
+    /**
+     * Default image duration in seconds for attract slides (when the item has no per-slide duration). Optional; falls back to ad screen duration, then 5s.
+     */
+    kioskAttractSlideDurationSec: z.number().int().min(1).max(300).optional()
   })
   .passthrough();
 
@@ -1101,6 +1145,21 @@ export interface KioskConfig {
   idOcrWedgeMrz?: boolean;
   idOcrWedgeRuDriverLicense?: boolean;
   offlineModeEnabled?: boolean;
+  /** See {@link KioskConfigSchema} — default `session_then_attract` in client. */
+  kioskAttractInactivityMode?: KioskAttractInactivityMode;
+  showAttractAfterSessionEnd?: boolean;
+  attractIdleSec?: number;
+  showQueueDepthOnAttract?: boolean;
+  /**
+   * Where full-screen attract gets its media. Default/omit: same as queue / ticket display for the branch.
+   */
+  kioskAttractSignageMode?: 'inherit' | 'playlist' | 'materials';
+  /** Fixed branch playlist for attract (when `kioskAttractSignageMode` is `playlist`). */
+  kioskAttractPlaylistId?: string;
+  /** Material ids in order (when mode is `materials`). */
+  kioskAttractActiveMaterialIds?: string[];
+  /** Optional per-slide default seconds for still images. */
+  kioskAttractSlideDurationSec?: number;
 }
 
 export interface UnitConfig {
