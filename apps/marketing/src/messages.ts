@@ -138,6 +138,12 @@ export type HomeMessages = {
     /** Visible text before the wordmark in the section H2. */
     headingPrefix: string;
     subheading: string;
+    /** Large gradient tag over the comparison table linking to `/roi`. */
+    roiTableTag: {
+      linkLabel: string;
+      /** Appended in a screen-reader-only span after the visible label. */
+      linkSrOnly: string;
+    };
     beforeColumn: string;
     afterColumn: string;
     rows: Array<{ before: string; after: string }>;
@@ -285,6 +291,8 @@ export type BlogMessages = {
 export type RoiMessages = {
   metaTitle: string;
   metaDescription: string;
+  /** Link above the page title (e.g. arrow + “Back to home”). */
+  backToHome: string;
   heading: string;
   subheading: string;
   disclaimer: string;
@@ -296,6 +304,10 @@ export type RoiMessages = {
   illustrativeStaffLabel: string;
   illustrativeStaffHint: string;
   methodology: string;
+  /** Shown after large hour totals (e.g. `h`, `ч`). */
+  hoursAbbrev: string;
+  /** Shown after the wait slider value (e.g. `min`, `мин`). */
+  minutesAbbrev: string;
 };
 
 export type ExitIntentMessages = {
@@ -303,7 +315,8 @@ export type ExitIntentMessages = {
   body: string;
   bookDemoCta: string;
   emailSalesCta: string;
-  dismiss: string;
+  /** `aria-label` for the icon-only close control (localized). */
+  closeAriaLabel: string;
   mailtoSubject: string;
 };
 
@@ -384,7 +397,7 @@ export const messages: Record<
       integrations: {
         heading: 'Integrations and open protocols',
         subheading:
-          'CalDAV and OIDC / SAML are industry-standard ways to plug in calendars and sign-in; the rest are packaged connections to common external services.',
+          'CalDAV and OIDC / SAML are industry-standard ways to plug in calendars and sign-in. The rest are packaged connections to common external services.',
         items: [
           { id: 'caldav', label: 'CalDAV' },
           { id: 'oidcSaml', label: 'OIDC / SAML 2.0' },
@@ -533,6 +546,11 @@ export const messages: Record<
         heading: 'The usual approach vs. QuokkaQ',
         headingPrefix: 'The usual approach vs.',
         subheading: 'Clear contrast with how queues are run today',
+        roiTableTag: {
+          linkLabel: 'Estimate implementation',
+          linkSrOnly:
+            ' — waiting-time sketch on its own page, with sliders and the amber disclaimer.'
+        },
         beforeColumn: 'Traditional approach',
         afterColumn: 'With QuokkaQ',
         rows: [
@@ -770,7 +788,7 @@ export const messages: Record<
         privacy: 'Privacy Policy',
         terms: 'Terms of Service',
         blog: 'Blog',
-        roi: 'ROI estimate',
+        roi: 'Waiting-time sketch',
         cookieSettings: 'Cookie settings',
         copyrightBrand: 'Bogatyrev V.',
         copyrightReserved: 'All rights reserved.'
@@ -782,7 +800,7 @@ export const messages: Record<
         'Notes on queue operations, public-sector rollouts, and honest ROI framing for multi-branch teams.',
       listHeading: 'Blog',
       listSubheading:
-        'Short articles for operations and IT—methodology first, no invented customer stories.',
+        'Short articles for operations and IT—methodology, field notes, and clear ways to talk about impact.',
       readMore: 'Read article',
       publishedPrefix: 'Published',
       listEmpty: 'No articles yet.',
@@ -791,34 +809,39 @@ export const messages: Record<
       postNotFoundBody: 'This slug does not exist or was removed.'
     },
     roi: {
-      metaTitle: 'ROI estimate',
+      metaTitle: 'Waiting-time sketch',
       metaDescription:
-        'Illustrative calculator for visitor waiting hours and a discussion-only staff-time proxy— not a promise of savings.',
-      heading: 'Rough ROI framing (illustrative)',
+        'Three sliders, two ballpark totals, and a short amber note. A team sketch—not a savings promise or a budget line.',
+      backToHome: 'Back to home',
+      heading: 'Waiting-time sketch — for a grounded team conversation',
       subheading:
-        'Adjust the sliders to explore orders of magnitude. Share the disclaimer with finance before treating any number as a budget line.',
+        'Pick visitors per day, how long the wait feels, and how many sites you want in the picture. The two totals below are rounded on purpose: visitor waiting hours per month, then a rough staff-side proxy (we hold six percent only as a talking point, not a labour forecast). Before anything reaches finance as “savings,” read the amber box under the numbers—it spells out what is assumed.',
       disclaimer:
-        'This page shows illustrative arithmetic for internal discussions only. It is not financial advice, not a QuokkaQ performance guarantee, and not calibrated to your sites. Real outcomes depend on processes, staffing rules, and adoption.',
-      visitorsPerDay: 'Visitors per day (per location, average)',
-      waitMinutes: 'Typical wait today (minutes, visitor perception)',
-      locations: 'Number of locations / branches in scope',
-      aggregateWaitLabel: 'Approx. aggregate visitor waiting hours / month',
+        'This page is a working note, not a figure for an audited savings claim. It is not financial or legal advice, and QuokkaQ does not guarantee these numbers for your branches. What actually lands still depends on your processes, staffing, and rollout.',
+      visitorsPerDay:
+        'Roughly how many visitors does one site see in a day, on average?',
+      waitMinutes:
+        'About how long does the wait feel to someone in line today (minutes)?',
+      locations: 'How many sites or branches are we sketching in?',
+      aggregateWaitLabel: 'Ballpark visitor waiting hours each month',
       aggregateWaitHint:
-        'Computed as visitors × wait minutes ÷ 60 × ~22 weekdays × number of locations. It is a coarse load indicator, not wasted staff time.',
+        'We multiply visitors, wait minutes, and locations, turn minutes into hours, and multiply by about twenty-two working days. Think of it as a weather map for how full the waiting area feels—not a payroll clock.',
       illustrativeStaffLabel:
-        'Illustrative staff-time proxy / month (discussion only)',
+        'A very rough “what if some of that touches staff?” hours / month',
       illustrativeStaffHint:
-        'Uses a fixed 6% heuristic applied to the aggregate waiting hours—meant only to spark a conversation with operations, not to forecast payroll savings.',
+        'Behind the scenes we borrow six percent of the crowd-hours above—just to give frontline leads and finance something to talk about, never to forecast labour savings.',
       methodology:
-        'Replace the default 6% with a coefficient your team agrees on after observing manual reconciliations, escalations, and rework for a sample week.'
+        'We left six percent as a placeholder. Stand next to the real week—rework, escalations, quiet fixes in spreadsheets—and let what you see suggest the number that should replace ours.',
+      hoursAbbrev: 'h',
+      minutesAbbrev: 'min'
     },
     exitIntent: {
-      title: 'Leaving already?',
-      body: 'If timing is tight, book a short demo or email us—we will keep it factual and low pressure.',
-      bookDemoCta: 'Book a demo',
-      emailSalesCta: 'Email sales',
-      dismiss: 'Close',
-      mailtoSubject: 'Question from the marketing site'
+      title: 'Heading out? Just a tiny hello',
+      body: 'Totally your call—no pitch overload. If a calm walkthrough or a quick question would help, pick whatever feels easiest.',
+      bookDemoCta: 'Book a relaxed demo',
+      emailSalesCta: 'Drop us a line',
+      closeAriaLabel: 'Close dialog',
+      mailtoSubject: 'Question from the QuokkaQ marketing site'
     },
     cookieConsent: {
       title: 'Cookies and analytics',
@@ -896,7 +919,7 @@ export const messages: Record<
       integrations: {
         heading: 'Интеграции и открытые протоколы',
         subheading:
-          'CalDAV и OIDC / SAML — общепринятые способы подключить календари и единый вход; остальное — готовые связки с распространёнными внешними сервисами.',
+          'CalDAV и OIDC / SAML — общепринятые способы подключить календари и единый вход. Остальное — готовые связки с распространёнными внешними сервисами.',
         items: [
           { id: 'caldav', label: 'CalDAV' },
           { id: 'oidcSaml', label: 'OIDC / SAML 2.0' },
@@ -1045,6 +1068,11 @@ export const messages: Record<
         heading: 'Привычный подход и КвоккаКю',
         headingPrefix: 'Привычный подход и',
         subheading: 'Наглядное сравнение с привычным способом вести очередь',
+        roiTableTag: {
+          linkLabel: 'Оценить внедрение',
+          linkSrOnly:
+            ' — черновик оценки ожидания на отдельной странице, с ползунками и жёлтым напоминанием.'
+        },
         beforeColumn: 'Традиционный подход',
         afterColumn: 'С КвоккаКю',
         rows: [
@@ -1282,7 +1310,7 @@ export const messages: Record<
         privacy: 'Политика конфиденциальности',
         terms: 'Условия использования',
         blog: 'Блог',
-        roi: 'Оценка эффекта',
+        roi: 'Оценка ожидания',
         cookieSettings: 'Настройки cookie',
         copyrightBrand: 'Богатырев В.С.',
         copyrightReserved: 'Все права защищены.'
@@ -1294,7 +1322,7 @@ export const messages: Record<
         'Заметки про эксплуатацию очередей, госсектор и честную постановку ROI для сетей филиалов.',
       listHeading: 'Блог',
       listSubheading:
-        'Короткие материалы для эксплуатации и ИТ: сначала методология, без вымышленных кейсов.',
+        'Короткие материалы для эксплуатации и ИТ — методология, заметки с площадок и понятные рамки для разговора об эффекте.',
       readMore: 'Читать статью',
       publishedPrefix: 'Опубликовано',
       listEmpty: 'Пока нет статей.',
@@ -1303,36 +1331,40 @@ export const messages: Record<
       postNotFoundBody: 'Такого адреса нет или материал снят с публикации.'
     },
     roi: {
-      metaTitle: 'Оценка эффекта (иллюстративно)',
+      metaTitle: 'Оценка ожидания «на салфетке»',
       metaDescription:
-        'Грубый калькулятор часов ожидания посетителей и обсуждаемого прокси времени персонала — не обещание экономии.',
-      heading: 'Грубая оценка эффекта (для обсуждения)',
+        'Три ползунка, два ориентира по часам и короткое жёлтое пояснение. Черновик для команды, а не обещание экономии в бюджете.',
+      backToHome: 'На главную',
+      heading: 'Оценка ожидания — черновик для разговора в команде',
       subheading:
-        'Подвиньте ползунки, чтобы увидеть порядок величин. Перед тем как заносить цифры в бюджет, покажите дисклеймер финансам и эксплуатации.',
+        'Задайте посетителей в день, минуты ожидания и число точек. Ниже появятся два ориентира: суммарные часы ожидания гостей в месяц и условные часы нагрузки на людей — мы берём шесть процентов только как зацепку для беседы, не как прогноз по ФОТ. Цифры специально округлые. Перед тем как переносить их в бюджет, прочитайте вместе с финансами и эксплуатацией жёлтый блок под цифрами: там сказано, что считаем допущением.',
       disclaimer:
-        'Страница показывает иллюстративную арифметику для внутренних обсуждений. Это не финансовая рекомендация, не гарантия результата от КвоккаКю и не калибровка под ваши площадки. Итог зависит от процессов, регламентов и внедрения.',
-      visitorsPerDay: 'Посетителей в день (в среднем на точку)',
+        'Это рабочая пометка для своих, а не строка для отчёта об «гарантированной экономии». Здесь нет инвестиционной рекомендации и нет гарантии от КвоккаКю. Результат по-прежнему определяют ваши процессы, люди на линии и то, как вы внедряете систему.',
+      visitorsPerDay:
+        'Сколько посетителей в среднем приходит на одну точку за день?',
       waitMinutes:
-        'Типичное ожидание сейчас (минуты, субъективно у посетителя)',
-      locations: 'Число локаций / филиалов в расчёте',
+        'Сколько минут ожидания обычно ощущает человек в очереди сейчас?',
+      locations: 'Сколько точек или филиалов берём в расчёт?',
       aggregateWaitLabel:
-        'Ориентировочно суммарные часы ожидания посетителей / месяц',
+        'Ориентир по суммарным часам ожидания гостей за месяц',
       aggregateWaitHint:
-        'Считается как посетители × минуты ожидания ÷ 60 × ~22 рабочих дня × число локаций. Это грубый индикатор нагрузки, а не «потерянное» время персонала.',
+        'Умножаем посетителей, минуты ожидания и число точек, переводим минуты в часы и берём примерно двадцать два рабочих дня в месяц. Это скорее снимок «насколько полна зона ожидания», а не табель «потерянного» персонала.',
       illustrativeStaffLabel:
-        'Иллюстративный прокси времени персонала / месяц (только для разговора)',
+        'Условные часы про нагрузку на людей — в месяц, для разговора',
       illustrativeStaffHint:
-        'Используется фиксированный коэффициент 6% к суммарным часам ожидания — лишь чтобы завести разговор с эксплуатацией, а не прогнозировать ФОТ.',
+        'Мы специально берём шесть процентов от суммы часов ожидания выше — лишь чтобы завести беседу с руководителем линии, а не строить прогноз по фонду оплаты труда.',
       methodology:
-        'Замените 6% на коэффициент, который ваша команда согласует после недели наблюдений за ручными сверками, эскалациями и переделками.'
+        'Шесть процентов оставили как шпаргалку. Проведите рядом обычную неделю — сверки, срочные звонки, возвраты на круг. То, что заметите глазами, и подскажет своё число вместо нашего наброска.',
+      hoursAbbrev: 'ч',
+      minutesAbbrev: 'мин'
     },
     exitIntent: {
-      title: 'Уже уходите?',
-      body: 'Если сейчас неудобно — запишитесь на короткое демо или напишите нам: без давления и с опорой на факты.',
+      title: 'Уже спешите? Совсем на пару слов',
+      body: 'Мы не будем вас уговаривать. Если хочется спокойно посмотреть продукт или просто спросить — выберите, что удобнее: демо или письмо.',
       bookDemoCta: 'Записаться на демо',
-      emailSalesCta: 'Написать в sales',
-      dismiss: 'Закрыть',
-      mailtoSubject: 'Вопрос с маркетингового сайта'
+      emailSalesCta: 'Написать нам',
+      closeAriaLabel: 'Закрыть окно',
+      mailtoSubject: 'Вопрос с сайта КвоккаКю'
     },
     cookieConsent: {
       title: 'Файлы cookie и аналитика',

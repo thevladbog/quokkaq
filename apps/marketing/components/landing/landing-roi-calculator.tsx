@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from 'react';
 
-import type { RoiMessages } from '@/src/messages';
+import type { AppLocale, RoiMessages } from '@/src/messages';
 
 const WORKDAYS = 22;
 const STAFF_PROXY_RATIO = 0.06;
 
 type Props = {
+  locale: AppLocale;
   copy: RoiMessages;
 };
 
@@ -15,10 +16,11 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
-export function LandingRoiCalculator({ copy }: Props) {
+export function LandingRoiCalculator({ locale, copy }: Props) {
   const [visitors, setVisitors] = useState(180);
   const [waitMinutes, setWaitMinutes] = useState(12);
   const [locations, setLocations] = useState(3);
+  const numberLocale = locale === 'ru' ? 'ru-RU' : 'en-US';
 
   const { aggregateWaitHours, staffProxyHours } = useMemo(() => {
     const v = clamp(visitors, 1, 50_000);
@@ -51,7 +53,7 @@ export function LandingRoiCalculator({ copy }: Props) {
               className='w-full accent-[color:var(--color-primary)]'
             />
             <span className='mt-1 block text-sm text-[color:var(--color-text-muted)] tabular-nums'>
-              {visitors.toLocaleString()}
+              {visitors.toLocaleString(numberLocale)}
             </span>
           </label>
           <label className='block'>
@@ -68,7 +70,9 @@ export function LandingRoiCalculator({ copy }: Props) {
               className='w-full accent-[color:var(--color-primary)]'
             />
             <span className='mt-1 block text-sm text-[color:var(--color-text-muted)] tabular-nums'>
-              {waitMinutes} min
+              {waitMinutes}
+              {'\u00a0'}
+              {copy.minutesAbbrev}
             </span>
           </label>
           <label className='block'>
@@ -85,7 +89,7 @@ export function LandingRoiCalculator({ copy }: Props) {
               className='w-full accent-[color:var(--color-primary)]'
             />
             <span className='mt-1 block text-sm text-[color:var(--color-text-muted)] tabular-nums'>
-              {locations}
+              {locations.toLocaleString(numberLocale)}
             </span>
           </label>
         </div>
@@ -96,7 +100,9 @@ export function LandingRoiCalculator({ copy }: Props) {
               {copy.aggregateWaitLabel}
             </dt>
             <dd className='font-display mt-1 text-3xl font-bold text-[color:var(--color-primary)] tabular-nums'>
-              {Math.round(aggregateWaitHours).toLocaleString()} h
+              {Math.round(aggregateWaitHours).toLocaleString(numberLocale)}
+              {'\u00a0'}
+              {copy.hoursAbbrev}
             </dd>
             <p className='mt-2 text-sm leading-relaxed text-[color:var(--color-text-muted)]'>
               {copy.aggregateWaitHint}
@@ -107,7 +113,9 @@ export function LandingRoiCalculator({ copy }: Props) {
               {copy.illustrativeStaffLabel}
             </dt>
             <dd className='font-display mt-1 text-3xl font-bold text-[color:var(--color-text)] tabular-nums'>
-              {Math.round(staffProxyHours).toLocaleString()} h
+              {Math.round(staffProxyHours).toLocaleString(numberLocale)}
+              {'\u00a0'}
+              {copy.hoursAbbrev}
             </dd>
             <p className='mt-2 text-sm leading-relaxed text-[color:var(--color-text-muted)]'>
               {copy.illustrativeStaffHint}

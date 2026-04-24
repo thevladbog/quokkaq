@@ -108,6 +108,40 @@
   }
 }
 
+@keyframes comparison-roi-table-tag-shimmer {
+  0%,
+  100% {
+    background-position: 0% 40%;
+  }
+
+  50% {
+    background-position: 100% 60%;
+  }
+}
+
+/** Gradient “shimmer” for the ROI link tag on the comparison table (marketing). */
+.comparison-roi-table-tag {
+  background-image: linear-gradient(
+    125deg,
+    color-mix(in oklab, var(--color-primary) 78%, #0f0806) 0%,
+    color-mix(in oklab, var(--color-secondary) 85%, #fffaf6) 28%,
+    color-mix(in oklab, var(--color-primary) 55%, #fff) 45%,
+    color-mix(in oklab, var(--color-secondary) 80%, #0c0a08) 62%,
+    color-mix(in oklab, var(--color-primary) 72%, #000) 100%
+  );
+  background-size: 240% 240%;
+  background-position: 0% 50%;
+  animation: comparison-roi-table-tag-shimmer 6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comparison-roi-table-tag {
+    animation: none;
+    background-position: 50% 50%;
+    background-size: 100% 100%;
+  }
+}
+
 @utility landing-page {
   position: relative;
   isolation: isolate;

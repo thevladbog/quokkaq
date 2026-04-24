@@ -11,7 +11,7 @@ type Props = {
 };
 
 /**
- * Renders only when there is verified content — no placeholder logos or fake quotes.
+ * Renders only when there is verified content — no placeholder logos or synthetic quotes.
  */
 export function LandingTestimonials({ items, heading }: Props) {
   if (!items.length) {

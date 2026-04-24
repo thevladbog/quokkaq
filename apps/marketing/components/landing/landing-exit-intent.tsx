@@ -1,5 +1,6 @@
 'use client';
 
+import { X } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useId, useState } from 'react';
 
@@ -103,12 +104,20 @@ export function LandingExitIntent({ locale, copy }: Props) {
         role='dialog'
         aria-modal
         aria-labelledby={titleId}
-        className='w-full max-w-md rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6 shadow-2xl dark:bg-[color:var(--color-surface-elevated)]'
+        className='relative w-full max-w-md rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6 pt-14 shadow-2xl sm:pt-6 dark:bg-[color:var(--color-surface-elevated)]'
         onClick={(e) => e.stopPropagation()}
       >
+        <button
+          type='button'
+          onClick={close}
+          aria-label={copy.closeAriaLabel}
+          className='focus-ring absolute top-3 right-3 inline-flex size-10 items-center justify-center rounded-xl text-[color:var(--color-text-muted)] transition hover:bg-[color:var(--color-surface-elevated)] hover:text-[color:var(--color-text)] dark:hover:bg-[color:var(--color-surface)]'
+        >
+          <X className='size-5 shrink-0' strokeWidth={2} aria-hidden />
+        </button>
         <h2
           id={titleId}
-          className='font-display text-xl font-bold tracking-tight text-[color:var(--color-text)]'
+          className='font-display pr-10 text-xl font-bold tracking-tight text-[color:var(--color-text)] sm:pr-12'
         >
           {copy.title}
         </h2>
@@ -130,13 +139,6 @@ export function LandingExitIntent({ locale, copy }: Props) {
             {copy.emailSalesCta}
           </a>
         </div>
-        <button
-          type='button'
-          onClick={close}
-          className='focus-ring mt-4 w-full rounded-lg py-2 text-sm font-medium text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-surface-elevated)]'
-        >
-          {copy.dismiss}
-        </button>
       </div>
     </div>
   );

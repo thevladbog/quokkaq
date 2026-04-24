@@ -1,6 +1,6 @@
 ---
 title: How to shortlist a queue management system
-description: A practical checklist for operations and IT teams—without vendor hype or fake case studies.
+description: A practical checklist for operations and IT teams—grounded in workflow, vendor questions, and post-launch metrics.
 date: '2026-04-01'
 ---
 
@@ -18,4 +18,4 @@ Before comparing logos, write down what actually happens today: how visitors joi
 
 ## What we publish next
 
-Follow-up posts will go deeper on public-sector rollouts and ROI framing—still grounded in methodology, not invented customer stories.
+Follow-up posts go deeper on public-sector rollouts and ROI framing—with the same careful walk through assumptions and next steps.

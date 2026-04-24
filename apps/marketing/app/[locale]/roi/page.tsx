@@ -1,10 +1,13 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 
 import { LandingFooterCta } from '@/components/landing/landing-footer-cta';
 import { LandingRoiCalculator } from '@/components/landing/landing-roi-calculator';
 import { LandingTopBar } from '@/components/landing/landing-top-bar';
 import { marketingAppBaseUrl } from '@/lib/fetch-marketing-subscription-plans';
+import { localeHomePath } from '@/lib/locale-paths';
 import {
   buildLocaleAlternates,
   marketingCanonicalUrl,
@@ -65,6 +68,14 @@ export default async function RoiPage({ params }: PageProps) {
       <LandingTopBar copy={t.home} locale={raw} appBaseUrl={appBaseUrl} />
       <main className='relative z-10 flex min-w-0 flex-1 flex-col overflow-x-clip py-16 sm:py-20'>
         <div className='mx-auto max-w-4xl px-4 sm:px-6 lg:px-8'>
+          <Link
+            href={localeHomePath(raw)}
+            prefetch={false}
+            className='focus-ring mb-8 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--color-primary)] underline-offset-4 transition hover:underline'
+          >
+            <ArrowLeft className='h-4 w-4 shrink-0' aria-hidden />
+            {t.roi.backToHome}
+          </Link>
           <h1 className='font-display text-4xl font-bold tracking-tight text-[color:var(--color-text)]'>
             {t.roi.heading}
           </h1>
@@ -72,7 +83,7 @@ export default async function RoiPage({ params }: PageProps) {
             {t.roi.subheading}
           </p>
           <div className='mt-12'>
-            <LandingRoiCalculator copy={t.roi} />
+            <LandingRoiCalculator locale={raw} copy={t.roi} />
           </div>
         </div>
       </main>
