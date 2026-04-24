@@ -32,7 +32,8 @@ export default defineConfig({
         test: {
           name: 'unit-node',
           environment: 'node',
-          include: ['lib/**/*.test.ts', 'app/api/**/*.test.ts']
+          include: ['lib/**/*.test.ts', 'app/api/**/*.test.ts'],
+          exclude: ['lib/kiosk-wcag-contrast.test.ts']
         }
       },
       {
@@ -40,7 +41,7 @@ export default defineConfig({
         test: {
           name: 'component-jsdom',
           environment: 'jsdom',
-          include: ['**/*.test.tsx'],
+          include: ['**/*.test.tsx', 'lib/kiosk-wcag-contrast.test.ts'],
           exclude: ['**/node_modules/**', '**/.next/**', '**/dist/**']
         }
       }

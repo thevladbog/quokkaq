@@ -96,10 +96,18 @@ export function KioskAttractSignageAdminBlock(props: {
           <Select
             value={value.mode}
             onValueChange={(v) => {
-              onChange({
+              const mode = v as KioskAttractSignageMode;
+              const next = {
                 ...value,
-                mode: v as KioskAttractSignageMode
-              });
+                mode
+              };
+              if (mode !== 'playlist') {
+                next.playlistId = '';
+              }
+              if (mode !== 'materials') {
+                next.materialIds = [];
+              }
+              onChange(next);
             }}
           >
             <SelectTrigger>
@@ -163,7 +171,7 @@ export function KioskAttractSignageAdminBlock(props: {
                   className='text-foreground font-medium underline underline-offset-2'
                   href={`/settings/units/${linkUnitId}?display=content`}
                 >
-                  {tDisplay('sub.content', { default: 'Playlists' })}
+                  {tDisplay('sub.content')}
                 </Link>
               </p>
             )}
@@ -184,7 +192,7 @@ export function KioskAttractSignageAdminBlock(props: {
               </div>
               <Button size='sm' variant='outline' asChild>
                 <Link href={`/settings/units/${linkUnitId}?display=materials`}>
-                  {tDisplay('openMediaLibrary', { default: 'Media library' })}
+                  {tDisplay('openMediaLibrary')}
                 </Link>
               </Button>
             </div>
@@ -195,9 +203,7 @@ export function KioskAttractSignageAdminBlock(props: {
                   className='pl-8'
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder={tDisplay('fallbackSearchPlaceholder', {
-                    default: 'Filter by name…'
-                  })}
+                  placeholder={tDisplay('fallbackSearchPlaceholder')}
                 />
               </div>
             ) : (
@@ -207,7 +213,7 @@ export function KioskAttractSignageAdminBlock(props: {
             )}
             {materials.length > 0 && filtered.length === 0 ? (
               <p className='text-muted-foreground text-sm'>
-                {tDisplay('fallbackSearchNoMatch', { default: 'No matches' })}
+                {tDisplay('fallbackSearchNoMatch')}
               </p>
             ) : null}
             {materials.length > 0 && filtered.length > 0 ? (

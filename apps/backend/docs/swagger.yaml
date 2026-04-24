@@ -15022,6 +15022,39 @@ paths:
             summary: Replace a playlist and its items
             tags:
                 - signage
+    /units/{unitId}/playlists/{playlistId}/public:
+        get:
+            description: Unauthenticated read; same JSON as the authenticated [SignageHandler.GetPlaylist] when the playlist belongs to the path unit. Used to resolve a fixed attract playlist.
+            operationId: GetSignagePlaylistPublic
+            parameters:
+                - description: Unit ID
+                  in: path
+                  name: unitId
+                  required: true
+                  schema:
+                    type: string
+                - description: Playlist ID
+                  in: path
+                  name: playlistId
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/models.Playlist'
+                    description: OK
+                "404":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Not found
+            summary: Get a playlist (public, for kiosk and display clients)
+            tags:
+                - signage
     /units/{unitId}/pre-registrations:
         get:
             description: Returns all pre-registrations associated with the unit (authenticated unit member).

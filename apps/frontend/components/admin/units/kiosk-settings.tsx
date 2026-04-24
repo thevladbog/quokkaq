@@ -344,7 +344,7 @@ export function KioskSettings({
             <AlertDescription className='text-muted-foreground'>
               {t('attract_signage_info_description')}{' '}
               <Link
-                href={`/settings/units/${unitId}?display=content`}
+                href={`/settings/units/${branchUnitIdForSignage ?? unitId}?display=content`}
                 className='text-foreground font-medium underline underline-offset-2'
               >
                 {t('attract_signage_info_link')}

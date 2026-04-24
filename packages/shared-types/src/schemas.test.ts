@@ -181,6 +181,12 @@ describe('KioskConfigSchema', () => {
       expect(r.data.kioskAttractInactivityMode).toBe('attract_only');
       expect(r.data.attractIdleSec).toBe(60);
     }
+    expect(KioskConfigSchema.safeParse({ attractIdleSec: 1 }).success).toBe(
+      false
+    );
+    expect(KioskConfigSchema.safeParse({ attractIdleSec: 9 }).success).toBe(
+      false
+    );
   });
 
   it('accepts kiosk attract signage override fields', () => {

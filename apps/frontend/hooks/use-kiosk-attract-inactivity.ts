@@ -68,7 +68,9 @@ export function useKioskAttractInactivity({
       return;
     }
     if (requireFirstUserActivity && !hasUserInteractedRef.current) {
-      return;
+      return () => {
+        clearTimer();
+      };
     }
     schedule();
     return () => {

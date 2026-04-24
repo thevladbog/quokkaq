@@ -552,7 +552,7 @@ export const KioskConfigSchema = z
     /**
      * Inactivity (seconds) before full-screen attract when `kioskAttractInactivityMode` is `attract_only`. Default 60.
      */
-    attractIdleSec: z.number().int().positive().max(600).optional(),
+    attractIdleSec: z.number().int().min(10).max(600).optional(),
     /**
      * When not false, attract screen may show live queue length / wait from unit ETA. Default true when unset.
      */

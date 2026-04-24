@@ -10,14 +10,16 @@ interface KioskLanguageSwitcherProps {
   className?: string;
 }
 
+type KioskUiLocale = 'en' | 'ru';
+
 export default function KioskLanguageSwitcher({
   className
 }: KioskLanguageSwitcherProps) {
-  const locale = useLocale();
+  const locale = useLocale() as KioskUiLocale;
   const router = useRouter();
   const pathname = usePathname();
 
-  const switchLanguage = (newLocale: string) => {
+  const switchLanguage = (newLocale: KioskUiLocale) => {
     try {
       localStorage.setItem('NEXT_LOCALE', newLocale);
     } catch {
@@ -29,8 +31,14 @@ export default function KioskLanguageSwitcher({
   return (
     <Button
       variant='secondary'
+      type='button'
       onClick={() => switchLanguage(locale === 'en' ? 'ru' : 'en')}
       className={cn('font-bold', className)}
+      aria-label={
+        locale === 'en'
+          ? 'Switch language to Russian'
+          : 'Switch language to English'
+      }
     >
       {locale === 'en' ? 'RU' : 'EN'}
     </Button>

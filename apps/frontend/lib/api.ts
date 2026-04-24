@@ -786,7 +786,7 @@ export const unitsApi = {
     playlistId: string
   ): Promise<orvalUnits.ModelsPlaylist | null> => {
     const res = await fetch(
-      `${API_BASE_URL}/units/${unitId}/playlists/${encodeURIComponent(playlistId)}/public`,
+      `${API_BASE_URL}/units/${encodeURIComponent(unitId)}/playlists/${encodeURIComponent(playlistId)}/public`,
       { cache: 'no-store' }
     );
     if (res.status === 404) {

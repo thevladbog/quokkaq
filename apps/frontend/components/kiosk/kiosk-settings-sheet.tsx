@@ -358,8 +358,15 @@ function KioskSettingsForm({
     (k0 as KioskConfig | undefined)?.showQueueDepthOnAttract !== false
   );
   const [ticketSuccessAutoCloseSec, setTicketSuccessAutoCloseSec] = useState(
-    (k0 as KioskConfig | undefined)?.ticketSuccessAutoCloseSec ??
-      DEFAULT_TICKET_SUCCESS_AUTOCLOSE_SEC
+    () =>
+      Math.min(
+        120,
+        Math.max(
+          1,
+          (k0 as KioskConfig | undefined)?.ticketSuccessAutoCloseSec ??
+            DEFAULT_TICKET_SUCCESS_AUTOCLOSE_SEC
+        )
+      )
   );
   const [visitorSmsAfterTicket, setVisitorSmsAfterTicket] = useState(
     (k0 as KioskConfig | undefined)?.visitorSmsAfterTicket !== false

@@ -85,34 +85,42 @@ func (h *SignageHandler) ListPlaylists(w http.ResponseWriter, r *http.Request) {
 func (h *SignageHandler) GetPlaylist(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
 	id := chi.URLParam(r, "playlistId")
-	out, err := h.svc.GetPlaylist(id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.Error(w, "Not found", http.StatusNotFound)
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if out.UnitID != unitID {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-	RespondJSON(w, out)
+	h.respondPlaylistForUnit(w, unitID, id)
 }
 
+// GetPlaylistPublic godoc
+// @ID           GetSignagePlaylistPublic
+// @Summary      Get a playlist (public, for kiosk and display clients)
+// @Description  Unauthenticated read; same JSON as the authenticated [SignageHandler.GetPlaylist] when the playlist belongs to the path unit. Used to resolve a fixed attract playlist.
+// @Tags         signage
+// @Produce      json
+// @Param        unitId path string true "Unit ID"
+// @Param        playlistId path string true "Playlist ID"
+// @Success      200  {object}  models.Playlist
+// @Failure      404  {string}  string  "Not found"
+// @Router       /units/{unitId}/playlists/{playlistId}/public [get]
+//
 // GetPlaylistPublic is the unauthenticated read used by the kiosk and public screens
 // to resolve a specific playlist by id (same payload as [SignageHandler.GetPlaylist]).
 func (h *SignageHandler) GetPlaylistPublic(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
 	id := chi.URLParam(r, "playlistId")
-	out, err := h.svc.GetPlaylist(id)
+	h.respondPlaylistForUnit(w, unitID, id)
+}
+
+// respondPlaylistForUnit returns the playlist with items when it exists and is owned by unitID.
+func (h *SignageHandler) respondPlaylistForUnit(
+	w http.ResponseWriter,
+	unitID, playlistID string,
+) {
+	out, err := h.svc.GetPlaylist(playlistID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("GetPlaylist", "playlistId", playlistID, "err", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	if out.UnitID != unitID {

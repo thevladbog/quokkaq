@@ -78,7 +78,11 @@ import {
 import { useKioskSessionIdle } from '@/hooks/use-kiosk-session-idle';
 import { useKioskAttractInactivity } from '@/hooks/use-kiosk-attract-inactivity';
 import { useSignageContentSlides } from '@/hooks/use-signage-content-slides';
-import { getSignageActivePlaylistQueryKey } from '@/lib/signage-content-slides';
+import {
+  getSignageActivePlaylistQueryKey,
+  getSignagePlaylistPublicQueryKey,
+  resolveKioskSignageUnitId
+} from '@/lib/signage-content-slides';
 import {
   getKioskAttractMode,
   getShowAttractAfterSessionEnd,
@@ -95,6 +99,8 @@ import {
 } from '@/lib/kiosk-snapshot-cache';
 import { toast } from 'sonner';
 
+const DEFAULT_TICKET_SUCCESS_AUTOCLOSE_SEC = 12;
+
 export default function UnitKioskPage() {
   const queryClient = useQueryClient();
   const params = useParams() as { unitId?: string };
@@ -109,7 +115,9 @@ export default function UnitKioskPage() {
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [autoCloseTimerId, setAutoCloseTimerId] =
     useState<NodeJS.Timeout | null>(null);
-  const [countdown, setCountdown] = useState<number>(12);
+  const [countdown, setCountdown] = useState<number>(
+    DEFAULT_TICKET_SUCCESS_AUTOCLOSE_SEC
+  );
   const [successEtaMinutes, setSuccessEtaMinutes] = useState<number | null>(
     null
   );
@@ -275,13 +283,12 @@ export default function UnitKioskPage() {
           resolveKioskAttractSignageMode(k) === 'playlist' &&
           k?.kioskAttractPlaylistId
         ) {
+          const sid = resolveKioskSignageUnitId(kioskApiUnitId, unit);
           void queryClient.invalidateQueries({
-            queryKey: [
-              'signage',
-              'playlist-public',
-              kioskApiUnitId,
+            queryKey: getSignagePlaylistPublicQueryKey(
+              sid ?? '',
               k.kioskAttractPlaylistId
-            ]
+            )
           });
         }
         if (unitId) {
@@ -304,7 +311,7 @@ export default function UnitKioskPage() {
       socketClient.off('feed.updated', onSignageFeed);
       socketClient.disconnect();
     };
-  }, [kioskApiUnitId, queryClient, unitId]);
+  }, [kioskApiUnitId, queryClient, unit, unitId]);
 
   /** Which grid column (pool) the kiosk shows: subdivision-wide vs this zone. */
   const kioskGridZoneScope = useMemo(() => {
@@ -561,7 +568,15 @@ export default function UnitKioskPage() {
     isTauriKiosk() && kioskCanPrint && kioskCfg?.isAlwaysPrintTicket === false;
 
   const ticketSuccessAutoCloseSec = useMemo(
-    () => Math.min(120, Math.max(1, kioskCfg?.ticketSuccessAutoCloseSec ?? 12)),
+    () =>
+      Math.min(
+        120,
+        Math.max(
+          1,
+          kioskCfg?.ticketSuccessAutoCloseSec ??
+            DEFAULT_TICKET_SUCCESS_AUTOCLOSE_SEC
+        )
+      ),
     [kioskCfg?.ticketSuccessAutoCloseSec]
   );
   const appointmentCheckinEnabled = Boolean(
@@ -1555,15 +1570,7 @@ export default function UnitKioskPage() {
           logoUrl={unit?.config?.kiosk?.logoUrl}
           showTicketHeader={showTicketHeader}
           headerText={kioskCfg?.headerText}
-          serviceName={getLocalizedName(
-            unitServicesTree?.find((s) => s.id === createdTicket.serviceId)
-              ?.name || '',
-            unitServicesTree?.find((s) => s.id === createdTicket.serviceId)
-              ?.nameRu || '',
-            unitServicesTree?.find((s) => s.id === createdTicket.serviceId)
-              ?.nameEn || '',
-            locale
-          )}
+          serviceName={successTicketServiceLabel}
           queueNumber={String(createdTicket.queueNumber)}
           successEtaMinutes={successEtaMinutes}
           successPeopleAhead={successPeopleAhead}
@@ -1770,7 +1777,9 @@ export default function UnitKioskPage() {
         <KioskAttractScreen
           onDismiss={() => {
             setShowAttract(false);
-            continueIdleSession();
+            if (attractMode !== 'attract_only') {
+              continueIdleSession();
+            }
           }}
           intlLocale={intlLocale}
           currentTime={currentTime}

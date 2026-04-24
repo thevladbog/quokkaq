@@ -8,12 +8,19 @@ import { logger } from '@/lib/logger';
 import { resolveKioskAttractSignageMode } from '@/lib/kiosk-attract-config';
 import {
   deriveContentSlidesFromSignage,
-  getSignageActivePlaylistQueryKey
+  getSignageActivePlaylistQueryKey,
+  getSignagePlaylistPublicQueryKey,
+  resolveKioskSignageUnitId
 } from '@/lib/signage-content-slides';
 
-type Unitish = {
-  config?: unknown;
-} | null;
+type Unitish =
+  | {
+      config?: unknown;
+      kind?: string;
+      parentId?: string | null;
+    }
+  | null
+  | undefined;
 
 function orderMaterialsByIdOrder(
   all: Material[],
@@ -36,23 +43,24 @@ export function useSignageContentSlides(
   const k = (unit?.config as UnitConfig | undefined)?.kiosk;
   const mode = resolveKioskAttractSignageMode(k);
   const playlistId = k?.kioskAttractPlaylistId?.trim() || '';
+  const signageUnitId = resolveKioskSignageUnitId(apiUnitId, unit);
 
   const { data: activePlData } = useQuery({
-    queryKey: getSignageActivePlaylistQueryKey(apiUnitId ?? ''),
-    queryFn: () => unitsApi.getActivePlaylist(apiUnitId!),
-    enabled: Boolean(apiUnitId) && mode === 'inherit',
+    queryKey: getSignageActivePlaylistQueryKey(signageUnitId ?? ''),
+    queryFn: () => unitsApi.getActivePlaylist(signageUnitId!),
+    enabled: Boolean(signageUnitId) && mode === 'inherit',
     refetchInterval: 60_000
   });
 
   const { data: customPlaylist } = useQuery({
-    queryKey: [
-      'signage',
-      'playlist-public',
-      apiUnitId ?? '',
+    queryKey: getSignagePlaylistPublicQueryKey(
+      signageUnitId ?? '',
       mode === 'playlist' ? playlistId : ''
-    ] as const,
-    queryFn: () => unitsApi.getSignagePlaylistPublic(apiUnitId!, playlistId),
-    enabled: Boolean(apiUnitId) && mode === 'playlist' && Boolean(playlistId),
+    ),
+    queryFn: () =>
+      unitsApi.getSignagePlaylistPublic(signageUnitId!, playlistId),
+    enabled:
+      Boolean(signageUnitId) && mode === 'playlist' && Boolean(playlistId),
     refetchInterval: 60_000
   });
 
@@ -60,7 +68,7 @@ export function useSignageContentSlides(
 
   useEffect(() => {
     let isMounted = true;
-    if (!apiUnitId || !unit) {
+    if (!signageUnitId || !unit) {
       setMaterials([]);
       return;
     }
@@ -69,7 +77,7 @@ export function useSignageContentSlides(
     );
     const run = async () => {
       try {
-        const allMaterials = await unitsApi.getMaterials(apiUnitId);
+        const allMaterials = await unitsApi.getMaterials(signageUnitId);
         if (!isMounted) {
           return;
         }
@@ -89,6 +97,9 @@ export function useSignageContentSlides(
         }
       } catch (e) {
         logger.error('useSignageContentSlides: getMaterials failed', e);
+        if (isMounted) {
+          setMaterials([]);
+        }
       }
     };
     void run();
@@ -99,7 +110,7 @@ export function useSignageContentSlides(
       isMounted = false;
       clearInterval(interval);
     };
-  }, [apiUnitId, unit]);
+  }, [signageUnitId, unit]);
 
   const contentSlides: ContentSlide[] = useMemo(() => {
     if (mode === 'playlist' && customPlaylist) {

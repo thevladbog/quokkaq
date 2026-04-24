@@ -68,7 +68,10 @@ export function KioskSessionIdleBar({
         </p>
         <div className='flex flex-col items-center gap-1.5 sm:flex-row sm:items-end sm:gap-4'>
           <span
-            className='text-foreground w-full min-w-0 text-center text-3xl font-bold tabular-nums sm:w-auto sm:text-4xl'
+            className={cn(
+              'w-full min-w-0 text-center text-3xl font-bold tabular-nums sm:w-auto sm:text-4xl',
+              highContrast ? 'text-zinc-100' : 'text-foreground'
+            )}
             aria-label={label}
           >
             {remainingSec}

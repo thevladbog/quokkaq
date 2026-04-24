@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import {
   contrastMeetsLevel,
@@ -11,6 +12,14 @@ import {
 describe('kiosk-wcag-contrast', () => {
   it('relativeLuminanceFromCssColor matches hex path for #000', () => {
     expect(relativeLuminanceFromCssColor('#000000')).toBeCloseTo(0, 2);
+  });
+
+  it('relativeLuminanceFromCssColor resolves rgb(0, 0, 0) to near-zero luminance', () => {
+    expect(relativeLuminanceFromCssColor('rgb(0, 0, 0)')).toBeCloseTo(0, 2);
+  });
+
+  it('relativeLuminanceFromCssColor returns null for empty input', () => {
+    expect(relativeLuminanceFromCssColor('')).toBeNull();
   });
 
   it('contrast is 1:1 for identical colors', () => {
