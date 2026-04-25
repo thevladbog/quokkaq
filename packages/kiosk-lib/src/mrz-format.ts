@@ -1,5 +1,108 @@
 import type { ParsedICAO } from './mrz';
 
+function isSixDecimalDigits(ymd: string): boolean {
+  if (ymd.length !== 6) {
+    return false;
+  }
+  for (let i = 0; i < 6; i++) {
+    const c = ymd[i] ?? '';
+    if (c < '0' || c > '9') {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * “Only filler” per `[<0]+` on 6-byte MRZ fields (e.g. 000000) — O(n) scan, no regex.
+ */
+function isOnlyChevronOrZero(ymd: string): boolean {
+  if (ymd.length < 1) {
+    return false;
+  }
+  for (let i = 0; i < ymd.length; i++) {
+    const c = ymd[i] ?? '';
+    if (c !== '0' && c !== '<') {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isAsciiSpace(c: string): boolean {
+  return (
+    c === ' ' ||
+    c === '\t' ||
+    c === '\n' ||
+    c === '\r' ||
+    c === '\f' ||
+    c === '\v' ||
+    c === '\u00a0'
+  );
+}
+
+function stripTrailingChar(s: string, ch: string): string {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === ch) {
+    end -= 1;
+  }
+  return s.slice(0, end);
+}
+
+function replaceAllChar1(s: string, ch: string, replacement: string): string {
+  if (replacement.length !== 1 || !s.includes(ch)) {
+    return s;
+  }
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    out += s[i] === ch ? replacement : s[i]!;
+  }
+  return out;
+}
+
+/** O(n) collapse of runs of ASCII-ish whitespace. */
+function collapseWhitespace(s: string): string {
+  const parts: string[] = [];
+  let i = 0;
+  const n = s.length;
+  while (i < n) {
+    while (i < n && isAsciiSpace(s[i]!)) {
+      i++;
+    }
+    if (i >= n) {
+      break;
+    }
+    const start = i;
+    i++;
+    while (i < n && !isAsciiSpace(s[i]!)) {
+      i++;
+    }
+    parts.push(s.slice(start, i));
+  }
+  return parts.join(' ');
+}
+
+function removeAngleBrackets(s: string): string {
+  if (s.length === 0) {
+    return s;
+  }
+  if (s.indexOf('<') < 0 && s.indexOf('>') < 0) {
+    return s;
+  }
+  let out = '';
+  for (let j = 0; j < s.length; j++) {
+    const c = s[j]!;
+    if (c !== '<' && c !== '>') {
+      out += c;
+    }
+  }
+  return out;
+}
+
+function mrzPrettyField(s: string): string {
+  return collapseWhitespace(replaceAllChar1(s, '<', ' ')).trim();
+}
+
 function yymmddToLabel(yymmdd: string): string {
   if (yymmdd.length !== 6) {
     return yymmdd;
@@ -14,10 +117,10 @@ function yymmddToLabel(yymmdd: string): string {
 
 /** Rejects 2030-32-47 style output when OCR/parse mangles YYMMDD. */
 function isPlausibleYymmdd(ymd: string): boolean {
-  if (!/^\d{6}$/.test(ymd)) {
+  if (!isSixDecimalDigits(ymd)) {
     return false;
   }
-  if (ymd === '<<<<<<' || /^[<0]+$/.test(ymd)) {
+  if (ymd === '<<<<<<' || isOnlyChevronOrZero(ymd)) {
     return false;
   }
   const mm = parseInt(ymd.slice(2, 4), 10);
@@ -42,7 +145,9 @@ function formatYymd(ymd: string): string {
 }
 
 function cleanDocNo(s: string): string {
-  return s.replace(/<+$/g, '').replace(/</g, ' ').replace(/\s+/g, ' ').trim();
+  return collapseWhitespace(
+    replaceAllChar1(stripTrailingChar(s, '<'), '<', ' ')
+  ).trim();
 }
 
 /**
@@ -53,14 +158,13 @@ export function formatIcaOmrzForKiosk(p: ParsedICAO): string {
   const d = p.dateOfBirthYmd ? formatYymd(p.dateOfBirthYmd) : '';
   const e = p.dateOfExpiryYmd ? formatYymd(p.dateOfExpiryYmd) : '';
   const type = p.documentType
-    ? String(p.documentType).replace(/</g, ' ').replace(/\s+/g, ' ').trim() ||
-      '—'
+    ? mrzPrettyField(String(p.documentType)) || '—'
     : '';
-  const nat = p.nationality
-    ? p.nationality.replace(/</g, ' ').replace(/\s+/g, ' ').trim()
-    : '';
+  const nat = p.nationality ? mrzPrettyField(p.nationality) : '';
   const doc = p.documentNumber ? cleanDocNo(p.documentNumber) : '';
-  const sx = (p.sex ?? '').replace(/[<>]/g, '').trim().toUpperCase();
+  const sx = removeAngleBrackets(p.sex ?? '')
+    .trim()
+    .toUpperCase();
   const ver =
     p.checks.documentNumber && p.checks.dateOfBirth && p.checks.dateOfExpiry;
   const last = (p.lastName ?? '').trim();
