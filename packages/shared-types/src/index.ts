@@ -144,6 +144,50 @@ export type ServiceModel = {
   calendarSlotKey?: string | null;
 };
 
+/** Document-mode kiosk JSON on the service; aligns with backend `validateKioskDocumentSettingsJSON`. */
+export const KioskDocumentSettingsSchema = z
+  .object({
+    retentionDays: z.coerce.number().int().min(1).max(30).optional()
+  })
+  .passthrough();
+
+/**
+ * Custom identification kiosk JSON on the service; aligns with backend
+ * `validateKioskIdentificationConfigJSON` (retention when sensitive, non-empty apiFieldKey).
+ */
+export const KioskIdentificationConfigSchema = z
+  .object({
+    sensitive: z.boolean().optional(),
+    retentionDays: z.coerce.number().int().optional(),
+    retention_days: z.coerce.number().int().optional(),
+    apiFieldKey: z.string().optional(),
+    showInQueuePreview: z.boolean().optional(),
+    skippable: z.boolean().optional(),
+    capture: z.record(z.string(), z.unknown()).optional(),
+    userInstruction: z.record(z.string(), z.unknown()).optional(),
+    operatorLabel: z.record(z.string(), z.unknown()).optional()
+  })
+  .passthrough()
+  .superRefine((data, ctx) => {
+    if (data.sensitive === true) {
+      const d = data.retentionDays ?? data.retention_days ?? 0;
+      if (d < 1 || d > 30) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'retention must be 1-30 when sensitive is true',
+          path: ['retentionDays']
+        });
+      }
+    }
+    if (data.apiFieldKey !== undefined && data.apiFieldKey.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'apiFieldKey must not be empty when set',
+        path: ['apiFieldKey']
+      });
+    }
+  });
+
 export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
   id: z.string(),
   unitId: z.string(),
@@ -173,8 +217,8 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
   identificationMode: z
     .enum(['none', 'phone', 'qr', 'document', 'custom', 'login', 'badge'])
     .optional(),
-  kioskDocumentSettings: z.unknown().optional(),
-  kioskIdentificationConfig: z.unknown().optional(),
+  kioskDocumentSettings: KioskDocumentSettingsSchema.optional(),
+  kioskIdentificationConfig: KioskIdentificationConfigSchema.optional(),
   isLeaf: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
   gridRow: z.number().nullable().optional(),

@@ -133,11 +133,11 @@ func (s *unitService) validateHierarchy(unitID, companyID string, parentID *stri
 	return nil
 }
 
-// mergeDefaultKioskServiceGridLayoutAuto sets config.kiosk.serviceGridLayout to "auto" when missing
-// so new units get automatic kiosk layout unless the client explicitly set another value.
+// mergeDefaultKioskServiceGridLayoutAuto sets config.kiosk.serviceGridLayout to "manual" when missing
+// so new units match legacy units and the frontend/schema default (unset means manual).
 func mergeDefaultKioskServiceGridLayoutAuto(config json.RawMessage) json.RawMessage {
 	if len(config) == 0 {
-		return json.RawMessage(`{"kiosk":{"serviceGridLayout":"auto"}}`)
+		return json.RawMessage(`{"kiosk":{"serviceGridLayout":"manual"}}`)
 	}
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(config, &m); err != nil {
@@ -145,7 +145,7 @@ func mergeDefaultKioskServiceGridLayoutAuto(config json.RawMessage) json.RawMess
 	}
 	rawK, hasK := m["kiosk"]
 	if !hasK || len(rawK) == 0 || string(rawK) == "null" {
-		m["kiosk"] = json.RawMessage(`{"serviceGridLayout":"auto"}`)
+		m["kiosk"] = json.RawMessage(`{"serviceGridLayout":"manual"}`)
 		out, err := json.Marshal(m)
 		if err != nil {
 			return config
@@ -157,9 +157,9 @@ func mergeDefaultKioskServiceGridLayoutAuto(config json.RawMessage) json.RawMess
 		return config
 	}
 	if k == nil {
-		m["kiosk"] = json.RawMessage(`{"serviceGridLayout":"auto"}`)
+		m["kiosk"] = json.RawMessage(`{"serviceGridLayout":"manual"}`)
 	} else if _, ok := k["serviceGridLayout"]; !ok {
-		k["serviceGridLayout"] = "auto"
+		k["serviceGridLayout"] = "manual"
 		kb, err := json.Marshal(k)
 		if err != nil {
 			return config

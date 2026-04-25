@@ -102,13 +102,13 @@ describe('shouldShowUserDataInQueueList', () => {
     expect(shouldShowUserDataInQueueList(t, get)).toBe(false);
   });
 
-  it('shows when getService undefined but data present', () => {
+  it('hides when getService is undefined', () => {
     const t = tick({
       id: '1',
       serviceId: 's1',
       documentsData: { a: 1 }
     });
-    expect(shouldShowUserDataInQueueList(t, () => undefined)).toBe(true);
+    expect(shouldShowUserDataInQueueList(t, () => undefined)).toBe(false);
   });
 });
 

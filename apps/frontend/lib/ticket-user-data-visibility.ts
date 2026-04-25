@@ -31,7 +31,7 @@ function parseKioskIdentPreview(raw: unknown): {
  * When list APIs include `documentsData` (staff with tickets.user_data.read), decide if the
  * staff queue "info" affordance and tooltip should be shown for this ticket.
  * Document mode: always. Custom: only if service config has showInQueuePreview.
- * If the service is not in `getService` (missing unit cache), and data is present, the icon is shown.
+ * If the service cannot be resolved, do not show previews (fail closed).
  */
 export function shouldShowUserDataInQueueList(
   ticket: Pick<Ticket, 'documentsData' | 'serviceId'>,
@@ -42,7 +42,7 @@ export function shouldShowUserDataInQueueList(
   }
   const s = getService(ticket.serviceId);
   if (!s) {
-    return true;
+    return false;
   }
   const mode = getServiceIdentificationMode(s);
   if (mode === 'document') {

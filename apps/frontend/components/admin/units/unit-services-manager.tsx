@@ -177,10 +177,17 @@ function parseKioskIdentConfigForm(raw: unknown): KioskIdentConfigForm {
             })
           }
         : capture;
+    let captureNormalized = captureMerged;
+    if (captureNormalized?.kind === 'ocr') {
+      captureNormalized = {
+        ...captureNormalized,
+        kind: 'keyboard_ru_en'
+      };
+    }
     return {
       ...d,
       ...p,
-      capture: captureMerged
+      capture: captureNormalized
     };
   }
   return defaultKioskIdentConfigForm();

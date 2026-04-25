@@ -332,7 +332,6 @@ export function useKioskDocumentOcrWedge(
       if (!firstAt.current || now - firstAt.current > WEDGE_MAX_MS) {
         buf.current = '';
         firstAt.current = now;
-        mrzLineBuf.current = [];
       }
       if (buf.current.length < LONG_MAX) {
         if (enableMrz && !enableRu) {

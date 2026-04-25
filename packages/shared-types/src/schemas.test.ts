@@ -489,4 +489,46 @@ describe('ServiceModelSchema (kiosk identification)', () => {
     });
     expect(r.success).toBe(true);
   });
+
+  it('rejects kioskDocumentSettings retentionDays out of range', () => {
+    const r = ServiceModelSchema.safeParse({
+      id: 's1',
+      unitId: 'u1',
+      name: 'Test',
+      isLeaf: true,
+      prebook: false,
+      offerIdentification: false,
+      identificationMode: 'document',
+      kioskDocumentSettings: { retentionDays: 31 }
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects kioskIdentificationConfig sensitive without valid retention', () => {
+    const r = ServiceModelSchema.safeParse({
+      id: 's1',
+      unitId: 'u1',
+      name: 'Test',
+      isLeaf: true,
+      prebook: false,
+      offerIdentification: false,
+      identificationMode: 'custom',
+      kioskIdentificationConfig: { sensitive: true }
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects empty apiFieldKey when set', () => {
+    const r = ServiceModelSchema.safeParse({
+      id: 's1',
+      unitId: 'u1',
+      name: 'Test',
+      isLeaf: true,
+      prebook: false,
+      offerIdentification: false,
+      identificationMode: 'custom',
+      kioskIdentificationConfig: { apiFieldKey: '   ' }
+    });
+    expect(r.success).toBe(false);
+  });
 });

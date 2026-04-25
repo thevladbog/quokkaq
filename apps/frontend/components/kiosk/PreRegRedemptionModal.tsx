@@ -70,6 +70,7 @@ export function PreRegRedemptionModal({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const detectIntervalIdRef = useRef<number | null>(null);
+  const detectInFlightRef = useRef(false);
   const [scanBusy, setScanBusy] = useState(false);
   const scanStopRef = useRef<() => void>(() => {});
 
@@ -197,6 +198,7 @@ export function PreRegRedemptionModal({
   }, [applyScanned]);
 
   const stopScanSession = useCallback(() => {
+    detectInFlightRef.current = false;
     if (detectIntervalIdRef.current != null) {
       clearInterval(detectIntervalIdRef.current);
       detectIntervalIdRef.current = null;
@@ -214,6 +216,18 @@ export function PreRegRedemptionModal({
   useEffect(() => {
     scanStopRef.current = stopScanSession;
   }, [stopScanSession]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      stopScanSession();
+    }
+  }, [isOpen, stopScanSession]);
+
+  useEffect(() => {
+    return () => {
+      scanStopRef.current();
+    };
+  }, []);
 
   /**
    * Video lives in a portal (above kiosk dialogs) — attach stream and BarcodeDetector
@@ -266,15 +280,25 @@ export function PreRegRedemptionModal({
         if (!el?.videoWidth) {
           return;
         }
+        if (detectInFlightRef.current) {
+          return;
+        }
+        detectInFlightRef.current = true;
         void (async () => {
-          const codes = await det.detect(el);
-          if (codes.length) {
-            const first = codes[0] as { rawValue?: string } | undefined;
-            const r = first?.rawValue;
-            if (r) {
-              applyScannedRef.current(r);
-              stopScanSession();
+          try {
+            const codes = await det.detect(el);
+            if (codes.length) {
+              const first = codes[0] as { rawValue?: string } | undefined;
+              const r = first?.rawValue;
+              if (r) {
+                applyScannedRef.current(r);
+                stopScanSession();
+              }
             }
+          } catch {
+            // BarcodeDetector may reject; ignore and retry on next tick.
+          } finally {
+            detectInFlightRef.current = false;
           }
         })();
       }, 500);
