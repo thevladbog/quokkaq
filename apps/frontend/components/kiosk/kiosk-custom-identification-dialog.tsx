@@ -70,17 +70,23 @@ export function KioskCustomIdentificationDialog({
     typeof config === 'object' && config ? (config as KioskIdent) : {}
   ) as KioskIdent;
   const field = (ident.apiFieldKey ?? 'value').trim() || 'value';
+  const otherLocale: 'en' | 'ru' = locale === 'ru' ? 'en' : 'ru';
   const label =
     (locale === 'ru' ? ident.operatorLabel?.ru : ident.operatorLabel?.en) ??
-    ident.operatorLabel?.ru ??
+    (otherLocale === 'ru'
+      ? ident.operatorLabel?.ru
+      : ident.operatorLabel?.en) ??
     t('custom_ident_value_label', { defaultValue: 'Value' });
   const instruction =
     (locale === 'ru' ? ident.userInstruction?.ru : ident.userInstruction?.en) ??
-    ident.userInstruction?.ru;
+    (otherLocale === 'ru'
+      ? ident.userInstruction?.ru
+      : ident.userInstruction?.en);
   const skippable = !!ident.skippable;
   const needsMultiline = ident.capture?.kind === 'keyboard_ru_en';
   const isBarcode = ident.capture?.kind === 'barcode';
   const showOnScreenKeyboard = ident.capture?.showOnScreenKeyboard !== false;
+  const ALPHANUMERIC_MAX = 256;
   const manualMode: KioskCustomManualInputMode =
     getKioskBarcodeManualInputMode(config);
   const numMax = adminClampNumericMaxLength(
@@ -175,7 +181,7 @@ export function KioskCustomIdentificationDialog({
             >
               {t('custom_ident_barcode_scanner_only', {
                 defaultValue:
-                  'This step accepts a connected scanner or serial reader only. On-screen typing is turned off in service settings.'
+                  'This step is configured for scanner input. You can also type manually if needed.'
               })}
             </p>
           ) : null}
@@ -187,9 +193,12 @@ export function KioskCustomIdentificationDialog({
                 name='kioskCustomIdentValue'
                 autoFocus
                 value={value}
-                onChange={(e) => setValue(e.target.value)}
+                onChange={(e) =>
+                  setValue(e.target.value.slice(0, ALPHANUMERIC_MAX))
+                }
                 className='min-h-24 text-base'
                 autoComplete='off'
+                maxLength={ALPHANUMERIC_MAX}
               />
             ) : (
               <div className='space-y-2'>

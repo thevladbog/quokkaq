@@ -743,9 +743,6 @@ function mergeServiceIntoUnitServicesListCache(
       if (old === undefined) {
         return [service];
       }
-      if (old.length === 0) {
-        return [service];
-      }
       const idx = old.findIndex((s) => s.id === service.id);
       if (idx < 0) {
         return [...old, service];
@@ -772,7 +769,7 @@ export const useCreateService = () => {
       mergeServiceIntoUnitServicesListCache(queryClient, created);
       queryClient.invalidateQueries({ queryKey: ['services'] });
       queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
-      queryClient.invalidateQueries({ queryKey: ['units'] });
+      queryClient.invalidateQueries({ queryKey: ['units'], exact: true });
     }
   });
 };
@@ -810,7 +807,7 @@ export const useUpdateService = () => {
       mergeServiceIntoUnitServicesListCache(queryClient, updated);
       queryClient.invalidateQueries({ queryKey: ['services'] });
       queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
-      queryClient.invalidateQueries({ queryKey: ['units'] });
+      queryClient.invalidateQueries({ queryKey: ['units'], exact: true });
     }
   });
 };
@@ -823,7 +820,7 @@ export const useDeleteService = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
-      queryClient.invalidateQueries({ queryKey: ['units'] });
+      queryClient.invalidateQueries({ queryKey: ['units'], exact: true });
     }
   });
 };

@@ -11,7 +11,6 @@ import (
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
-	"gorm.io/gorm"
 )
 
 type ServiceHandler struct {
@@ -71,7 +70,7 @@ func (h *ServiceHandler) CreateService(w http.ResponseWriter, r *http.Request) {
 			writeQuotaExceeded(w, "services", err)
 		case errors.Is(err, services.ErrDuplicateCalendarSlotKey):
 			http.Error(w, err.Error(), http.StatusConflict)
-		case errors.Is(err, gorm.ErrRecordNotFound), repository.IsNotFound(err):
+		case repository.IsNotFound(err):
 			http.Error(w, "unit not found", http.StatusBadRequest)
 		case errors.Is(err, repository.ErrServiceUnitIDRequired),
 			errors.Is(err, services.ErrKioskConfigRetentionOutOfRange),

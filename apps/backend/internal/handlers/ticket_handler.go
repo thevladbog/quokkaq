@@ -45,11 +45,19 @@ type TicketHandler struct {
 var (
 	unitQueueStatusCacheMu   sync.Mutex
 	unitQueueStatusCacheData = make(map[string]queueStatusCacheEntry)
+	ticketUserDataWiringWarn sync.Once
 )
 
 type queueStatusCacheEntry struct {
 	at   time.Time
 	body []byte
+}
+
+type ticketHandlerUnitCacheKey struct{}
+
+type ticketHandlerUnitCache struct {
+	mu   sync.Mutex
+	byID map[string]*models.Unit
 }
 
 const (
@@ -105,6 +113,66 @@ func (h *TicketHandler) orm() *gorm.DB {
 		return h.db
 	}
 	return database.DB
+}
+
+func withTicketHandlerUnitCache(r *http.Request) *http.Request {
+	if r == nil {
+		return r
+	}
+	if _, ok := r.Context().Value(ticketHandlerUnitCacheKey{}).(*ticketHandlerUnitCache); ok {
+		return r
+	}
+	cache := &ticketHandlerUnitCache{byID: make(map[string]*models.Unit)}
+	return r.WithContext(context.WithValue(r.Context(), ticketHandlerUnitCacheKey{}, cache))
+}
+
+func (h *TicketHandler) getUnitForRequest(r *http.Request, unitID string) (*models.Unit, error) {
+	if h.unitService == nil {
+		return nil, nil
+	}
+	id := strings.TrimSpace(unitID)
+	if id == "" {
+		return nil, nil
+	}
+	if cache, ok := r.Context().Value(ticketHandlerUnitCacheKey{}).(*ticketHandlerUnitCache); ok {
+		cache.mu.Lock()
+		if u, hit := cache.byID[id]; hit {
+			cache.mu.Unlock()
+			return u, nil
+		}
+		cache.mu.Unlock()
+		u, err := h.unitService.GetUnitByID(id)
+		if err != nil {
+			return nil, err
+		}
+		cache.mu.Lock()
+		cache.byID[id] = u
+		cache.mu.Unlock()
+		return u, nil
+	}
+	return h.unitService.GetUnitByID(id)
+}
+
+func ticketIdempotencyRequesterID(r *http.Request) *string {
+	if r == nil {
+		return nil
+	}
+	sub, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		return nil
+	}
+	id := strings.TrimSpace(sub)
+	if id == "" {
+		return nil
+	}
+	return &id
+}
+
+func idempotencyMatchesRequester(stored, current *string) bool {
+	if stored == nil || current == nil {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(*stored), strings.TrimSpace(*current))
 }
 
 // enrichTicketQueuePositionAndZone sets queue position, estimated wait, and service zone name for API responses.
@@ -205,13 +273,16 @@ func (h *TicketHandler) applyTicketUserDataForHTTP(r *http.Request, u *models.Un
 		return
 	}
 	if h.userRepo == nil || h.tenantRbac == nil {
+		ticketUserDataWiringWarn.Do(func() {
+			logger.WarnContext(r.Context(), "ticket user-data redaction running in fallback mode: userRepo/tenantRbac not wired")
+		})
 		t.DocumentsData = nil
 		t.DocumentsDataExpiresAt = nil
 		return
 	}
 	unit := u
 	if unit == nil && h.unitService != nil {
-		u2, err := h.unitService.GetUnitByID(t.UnitID)
+		u2, err := h.getUnitForRequest(r, t.UnitID)
 		if err != nil {
 			t.DocumentsData = nil
 			t.DocumentsDataExpiresAt = nil
@@ -235,13 +306,11 @@ func (h *TicketHandler) redactTicketForStaffResponse(r *http.Request, t *models.
 	if t == nil {
 		return
 	}
-	var uu *models.Unit
-	if h.unitService != nil {
-		if u, e := h.unitService.GetUnitByID(t.UnitID); e == nil {
-			uu = u
-		}
+	if v := strings.TrimSpace(r.Header.Get("X-Visitor-Token")); v != "" && t.VisitorToken == v {
+		return
 	}
-	h.applyTicketUserDataForHTTP(r, uu, t, false)
+	r = withTicketHandlerUnitCache(r)
+	h.applyTicketUserDataForHTTP(r, nil, t, false)
 }
 
 func (h *TicketHandler) ticketVisitorPhoneKnown(ticket *models.Ticket) bool {
@@ -431,18 +500,17 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	idempotency := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	requesterID := ticketIdempotencyRequesterID(r)
 	if idempotency != "" {
 		var row models.KioskTicketIdempotency
 		if err := database.DB.Where("unit_id = ? AND idempotency_key = ?", unitID, idempotency).First(&row).Error; err == nil {
+			if !idempotencyMatchesRequester(row.TerminalOrClientID, requesterID) {
+				http.Error(w, "forbidden", http.StatusForbidden)
+				return
+			}
 			if prev, perr := h.service.GetTicketByID(row.TicketID); perr == nil {
 				h.enrichTicketQueuePositionAndZone(prev)
-				var uu *models.Unit
-				if h.unitService != nil {
-					if ux, e := h.unitService.GetUnitByID(prev.UnitID); e == nil {
-						uu = ux
-					}
-				}
-				h.applyTicketUserDataForHTTP(r, uu, prev, true)
+				h.applyTicketUserDataForHTTP(r, nil, prev, true)
 				w.WriteHeader(http.StatusOK)
 				RespondJSON(w, h.publicTicketView(r.Context(), prev))
 				return
@@ -483,7 +551,12 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if idempotency != "" {
-		row := models.KioskTicketIdempotency{UnitID: unitID, IdempotencyKey: idempotency, TicketID: ticket.ID}
+		row := models.KioskTicketIdempotency{
+			UnitID:             unitID,
+			IdempotencyKey:     idempotency,
+			TicketID:           ticket.ID,
+			TerminalOrClientID: requesterID,
+		}
 		_ = database.DB.Create(&row).Error
 	}
 
@@ -531,13 +604,8 @@ func (h *TicketHandler) GetTicketByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.enrichTicketQueuePositionAndZone(ticket)
-	var uu *models.Unit
-	if h.unitService != nil {
-		if ux, e := h.unitService.GetUnitByID(ticket.UnitID); e == nil {
-			uu = ux
-		}
-	}
-	h.applyTicketUserDataForHTTP(r, uu, ticket, false)
+	r = withTicketHandlerUnitCache(r)
+	h.applyTicketUserDataForHTTP(r, nil, ticket, false)
 	RespondJSON(w, h.publicTicketView(r.Context(), ticket))
 }
 

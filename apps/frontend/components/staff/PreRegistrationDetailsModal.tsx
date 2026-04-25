@@ -8,9 +8,9 @@ import {
   DialogFooter
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Ticket } from '@/lib/api';
+import type { Ticket } from '@/lib/api';
 import { formatFullName } from '@/lib/format';
-import { useTranslations, useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import {
   KIOSK_ID_CUSTOM_DATA_SKIPPED_KEY,
   KIOSK_ID_DOCUMENT_OCR_FAILED_KEY,
@@ -42,12 +42,11 @@ export function PreRegistrationDetailsModal({
 }: PreRegistrationDetailsModalProps) {
   const t = useTranslations('staff.pre_registration');
   const tUser = useTranslations('staff.ticket_user_data');
-  const locale = useLocale();
 
   const hasPre = Boolean(ticket?.preRegistration);
-  const hasDoc =
-    Boolean(ticket) &&
-    ticketHasDocumentsData(ticket as Ticket, canReadUserData);
+  const hasDoc = ticket
+    ? ticketHasDocumentsData(ticket, canReadUserData)
+    : false;
 
   useEffect(() => {
     if (!isOpen || !ticket) {
@@ -221,11 +220,7 @@ export function PreRegistrationDetailsModal({
                       {label}
                     </div>
                     <div className='text-foreground/95 min-w-0 flex-1 text-sm leading-relaxed break-words whitespace-pre-wrap'>
-                      {isOcr && (locale === 'ru' || locale === 'en') ? (
-                        <span lang={locale}>{display}</span>
-                      ) : (
-                        display
-                      )}
+                      {display}
                     </div>
                   </div>
                 );

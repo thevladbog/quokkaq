@@ -210,8 +210,6 @@ export default function UnitKioskPage() {
   const [customIdentOpen, setCustomIdentOpen] = useState(false);
   const [pendingCustomService, setPendingCustomService] =
     useState<Service | null>(null);
-  /** Last "Use text" from document scan — visible strip + prefill into phone / pre-reg where applicable. */
-  const [kioskOcrResultText, setKioskOcrResultText] = useState('');
   const [browserOnline, setBrowserOnline] = useState(
     () => typeof window === 'undefined' || navigator.onLine
   );
@@ -452,73 +450,73 @@ export default function UnitKioskPage() {
     return () => cancelAnimationFrame(id);
   }, [kioskGridZoneScope]);
 
-  const tryPrintTicket = async (
-    ticket: Ticket,
-    serviceLabel: string
-  ): Promise<boolean> => {
-    const kc = kioskCfg;
-    if (!kc || kc.isPrintEnabled === false) {
-      return false;
-    }
-    try {
-      const ticketPageUrl = `${baseAppUrl}/${locale}/ticket/${ticket.id}`;
-      const unitLabelOverride = kc.kioskUnitLabelText?.trim();
-      const unitDisplayTitle =
-        unitLabelOverride ||
-        (unit ? getUnitDisplayName(unit, locale) : '').trim() ||
-        t('kioskTitle');
-      const logoForPrint =
-        kc.printerLogoUrl?.trim() || kc.logoUrl?.trim() || '';
-      const logoFetchUrl =
-        typeof window !== 'undefined' && logoForPrint
-          ? `${window.location.origin}/api/kiosk-print-logo?url=${encodeURIComponent(logoForPrint)}`
-          : undefined;
-      const extraBodyLines: string[] = [];
-      if (
-        typeof ticket.queuePosition === 'number' &&
-        ticket.queuePosition > 0
-      ) {
-        extraBodyLines.push(
-          t('ticket.receipt_queue_position', { n: ticket.queuePosition })
-        );
-        const ahead = Math.max(0, ticket.queuePosition - 1);
-        extraBodyLines.push(t('ticket.receipt_people_ahead', { n: ahead }));
+  const tryPrintTicket = useCallback(
+    async (ticket: Ticket, serviceLabel: string): Promise<boolean> => {
+      const kc = kioskCfg;
+      if (!kc || kc.isPrintEnabled === false) {
+        return false;
       }
-      if (ticket.serviceZoneName?.trim()) {
-        extraBodyLines.push(
-          t('ticket.receipt_zone', { zone: ticket.serviceZoneName.trim() })
-        );
+      try {
+        const ticketPageUrl = `${baseAppUrl}/${locale}/ticket/${ticket.id}`;
+        const unitLabelOverride = kc.kioskUnitLabelText?.trim();
+        const unitDisplayTitle =
+          unitLabelOverride ||
+          (unit ? getUnitDisplayName(unit, locale) : '').trim() ||
+          t('kioskTitle');
+        const logoForPrint =
+          kc.printerLogoUrl?.trim() || kc.logoUrl?.trim() || '';
+        const logoFetchUrl =
+          typeof window !== 'undefined' && logoForPrint
+            ? `${window.location.origin}/api/kiosk-print-logo?url=${encodeURIComponent(logoForPrint)}`
+            : undefined;
+        const extraBodyLines: string[] = [];
+        if (
+          typeof ticket.queuePosition === 'number' &&
+          ticket.queuePosition > 0
+        ) {
+          extraBodyLines.push(
+            t('ticket.receipt_queue_position', { n: ticket.queuePosition })
+          );
+          const ahead = Math.max(0, ticket.queuePosition - 1);
+          extraBodyLines.push(t('ticket.receipt_people_ahead', { n: ahead }));
+        }
+        if (ticket.serviceZoneName?.trim()) {
+          extraBodyLines.push(
+            t('ticket.receipt_zone', { zone: ticket.serviceZoneName.trim() })
+          );
+        }
+        const bytes = await buildKioskTicketEscPos({
+          kiosk: kc,
+          ticket,
+          serviceLabel,
+          ticketPageUrl,
+          unitDisplayTitle,
+          logoFetchUrl,
+          extraBodyLines: extraBodyLines.length > 0 ? extraBodyLines : undefined
+        });
+        const ok = await printReceiptBytesFromKioskConfig(kc, bytes);
+        if (!ok && kioskApiUnitId && isTauriKiosk()) {
+          reportKioskPrinterTelemetry(
+            kioskApiUnitId,
+            'print_error',
+            'Print not sent (missing target, label mode, or desktop print pipeline)'
+          );
+        }
+        return ok;
+      } catch (e) {
+        console.error('Kiosk native print failed:', e);
+        if (kioskApiUnitId) {
+          reportKioskPrinterTelemetry(
+            kioskApiUnitId,
+            'print_error',
+            e instanceof Error ? e.message : String(e)
+          );
+        }
+        return false;
       }
-      const bytes = await buildKioskTicketEscPos({
-        kiosk: kc,
-        ticket,
-        serviceLabel,
-        ticketPageUrl,
-        unitDisplayTitle,
-        logoFetchUrl,
-        extraBodyLines: extraBodyLines.length > 0 ? extraBodyLines : undefined
-      });
-      const ok = await printReceiptBytesFromKioskConfig(kc, bytes);
-      if (!ok && kioskApiUnitId && isTauriKiosk()) {
-        reportKioskPrinterTelemetry(
-          kioskApiUnitId,
-          'print_error',
-          'Print not sent (missing target, label mode, or desktop print pipeline)'
-        );
-      }
-      return ok;
-    } catch (e) {
-      console.error('Kiosk native print failed:', e);
-      if (kioskApiUnitId) {
-        reportKioskPrinterTelemetry(
-          kioskApiUnitId,
-          'print_error',
-          e instanceof Error ? e.message : String(e)
-        );
-      }
-      return false;
-    }
-  };
+    },
+    [kioskCfg, baseAppUrl, locale, unit, t, kioskApiUnitId]
+  );
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
@@ -1176,77 +1174,116 @@ export default function UnitKioskPage() {
     );
   }, [useAutoKioskLayout, autolayoutPageTotal]);
 
-  const openTicketSuccessFlow = (ticket: Ticket, service: Service) => {
-    setSuccessEtaMinutes(null);
-    if (typeof ticket.queuePosition === 'number' && ticket.queuePosition > 0) {
-      setSuccessPeopleAhead(Math.max(0, ticket.queuePosition - 1));
-    } else {
-      setSuccessPeopleAhead(null);
-    }
-    setCreatedTicket(ticket);
-    setIsTicketModalOpen(true);
-    setSelectedServicePath([]);
-    setKioskSmsError(null);
-    setKioskSmsAgreed(false);
-    setKioskSmsDigits('');
-
-    const needSms = ticket.smsPostTicketStepRequired === true;
-    if (needSms) {
-      setKioskSmsBlocking(true);
-      if (autoCloseTimerId) {
-        clearInterval(autoCloseTimerId);
-        setAutoCloseTimerId(null);
+  const openTicketSuccessFlow = useCallback(
+    (ticket: Ticket, service: Service) => {
+      setSuccessEtaMinutes(null);
+      if (
+        typeof ticket.queuePosition === 'number' &&
+        ticket.queuePosition > 0
+      ) {
+        setSuccessPeopleAhead(Math.max(0, ticket.queuePosition - 1));
+      } else {
+        setSuccessPeopleAhead(null);
       }
-    } else {
-      setKioskSmsBlocking(false);
-      scheduleTicketModalAutoClose();
-    }
+      setCreatedTicket(ticket);
+      setIsTicketModalOpen(true);
+      setSelectedServicePath([]);
+      setKioskSmsError(null);
+      setKioskSmsAgreed(false);
+      setKioskSmsDigits('');
 
-    const serviceLabel = getLocalizedName(
-      service.name,
-      service.nameRu || '',
-      service.nameEn || '',
-      locale
-    );
-    const canPrint = hasKioskPrintTarget(kioskCfg);
-    const printAutomatically =
-      canPrint && kioskCfg?.isAlwaysPrintTicket !== false;
-    if (printAutomatically) {
-      void tryPrintTicket(ticket, serviceLabel);
-    }
-    setMessage(
-      t('ticketCreated', {
-        defaultValue: 'Ticket created successfully!',
-        service: serviceLabel
-      })
-    );
-  };
+      const needSms = ticket.smsPostTicketStepRequired === true;
+      if (needSms) {
+        setKioskSmsBlocking(true);
+        if (autoCloseTimerId) {
+          clearInterval(autoCloseTimerId);
+          setAutoCloseTimerId(null);
+        }
+      } else {
+        setKioskSmsBlocking(false);
+        scheduleTicketModalAutoClose();
+      }
 
-  const createTicketForService = async (
-    service: Service,
-    opts?:
-      | { visitorPhone: string; visitorLocale: 'en' | 'ru' }
-      | { kioskIdentifiedUserId: string }
-      | { documentsData: Record<string, unknown> },
-    failTarget?: 'phoneModal' | 'page' | 'employeeModal'
-  ) => {
-    setMessage('');
-    setEmployeeCreateTicketError('');
-    try {
-      let ticket;
-      if (opts && 'kioskIdentifiedUserId' in opts) {
-        ticket = await createTicketMutation.mutateAsync({
-          unitId: kioskApiUnitId!,
-          serviceId: service.id,
-          kioskIdentifiedUserId: opts.kioskIdentifiedUserId
-        });
-      } else if (opts && 'documentsData' in opts) {
-        const { documentsData } = opts;
-        ticket = await createTicketMutation.mutateAsync({
-          unitId: kioskApiUnitId!,
-          serviceId: service.id,
-          documentsData
-        });
+      const serviceLabel = getLocalizedName(
+        service.name,
+        service.nameRu || '',
+        service.nameEn || '',
+        locale
+      );
+      const canPrint = hasKioskPrintTarget(kioskCfg);
+      const printAutomatically =
+        canPrint && kioskCfg?.isAlwaysPrintTicket !== false;
+      if (printAutomatically) {
+        void tryPrintTicket(ticket, serviceLabel);
+      }
+      setMessage(
+        t('ticketCreated', {
+          defaultValue: 'Ticket created successfully!',
+          service: serviceLabel
+        })
+      );
+    },
+    [
+      autoCloseTimerId,
+      scheduleTicketModalAutoClose,
+      locale,
+      kioskCfg,
+      t,
+      tryPrintTicket
+    ]
+  );
+
+  const createTicketForService = useCallback(
+    async (
+      service: Service,
+      opts?:
+        | { visitorPhone: string; visitorLocale: 'en' | 'ru' }
+        | { kioskIdentifiedUserId: string }
+        | { documentsData: Record<string, unknown> },
+      failTarget?: 'phoneModal' | 'page' | 'employeeModal'
+    ) => {
+      setMessage('');
+      setEmployeeCreateTicketError('');
+      try {
+        let ticket;
+        if (opts && 'kioskIdentifiedUserId' in opts) {
+          ticket = await createTicketMutation.mutateAsync({
+            unitId: kioskApiUnitId!,
+            serviceId: service.id,
+            kioskIdentifiedUserId: opts.kioskIdentifiedUserId
+          });
+        } else if (opts && 'documentsData' in opts) {
+          const { documentsData } = opts;
+          ticket = await createTicketMutation.mutateAsync({
+            unitId: kioskApiUnitId!,
+            serviceId: service.id,
+            documentsData
+          });
+          setPhoneIdentificationError('');
+          setIsPhoneIdentificationOpen(false);
+          setPendingPhoneService(null);
+          setIsEmployeeIdentificationOpen(false);
+          setPendingEmployeeService(null);
+          setEmployeeIdSubmode('badge');
+          setDocumentOcrOpen(false);
+          setPendingDocumentService(null);
+          setCustomIdentOpen(false);
+          setPendingCustomService(null);
+          openTicketSuccessFlow(ticket, service);
+          return;
+        } else if (opts && 'visitorPhone' in opts) {
+          ticket = await createTicketMutation.mutateAsync({
+            unitId: kioskApiUnitId!,
+            serviceId: service.id,
+            visitorPhone: opts.visitorPhone,
+            visitorLocale: opts.visitorLocale
+          });
+        } else {
+          ticket = await createTicketMutation.mutateAsync({
+            unitId: kioskApiUnitId!,
+            serviceId: service.id
+          });
+        }
         setPhoneIdentificationError('');
         setIsPhoneIdentificationOpen(false);
         setPendingPhoneService(null);
@@ -1254,63 +1291,45 @@ export default function UnitKioskPage() {
         setPendingEmployeeService(null);
         setEmployeeIdSubmode('badge');
         openTicketSuccessFlow(ticket, service);
-        return;
-      } else if (opts && 'visitorPhone' in opts) {
-        ticket = await createTicketMutation.mutateAsync({
-          unitId: kioskApiUnitId!,
-          serviceId: service.id,
-          visitorPhone: opts.visitorPhone,
-          visitorLocale: opts.visitorLocale
-        });
-      } else {
-        ticket = await createTicketMutation.mutateAsync({
-          unitId: kioskApiUnitId!,
-          serviceId: service.id
-        });
-      }
-      setPhoneIdentificationError('');
-      setIsPhoneIdentificationOpen(false);
-      setPendingPhoneService(null);
-      setIsEmployeeIdentificationOpen(false);
-      setPendingEmployeeService(null);
-      setEmployeeIdSubmode('badge');
-      openTicketSuccessFlow(ticket, service);
-    } catch (error) {
-      console.error('Failed to create ticket:', error);
-      if (isQuotaExceededError(error)) {
-        const quotaMsg = t('ticketQuotaExceeded');
-        if (failTarget === 'phoneModal') {
-          setPhoneIdentificationError(quotaMsg);
-        } else if (failTarget === 'employeeModal') {
-          setEmployeeCreateTicketError(quotaMsg);
-        } else {
-          setMessage(quotaMsg);
+      } catch (error) {
+        console.error('Failed to create ticket:', error);
+        if (isQuotaExceededError(error)) {
+          const quotaMsg = t('ticketQuotaExceeded');
+          if (failTarget === 'phoneModal') {
+            setPhoneIdentificationError(quotaMsg);
+          } else if (failTarget === 'employeeModal') {
+            setEmployeeCreateTicketError(quotaMsg);
+          } else {
+            setMessage(quotaMsg);
+          }
+          return;
         }
-        return;
+        const failDefault = t('ticketCreationFailed', {
+          defaultValue: 'Failed to create ticket. Please try again.'
+        });
+        if (failTarget === 'phoneModal') {
+          setPhoneIdentificationError(
+            t('phone_identification.submit_failed', {
+              defaultValue: failDefault
+            })
+          );
+        } else if (failTarget === 'employeeModal') {
+          setEmployeeCreateTicketError(
+            tEmployee('ticket_create_failed', { defaultValue: failDefault })
+          );
+        } else {
+          setMessage(failDefault);
+        }
       }
-      const failDefault = t('ticketCreationFailed', {
-        defaultValue: 'Failed to create ticket. Please try again.'
-      });
-      if (failTarget === 'phoneModal') {
-        setPhoneIdentificationError(
-          t('phone_identification.submit_failed', {
-            defaultValue: failDefault
-          })
-        );
-      } else if (failTarget === 'employeeModal') {
-        setEmployeeCreateTicketError(
-          tEmployee('ticket_create_failed', { defaultValue: failDefault })
-        );
-      } else {
-        setMessage(failDefault);
-      }
-    }
-  };
+    },
+    [createTicketMutation, kioskApiUnitId, openTicketSuccessFlow, t, tEmployee]
+  );
 
   const createTicketForServiceRef = useRef(createTicketForService);
-  // Store latest for async identification handlers; ref is not read during render.
-  // eslint-disable-next-line react-hooks/refs -- sync latest closed-over API for event handlers
-  createTicketForServiceRef.current = createTicketForService;
+  // Store latest for async identification handlers; assignment happens in useEffect after commit.
+  useEffect(() => {
+    createTicketForServiceRef.current = createTicketForService;
+  }, [createTicketForService]);
 
   const onDocumentOcrUnsuccessful = useCallback(() => {
     const svc = pendingDocumentServiceRef.current;
@@ -2340,7 +2359,6 @@ export default function UnitKioskPage() {
           onConfirm={handlePhoneIdentificationConfirm}
           isPending={createTicketMutation.isPending}
           errorMessage={phoneIdentificationError || undefined}
-          kioskOcrText={kioskOcrResultText}
         />
 
         <Dialog
@@ -2511,33 +2529,14 @@ export default function UnitKioskPage() {
             onUnsuccessfulDocumentScan={onDocumentOcrUnsuccessful}
             onUseText={(text) => {
               const svc = pendingDocumentService;
-              if (svc) {
-                setPendingDocumentService(null);
-                setDocumentOcrOpen(false);
-                void createTicketForService(svc, {
-                  documentsData: { [KIOSK_ID_DOCUMENT_OCR_KEY]: text }
-                });
+              if (!svc) {
                 return;
               }
-              setKioskOcrResultText(text);
-              void (async () => {
-                try {
-                  await navigator.clipboard.writeText(text);
-                  toast.success(
-                    t('id_ocr.result_clipboard', {
-                      defaultValue:
-                        'OCR text copied. Paste where needed on the next step, or use suggested digits if a button is offered.'
-                    })
-                  );
-                } catch {
-                  toast.info(
-                    t('id_ocr.result_no_clipboard', {
-                      defaultValue:
-                        'Could not access the clipboard. You can re-scan or type on the next step if needed.'
-                    })
-                  );
-                }
-              })();
+              setPendingDocumentService(null);
+              setDocumentOcrOpen(false);
+              void createTicketForService(svc, {
+                documentsData: { [KIOSK_ID_DOCUMENT_OCR_KEY]: text }
+              });
             }}
           />
         ) : null}
@@ -2560,7 +2559,6 @@ export default function UnitKioskPage() {
           autoRedeemFromDeeplink={
             redeemAutoFromDeeplink && !isKioskQrIdentificationOpen
           }
-          kioskOcrText={kioskOcrResultText}
           onSuccess={async (ticket) => {
             let full: Ticket = ticket;
             try {

@@ -83,74 +83,59 @@ export const ColorPicker = ({
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  const [hue, setHue] = useState(() => {
-    let c: ReturnType<typeof Color>;
-    const src =
+  const initialHsla = useMemo(() => {
+    const parseColor = (source: unknown): ReturnType<typeof Color> | null => {
+      const raw = String(source ?? '').trim();
+      if (!raw) {
+        return null;
+      }
+      try {
+        return Color(raw);
+      } catch {
+        return null;
+      }
+    };
+    const parsedDefault = parseColor(defaultValue) ?? Color('#000000');
+    const source =
       value != null && String(value).trim() !== '' ? value : defaultValue;
-    try {
-      c = Color(String(src).trim() || String(defaultValue));
-    } catch {
-      c = Color(String(defaultValue));
-    }
-    const d = Color(String(defaultValue));
-    const h0 = c.hue();
-    const dH = d.hue();
-    if (Number.isFinite(h0)) {
-      return h0;
-    }
-    return Number.isFinite(dH) ? dH : 0;
-  });
-  const [saturation, setSaturation] = useState(() => {
-    let c: ReturnType<typeof Color>;
-    const src =
-      value != null && String(value).trim() !== '' ? value : defaultValue;
-    try {
-      c = Color(String(src).trim() || String(defaultValue));
-    } catch {
-      c = Color(String(defaultValue));
-    }
-    const d = Color(String(defaultValue));
-    const s0 = c.saturationl();
-    const s1 = d.saturationl();
-    if (Number.isFinite(s0)) {
-      return s0;
-    }
-    return Number.isFinite(s1) ? s1 : 100;
-  });
-  const [lightness, setLightness] = useState(() => {
-    let c: ReturnType<typeof Color>;
-    const src =
-      value != null && String(value).trim() !== '' ? value : defaultValue;
-    try {
-      c = Color(String(src).trim() || String(defaultValue));
-    } catch {
-      c = Color(String(defaultValue));
-    }
-    const d = Color(String(defaultValue));
-    const l0 = c.lightness();
-    const l1 = d.lightness();
-    if (Number.isFinite(l0)) {
-      return l0;
-    }
-    return Number.isFinite(l1) ? l1 : 50;
-  });
-  const [alpha, setAlpha] = useState(() => {
-    let c: ReturnType<typeof Color>;
-    const src =
-      value != null && String(value).trim() !== '' ? value : defaultValue;
-    try {
-      c = Color(String(src).trim() || String(defaultValue));
-    } catch {
-      c = Color(String(defaultValue));
-    }
-    const d = Color(String(defaultValue));
-    const a0 = c.alpha();
-    const a1 = d.alpha();
-    if (Number.isFinite(a0)) {
-      return a0 * 100;
-    }
-    return Number.isFinite(a1) ? a1 * 100 : 100;
-  });
+    const parsedValue = parseColor(source) ?? parsedDefault;
+    const hue = parsedValue.hue();
+    const saturation = parsedValue.saturationl();
+    const lightness = parsedValue.lightness();
+    const alpha = parsedValue.alpha();
+    const defaultHue = parsedDefault.hue();
+    const defaultSaturation = parsedDefault.saturationl();
+    const defaultLightness = parsedDefault.lightness();
+    const defaultAlpha = parsedDefault.alpha();
+    return {
+      h: Number.isFinite(hue)
+        ? hue
+        : Number.isFinite(defaultHue)
+          ? defaultHue
+          : 0,
+      s: Number.isFinite(saturation)
+        ? saturation
+        : Number.isFinite(defaultSaturation)
+          ? defaultSaturation
+          : 100,
+      l: Number.isFinite(lightness)
+        ? lightness
+        : Number.isFinite(defaultLightness)
+          ? defaultLightness
+          : 50,
+      a:
+        (Number.isFinite(alpha)
+          ? alpha
+          : Number.isFinite(defaultAlpha)
+            ? defaultAlpha
+            : 1) * 100
+    };
+  }, [value, defaultValue]);
+
+  const [hue, setHue] = useState(initialHsla.h);
+  const [saturation, setSaturation] = useState(initialHsla.s);
+  const [lightness, setLightness] = useState(initialHsla.l);
+  const [alpha, setAlpha] = useState(initialHsla.a);
   const [mode, setMode] = useState('hex');
   const skipInitialOnChange = useRef(true);
   const syncFromProp = useRef(false);
@@ -368,7 +353,8 @@ export const ColorPickerEyeDropper = ({
   className,
   ...props
 }: ColorPickerEyeDropperProps) => {
-  const { setHue, setSaturation, setLightness, setAlpha } = useColorPicker();
+  const { hue, setHue, setSaturation, setLightness, setAlpha } =
+    useColorPicker();
 
   const handleEyeDropper = async () => {
     try {
@@ -378,11 +364,20 @@ export const ColorPickerEyeDropper = ({
       const color = Color(result.sRGBHex);
       const [h, s, l] = color.hsl().array();
 
-      setHue(h);
+      setHue(Number.isNaN(h) ? hue : h);
       setSaturation(s);
       setLightness(l);
       setAlpha(100);
     } catch (error) {
+      if (
+        (error instanceof DOMException && error.name === 'AbortError') ||
+        (error &&
+          typeof error === 'object' &&
+          'name' in error &&
+          (error as { name?: string }).name === 'AbortError')
+      ) {
+        return;
+      }
       console.error('EyeDropper failed:', error);
     }
   };
@@ -458,7 +453,7 @@ export const ColorPickerFormat = ({
   ...props
 }: ColorPickerFormatProps) => {
   const { hue, saturation, lightness, alpha, mode } = useColorPicker();
-  const color = Color.hsl(hue, saturation, lightness, alpha / 100);
+  const color = Color.hsl(hue, saturation, lightness).alpha(alpha / 100);
 
   if (mode === 'hex') {
     const hex = color.hex();

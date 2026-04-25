@@ -53,14 +53,28 @@ func TestMergeServiceJSONPatch_updatesNameWhenSent(t *testing.T) {
 
 func TestMergeServiceJSONPatch_iconKey(t *testing.T) {
 	existing := models.Service{ID: "x", UnitID: "u", Name: "N"}
-	merged := existing
-	raw := map[string]json.RawMessage{"iconKey": json.RawMessage(`"health"`)}
-	if err := MergeServiceJSONPatch(&merged, raw); err != nil {
-		t.Fatal(err)
-	}
-	if merged.IconKey == nil || *merged.IconKey != "health" {
-		t.Fatalf("iconKey: got %#v", merged.IconKey)
-	}
+	t.Run("sets icon key", func(t *testing.T) {
+		merged := existing
+		raw := map[string]json.RawMessage{"iconKey": json.RawMessage(`"health"`)}
+		if err := MergeServiceJSONPatch(&merged, raw); err != nil {
+			t.Fatal(err)
+		}
+		if merged.IconKey == nil || *merged.IconKey != "health" {
+			t.Fatalf("iconKey: got %#v", merged.IconKey)
+		}
+	})
+	t.Run("clears icon key with null", func(t *testing.T) {
+		ik := "health"
+		merged := existing
+		merged.IconKey = &ik
+		raw := map[string]json.RawMessage{"iconKey": json.RawMessage("null")}
+		if err := MergeServiceJSONPatch(&merged, raw); err != nil {
+			t.Fatal(err)
+		}
+		if merged.IconKey != nil {
+			t.Fatalf("iconKey: got %#v, want nil", merged.IconKey)
+		}
+	})
 }
 
 // Regression: same patch used to clobber custom/document with none when

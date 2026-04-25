@@ -6,6 +6,7 @@ import {
   PermTicketsViewUserData,
   userUnitPermissionMatches
 } from '@/lib/permission-variants';
+import { isTenantAdminUser } from '@/lib/tenant-admin-access';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -54,6 +55,7 @@ export default function ShiftDashboardPage({
   const { user } = useAuthContext();
   const canReadUserData = useMemo(
     () =>
+      isTenantAdminUser(user) ||
       userUnitPermissionMatches(
         user?.permissions?.[unitId] ?? [],
         PermTicketsViewUserData

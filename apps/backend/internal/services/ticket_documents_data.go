@@ -1,10 +1,10 @@
 package services
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"quokkaq-go-backend/internal/models"
@@ -38,7 +38,7 @@ func HasRequestDocumentsData(m *json.RawMessage) bool {
 	if m == nil {
 		return false
 	}
-	t := bytesTrimJSONBytes(*m)
+	t := bytes.TrimSpace(*m)
 	return len(t) > 0 && string(t) != "null"
 }
 
@@ -47,7 +47,7 @@ func ResolveDocumentsDataForNewTicket(service *models.Service, in *json.RawMessa
 	if in == nil || len(*in) == 0 {
 		return nil, nil, nil
 	}
-	trim := bytesOrSpaceJSON(*in)
+	trim := bytes.TrimSpace(*in)
 	if len(trim) == 0 || string(trim) == "null" {
 		return nil, nil, nil
 	}
@@ -93,23 +93,26 @@ func ResolveDocumentsDataForNewTicket(service *models.Service, in *json.RawMessa
 	return nil, nil, ErrDocumentsDataNotAllowed
 }
 
-func bytesOrSpaceJSON(b []byte) []byte   { return bytesTrimJSONBytes(b) }
-func bytesTrimJSONBytes(b []byte) []byte { return []byte(strings.TrimSpace(string(b))) }
-
 func parseRetentionFromKioskDocumentSettings(raw json.RawMessage) (int, error) {
-	if len(raw) == 0 || string(raw) == "null" {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || string(trimmed) == "null" {
 		return 7, nil
 	}
 	var s struct {
-		RetentionDays *int `json:"retentionDays"`
+		RetentionDays      *int `json:"retentionDays"`
+		RetentionDaysSnake *int `json:"retention_days"`
 	}
-	if err := json.Unmarshal(raw, &s); err != nil {
+	if err := json.Unmarshal(trimmed, &s); err != nil {
 		return 0, fmt.Errorf("kioskDocumentSettings: %w", err)
 	}
-	if s.RetentionDays == nil {
+	retention := s.RetentionDays
+	if retention == nil {
+		retention = s.RetentionDaysSnake
+	}
+	if retention == nil {
 		return 7, nil
 	}
-	d := *s.RetentionDays
+	d := *retention
 	if d < 1 || d > 30 {
 		return 0, ErrKioskConfigRetentionOutOfRange
 	}
@@ -140,5 +143,5 @@ func parseKioskIdentConfigSensitive(raw json.RawMessage) (sensitive bool, retent
 	if cfg.RetentionDaysAlt != nil {
 		return true, *cfg.RetentionDaysAlt, nil
 	}
-	return true, 0, ErrKioskConfigRetentionOutOfRange
+	return true, 0, ErrKioskConfigRetentionRequiredWhenSensitive
 }

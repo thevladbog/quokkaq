@@ -2355,12 +2355,12 @@
     "occupiedUnknown": "Occupied",
     "occupyCounterError": "Could not occupy counter: {message}",
     "user_data_queue": {
-      "details_label": "Document data (kiosk)"
+      "details_label": "Identification data"
     },
     "ticket_user_data": {
       "badge": "Kiosk",
-      "badge_aria": "Open document data (kiosk)",
-      "section_title": "Document data",
+      "badge_aria": "Open identification data",
+      "section_title": "Identification data",
       "id_document_ocr": "Document (OCR line)",
       "ocr_failed_preview": "Document not read at the kiosk after 2 camera attempts. Verify identity at the counter.",
       "custom_skipped_preview": "Visitor did not provide the requested data on the kiosk. Verify as needed.",
@@ -2414,7 +2414,7 @@
     "qr_checkin_unavailable": "This service needs appointment or pre‑registration check‑in, but it is not enabled for this kiosk. Ask an administrator to enable it in unit settings, or change the service identification mode.",
     "qr_checkin_unavailable_ok": "OK",
     "document_ocr_unavailable_title": "Document scan not available",
-    "document_ocr_unavailable": "This service requires scanning an ID document, but document OCR is not enabled for this kiosk (plan or unit settings). Ask an administrator to enable kiosk_id_ocr and ID document OCR, or change the service identification mode.",
+    "document_ocr_unavailable": "This service requires scanning an ID document, but document scanning is not enabled for this kiosk or plan. Ask an administrator to enable ID document OCR, or change the service identification mode.",
     "document_ocr_unavailable_ok": "OK",
     "service_tile": {
       "document_id_hint": "Have a government-issued ID ready."

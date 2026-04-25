@@ -86,6 +86,25 @@ func TestResolveDocumentsDataForNewTicket(t *testing.T) {
 		}
 	})
 
+	t.Run("document retention accepts snake_case", func(t *testing.T) {
+		in := json.RawMessage(`{"idDocumentOcr":"X"}`)
+		_, exp, err := ResolveDocumentsDataForNewTicket(
+			svcDoc(`{"retention_days":4}`),
+			&in,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if exp == nil {
+			t.Fatal("expected expiry")
+		}
+		before := time.Now().UTC().AddDate(0, 0, 3)
+		after := time.Now().UTC().AddDate(0, 0, 5)
+		if exp.Before(before) || exp.After(after) {
+			t.Fatalf("exp ~4d, got %v", exp)
+		}
+	})
+
 	t.Run("document invalid retention 0", func(t *testing.T) {
 		in := json.RawMessage(`{"a":1}`)
 		_, _, err := ResolveDocumentsDataForNewTicket(svcDoc(`{"retentionDays":0}`), &in)
@@ -161,7 +180,7 @@ func TestResolveDocumentsDataForNewTicket(t *testing.T) {
 		in := json.RawMessage(`{"a":1}`)
 		_, _, err := ResolveDocumentsDataForNewTicket(
 			svcCustom(`{"sensitive": true}`), &in)
-		if !errors.Is(err, ErrKioskConfigRetentionOutOfRange) {
+		if !errors.Is(err, ErrKioskConfigRetentionRequiredWhenSensitive) {
 			t.Fatalf("err %v", err)
 		}
 	})

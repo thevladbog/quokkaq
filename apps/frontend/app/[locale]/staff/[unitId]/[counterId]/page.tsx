@@ -68,6 +68,7 @@ import {
   PermTicketsViewUserData,
   userUnitPermissionMatches
 } from '@/lib/permission-variants';
+import { isTenantAdminUser } from '@/lib/tenant-admin-access';
 import { cn } from '@/lib/utils';
 import { formatWaitDurationSeconds } from '@/components/supervisor/supervisor-queue-utils';
 import { useLiveElapsedSecondsSince } from '@/lib/use-live-elapsed-since';
@@ -100,6 +101,7 @@ export default function StaffWorkspacePage({
   const { user } = useAuthContext();
   const canReadUserData = useMemo(
     () =>
+      isTenantAdminUser(user) ||
       userUnitPermissionMatches(
         user?.permissions?.[unitId] ?? [],
         PermTicketsViewUserData

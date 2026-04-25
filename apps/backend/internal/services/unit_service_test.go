@@ -1,79 +1,86 @@
 package services
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 )
 
-func TestEnsureDefaultKioskServiceGridLayout_emptyConfig(t *testing.T) {
-	out := ensureDefaultKioskServiceGridLayout(nil)
-	var m map[string]any
-	if err := json.Unmarshal(out, &m); err != nil {
-		t.Fatal(err)
+func TestEnsureDefaultKioskServiceGridLayout(t *testing.T) {
+	tests := []struct {
+		name                   string
+		in                     json.RawMessage
+		wantLayout             string
+		wantTheme              *string
+		wantFoo                *float64
+		expectExactPassthrough bool
+	}{
+		{
+			name:       "nil config injects manual",
+			in:         nil,
+			wantLayout: "manual",
+		},
+		{
+			name:       "json null injects manual",
+			in:         json.RawMessage("null"),
+			wantLayout: "manual",
+		},
+		{
+			name:       "empty object injects manual",
+			in:         json.RawMessage(`{}`),
+			wantLayout: "manual",
+		},
+		{
+			name:                   "non-object kiosk is preserved",
+			in:                     json.RawMessage(`{"kiosk":"nope"}`),
+			expectExactPassthrough: true,
+		},
+		{
+			name:       "preserves explicit auto and siblings",
+			in:         json.RawMessage(`{"kiosk":{"serviceGridLayout":"auto","foo":1}}`),
+			wantLayout: "auto",
+			wantFoo:    ptrFloat64(1),
+		},
+		{
+			name:       "injects manual when missing and preserves siblings",
+			in:         json.RawMessage(`{"kiosk":{"theme":"dark"}}`),
+			wantLayout: "manual",
+			wantTheme:  ptrString("dark"),
+		},
 	}
-	k, ok := m["kiosk"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected kiosk object, got %T", m["kiosk"])
-	}
-	if k["serviceGridLayout"] != "manual" {
-		t.Fatalf("serviceGridLayout = %q, want manual", k["serviceGridLayout"])
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			out := ensureDefaultKioskServiceGridLayout(tc.in)
+			if tc.expectExactPassthrough {
+				if !bytes.Equal(out, tc.in) {
+					t.Fatalf("want unchanged %s, got %s", tc.in, out)
+				}
+				return
+			}
+
+			var m map[string]any
+			if err := json.Unmarshal(out, &m); err != nil {
+				t.Fatal(err)
+			}
+			k, ok := m["kiosk"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected kiosk object, got %T", m["kiosk"])
+			}
+			if k["serviceGridLayout"] != tc.wantLayout {
+				t.Fatalf("serviceGridLayout = %v, want %s", k["serviceGridLayout"], tc.wantLayout)
+			}
+			if tc.wantTheme != nil && k["theme"] != *tc.wantTheme {
+				t.Fatalf("theme = %v, want %s", k["theme"], *tc.wantTheme)
+			}
+			if tc.wantFoo != nil {
+				if k["foo"] != *tc.wantFoo {
+					t.Fatalf("foo = %v, want %v", k["foo"], *tc.wantFoo)
+				}
+			}
+		})
 	}
 }
 
-func TestEnsureDefaultKioskServiceGridLayout_jsonNull(t *testing.T) {
-	out := ensureDefaultKioskServiceGridLayout(json.RawMessage("null"))
-	var m map[string]any
-	if err := json.Unmarshal(out, &m); err != nil {
-		t.Fatal(err)
-	}
-	k, ok := m["kiosk"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected kiosk object, got %T", m["kiosk"])
-	}
-	if k["serviceGridLayout"] != "manual" {
-		t.Fatalf("serviceGridLayout = %q, want manual", k["serviceGridLayout"])
-	}
-}
-
-func TestEnsureDefaultKioskServiceGridLayout_nonObjectKioskPreserved(t *testing.T) {
-	in := json.RawMessage(`{"kiosk":"nope"}`)
-	out := ensureDefaultKioskServiceGridLayout(in)
-	if string(out) != string(in) {
-		t.Fatalf("want unchanged %s, got %s", in, out)
-	}
-}
-
-func TestEnsureDefaultKioskServiceGridLayout_preservesExplicitAuto(t *testing.T) {
-	in := json.RawMessage(`{"kiosk":{"serviceGridLayout":"auto","foo":1}}`)
-	out := ensureDefaultKioskServiceGridLayout(in)
-	var m map[string]json.RawMessage
-	if err := json.Unmarshal(out, &m); err != nil {
-		t.Fatal(err)
-	}
-	var k map[string]any
-	if err := json.Unmarshal(m["kiosk"], &k); err != nil {
-		t.Fatal(err)
-	}
-	if k["serviceGridLayout"] != "auto" {
-		t.Fatalf("serviceGridLayout = %v, want auto unchanged", k["serviceGridLayout"])
-	}
-}
-
-func TestEnsureDefaultKioskServiceGridLayout_injectsManualWhenMissing(t *testing.T) {
-	in := json.RawMessage(`{"kiosk":{"theme":"dark"}}`)
-	out := ensureDefaultKioskServiceGridLayout(in)
-	var m map[string]json.RawMessage
-	if err := json.Unmarshal(out, &m); err != nil {
-		t.Fatal(err)
-	}
-	var k map[string]any
-	if err := json.Unmarshal(m["kiosk"], &k); err != nil {
-		t.Fatal(err)
-	}
-	if k["serviceGridLayout"] != "manual" {
-		t.Fatalf("serviceGridLayout = %v, want manual", k["serviceGridLayout"])
-	}
-	if k["theme"] != "dark" {
-		t.Fatalf("theme = %v, want dark", k["theme"])
-	}
-}
+func ptrString(v string) *string    { return &v }
+func ptrFloat64(v float64) *float64 { return &v }
