@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestMergeDefaultKioskServiceGridLayoutAuto_emptyConfig(t *testing.T) {
-	out := mergeDefaultKioskServiceGridLayoutAuto(nil)
+func TestEnsureDefaultKioskServiceGridLayout_emptyConfig(t *testing.T) {
+	out := ensureDefaultKioskServiceGridLayout(nil)
 	var m map[string]any
 	if err := json.Unmarshal(out, &m); err != nil {
 		t.Fatal(err)
@@ -20,9 +20,32 @@ func TestMergeDefaultKioskServiceGridLayoutAuto_emptyConfig(t *testing.T) {
 	}
 }
 
-func TestMergeDefaultKioskServiceGridLayoutAuto_preservesExplicitAuto(t *testing.T) {
+func TestEnsureDefaultKioskServiceGridLayout_jsonNull(t *testing.T) {
+	out := ensureDefaultKioskServiceGridLayout(json.RawMessage("null"))
+	var m map[string]any
+	if err := json.Unmarshal(out, &m); err != nil {
+		t.Fatal(err)
+	}
+	k, ok := m["kiosk"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected kiosk object, got %T", m["kiosk"])
+	}
+	if k["serviceGridLayout"] != "manual" {
+		t.Fatalf("serviceGridLayout = %q, want manual", k["serviceGridLayout"])
+	}
+}
+
+func TestEnsureDefaultKioskServiceGridLayout_nonObjectKioskPreserved(t *testing.T) {
+	in := json.RawMessage(`{"kiosk":"nope"}`)
+	out := ensureDefaultKioskServiceGridLayout(in)
+	if string(out) != string(in) {
+		t.Fatalf("want unchanged %s, got %s", in, out)
+	}
+}
+
+func TestEnsureDefaultKioskServiceGridLayout_preservesExplicitAuto(t *testing.T) {
 	in := json.RawMessage(`{"kiosk":{"serviceGridLayout":"auto","foo":1}}`)
-	out := mergeDefaultKioskServiceGridLayoutAuto(in)
+	out := ensureDefaultKioskServiceGridLayout(in)
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(out, &m); err != nil {
 		t.Fatal(err)
@@ -36,9 +59,9 @@ func TestMergeDefaultKioskServiceGridLayoutAuto_preservesExplicitAuto(t *testing
 	}
 }
 
-func TestMergeDefaultKioskServiceGridLayoutAuto_injectsManualWhenMissing(t *testing.T) {
+func TestEnsureDefaultKioskServiceGridLayout_injectsManualWhenMissing(t *testing.T) {
 	in := json.RawMessage(`{"kiosk":{"theme":"dark"}}`)
-	out := mergeDefaultKioskServiceGridLayoutAuto(in)
+	out := ensureDefaultKioskServiceGridLayout(in)
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(out, &m); err != nil {
 		t.Fatal(err)

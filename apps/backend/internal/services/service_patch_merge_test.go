@@ -70,8 +70,8 @@ func TestMergeServiceJSONPatch_customModeNotClobberedByOfferIdentFalse(t *testin
 		ID:                  "s1",
 		UnitID:              "u1",
 		Name:                "Leaf",
-		IdentificationMode:  models.IdentificationModeCustom,
-		OfferIdentification: false,
+		IdentificationMode:  models.IdentificationModeNone,
+		OfferIdentification: true,
 	}
 	merged := existing
 	raw := map[string]json.RawMessage{

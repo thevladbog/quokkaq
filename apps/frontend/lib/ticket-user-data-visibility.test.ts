@@ -4,7 +4,10 @@ import {
   shouldShowUserDataInQueueList,
   ticketHasDocumentsData
 } from './ticket-user-data-visibility';
-import { KIOSK_ID_DOCUMENT_OCR_FAILED_KEY } from '@quokkaq/shared-types';
+import {
+  KIOSK_ID_DOCUMENT_OCR_KEY,
+  KIOSK_ID_DOCUMENT_OCR_FAILED_KEY
+} from '@quokkaq/shared-types';
 import type { Service, Ticket } from '@quokkaq/shared-types';
 
 const svc = (partial: Partial<Service> & { id: string }): Service =>
@@ -27,28 +30,50 @@ const tick = (
   }) as Ticket;
 
 describe('ticketHasDocumentsData', () => {
+  it('is false without permission', () => {
+    expect(
+      ticketHasDocumentsData(
+        { documentsData: { k: 1 } } as Pick<Ticket, 'documentsData'>,
+        false
+      )
+    ).toBe(false);
+  });
+
   it('is false for empty or missing', () => {
     expect(
       ticketHasDocumentsData(
-        tick({ id: '1', serviceId: 's' }) as Pick<Ticket, 'documentsData'>
+        tick({ id: '1', serviceId: 's' }) as Pick<Ticket, 'documentsData'>,
+        true
       )
     ).toBe(false);
     expect(
-      ticketHasDocumentsData({
-        documentsData: {}
-      } as Pick<Ticket, 'documentsData'>)
+      ticketHasDocumentsData(
+        { documentsData: {} } as Pick<Ticket, 'documentsData'>,
+        true
+      )
     ).toBe(false);
   });
-  it('is true for non-empty object', () => {
+  it('is true for non-empty object with permission', () => {
     expect(
-      ticketHasDocumentsData({
-        documentsData: { k: 1 }
-      } as Pick<Ticket, 'documentsData'>)
+      ticketHasDocumentsData(
+        { documentsData: { k: 1 } } as Pick<Ticket, 'documentsData'>,
+        true
+      )
     ).toBe(true);
   });
 });
 
 describe('shouldShowUserDataInQueueList', () => {
+  it('hides when canRead is false', () => {
+    const t = tick({
+      id: '1',
+      serviceId: 'a',
+      documentsData: { a: 1 }
+    });
+    const get = () => svc({ id: 'a', identificationMode: 'document' });
+    expect(shouldShowUserDataInQueueList(t, get, false)).toBe(false);
+  });
+
   it('hides when no documentsData', () => {
     const get = (id: string | undefined) =>
       id ? svc({ id, identificationMode: 'document' }) : undefined;
@@ -57,7 +82,8 @@ describe('shouldShowUserDataInQueueList', () => {
         tick({ id: '1', serviceId: 'a' }) as Parameters<
           typeof shouldShowUserDataInQueueList
         >[0],
-        get
+        get,
+        true
       )
     ).toBe(false);
   });
@@ -66,10 +92,10 @@ describe('shouldShowUserDataInQueueList', () => {
     const t = tick({
       id: '1',
       serviceId: 's1',
-      documentsData: { idDocumentOcr: 'x' }
+      documentsData: { [KIOSK_ID_DOCUMENT_OCR_KEY]: 'x' }
     });
     const get = () => svc({ id: 's1', identificationMode: 'document' });
-    expect(shouldShowUserDataInQueueList(t, get)).toBe(true);
+    expect(shouldShowUserDataInQueueList(t, get, true)).toBe(true);
   });
 
   it('shows for custom with showInQueuePreview', () => {
@@ -84,7 +110,7 @@ describe('shouldShowUserDataInQueueList', () => {
         identificationMode: 'custom',
         kioskIdentificationConfig: { showInQueuePreview: true } as never
       });
-    expect(shouldShowUserDataInQueueList(t, get)).toBe(true);
+    expect(shouldShowUserDataInQueueList(t, get, true)).toBe(true);
   });
 
   it('hides for custom without showInQueuePreview', () => {
@@ -99,7 +125,7 @@ describe('shouldShowUserDataInQueueList', () => {
         identificationMode: 'custom',
         kioskIdentificationConfig: { showInQueuePreview: false } as never
       });
-    expect(shouldShowUserDataInQueueList(t, get)).toBe(false);
+    expect(shouldShowUserDataInQueueList(t, get, true)).toBe(false);
   });
 
   it('hides when getService is undefined', () => {
@@ -108,18 +134,28 @@ describe('shouldShowUserDataInQueueList', () => {
       serviceId: 's1',
       documentsData: { a: 1 }
     });
-    expect(shouldShowUserDataInQueueList(t, () => undefined)).toBe(false);
+    expect(shouldShowUserDataInQueueList(t, () => undefined, true)).toBe(false);
   });
 });
 
 describe('getDocumentsDataPreviewString', () => {
+  it('returns empty without permission', () => {
+    const s = getDocumentsDataPreviewString(
+      { documentsData: { k: 'v' } } as Pick<Ticket, 'documentsData'>,
+      10,
+      false
+    );
+    expect(s).toBe('');
+  });
+
   it('truncates long line', () => {
     const long = 'a'.repeat(200);
     const s = getDocumentsDataPreviewString(
       {
         documentsData: { k: long }
       } as Pick<Ticket, 'documentsData'>,
-      10
+      10,
+      true
     );
     expect(s.length).toBe(10);
     expect(s.endsWith('…')).toBe(true);
@@ -131,8 +167,25 @@ describe('getDocumentsDataPreviewString', () => {
         documentsData: { [KIOSK_ID_DOCUMENT_OCR_FAILED_KEY]: true }
       } as Pick<Ticket, 'documentsData'>,
       200,
+      true,
       { ocrFailed: 'OCR fail msg', customSkipped: 'Skip msg' }
     );
     expect(s).toBe('OCR fail msg');
+  });
+
+  it('with flag labels uses friendly OCR line', () => {
+    const s = getDocumentsDataPreviewString(
+      {
+        documentsData: { [KIOSK_ID_DOCUMENT_OCR_KEY]: 'abc' }
+      } as Pick<Ticket, 'documentsData'>,
+      200,
+      true,
+      {
+        ocrFailed: 'x',
+        customSkipped: 'y',
+        idDocumentOcr: 'OCR line'
+      }
+    );
+    expect(s).toBe('OCR line: abc');
   });
 });

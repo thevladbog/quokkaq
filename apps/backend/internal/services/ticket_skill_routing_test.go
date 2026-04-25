@@ -62,6 +62,9 @@ func (r *stubUnitRepo) FindByIDLight(_ string) (*models.Unit, error) {
 		SkillBasedRoutingEnabled: r.skillEnabled,
 	}, nil
 }
+func (r *stubUnitRepo) FindByIDLightTxForUpdate(_ *gorm.DB, _ string) (*models.Unit, error) {
+	return r.FindByIDLight("")
+}
 
 func (r *stubUnitRepo) CountSubdivisionsByCompanyID(string) (int64, error) { return 0, nil }
 

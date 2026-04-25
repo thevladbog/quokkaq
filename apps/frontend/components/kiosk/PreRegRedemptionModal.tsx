@@ -73,6 +73,7 @@ export function PreRegRedemptionModal({
   const detectInFlightRef = useRef(false);
   const [scanBusy, setScanBusy] = useState(false);
   const scanStopRef = useRef<() => void>(() => {});
+  const cameraCloseButtonRef = useRef<HTMLButtonElement>(null);
 
   type BarcodeCtor = new (opts: { formats: string[] }) => {
     detect: (src: ImageBitmapSource) => Promise<unknown[]>;
@@ -331,6 +332,27 @@ export function PreRegRedemptionModal({
     };
   }, [scanBusy, stopScanSession, t]);
 
+  useEffect(() => {
+    if (!scanBusy) {
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        e.preventDefault();
+        stopScanSession();
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    const id = window.setTimeout(() => {
+      cameraCloseButtonRef.current?.focus();
+    }, 0);
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      clearTimeout(id);
+    };
+  }, [scanBusy, stopScanSession]);
+
   const scanActive = isOpen && tab === 'code' && !redeemMutation.isPending;
   useKioskBarcodeWedge(scanActive, applyScanned);
   useKioskSerialScannerStream(scanActive, applyScanned, unitId);
@@ -430,15 +452,8 @@ export function PreRegRedemptionModal({
   const cameraScanOverlay = scanBusy ? (
     <div
       className='absolute inset-0 z-50 flex flex-col bg-black/75'
-      role='dialog'
-      aria-modal='true'
+      role='region'
       aria-label={t('camera_scan_aria', { defaultValue: 'Scan with camera' })}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') {
-          e.stopPropagation();
-          stopScanSession();
-        }
-      }}
     >
       <div
         className='flex min-h-0 flex-1 flex-col items-center justify-center p-3 sm:p-5'
@@ -457,6 +472,7 @@ export function PreRegRedemptionModal({
             muted
           />
           <Button
+            ref={cameraCloseButtonRef}
             type='button'
             size='icon'
             variant='secondary'

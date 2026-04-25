@@ -133,15 +133,18 @@ func (s *unitService) validateHierarchy(unitID, companyID string, parentID *stri
 	return nil
 }
 
-// mergeDefaultKioskServiceGridLayoutAuto sets config.kiosk.serviceGridLayout to "manual" when missing
+// ensureDefaultKioskServiceGridLayout sets config.kiosk.serviceGridLayout to "manual" when missing
 // so new units match legacy units and the frontend/schema default (unset means manual).
-func mergeDefaultKioskServiceGridLayoutAuto(config json.RawMessage) json.RawMessage {
-	if len(config) == 0 {
+func ensureDefaultKioskServiceGridLayout(config json.RawMessage) json.RawMessage {
+	if len(config) == 0 || string(config) == "null" {
 		return json.RawMessage(`{"kiosk":{"serviceGridLayout":"manual"}}`)
 	}
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(config, &m); err != nil {
 		return config
+	}
+	if m == nil {
+		return json.RawMessage(`{"kiosk":{"serviceGridLayout":"manual"}}`)
 	}
 	rawK, hasK := m["kiosk"]
 	if !hasK || len(rawK) == 0 || string(rawK) == "null" {
@@ -204,7 +207,7 @@ func (s *unitService) CreateUnit(unit *models.Unit) error {
 		return err
 	}
 
-	unit.Config = mergeDefaultKioskServiceGridLayoutAuto(unit.Config)
+	unit.Config = ensureDefaultKioskServiceGridLayout(unit.Config)
 
 	// Enforce quota limits when quota service is available.
 	if s.quota != nil {

@@ -36,16 +36,23 @@ func validateKioskDocumentSettingsJSON(raw json.RawMessage) error {
 	if len(raw) == 0 || string(raw) == "null" {
 		return nil
 	}
+	// Intentionally ignoring other kiosk document fields here; only retention is validated.
 	var s struct {
 		RetentionDays *int `json:"retentionDays"`
+		RetentionAlt  *int `json:"retention_days"`
 	}
 	if err := json.Unmarshal(raw, &s); err != nil {
 		return fmt.Errorf("kioskDocumentSettings: %w", err)
 	}
-	if s.RetentionDays == nil {
+	d := 0
+	if s.RetentionDays != nil {
+		d = *s.RetentionDays
+	} else if s.RetentionAlt != nil {
+		d = *s.RetentionAlt
+	} else {
 		return nil
 	}
-	if *s.RetentionDays < 1 || *s.RetentionDays > 30 {
+	if d < 1 || d > 30 {
 		return ErrKioskConfigRetentionOutOfRange
 	}
 	return nil
@@ -70,7 +77,11 @@ func validateKioskIdentificationConfigJSON(raw json.RawMessage) error {
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return fmt.Errorf("kioskIdentificationConfig: %w", err)
 	}
+	// Intentionally ignoring optional capture/showInQueue/skippable/operator fields (validated client-side or unused server-side).
 	if cfg.Sensitive != nil && *cfg.Sensitive {
+		if cfg.RetentionDays == nil && cfg.RetentionAlt == nil {
+			return ErrKioskConfigRetentionRequiredWhenSensitive
+		}
 		d := 0
 		if cfg.RetentionDays != nil {
 			d = *cfg.RetentionDays
@@ -87,10 +98,5 @@ func validateKioskIdentificationConfigJSON(raw json.RawMessage) error {
 			return fmt.Errorf("kioskIdentificationConfig: apiFieldKey may not be empty when set")
 		}
 	}
-	_ = cfg.Capture
-	_ = cfg.ShowInQueue
-	_ = cfg.Skippable
-	_ = cfg.UserInstruction
-	_ = cfg.OperatorLabel
 	return nil
 }

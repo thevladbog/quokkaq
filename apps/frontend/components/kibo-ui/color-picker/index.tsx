@@ -18,6 +18,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useLayoutEffect,
   useRef,
   useState
 } from 'react';
@@ -77,26 +78,86 @@ export const ColorPicker = ({
   className,
   ...props
 }: ColorPickerProps) => {
-  const initialSource =
-    value != null && String(value).trim() !== '' ? value : defaultValue;
-  const selectedColor = Color((initialSource as string) || defaultValue);
-  const defaultColor = Color(defaultValue);
+  const onChangeRef = useRef(onChange);
+  useLayoutEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
-  const [hue, setHue] = useState(
-    selectedColor.hue() || defaultColor.hue() || 0
-  );
-  const [saturation, setSaturation] = useState(
-    selectedColor.saturationl() || defaultColor.saturationl() || 100
-  );
-  const [lightness, setLightness] = useState(
-    selectedColor.lightness() || defaultColor.lightness() || 50
-  );
-  const [alpha, setAlpha] = useState(
-    selectedColor.alpha() * 100 || defaultColor.alpha() * 100
-  );
+  const [hue, setHue] = useState(() => {
+    let c: ReturnType<typeof Color>;
+    const src =
+      value != null && String(value).trim() !== '' ? value : defaultValue;
+    try {
+      c = Color(String(src).trim() || String(defaultValue));
+    } catch {
+      c = Color(String(defaultValue));
+    }
+    const d = Color(String(defaultValue));
+    const h0 = c.hue();
+    const dH = d.hue();
+    if (Number.isFinite(h0)) {
+      return h0;
+    }
+    return Number.isFinite(dH) ? dH : 0;
+  });
+  const [saturation, setSaturation] = useState(() => {
+    let c: ReturnType<typeof Color>;
+    const src =
+      value != null && String(value).trim() !== '' ? value : defaultValue;
+    try {
+      c = Color(String(src).trim() || String(defaultValue));
+    } catch {
+      c = Color(String(defaultValue));
+    }
+    const d = Color(String(defaultValue));
+    const s0 = c.saturationl();
+    const s1 = d.saturationl();
+    if (Number.isFinite(s0)) {
+      return s0;
+    }
+    return Number.isFinite(s1) ? s1 : 100;
+  });
+  const [lightness, setLightness] = useState(() => {
+    let c: ReturnType<typeof Color>;
+    const src =
+      value != null && String(value).trim() !== '' ? value : defaultValue;
+    try {
+      c = Color(String(src).trim() || String(defaultValue));
+    } catch {
+      c = Color(String(defaultValue));
+    }
+    const d = Color(String(defaultValue));
+    const l0 = c.lightness();
+    const l1 = d.lightness();
+    if (Number.isFinite(l0)) {
+      return l0;
+    }
+    return Number.isFinite(l1) ? l1 : 50;
+  });
+  const [alpha, setAlpha] = useState(() => {
+    let c: ReturnType<typeof Color>;
+    const src =
+      value != null && String(value).trim() !== '' ? value : defaultValue;
+    try {
+      c = Color(String(src).trim() || String(defaultValue));
+    } catch {
+      c = Color(String(defaultValue));
+    }
+    const d = Color(String(defaultValue));
+    const a0 = c.alpha();
+    const a1 = d.alpha();
+    if (Number.isFinite(a0)) {
+      return a0 * 100;
+    }
+    return Number.isFinite(a1) ? a1 * 100 : 100;
+  });
   const [mode, setMode] = useState('hex');
   const skipInitialOnChange = useRef(true);
   const syncFromProp = useRef(false);
+  const liveHsla = useRef({ h: 0, s: 0, l: 0, a: 0 });
+  useLayoutEffect(() => {
+    liveHsla.current = { h: hue, s: saturation, l: lightness, a: alpha };
+  }, [hue, saturation, lightness, alpha]);
 
   // Update internal HSL when the controlled `value` (e.g. hex) changes
   useEffect(() => {
@@ -106,11 +167,19 @@ export const ColorPicker = ({
     try {
       const c = Color(String(value).trim());
       const [h, s, l] = c.hsl().round().array();
+      const a = c.alpha() * 100;
+      const o = liveHsla.current;
+      if (h === o.h && s === o.s && l === o.l && a === o.a) {
+        if (syncFromProp.current) {
+          syncFromProp.current = false;
+        }
+        return;
+      }
       syncFromProp.current = true;
       setHue(h);
       setSaturation(s);
       setLightness(l);
-      setAlpha(c.alpha() * 100);
+      setAlpha(a);
     } catch {
       // ignore bad strings
     }
@@ -118,7 +187,7 @@ export const ColorPicker = ({
 
   // Notify parent (downstream) when the user (or this panel) changes HSL/alpha
   useEffect(() => {
-    if (!onChange) {
+    if (!onChangeRef.current) {
       return;
     }
     if (skipInitialOnChange.current) {
@@ -132,8 +201,8 @@ export const ColorPicker = ({
     const color = Color.hsl(hue, saturation, lightness).alpha(alpha / 100);
     const rgba = color.rgb().array();
 
-    onChange([rgba[0], rgba[1], rgba[2], alpha / 100]);
-  }, [hue, saturation, lightness, alpha, onChange]);
+    onChangeRef.current([rgba[0], rgba[1], rgba[2], alpha / 100]);
+  }, [hue, saturation, lightness, alpha]);
 
   return (
     <ColorPickerContext.Provider

@@ -27,6 +27,9 @@ var ErrDocumentsDataPayloadTooLarge = errors.New("documentsData payload too larg
 // ErrKioskConfigRetentionOutOfRange is returned when retentionDays is not in 1..30 when required.
 var ErrKioskConfigRetentionOutOfRange = errors.New("kiosk config: retentionDays must be between 1 and 30")
 
+// ErrKioskConfigRetentionRequiredWhenSensitive is returned when sensitive is true but no retention field is set.
+var ErrKioskConfigRetentionRequiredWhenSensitive = errors.New("kiosk config: retention is required when sensitive is true")
+
 // ErrDocumentsDataWithKioskIdp is returned when documentsData is set together with employee badge/login identification.
 var ErrDocumentsDataWithKioskIdp = errors.New("documentsData is not combinable with kioskIdentifiedUserId for this service")
 

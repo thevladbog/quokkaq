@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 
@@ -46,16 +46,28 @@ export function KioskTouchKeyboard({
   /** Used with `layoutToggle` (e.g. kiosk UI locale). */
   initialLayout?: KioskKeyboardScript;
 }) {
-  const [script, setScript] = useState<KioskKeyboardScript>(
-    layoutToggle ? initialLayout : 'en'
-  );
+  const [script, setScript] = useState<KioskKeyboardScript>(initialLayout);
   const t = useTranslations('kiosk');
+  const userOverrodeScript = useRef(false);
+  const prevLayoutToggle = useRef(layoutToggle);
 
   useEffect(() => {
-    if (layoutToggle) {
+    if (layoutToggle && !prevLayoutToggle.current) {
+      userOverrodeScript.current = false;
+    }
+    prevLayoutToggle.current = layoutToggle;
+    if (!layoutToggle) {
+      return;
+    }
+    if (!userOverrodeScript.current) {
       setScript(initialLayout);
     }
   }, [layoutToggle, initialLayout]);
+
+  const onPickScript = (next: KioskKeyboardScript) => {
+    userOverrodeScript.current = true;
+    setScript(next);
+  };
 
   const row2 = script === 'ru' ? RU_ROW2 : EN_ROW2;
   const row3 = script === 'ru' ? RU_ROW3 : EN_ROW3;
@@ -85,7 +97,7 @@ export function KioskTouchKeyboard({
             aria-label={t('touch_keyboard_aria_latin', {
               defaultValue: 'Latin layout (English letters)'
             })}
-            onClick={() => setScript('en')}
+            onClick={() => onPickScript('en')}
           >
             EN
           </Button>
@@ -97,7 +109,7 @@ export function KioskTouchKeyboard({
             aria-label={t('touch_keyboard_aria_cyrillic', {
               defaultValue: 'Russian (Cyrillic) layout'
             })}
-            onClick={() => setScript('ru')}
+            onClick={() => onPickScript('ru')}
           >
             RU
           </Button>
@@ -111,7 +123,9 @@ export function KioskTouchKeyboard({
             className={backspaceClass}
             variant='secondary'
             onClick={onBackspace}
-            aria-label='Backspace'
+            aria-label={t('touch_keyboard_backspace', {
+              defaultValue: 'Backspace'
+            })}
           >
             ⌫
           </Button>
@@ -129,7 +143,7 @@ export function KioskTouchKeyboard({
             className={spaceClass}
             variant='outline'
             onClick={() => onKey(' ')}
-            aria-label='Space'
+            aria-label={t('touch_keyboard_space', { defaultValue: 'Space' })}
           >
             __
           </Button>
@@ -157,6 +171,7 @@ export function KioskTouchNumpad({
   onDigit: (d: string) => void;
   onBackspace: () => void;
 }) {
+  const t = useTranslations('kiosk');
   return (
     <div className='mx-auto flex w-full max-w-full min-w-0 flex-col gap-2.5 sm:gap-3'>
       {NUM_ROWS.map((row, i) => (
@@ -173,7 +188,9 @@ export function KioskTouchNumpad({
                   className='h-16 min-h-[3.25rem] min-w-0 flex-1 basis-0 touch-manipulation text-xl font-semibold sm:text-2xl'
                   variant='secondary'
                   onClick={onBackspace}
-                  aria-label='Backspace'
+                  aria-label={t('touch_keyboard_backspace', {
+                    defaultValue: 'Backspace'
+                  })}
                 >
                   ⌫
                 </Button>

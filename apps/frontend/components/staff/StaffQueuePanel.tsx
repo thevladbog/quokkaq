@@ -45,6 +45,8 @@ type TFn = (
 export interface StaffQueuePanelProps {
   t: TFn;
   unitId: string;
+  /** False when the operator lacks `tickets.user_data.read` for this unit. */
+  canReadUserData: boolean;
   /** When true, picking tickets and creating tickets from the panel are blocked. */
   counterOnBreak?: boolean;
   waitingTickets: Ticket[];
@@ -107,7 +109,8 @@ export function StaffQueuePanel({
   currentTicket,
   onPickTicket,
   onShowDetails,
-  services
+  services,
+  canReadUserData
 }: StaffQueuePanelProps) {
   const [scopeOpen, setScopeOpen] = useState(false);
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
@@ -254,6 +257,7 @@ export function StaffQueuePanel({
                   t={t}
                   onShowDetails={() => onShowDetails(ticket)}
                   getServiceForTicket={getServiceForTicket}
+                  canReadUserData={canReadUserData}
                 />
               ))
             ) : (
@@ -311,7 +315,8 @@ function StaffQueueTicketRow({
   disabled,
   t,
   onShowDetails,
-  getServiceForTicket
+  getServiceForTicket,
+  canReadUserData
 }: {
   ticket: Ticket;
   serviceLabel: string;
@@ -321,6 +326,7 @@ function StaffQueueTicketRow({
   t: TFn;
   onShowDetails: () => void;
   getServiceForTicket: (id: string | undefined) => Service | undefined;
+  canReadUserData: boolean;
 }) {
   const { background, formatTime, elapsed, isOverdue, isWarning } =
     useTicketTimer(ticket.createdAt || undefined, ticket.maxWaitingTime);
@@ -335,19 +341,28 @@ function StaffQueueTicketRow({
   const preReg = Boolean(ticket.preRegistration);
   const userQueuePreview = shouldShowUserDataInQueueList(
     ticket,
-    getServiceForTicket
+    getServiceForTicket,
+    canReadUserData
   );
   const showInfo = preReg || userQueuePreview;
-  const docPreview = getDocumentsDataPreviewString(ticket, 500, {
-    ocrFailed: t('ticket_user_data.ocr_failed_preview', {
-      defaultValue:
-        'Document not read at the kiosk after 2 camera attempts. Verify identity at the counter.'
-    }),
-    customSkipped: t('ticket_user_data.custom_skipped_preview', {
-      defaultValue:
-        'Visitor did not provide the requested data on the kiosk. Verify as needed.'
-    })
-  });
+  const docPreview = getDocumentsDataPreviewString(
+    ticket,
+    500,
+    canReadUserData,
+    {
+      ocrFailed: t('ticket_user_data.ocr_failed_preview', {
+        defaultValue:
+          'Document not read at the kiosk after 2 camera attempts. Verify identity at the counter.'
+      }),
+      customSkipped: t('ticket_user_data.custom_skipped_preview', {
+        defaultValue:
+          'Visitor did not provide the requested data on the kiosk. Verify as needed.'
+      }),
+      idDocumentOcr: t('ticket_user_data.id_document_ocr', {
+        defaultValue: 'Document (OCR line)'
+      })
+    }
+  );
 
   return (
     <div

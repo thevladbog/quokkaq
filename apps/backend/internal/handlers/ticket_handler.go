@@ -461,6 +461,7 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 			errors.Is(err, services.ErrDocumentsDataInvalid),
 			errors.Is(err, services.ErrDocumentsDataPayloadTooLarge),
 			errors.Is(err, services.ErrKioskConfigRetentionOutOfRange),
+			errors.Is(err, services.ErrKioskConfigRetentionRequiredWhenSensitive),
 			errors.Is(err, services.ErrDocumentsDataWithKioskIdp):
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

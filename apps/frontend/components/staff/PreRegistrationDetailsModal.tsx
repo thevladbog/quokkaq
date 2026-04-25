@@ -31,19 +31,23 @@ interface PreRegistrationDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   ticket: Ticket | null;
+  canReadUserData: boolean;
 }
 
 export function PreRegistrationDetailsModal({
   isOpen,
   onClose,
-  ticket
+  ticket,
+  canReadUserData
 }: PreRegistrationDetailsModalProps) {
   const t = useTranslations('staff.pre_registration');
   const tUser = useTranslations('staff.ticket_user_data');
   const locale = useLocale();
 
   const hasPre = Boolean(ticket?.preRegistration);
-  const hasDoc = Boolean(ticket) && ticketHasDocumentsData(ticket as Ticket);
+  const hasDoc =
+    Boolean(ticket) &&
+    ticketHasDocumentsData(ticket as Ticket, canReadUserData);
 
   useEffect(() => {
     if (!isOpen || !ticket) {

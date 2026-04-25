@@ -1667,7 +1667,7 @@
       "ticket_success_auto_close_label": "Ticket success auto-close (seconds)",
       "ticket_success_auto_close_hint": "How long the success dialog stays open before returning to the grid (when SMS capture is not required). Default: 12.",
       "id_ocr_enable": "ID / document OCR (camera)",
-      "id_ocr_enable_hint": "Requires the kiosk_id_ocr plan feature. Images are not kept; only on-screen text for manual use.",
+      "id_ocr_enable_hint": "Requires the kiosk_id_ocr plan feature. Text extracted on device (OCR / MRZ) is stored on tickets as documentsData and is subject to your data retention and cleanup settings for this service.",
       "id_ocr_wedge_mrz": "ICAO MRZ (scanner / keyboard wedge)",
       "id_ocr_wedge_mrz_hint": "Passport or ID: two- or three-line machine-readable zone via HID/serial. Data stays in session.",
       "id_ocr_wedge_ru": "RU driver’s license (barcode)",
@@ -2483,6 +2483,8 @@
     "custom_ident_barcode_scanner_only": "This step is set to scanner or serial reader only. On-screen typing is disabled in the service settings.",
     "touch_keyboard_aria_latin": "Latin layout (English letters)",
     "touch_keyboard_aria_cyrillic": "Russian (Cyrillic) layout",
+    "touch_keyboard_backspace": "Backspace",
+    "touch_keyboard_space": "Space",
     "network": {
       "online": "Online",
       "offline": "No network"
@@ -2945,7 +2947,7 @@
       "allow_prebooking": "Allow Prebooking",
       "offer_identification": "Offer identification (kiosk phone)",
       "kiosk_identification_mode": "Kiosk identification step",
-      "kiosk_identification_mode_help": "Shown after a visitor picks this service (leaf): phone (SMS), booking QR or code, ID document (requires kiosk_id_ocr and ID OCR on the device), employee login, or access badge, or none — go straight to the ticket.",
+      "kiosk_identification_mode_help": "Shown after a visitor picks this service (leaf): phone (SMS), booking QR or code, ID document (requires kiosk_id_ocr and ID OCR on the device), a custom field you configure, employee login, or access badge, or none — go straight to the ticket. Custom mode uses a manual kiosk identification config and API field you set in the form.",
       "kiosk_identification_mode_none": "None (ticket immediately)",
       "kiosk_identification_mode_phone": "Phone (SMS / identification)",
       "kiosk_identification_mode_qr": "Booking code / QR (pre-registration check-in)",

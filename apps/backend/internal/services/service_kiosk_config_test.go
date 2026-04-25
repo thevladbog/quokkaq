@@ -53,6 +53,20 @@ func TestValidateServiceKioskFields(t *testing.T) {
 		}
 	})
 
+	t.Run("document retention_days out of range", func(t *testing.T) {
+		d := 40
+		b, _ := json.Marshal(struct {
+			RetentionAlt *int `json:"retention_days"`
+		}{RetentionAlt: &d})
+		s := &models.Service{
+			IdentificationMode:    models.IdentificationModeDocument,
+			KioskDocumentSettings: b,
+		}
+		if err := ValidateServiceKioskFields(s); !errors.Is(err, ErrKioskConfigRetentionOutOfRange) {
+			t.Fatalf("err: %v", err)
+		}
+	})
+
 	t.Run("custom sensitive without retention", func(t *testing.T) {
 		sn := true
 		b, _ := json.Marshal(struct {
@@ -62,7 +76,7 @@ func TestValidateServiceKioskFields(t *testing.T) {
 			IdentificationMode:        models.IdentificationModeCustom,
 			KioskIdentificationConfig: b,
 		}
-		if err := ValidateServiceKioskFields(s); !errors.Is(err, ErrKioskConfigRetentionOutOfRange) {
+		if err := ValidateServiceKioskFields(s); !errors.Is(err, ErrKioskConfigRetentionRequiredWhenSensitive) {
 			t.Fatalf("err: %v", err)
 		}
 	})

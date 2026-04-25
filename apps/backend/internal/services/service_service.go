@@ -6,6 +6,8 @@ import (
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
+
+	"gorm.io/gorm"
 )
 
 // ErrServiceUnitImmutable is returned when an update tries to change a service's unit.
@@ -117,18 +119,23 @@ func (s *serviceService) CreateService(service *models.Service) error {
 			return ErrServiceQuotaExceeded
 		}
 	}
-	next, err := s.repo.NextSortOrderForUnit(service.UnitID)
-	if err != nil {
-		return err
-	}
-	service.SortOrder = next
-	if err := s.repo.Create(service); err != nil {
-		if errors.Is(err, repository.ErrDuplicateCalendarSlotKey) {
-			return ErrDuplicateCalendarSlotKey
+	return s.unitRepo.Transaction(func(tx *gorm.DB) error {
+		if _, err := s.unitRepo.FindByIDLightTxForUpdate(tx, service.UnitID); err != nil {
+			return err
 		}
-		return err
-	}
-	return nil
+		next, err := s.repo.NextSortOrderForUnitTx(tx, service.UnitID)
+		if err != nil {
+			return err
+		}
+		service.SortOrder = next
+		if err := s.repo.CreateTx(tx, service); err != nil {
+			if errors.Is(err, repository.ErrDuplicateCalendarSlotKey) {
+				return ErrDuplicateCalendarSlotKey
+			}
+			return err
+		}
+		return nil
+	})
 }
 
 func (s *serviceService) GetServicesByUnit(unitID string) ([]models.Service, error) {

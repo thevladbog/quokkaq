@@ -101,6 +101,9 @@ func (p *predUnitRepo) FindByID(string) (*models.Unit, error) { return p.u, nil 
 func (p *predUnitRepo) FindByIDLight(string) (*models.Unit, error) {
 	return p.u, nil
 }
+func (p *predUnitRepo) FindByIDLightTxForUpdate(_ *gorm.DB, _ string) (*models.Unit, error) {
+	return p.u, nil
+}
 func (p *predUnitRepo) Update(*models.Unit) error                  { return nil }
 func (p *predUnitRepo) UpdateConfig(string, json.RawMessage) error { return nil }
 func (p *predUnitRepo) Delete(string) error                        { return nil }

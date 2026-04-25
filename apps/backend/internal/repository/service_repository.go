@@ -14,6 +14,9 @@ import (
 // ErrDuplicateCalendarSlotKey is returned when a concurrent create/update hits the partial unique index on (unit_id, calendar_slot_key).
 var ErrDuplicateCalendarSlotKey = errors.New("calendar slot key already in use for this unit")
 
+// ErrServiceUnitIDRequired is returned when computing sort order without a unit id.
+var ErrServiceUnitIDRequired = errors.New("unitID is required")
+
 func isCalendarSlotKeyUniqueViolation(err error) bool {
 	var pe *pgconn.PgError
 	if !errors.As(err, &pe) || pe.Code != "23505" {
@@ -25,8 +28,12 @@ func isCalendarSlotKeyUniqueViolation(err error) bool {
 
 type ServiceRepository interface {
 	Create(service *models.Service) error
+	// CreateTx runs Create within tx (e.g. sort order is locked with the unit).
+	CreateTx(tx *gorm.DB, service *models.Service) error
 	// NextSortOrderForUnit returns max(sort_order)+1 for the unit (0 if no rows).
 	NextSortOrderForUnit(unitID string) (int, error)
+	// NextSortOrderForUnitTx is the same as NextSortOrderForUnit but on tx (for use after locking the parent unit).
+	NextSortOrderForUnitTx(tx *gorm.DB, unitID string) (int, error)
 	FindAllByUnit(unitID string) ([]models.Service, error)
 	// FindAllByUnitSubtree returns services for rootUnitID and all descendant units (single recursive CTE).
 	FindAllByUnitSubtree(rootUnitID string) ([]models.Service, error)
@@ -54,10 +61,20 @@ func NewServiceRepository() ServiceRepository {
 
 func (r *serviceRepository) NextSortOrderForUnit(unitID string) (int, error) {
 	if unitID == "" {
-		return 0, nil
+		return 0, ErrServiceUnitIDRequired
+	}
+	return r.NextSortOrderForUnitTx(r.db, unitID)
+}
+
+func (r *serviceRepository) NextSortOrderForUnitTx(tx *gorm.DB, unitID string) (int, error) {
+	if unitID == "" {
+		return 0, ErrServiceUnitIDRequired
+	}
+	if tx == nil {
+		return 0, errors.New("nil tx provided to NextSortOrderForUnitTx")
 	}
 	var m int
-	if err := r.db.Raw(
+	if err := tx.Raw(
 		`SELECT COALESCE(MAX(sort_order), -1) FROM services WHERE unit_id = ?`,
 		unitID,
 	).Scan(&m).Error; err != nil {
@@ -66,12 +83,19 @@ func (r *serviceRepository) NextSortOrderForUnit(unitID string) (int, error) {
 	return m + 1, nil
 }
 
-func (r *serviceRepository) Create(service *models.Service) error {
-	err := r.db.Create(service).Error
+func (r *serviceRepository) CreateTx(tx *gorm.DB, service *models.Service) error {
+	if tx == nil {
+		return errors.New("nil tx provided to CreateTx")
+	}
+	err := tx.Create(service).Error
 	if err != nil && isCalendarSlotKeyUniqueViolation(err) {
 		return ErrDuplicateCalendarSlotKey
 	}
 	return err
+}
+
+func (r *serviceRepository) Create(service *models.Service) error {
+	return r.CreateTx(r.db, service)
 }
 
 func (r *serviceRepository) FindAllByUnit(unitID string) ([]models.Service, error) {

@@ -45,7 +45,8 @@ export function SupervisorShiftDashboard({
   workplacesLoading,
   dashboardUnitId,
   activityUnitId,
-  activityQueryEnabled
+  activityQueryEnabled,
+  canReadUserData
 }: {
   unitName: string | undefined;
   stats: DashboardStats | undefined;
@@ -70,6 +71,7 @@ export function SupervisorShiftDashboard({
   /** Unit id for activity API (matches counters scope). */
   activityUnitId: string | null;
   activityQueryEnabled: boolean;
+  canReadUserData: boolean;
 }) {
   const t = useTranslations('supervisor.dashboardUi');
   const tStaffSupport = useTranslations('staff.support');
@@ -169,6 +171,7 @@ export function SupervisorShiftDashboard({
             services={services}
             onForceRelease={onForceRelease}
             releasePending={forceReleasePending}
+            canReadUserData={canReadUserData}
           />
         </TabsContent>
 

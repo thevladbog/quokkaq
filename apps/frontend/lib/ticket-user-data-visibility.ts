@@ -1,14 +1,19 @@
 import { getServiceIdentificationMode } from '@/lib/kiosk-service-identification';
 import {
   KIOSK_ID_CUSTOM_DATA_SKIPPED_KEY,
+  KIOSK_ID_DOCUMENT_OCR_KEY,
   KIOSK_ID_DOCUMENT_OCR_FAILED_KEY,
   type Service,
   type Ticket
 } from '@quokkaq/shared-types';
 
 export function ticketHasDocumentsData(
-  ticket: Pick<Ticket, 'documentsData'>
+  ticket: Pick<Ticket, 'documentsData'>,
+  canReadUserData: boolean
 ): boolean {
+  if (!canReadUserData) {
+    return false;
+  }
   const d = ticket.documentsData;
   return (
     d != null && typeof d === 'object' && Object.keys(d as object).length > 0
@@ -35,9 +40,13 @@ function parseKioskIdentPreview(raw: unknown): {
  */
 export function shouldShowUserDataInQueueList(
   ticket: Pick<Ticket, 'documentsData' | 'serviceId'>,
-  getService: (id: string | undefined) => Service | undefined
+  getService: (id: string | undefined) => Service | undefined,
+  canReadUserData: boolean
 ): boolean {
-  if (!ticketHasDocumentsData(ticket)) {
+  if (!canReadUserData) {
+    return false;
+  }
+  if (!ticketHasDocumentsData(ticket, canReadUserData)) {
     return false;
   }
   const s = getService(ticket.serviceId);
@@ -61,6 +70,8 @@ export function shouldShowUserDataInQueueList(
 export type DocumentsDataFlagLabels = {
   ocrFailed: string;
   customSkipped: string;
+  /** Label for OCR / MRZ line; defaults in UI if omitted. */
+  idDocumentOcr?: string;
 };
 
 /**
@@ -70,9 +81,13 @@ export type DocumentsDataFlagLabels = {
  */
 export function getDocumentsDataPreviewString(
   ticket: Pick<Ticket, 'documentsData'>,
-  maxLen = 120,
+  maxLen: number,
+  canReadUserData: boolean,
   flagLabels?: DocumentsDataFlagLabels
 ): string {
+  if (!canReadUserData) {
+    return '';
+  }
   const d = ticket.documentsData;
   if (!d || typeof d !== 'object') {
     return '';
@@ -99,6 +114,7 @@ export function getDocumentsDataPreviewString(
     return `${line.slice(0, maxLen - 1)}…`;
   }
 
+  const ocrLineLabel = flagLabels.idDocumentOcr ?? 'Document (OCR)';
   const parts: string[] = [];
   for (const k of keys) {
     const v = e[k];
@@ -106,6 +122,14 @@ export function getDocumentsDataPreviewString(
       parts.push(flagLabels.ocrFailed);
     } else if (k === KIOSK_ID_CUSTOM_DATA_SKIPPED_KEY && v === true) {
       parts.push(flagLabels.customSkipped);
+    } else if (k === KIOSK_ID_DOCUMENT_OCR_KEY) {
+      const text =
+        v === null || v === undefined
+          ? ''
+          : typeof v === 'string'
+            ? v
+            : String(v);
+      parts.push(`${ocrLineLabel}: ${text}`);
     } else {
       const text =
         v === null || v === undefined

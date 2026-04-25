@@ -741,7 +741,7 @@ function mergeServiceIntoUnitServicesListCache(
     getUnitServicesListQueryKey(unitId),
     (old) => {
       if (old === undefined) {
-        return old;
+        return [service];
       }
       if (old.length === 0) {
         return [service];
@@ -773,11 +773,6 @@ export const useCreateService = () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
       queryClient.invalidateQueries({ queryKey: ['units'] });
-      if (created.unitId) {
-        queryClient.invalidateQueries({
-          queryKey: ['units', created.unitId, 'services-tree']
-        });
-      }
     }
   });
 };
@@ -816,11 +811,6 @@ export const useUpdateService = () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
       queryClient.invalidateQueries({ queryKey: ['units'] });
-      if (updated.unitId) {
-        queryClient.invalidateQueries({
-          queryKey: ['units', updated.unitId, 'services-tree']
-        });
-      }
     }
   });
 };

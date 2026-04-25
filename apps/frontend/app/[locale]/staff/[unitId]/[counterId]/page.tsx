@@ -63,6 +63,11 @@ import { StaffWorkstationActionPanel } from '@/components/staff/StaffWorkstation
 import { StaffVisitorContextPanel } from '@/components/staff/StaffVisitorContextPanel';
 import { StaffQueuePanel } from '@/components/staff/StaffQueuePanel';
 import { useSyncActiveUnit } from '@/contexts/ActiveUnitContext';
+import { useAuthContext } from '@/contexts/AuthContext';
+import {
+  PermTicketsViewUserData,
+  userUnitPermissionMatches
+} from '@/lib/permission-variants';
 import { cn } from '@/lib/utils';
 import { formatWaitDurationSeconds } from '@/components/supervisor/supervisor-queue-utils';
 import { useLiveElapsedSecondsSince } from '@/lib/use-live-elapsed-since';
@@ -92,6 +97,15 @@ export default function StaffWorkspacePage({
   const { unitId, counterId, locale } = use(params);
   const t = useTranslations('staff');
   const router = useRouter();
+  const { user } = useAuthContext();
+  const canReadUserData = useMemo(
+    () =>
+      userUnitPermissionMatches(
+        user?.permissions?.[unitId] ?? [],
+        PermTicketsViewUserData
+      ),
+    [user, unitId]
+  );
   useSyncActiveUnit(unitId);
   const [inProgressTicketId, setInProgressTicketId] = useState<string | null>(
     null
@@ -929,6 +943,7 @@ export default function StaffWorkspacePage({
           isOpen={isDetailsOpen}
           onClose={() => setIsDetailsOpen(false)}
           ticket={detailsTicket}
+          canReadUserData={canReadUserData}
         />
 
         <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_17.5rem] xl:grid-cols-[minmax(0,1fr)_19rem]'>
@@ -980,6 +995,7 @@ export default function StaffWorkspacePage({
                     ticket={currentTicket}
                     t={t}
                     onShowDetails={() => openDetails(currentTicket)}
+                    canReadUserData={canReadUserData}
                   />
                 ) : (
                   <StaffIdleWorkstationHero
@@ -1025,6 +1041,7 @@ export default function StaffWorkspacePage({
           <StaffQueuePanel
             t={t}
             unitId={unitId}
+            canReadUserData={canReadUserData}
             counterOnBreak={workstationOnBreak}
             waitingTickets={queueDisplayTickets}
             showAllTicketsInQueue={showAllQueueTickets}

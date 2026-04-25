@@ -49,7 +49,8 @@ export function SupervisorListView({
   onShowTicketDetails,
   services,
   onForceRelease,
-  releasePending
+  releasePending,
+  canReadUserData
 }: {
   queue: (Ticket & { service?: Service })[] | undefined;
   queueLoading: boolean;
@@ -59,6 +60,7 @@ export function SupervisorListView({
   services: Service[];
   onForceRelease: (counter: ShiftCounterRow) => void;
   releasePending: boolean;
+  canReadUserData: boolean;
 }) {
   const locale = useLocale();
   const t = useTranslations('supervisor.dashboardUi');
@@ -142,7 +144,11 @@ export function SupervisorListView({
                       </TableCell>
                       <TableCell>
                         {ticket.preRegistration ||
-                        shouldShowUserDataInQueueList(ticket, getService) ? (
+                        shouldShowUserDataInQueueList(
+                          ticket,
+                          getService,
+                          canReadUserData
+                        ) ? (
                           <Button
                             type='button'
                             size='icon'

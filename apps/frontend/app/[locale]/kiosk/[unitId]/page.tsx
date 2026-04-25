@@ -566,7 +566,8 @@ export default function UnitKioskPage() {
     !isKioskDocumentOcrDisabledOpen &&
     !isPhoneIdentificationOpen &&
     !isEmployeeIdentificationOpen &&
-    !documentOcrModalBlocking
+    !documentOcrModalBlocking &&
+    !customIdentOpen
   );
   const sessionIdleBaseEnabled = kioskNoModalBlockers && !showAttract;
   const sessionIdleEnabled =
@@ -833,7 +834,11 @@ export default function UnitKioskPage() {
         <p
           className={cn(
             'min-w-0 truncate text-lg font-bold tracking-tight sm:text-xl md:text-2xl',
-            useHcSurfaces ? 'text-white' : 'text-kiosk-ink'
+            useHcSurfaces
+              ? 'text-white'
+              : useLightKioskHeaderText
+                ? 'text-zinc-100'
+                : 'text-kiosk-ink'
           )}
         >
           {resolvedHeaderUnitTitle}

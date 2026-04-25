@@ -1,6 +1,11 @@
 'use client';
 
 import { use, useEffect, useMemo, useState } from 'react';
+import { useAuthContext } from '@/contexts/AuthContext';
+import {
+  PermTicketsViewUserData,
+  userUnitPermissionMatches
+} from '@/lib/permission-variants';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -46,6 +51,15 @@ export default function ShiftDashboardPage({
   const tAnomalies = useTranslations('anomalies');
   const locale = useLocale();
   const queryClient = useQueryClient();
+  const { user } = useAuthContext();
+  const canReadUserData = useMemo(
+    () =>
+      userUnitPermissionMatches(
+        user?.permissions?.[unitId] ?? [],
+        PermTicketsViewUserData
+      ),
+    [user, unitId]
+  );
   useSyncActiveUnit(unitId);
   const { activeSlaAlerts, dismissAlert, dismissAllAlerts } =
     useSlaAlerts(unitId);
@@ -298,6 +312,7 @@ export default function ShiftDashboardPage({
         dashboardUnitId={unitId}
         activityUnitId={countersUnitId}
         activityQueryEnabled={countersQueryEnabled}
+        canReadUserData={canReadUserData}
       />
 
       <Dialog
@@ -385,6 +400,7 @@ export default function ShiftDashboardPage({
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
         ticket={detailsTicket}
+        canReadUserData={canReadUserData}
       />
     </>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -97,6 +97,12 @@ export function KioskCustomIdentificationDialog({
     },
     [isBarcode, manualMode, numMax]
   );
+
+  useEffect(() => {
+    if (!open) {
+      setValue('');
+    }
+  }, [open]);
 
   useKioskSerialScannerStream(
     open && isBarcode && (unitId || '').trim() !== '',
@@ -200,7 +206,6 @@ export function KioskCustomIdentificationDialog({
                   maxLength={maxLen}
                   inputMode={inputMode}
                   enterKeyHint='done'
-                  readOnly={isBarcode}
                   title={
                     isBarcode
                       ? t('custom_ident_barcode_field_readonly_hint', {

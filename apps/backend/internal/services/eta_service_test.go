@@ -133,6 +133,9 @@ func (e *etaUnitRepo) FindByIDLight(id string) (*models.Unit, error) {
 	}
 	return &models.Unit{ID: id, Timezone: "UTC"}, nil
 }
+func (e *etaUnitRepo) FindByIDLightTxForUpdate(_ *gorm.DB, id string) (*models.Unit, error) {
+	return e.FindByIDLight(id)
+}
 
 // helper for creating a gorm.DB-satisfying counter repo (unused but avoids
 // embedding issues when nil methods would be called)
