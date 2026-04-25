@@ -2,6 +2,12 @@
 
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
+import {
+  Status,
+  StatusIndicator,
+  StatusLabel,
+  type KiboStatusVariant
+} from '@/components/kibo-ui/status';
 
 export type KioskRuntimeStatus = 'ok' | 'offline' | 'frozen' | 'loading';
 
@@ -11,11 +17,25 @@ type KioskBuildStatusBarProps = {
   highContrast: boolean;
 };
 
-const BADGE =
-  'inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium';
+function kioskToKiboStatus(s: KioskRuntimeStatus): KiboStatusVariant {
+  switch (s) {
+    case 'ok':
+      return 'online';
+    case 'offline':
+      return 'offline';
+    case 'frozen':
+      return 'frozen';
+    case 'loading':
+      return 'loading';
+    default:
+      return 'online';
+  }
+}
 
 /**
- * Bottom strip: build / app version and runtime health badge. Keep z-index below idle bar and attract.
+ * Bottom strip: build / app version and runtime health.
+ * Status UI from {@link https://www.kibo-ui.com/components/status Kibo UI Status} (vendored under `components/kibo-ui/status`).
+ * Keep z-index below idle bar and attract.
  */
 export function KioskBuildStatusBar({
   appVersion,
@@ -23,6 +43,15 @@ export function KioskBuildStatusBar({
   highContrast
 }: KioskBuildStatusBarProps) {
   const t = useTranslations('kiosk.status_bar');
+  const kibo = kioskToKiboStatus(status);
+  const label =
+    status === 'ok'
+      ? t('badge_ok')
+      : status === 'offline'
+        ? t('badge_offline')
+        : status === 'frozen'
+          ? t('badge_frozen')
+          : t('badge_loading');
 
   return (
     <div
@@ -38,32 +67,46 @@ export function KioskBuildStatusBar({
         >
           {t('version_label', { v: appVersion })}
         </span>
-        <span
+        <Status
+          status={kibo}
+          title={label}
           className={cn(
-            BADGE,
-            status === 'ok' &&
-              (highContrast
-                ? 'bg-emerald-500/20 text-emerald-200'
-                : 'bg-emerald-500/15 text-emerald-800'),
-            status === 'offline' &&
-              (highContrast
-                ? 'bg-amber-500/25 text-amber-100'
-                : 'bg-amber-500/20 text-amber-950'),
-            status === 'frozen' &&
-              (highContrast
-                ? 'bg-rose-500/25 text-rose-100'
-                : 'bg-rose-500/15 text-rose-950'),
-            status === 'loading' &&
-              (highContrast
-                ? 'bg-zinc-500/30 text-zinc-200'
-                : 'bg-muted text-muted-foreground')
+            'pointer-events-auto shrink-0 !gap-1.5 border-0 px-2.5 py-0.5 text-[11px] font-medium sm:text-xs',
+            highContrast &&
+              kibo === 'online' &&
+              'bg-emerald-500/20 text-emerald-200',
+            highContrast &&
+              kibo === 'offline' &&
+              'bg-amber-500/25 text-amber-100',
+            highContrast && kibo === 'frozen' && 'bg-rose-500/25 text-rose-100',
+            highContrast &&
+              kibo === 'loading' &&
+              'bg-zinc-500/30 text-zinc-200',
+            !highContrast &&
+              kibo === 'online' &&
+              'bg-emerald-500/15 text-emerald-900 dark:text-emerald-200',
+            !highContrast &&
+              kibo === 'offline' &&
+              'bg-amber-500/20 text-amber-950 dark:text-amber-100',
+            !highContrast &&
+              kibo === 'frozen' &&
+              'bg-rose-500/15 text-rose-950 dark:text-rose-100',
+            !highContrast &&
+              kibo === 'loading' &&
+              'bg-muted text-muted-foreground'
           )}
         >
-          {status === 'ok' && t('badge_ok')}
-          {status === 'offline' && t('badge_offline')}
-          {status === 'frozen' && t('badge_frozen')}
-          {status === 'loading' && t('badge_loading')}
-        </span>
+          <StatusIndicator />
+          <StatusLabel
+            className={cn(
+              'text-xs font-medium',
+              highContrast ? 'text-inherit' : 'text-foreground/90',
+              'max-w-[min(14rem,55vw)] truncate sm:max-w-[18rem]'
+            )}
+          >
+            {label}
+          </StatusLabel>
+        </Status>
       </div>
     </div>
   );

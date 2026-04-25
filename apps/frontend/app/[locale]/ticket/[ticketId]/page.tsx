@@ -5,6 +5,11 @@ import { useParams, useRouter } from 'next/navigation';
 import { socketClient, type UnitETASnapshot } from '@/lib/socket';
 import { toast } from 'sonner';
 import { useTranslations, useLocale } from 'next-intl';
+import {
+  KIOSK_ID_CUSTOM_DATA_SKIPPED_KEY,
+  KIOSK_ID_DOCUMENT_OCR_FAILED_KEY,
+  KIOSK_ID_DOCUMENT_OCR_KEY
+} from '@quokkaq/shared-types';
 import { ticketsApi, Ticket } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -70,10 +75,21 @@ export default function TicketPage() {
   const { ticketId } = useParams() as { ticketId?: string };
   const { data: unit } = useUnit(ticket?.unitId || '');
 
+  const getVisitorToken = useCallback((): string | undefined => {
+    if (!ticketId) return undefined;
+    return (
+      (typeof window !== 'undefined' &&
+        sessionStorage.getItem(`visitor_token_${ticketId}`)) ||
+      undefined
+    );
+  }, [ticketId]);
+
   const refreshTicket = useCallback(async () => {
     if (!ticketId) return;
     try {
-      const updated = await ticketsApi.getById(ticketId);
+      const updated = await ticketsApi.getById(ticketId, {
+        visitorToken: getVisitorToken()
+      });
       ticketRef.current = updated;
       setTicket(updated);
       if (
@@ -86,7 +102,7 @@ export default function TicketPage() {
     } catch {
       // Silently ignore refresh errors to not spam errors during polling
     }
-  }, [ticketId]);
+  }, [ticketId, getVisitorToken]);
 
   useEffect(() => {
     if (!ticketId) return;
@@ -98,7 +114,11 @@ export default function TicketPage() {
 
     const load = async () => {
       try {
-        const t_data = await ticketsApi.getById(ticketId);
+        const vt =
+          typeof window !== 'undefined' && ticketId
+            ? (sessionStorage.getItem(`visitor_token_${ticketId}`) ?? undefined)
+            : undefined;
+        const t_data = await ticketsApi.getById(ticketId, { visitorToken: vt });
 
         // Guard: if this effect was cleaned up while the request was in-flight
         // (e.g. React Strict Mode double-invoke or dependency change), bail out
@@ -196,10 +216,7 @@ export default function TicketPage() {
     };
   }, [ticketId, t, refreshTicket]);
 
-  const getVisitorToken = () =>
-    ticketId
-      ? (sessionStorage.getItem(`visitor_token_${ticketId}`) ?? undefined)
-      : undefined;
+  const getVisitorTokenForActions = () => getVisitorToken();
 
   const handleCancel = async () => {
     if (!ticketId) return;
@@ -207,7 +224,7 @@ export default function TicketPage() {
     try {
       const updated = await ticketsApi.visitorCancel(
         ticketId,
-        getVisitorToken()
+        getVisitorTokenForActions()
       );
       ticketRef.current = updated;
       setTicket(updated);
@@ -226,7 +243,7 @@ export default function TicketPage() {
         ticketId,
         smsPhone.trim(),
         locale,
-        getVisitorToken()
+        getVisitorTokenForActions()
       );
       setSmsSubmitted(true);
       toast.success(t('sms_optin_success'));
@@ -346,6 +363,57 @@ export default function TicketPage() {
           >
             {tStaff(ticket.status)}
           </Badge>
+
+          {(() => {
+            const dd = ticket.documentsData as
+              | Record<string, unknown>
+              | undefined;
+            if (!dd) {
+              return null;
+            }
+            const visitorDocEntries = Object.entries(dd).filter(
+              ([key]) =>
+                key !== KIOSK_ID_DOCUMENT_OCR_FAILED_KEY &&
+                key !== KIOSK_ID_CUSTOM_DATA_SKIPPED_KEY
+            );
+            if (visitorDocEntries.length === 0) {
+              return null;
+            }
+            return (
+              <div className='mb-4 w-full max-w-sm space-y-2 text-left text-sm'>
+                <p className='text-foreground/90 font-medium'>
+                  {t('documents_data_title')}
+                </p>
+                {visitorDocEntries.map(([key, val]) => {
+                  const label =
+                    key === KIOSK_ID_DOCUMENT_OCR_KEY
+                      ? t('documents_id_ocr')
+                      : key;
+                  const text =
+                    val == null
+                      ? ''
+                      : typeof val === 'string'
+                        ? val
+                        : String(val);
+                  return (
+                    <div
+                      key={key}
+                      className='border-border/60 text-muted-foreground rounded-md border p-2 text-xs break-words'
+                    >
+                      <span className='text-foreground/80 font-medium'>
+                        {label}
+                      </span>
+                      {text ? (
+                        <p className='text-foreground mt-1 wrap-break-word whitespace-pre-wrap'>
+                          {text}
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Queue position + ETA (waiting only) */}
           {ticket.status === 'waiting' && (
@@ -505,25 +573,6 @@ export default function TicketPage() {
               <div className='text-muted-foreground text-center text-sm'>
                 {unit.config.kiosk.footerText}
               </div>
-            </>
-          )}
-
-          {/* Feedback */}
-          {unit?.config?.kiosk?.feedbackUrl && isTerminal && (
-            <>
-              <Separator className='my-4 w-full' />
-              <Button variant='outline' className='w-full' asChild>
-                <a
-                  href={unit.config.kiosk.feedbackUrl.replace(
-                    '{{ticketId}}',
-                    ticket.id
-                  )}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                >
-                  {t('rate_visit')}
-                </a>
-              </Button>
             </>
           )}
         </CardContent>

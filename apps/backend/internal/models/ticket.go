@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -35,10 +36,15 @@ type Ticket struct {
 	PreRegistrationID *string `json:"preRegistrationId,omitempty"`
 	// KioskIdentifiedUserID is set when the ticket was issued after kiosk employee identification (badge / login) matched a user in the tenant.
 	KioskIdentifiedUserID *string `gorm:"column:kiosk_identified_user_id" json:"kioskIdentifiedUserId,omitempty"`
-	ClientID              *string `json:"clientId,omitempty"`
-	Status                string  `gorm:"default:'waiting'" json:"status"`
-	Priority              int     `gorm:"default:0" json:"priority"`
-	IsEOD                 bool    `gorm:"default:false" json:"isEod"`
+	// DocumentsData stores kiosk-provided key/value (document OCR, custom fields). PII: see OpenAPI / DWH policy; staff access requires permission tickets.user_data.read.
+	// - documentsData is cleared by a scheduled job when documentsDataExpiresAt is in the past (sensitive or document mode with retention).
+	// - documentsDataExpiresAt: set at creation for document/sensitive custom flows; may be null for non-sensitive custom data (no auto-expiry from cron).
+	DocumentsData          json.RawMessage `gorm:"type:jsonb;column:documents_data" json:"documentsData,omitempty" swaggertype:"object"`
+	DocumentsDataExpiresAt *time.Time      `gorm:"column:documents_data_expires_at" json:"documentsDataExpiresAt,omitempty"`
+	ClientID               *string         `json:"clientId,omitempty"`
+	Status                 string          `gorm:"default:'waiting'" json:"status"`
+	Priority               int             `gorm:"default:0" json:"priority"`
+	IsEOD                  bool            `gorm:"default:false" json:"isEod"`
 	// IsCredit marks a ticket issued when the monthly tickets_per_month quota was exhausted but
 	// the working day (EOD) was still open. Credit tickets are counted against the next billing period.
 	IsCredit bool    `gorm:"default:false;column:is_credit" json:"isCredit"`

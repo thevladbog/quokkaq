@@ -61,6 +61,17 @@ export type ParsedICAO = {
   checks: MrzCheckResults;
 };
 
+/**
+ * Strip everything except ICAO 9303 line charset (A–Z, 0–9, filler `<`).
+ * Removes em dashes, Cyrillic, and punctuation so Tesseract “noise lines”
+ * are not mis-parsed as 30/44-char fields with invisible junk.
+ */
+export function sanitizeIcaOmrzInputLine(line: string): string {
+  return String(line)
+    .toUpperCase()
+    .replace(/[^A-Z0-9<]+/g, '');
+}
+
 function normalizeLine(line: string, n: number): string {
   const u = line.toUpperCase().replace(/[\r\n\t]/g, '');
   if (u.length > n) {
@@ -89,6 +100,17 @@ function parseMrzNameBlock(block: string): { last: string; first: string } {
     return { last: p[0] ?? '', first: p.slice(1).join(' ').trim() };
   }
   return { last: s, first: '' };
+}
+
+/** Tesseract et al. often OCR "P" as "3" at the start of TD3 line 1. */
+function fixTd3Line1Ocr(line1: string): string {
+  if (line1.length < 2) {
+    return line1;
+  }
+  if (line1[0] === '3' && line1[1] === '<') {
+    return `P${line1.slice(1)}`;
+  }
+  return line1;
 }
 
 function parseTD3(line1: string, line2: string): ParsedICAO {
@@ -182,6 +204,7 @@ export type ParseIcaOmrzResult =
 export function parseIcaOmrz(lines: string[]): ParseIcaOmrzResult {
   const clean = lines
     .map((l) => l.replace(/\r/g, '').replace(/\n/g, '').trim())
+    .map(sanitizeIcaOmrzInputLine)
     .filter((l) => l.length > 0);
   if (clean.length === 2) {
     const a = clean[0] ?? '';
@@ -189,7 +212,8 @@ export function parseIcaOmrz(lines: string[]): ParseIcaOmrzResult {
     if (a.length < 20 || b.length < 20) {
       return { ok: false, error: 'TD3: lines too short' };
     }
-    return { ok: true, value: parseTD3(a, b) };
+    // OCR often reads leading P< as 3< on passports (P vs 3).
+    return { ok: true, value: parseTD3(fixTd3Line1Ocr(a), b) };
   }
   if (clean.length === 3) {
     if ((clean[0] ?? '').length < 20) {
@@ -208,7 +232,10 @@ export function parseIcaOmrz(lines: string[]): ParseIcaOmrzResult {
     // Single long paste: try split 44+44 or 30*3
     const t = clean[0] as string;
     if (t.length === 88) {
-      return { ok: true, value: parseTD3(t.slice(0, 44), t.slice(44, 88)) };
+      return {
+        ok: true,
+        value: parseTD3(fixTd3Line1Ocr(t.slice(0, 44)), t.slice(44, 88))
+      };
     }
     if (t.length === 90) {
       return {

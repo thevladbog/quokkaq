@@ -100,21 +100,6 @@ describe('buildKioskTicketEscPos', () => {
     expect(asLatin).not.toContain(`ID: ${sampleTicket.id}`);
   });
 
-  it('substitutes {{ticketId}} in feedbackUrl', async () => {
-    const bytes = await buildKioskTicketEscPos({
-      kiosk: { feedbackUrl: 'https://poll.example/r/{{ticketId}}/done' },
-      ticket: sampleTicket,
-      serviceLabel: 'S',
-      ticketPageUrl: 'https://x',
-      unitDisplayTitle: ''
-    });
-    const asLatin = new TextDecoder('latin1').decode(bytes);
-    expect(asLatin).toContain('poll.example/r/');
-    expect(asLatin).toContain('550e8400-e29b-41d4-');
-    expect(asLatin).toContain('a716-446655440000/done');
-    expect(asLatin).not.toContain('{{ticketId}}');
-  });
-
   it('omits header text when showHeader is false', async () => {
     const secret = 'SECRET_HEADER_XYZ';
     const bytes = await buildKioskTicketEscPos({

@@ -53,16 +53,20 @@ export function useKioskSessionIdle({
   /** After the first user interaction, we may auto-arm when `enabled` turns on again (e.g. after ticket success). */
   const hasUserInteractedRef = useRef(false);
 
-  const clearTimers = useCallback(() => {
+  const clearWarningArmingTimeout = useCallback(() => {
     if (warningTimeoutRef.current) {
       clearTimeout(warningTimeoutRef.current);
       warningTimeoutRef.current = null;
     }
+  }, []);
+
+  const clearTimers = useCallback(() => {
+    clearWarningArmingTimeout();
     if (countdownIntervalRef.current) {
       clearInterval(countdownIntervalRef.current);
       countdownIntervalRef.current = null;
     }
-  }, []);
+  }, [clearWarningArmingTimeout]);
 
   const endSession = useCallback(() => {
     clearTimers();
@@ -77,6 +81,7 @@ export function useKioskSessionIdle({
       return;
     }
     warningTimeoutRef.current = setTimeout(() => {
+      warningTimeoutRef.current = null;
       setShowWarning(true);
       let left = countdownSec;
       setRemainingSec(left);
@@ -121,8 +126,17 @@ export function useKioskSessionIdle({
       return;
     }
     scheduleWarning();
+    // Only clear the inactivity "arming" delay here. If we called full `clearTimers`
+    // on the transition to `showWarning === true`, the previous effect's cleanup
+    // would run *after* the arming callback starts the countdown interval, wiping
+    // that interval and freezing `remainingSec`.
+    // Inlined (refs only) so this effect's dependency list stays the same as before
+    // and HMR does not see a changing `useEffect` dep array size.
     return () => {
-      clearTimers();
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+        warningTimeoutRef.current = null;
+      }
     };
   }, [
     beforeWarningSec,

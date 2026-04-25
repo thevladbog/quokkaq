@@ -1,4 +1,7 @@
-import type { KioskConfig, Ticket } from '@quokkaq/shared-types';
+import type {
+  KioskConfigForDeviceRuntime,
+  Ticket
+} from '@quokkaq/shared-types';
 import { encodeCp1251 } from './cp1251-encode';
 
 const ESC = 0x1b;
@@ -12,7 +15,7 @@ const RECEIPT_MAX_CHARS = 42;
 
 export type BuildKioskTicketEscPosInput = {
   kiosk: Pick<
-    KioskConfig,
+    KioskConfigForDeviceRuntime,
     | 'logoUrl'
     | 'printerLogoUrl'
     | 'headerText'
@@ -20,7 +23,6 @@ export type BuildKioskTicketEscPosInput = {
     | 'showHeader'
     | 'showFooter'
     | 'showUnitInHeader'
-    | 'feedbackUrl'
   >;
   ticket: Ticket;
   serviceLabel: string;
@@ -375,13 +377,6 @@ function buildFallbackTicketEscPos(
       lines.push(...wrapLine(normalizeReceiptTextLine(raw), maxC));
     }
   }
-  const fb = k.feedbackUrl?.trim();
-  if (fb) {
-    lines.push('');
-    lines.push(
-      normalizeReceiptTextLine(fb.split('{{ticketId}}').join(input.ticket.id))
-    );
-  }
   return buildEscPosReceiptCp1251(lines);
 }
 
@@ -491,17 +486,6 @@ async function buildRichTicketEscPos(
     }
   }
 
-  const fb = k.feedbackUrl?.trim();
-  if (fb) {
-    appendSelectWpc1251(parts);
-    const replaced = normalizeReceiptTextLine(
-      fb.split('{{ticketId}}').join(input.ticket.id)
-    );
-    for (const wl of wrapLine(replaced, maxC)) {
-      appendLine(parts, wl, 'left');
-    }
-  }
-
   parts.push(0x0a);
   appendPrintAndFeedLines(parts, 4);
   parts.push(0x0a);
@@ -511,7 +495,7 @@ async function buildRichTicketEscPos(
 
 /**
  * Full ticket receipt: logo, header/footer from kiosk config, service, large queue #,
- * centered QR (URL only inside QR, no printed link line), optional feedback URL.
+ * centered QR (URL only inside QR, no printed link line).
  * On failure, falls back to a plain CP1251 text receipt.
  */
 export async function buildKioskTicketEscPos(

@@ -3,6 +3,7 @@ import { Buffer } from 'node:buffer';
 import { encodeCp1251 } from './cp1251-encode';
 import {
   formatRuDrivingLicenseText,
+  isLikelyRuDrivingLicenseFromScanString,
   parseRuDrivingLicenseBarcode
 } from './ru-driving-license';
 
@@ -41,6 +42,25 @@ describe('parseRuDrivingLicenseBarcode', () => {
     expect(p.firstName).toBe('СИДОР');
     expect(p.middleName).toBe('СИДОР');
     expect(p.encoding).toBe('windows-1251');
+  });
+});
+
+describe('isLikelyRuDrivingLicenseFromScanString', () => {
+  it('is false for stray pipe from OCR (e.g. passport text)', () => {
+    expect(isLikelyRuDrivingLicenseFromScanString('a|b|hello')).toBe(false);
+  });
+
+  it('is true for ≥9 pipe fields (RI driver license line)', () => {
+    const open =
+      '1001999991|20160101|20260101|ПЕТРОВ|ПЁТР|ПЁТРОВИЧ|19850505|A|77|1';
+    expect(isLikelyRuDrivingLicenseFromScanString(open)).toBe(true);
+  });
+
+  it('is true for base64 of license', () => {
+    const line =
+      '2002002002|20200115|20260115|IVANOV|IVAN|IVANOVICH|19900101|B,BE|16|200200200299';
+    const b64 = Buffer.from(line, 'utf8').toString('base64');
+    expect(isLikelyRuDrivingLicenseFromScanString(b64)).toBe(true);
   });
 });
 

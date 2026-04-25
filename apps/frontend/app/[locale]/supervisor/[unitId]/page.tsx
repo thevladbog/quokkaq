@@ -1,6 +1,12 @@
 'use client';
 
 import { use, useEffect, useMemo, useState } from 'react';
+import { useAuthContext } from '@/contexts/AuthContext';
+import {
+  PermTicketsViewUserData,
+  userUnitPermissionMatches
+} from '@/lib/permission-variants';
+import { isTenantAdminUser } from '@/lib/tenant-admin-access';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -14,7 +20,8 @@ import {
   getGetUnitByIDQueryKey,
   getGetUnitsUnitIdChildWorkplacesQueryKey
 } from '@/lib/api/generated/units';
-import { shiftApi, unitsApi, Ticket } from '@/lib/api';
+import { useUnitServices } from '@/lib/hooks';
+import { shiftApi, unitsApi, Ticket, type Service } from '@/lib/api';
 import { useLocale, useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, AlertTriangle } from 'lucide-react';
@@ -25,6 +32,7 @@ import { SlaAlertBanner } from '@/components/supervisor/SlaAlertBanner';
 import { KioskPrinterAlertBanner } from '@/components/supervisor/KioskPrinterAlertBanner';
 import type { ShiftCounterRow } from '@/components/supervisor/SupervisorWorkstationMonitoring';
 import { useSyncActiveUnit } from '@/contexts/ActiveUnitContext';
+import { getAnomalyMessage } from '@/lib/anomaly-i18n';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { useSlaAlerts } from '@/hooks/use-sla-alerts';
 import { useKioskPrinterAlerts } from '@/hooks/use-kiosk-printer-alerts';
@@ -41,8 +49,19 @@ export default function ShiftDashboardPage({
 }) {
   const { unitId } = use(params);
   const t = useTranslations('supervisor');
+  const tAnomalies = useTranslations('anomalies');
   const locale = useLocale();
   const queryClient = useQueryClient();
+  const { user } = useAuthContext();
+  const canReadUserData = useMemo(
+    () =>
+      isTenantAdminUser(user) ||
+      userUnitPermissionMatches(
+        user?.permissions?.[unitId] ?? [],
+        PermTicketsViewUserData
+      ),
+    [user, unitId]
+  );
   useSyncActiveUnit(unitId);
   const { activeSlaAlerts, dismissAlert, dismissAllAlerts } =
     useSlaAlerts(unitId);
@@ -75,7 +94,7 @@ export default function ShiftDashboardPage({
     };
     const onAnom = (a: UnitAnomalyAlert) => {
       if (a.unitId !== unitId) return;
-      toast.error(a.message);
+      toast.error(getAnomalyMessage(a.kind, a.message, tAnomalies));
     };
     const onKioskSurvey = (d: {
       unitId: string;
@@ -95,7 +114,7 @@ export default function ShiftDashboardPage({
       socketClient.offAnomalyAlert(onAnom);
       socketClient.offKioskSurveyLow(onKioskSurvey);
     };
-  }, [unitId, t]);
+  }, [unitId, t, tAnomalies]);
 
   const [showEODDialog, setShowEODDialog] = useState(false);
   const [forceReleaseDialogOpen, setForceReleaseDialogOpen] = useState(false);
@@ -167,6 +186,9 @@ export default function ShiftDashboardPage({
     refetchInterval: 10000,
     refetchOnMount: 'always'
   });
+
+  const { data: unitServicesData } = useUnitServices(unitId);
+  const servicesForQueuePreview: Service[] = unitServicesData ?? [];
 
   const { data: queue, isLoading: queueLoading } = useQuery({
     queryKey: ['shift-queue', unitId],
@@ -274,6 +296,7 @@ export default function ShiftDashboardPage({
         onForceRelease={handleForceRelease}
         forceReleasePending={forceReleaseMutation.isPending}
         onShowTicketDetails={openDetails}
+        services={servicesForQueuePreview}
         serviceZoneMode={serviceZonePickerMode}
         workplaceZones={
           serviceZonePickerMode
@@ -291,6 +314,7 @@ export default function ShiftDashboardPage({
         dashboardUnitId={unitId}
         activityUnitId={countersUnitId}
         activityQueryEnabled={countersQueryEnabled}
+        canReadUserData={canReadUserData}
       />
 
       <Dialog
@@ -378,6 +402,7 @@ export default function ShiftDashboardPage({
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
         ticket={detailsTicket}
+        canReadUserData={canReadUserData}
       />
     </>
   );

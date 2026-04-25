@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -10,6 +11,9 @@ import (
 // MergeServiceJSONPatch copies only keys present in raw (JSON object) onto dst.
 // Used for PUT /services/:id so sparse bodies (e.g. grid-only updates) do not zero out name, prefix, etc.
 func MergeServiceJSONPatch(dst *models.Service, raw map[string]json.RawMessage) error {
+	// If both are sent, `identificationMode` is the source of truth; do not let legacy
+	// `offerIdentification: false` (random map order) override custom/document/etc.
+	_, hasIdentificationModeInPatch := raw["identificationMode"]
 	for k, v := range raw {
 		switch k {
 		case "id", "children", "parent", "unit":
@@ -68,6 +72,12 @@ func MergeServiceJSONPatch(dst *models.Service, raw map[string]json.RawMessage) 
 				return fmt.Errorf("imageUrl: %w", err)
 			}
 			dst.ImageUrl = p
+		case "iconKey":
+			var p *string
+			if err := json.Unmarshal(v, &p); err != nil {
+				return fmt.Errorf("iconKey: %w", err)
+			}
+			dst.IconKey = p
 		case "backgroundColor":
 			var p *string
 			if err := json.Unmarshal(v, &p); err != nil {
@@ -121,6 +131,9 @@ func MergeServiceJSONPatch(dst *models.Service, raw map[string]json.RawMessage) 
 			}
 			dst.CalendarSlotKey = p
 		case "offerIdentification":
+			if hasIdentificationModeInPatch {
+				break
+			}
 			if err := json.Unmarshal(v, &dst.OfferIdentification); err != nil {
 				return fmt.Errorf("offerIdentification: %w", err)
 			}
@@ -173,6 +186,30 @@ func MergeServiceJSONPatch(dst *models.Service, raw map[string]json.RawMessage) 
 				return fmt.Errorf("gridColSpan: %w", err)
 			}
 			dst.GridColSpan = p
+		case "sortOrder":
+			if err := json.Unmarshal(v, &dst.SortOrder); err != nil {
+				return fmt.Errorf("sortOrder: %w", err)
+			}
+		case "kioskDocumentSettings":
+			b := bytesTrimJSON(v)
+			if len(b) == 0 || string(b) == "null" {
+				dst.KioskDocumentSettings = nil
+				break
+			}
+			if !json.Valid(b) {
+				return fmt.Errorf("kioskDocumentSettings: invalid json")
+			}
+			dst.KioskDocumentSettings = append(json.RawMessage(nil), b...)
+		case "kioskIdentificationConfig":
+			b := bytesTrimJSON(v)
+			if len(b) == 0 || string(b) == "null" {
+				dst.KioskIdentificationConfig = nil
+				break
+			}
+			if !json.Valid(b) {
+				return fmt.Errorf("kioskIdentificationConfig: invalid json")
+			}
+			dst.KioskIdentificationConfig = append(json.RawMessage(nil), b...)
 		default:
 			// Ignore unknown keys so generated clients can add read-only metadata without breaking updates.
 			continue
@@ -180,3 +217,5 @@ func MergeServiceJSONPatch(dst *models.Service, raw map[string]json.RawMessage) 
 	}
 	return nil
 }
+
+func bytesTrimJSON(v json.RawMessage) []byte { return bytes.TrimSpace(v) }

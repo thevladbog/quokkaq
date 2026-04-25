@@ -36,6 +36,8 @@ CREATE TABLE tickets (
 	counter_id text,
 	pre_registration_id text,
 	kiosk_identified_user_id text,
+	documents_data text,
+	documents_data_expires_at datetime,
 	client_id text,
 	status text,
 	priority integer DEFAULT 0,

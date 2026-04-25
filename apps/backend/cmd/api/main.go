@@ -290,6 +290,25 @@ func run() error {
 			}
 		}
 	}()
+	go func() {
+		tck := time.NewTicker(20 * time.Minute)
+		defer tck.Stop()
+		for {
+			select {
+			case <-refreshCtx.Done():
+				return
+			case <-tck.C:
+				n, exErr := ticketRepo.ClearExpiredTicketDocuments()
+				if exErr != nil {
+					slog.Error("tickets: clear expired documentsData", "err", exErr)
+					continue
+				}
+				if n > 0 {
+					slog.Info("tickets: cleared expired documentsData", "rows", n)
+				}
+			}
+		}
+	}()
 	shiftService := services.NewShiftService(ticketRepo, counterRepo, serviceRepo, auditLogRepo, operatorIntervalRepo, hub, userRepo)
 	templateService := services.NewTemplateService(templateRepo)
 	invitationService := services.NewInvitationServiceWithQuota(invitationRepo, mailService, userRepo, unitRepo, templateService, quotaService)
@@ -324,7 +343,7 @@ func run() error {
 	employeeIdpRepo := repository.NewEmployeeIdpRepository(database.DB)
 	employeeIdpService := services.NewEmployeeIdpService(unitRepo, userRepo, employeeIdpRepo)
 	employeeIdpHandler := handlers.NewEmployeeIdpHandler(employeeIdpService, employeeIdpRepo, database.DB)
-	ticketHandler := handlers.NewTicketHandlerFull(ticketService, operationalService, etaService, unitService, database.DB).WithSettingsService(deploymentSaaSSettingsService).WithSurveyService(surveyService).WithNotificationService(notificationService).WithUserRepository(userRepo)
+	ticketHandler := handlers.NewTicketHandlerFull(ticketService, operationalService, etaService, unitService, database.DB).WithSettingsService(deploymentSaaSSettingsService).WithSurveyService(surveyService).WithNotificationService(notificationService).WithUserRepository(userRepo).WithTenantRbac(tenantRBACRepo)
 	publicShortTicketHandler := handlers.NewPublicShortTicketHandler(ticketShortLinkRepo)
 	serviceHandler := handlers.NewServiceHandler(serviceService, userRepo)
 	counterHandler := handlers.NewCounterHandler(counterService, counterRepo, operationalService, userRepo, unitRepo)

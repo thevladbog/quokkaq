@@ -50,3 +50,56 @@ func TestMergeServiceJSONPatch_updatesNameWhenSent(t *testing.T) {
 		t.Fatalf("name: got %q", merged.Name)
 	}
 }
+
+func TestMergeServiceJSONPatch_iconKey(t *testing.T) {
+	existing := models.Service{ID: "x", UnitID: "u", Name: "N"}
+	t.Run("sets icon key", func(t *testing.T) {
+		merged := existing
+		raw := map[string]json.RawMessage{"iconKey": json.RawMessage(`"health"`)}
+		if err := MergeServiceJSONPatch(&merged, raw); err != nil {
+			t.Fatal(err)
+		}
+		if merged.IconKey == nil || *merged.IconKey != "health" {
+			t.Fatalf("iconKey: got %#v", merged.IconKey)
+		}
+	})
+	t.Run("clears icon key with null", func(t *testing.T) {
+		ik := "health"
+		merged := existing
+		merged.IconKey = &ik
+		raw := map[string]json.RawMessage{"iconKey": json.RawMessage("null")}
+		if err := MergeServiceJSONPatch(&merged, raw); err != nil {
+			t.Fatal(err)
+		}
+		if merged.IconKey != nil {
+			t.Fatalf("iconKey: got %#v, want nil", merged.IconKey)
+		}
+	})
+}
+
+// Regression: same patch used to clobber custom/document with none when
+// offerIdentification:false was applied after identificationMode (random map order).
+func TestMergeServiceJSONPatch_customModeNotClobberedByOfferIdentFalse(t *testing.T) {
+	existing := models.Service{
+		ID:                  "s1",
+		UnitID:              "u1",
+		Name:                "Leaf",
+		IdentificationMode:  models.IdentificationModeNone,
+		OfferIdentification: true,
+	}
+	merged := existing
+	raw := map[string]json.RawMessage{
+		"identificationMode":        json.RawMessage(`"custom"`),
+		"offerIdentification":       json.RawMessage(`false`),
+		"kioskIdentificationConfig": json.RawMessage(`{"apiFieldKey":"v"}`),
+	}
+	if err := MergeServiceJSONPatch(&merged, raw); err != nil {
+		t.Fatal(err)
+	}
+	if merged.IdentificationMode != models.IdentificationModeCustom {
+		t.Fatalf("identificationMode: got %q", merged.IdentificationMode)
+	}
+	if merged.OfferIdentification {
+		t.Fatalf("OfferIdentification: want false")
+	}
+}

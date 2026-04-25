@@ -28,6 +28,8 @@ CREATE TABLE tickets (
 	priority integer DEFAULT 0,
 	is_eod integer DEFAULT 0,
 	is_credit integer DEFAULT 0,
+	documents_data text,
+	documents_data_expires_at datetime,
 	created_at datetime
 );
 `).Error; err != nil {

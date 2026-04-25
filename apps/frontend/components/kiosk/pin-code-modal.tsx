@@ -1,12 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog';
+import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { KioskDialogContent } from '@/components/kiosk/kiosk-dialog-content';
 import { Button } from '@/components/ui/button';
 import { Delete } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -26,7 +22,7 @@ export function PinCodeModal({
 }: PinCodeModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className='sm:max-w-[400px]'>
+      <KioskDialogContent className='sm:max-w-[400px]'>
         <DialogHeader>
           <DialogTitle className='text-center'>
             <PinCodeTitle />
@@ -39,7 +35,7 @@ export function PinCodeModal({
             correctPin={correctPin}
           />
         )}
-      </DialogContent>
+      </KioskDialogContent>
     </Dialog>
   );
 }

@@ -32,6 +32,11 @@ handlers → services → repository → models (GORM)
 
 auth, users, units, tickets, services, counters, shifts, slots, bookings, pre-registrations, invitations, templates, mail, storage, TTS, job enqueue.
 
+### Талон: `documentsData` и поля с киоска (PII)
+
+- Разрешение и валидация снимков при создании талона: [`internal/services/ticket_documents_data.go`](internal/services/ticket_documents_data.go); проверка полей услуги/киоска — [`internal/services/service_kiosk_config.go`](internal/services/service_kiosk_config.go). Cron очистки истёкших: [`ClearExpiredTicketDocuments`](internal/repository/ticket_repository.go), планировщик в [`cmd/api/main.go`](cmd/api/main.go).
+- **Урезание ответов HTTP** по `tickets.user_data.read` и публичному `X-Visitor-Token` — в [`internal/handlers/ticket_handler.go`](internal/handlers/ticket_handler.go) (например `applyTicketUserDataForHTTP`, staff-редакции). Подробнее: runbook [«Ticket documentsData»](../../docs/operations/ticket-documents-data.md).
+
 ## Digital Signage (табло, внешние фиды, плейлисты)
 
 - **Модели/таблицы:** [`internal/models/signage.go`](internal/models/signage.go) — плейлисты, расписания, `ExternalFeed` (в т.ч. `last_error`, `last_fetch_at`, `consecutive_failures` после миграции), объявления на экран.

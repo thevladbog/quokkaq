@@ -7,6 +7,12 @@ type KioskWelcomeHeroProps = {
   title: string;
   subtitle?: string;
   highContrast?: boolean;
+  /**
+   * True when the main body is dark (by L*), e.g. `kioskBaseTheme: dark` or custom dark `bodyColor`
+   * — not only a11y HC. Ensures the heading stays light even if `data-kiosk-base-theme` is omitted
+   * (e.g. custom unit colors) so it does not use the default dark-brown kiosk-ink.
+   */
+  onDarkKioskPage?: boolean;
   /** e.g. accessibility control — top-end of the hero, below the top bar, alongside headings */
   accessory?: ReactNode;
 };
@@ -15,16 +21,18 @@ export function KioskWelcomeHero({
   title,
   subtitle,
   highContrast,
+  onDarkKioskPage = false,
   accessory
 }: KioskWelcomeHeroProps) {
   const hasAccessory = Boolean(accessory);
+  const lightText = highContrast || onDarkKioskPage;
 
   const textBlock = (
     <>
       <h1
         className={cn(
           'kiosk-welcome-title text-center font-extrabold tracking-tight',
-          highContrast ? 'text-white' : 'text-kiosk-ink'
+          lightText ? 'text-white' : 'text-kiosk-ink'
         )}
       >
         {title}
@@ -33,7 +41,7 @@ export function KioskWelcomeHero({
         <p
           className={cn(
             'kiosk-welcome-subtitle mx-auto mt-2 max-w-2xl text-center font-medium',
-            highContrast ? 'text-zinc-300' : 'text-kiosk-ink-muted'
+            lightText ? 'text-zinc-200' : 'text-kiosk-ink-muted'
           )}
         >
           {subtitle}

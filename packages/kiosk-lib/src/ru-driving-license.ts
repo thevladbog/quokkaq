@@ -30,6 +30,25 @@ function parsePipeFields(s: string): string[] {
   return s.split('|').map((f) => f.replace(/\0/g, '').trim());
 }
 
+/**
+ * RU VU 2D barcode: ≥9 pipe-separated fields, or a compact base64 payload. Use this
+ * to ignore stray "|" in OCR of passports / other pages (avoids "partial" false positives).
+ */
+export function isLikelyRuDrivingLicenseFromScanString(raw: string): boolean {
+  const t = String(raw).trim();
+  if (!t) {
+    return false;
+  }
+  const compact = t.replace(/\s+/g, '');
+  if (looksLikeBase64(compact) && compact.length >= 16) {
+    return true;
+  }
+  if (!t.includes('|')) {
+    return false;
+  }
+  return parsePipeFields(t).length >= PIPE_MIN_FIELDS;
+}
+
 /** Returns true for plausible base64 of reasonable length. */
 function looksLikeBase64(s: string): boolean {
   const t = s.replace(/\s+/g, '');

@@ -2,12 +2,14 @@ package repository
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type UnitRepository interface {
@@ -20,6 +22,8 @@ type UnitRepository interface {
 	FindByID(id string) (*models.Unit, error)
 	// FindByIDLight loads only the unit row (no relations). Use for updates/auth checks; use FindByID for API responses that need nested data.
 	FindByIDLight(id string) (*models.Unit, error)
+	// FindByIDLightTxForUpdate loads the unit row with SELECT ... FOR UPDATE within tx (parent row lock for service sort order).
+	FindByIDLightTxForUpdate(tx *gorm.DB, id string) (*models.Unit, error)
 	Update(unit *models.Unit) error
 	// UpdateConfig updates only the config JSONB column (no full Save — avoids wiping associations).
 	UpdateConfig(unitID string, config json.RawMessage) error
@@ -84,6 +88,18 @@ func (r *unitRepository) FindByID(id string) (*models.Unit, error) {
 func (r *unitRepository) FindByIDLight(id string) (*models.Unit, error) {
 	var unit models.Unit
 	err := r.db.First(&unit, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &unit, nil
+}
+
+func (r *unitRepository) FindByIDLightTxForUpdate(tx *gorm.DB, id string) (*models.Unit, error) {
+	if tx == nil {
+		return nil, errors.New("nil tx provided to FindByIDLightTxForUpdate")
+	}
+	var unit models.Unit
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&unit, "id = ?", id).Error
 	if err != nil {
 		return nil, err
 	}

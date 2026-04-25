@@ -6,6 +6,8 @@ import (
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
+
+	"gorm.io/gorm"
 )
 
 // ErrServiceUnitImmutable is returned when an update tries to change a service's unit.
@@ -94,6 +96,9 @@ func (s *serviceService) CreateService(service *models.Service) error {
 		return errors.New("unit ID is required")
 	}
 	syncServiceIdentificationFields(service)
+	if err := ValidateServiceKioskFields(service); err != nil {
+		return err
+	}
 	service.CalendarSlotKey = normalizeCalendarSlotKeyPtr(service.CalendarSlotKey)
 	if err := s.assertCalendarSlotKeyUnique(service.UnitID, service.CalendarSlotKey, ""); err != nil {
 		return err
@@ -114,13 +119,23 @@ func (s *serviceService) CreateService(service *models.Service) error {
 			return ErrServiceQuotaExceeded
 		}
 	}
-	if err := s.repo.Create(service); err != nil {
-		if errors.Is(err, repository.ErrDuplicateCalendarSlotKey) {
-			return ErrDuplicateCalendarSlotKey
+	return s.unitRepo.Transaction(func(tx *gorm.DB) error {
+		if _, err := s.unitRepo.FindByIDLightTxForUpdate(tx, service.UnitID); err != nil {
+			return err
 		}
-		return err
-	}
-	return nil
+		next, err := s.repo.NextSortOrderForUnitTx(tx, service.UnitID)
+		if err != nil {
+			return err
+		}
+		service.SortOrder = next
+		if err := s.repo.CreateTx(tx, service); err != nil {
+			if errors.Is(err, repository.ErrDuplicateCalendarSlotKey) {
+				return ErrDuplicateCalendarSlotKey
+			}
+			return err
+		}
+		return nil
+	})
 }
 
 func (s *serviceService) GetServicesByUnit(unitID string) ([]models.Service, error) {
@@ -142,6 +157,9 @@ func (s *serviceService) UpdateService(service *models.Service) error {
 	// Never persist a caller-supplied unit change; keep the row's unit.
 	service.UnitID = existing.UnitID
 	syncServiceIdentificationFields(service)
+	if err := ValidateServiceKioskFields(service); err != nil {
+		return err
+	}
 
 	key := effectiveCalendarSlotKeyForUpdate(service, existing)
 	if err := s.assertCalendarSlotKeyUnique(service.UnitID, key, service.ID); err != nil {

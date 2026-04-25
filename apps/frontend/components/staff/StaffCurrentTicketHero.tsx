@@ -3,12 +3,22 @@
 import { useMemo, useState } from 'react';
 import { Info, Tags } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 import { Ticket } from '@/lib/api';
 import { useTicketTimer } from '@/lib/ticket-timer';
 import { visitorTagPillStyles } from '@/lib/visitor-tag-styles';
 import { VisitorPhotoFrame } from '@/components/staff/VisitorPhotoFrame';
 import { StaffVisitorTagsEditModal } from '@/components/staff/StaffVisitorTagsEditModal';
 import { cn } from '@/lib/utils';
+import {
+  getDocumentsDataPreviewString,
+  ticketHasDocumentsData
+} from '@/lib/ticket-user-data-visibility';
 
 type TFn = (
   key: string,
@@ -20,6 +30,7 @@ export interface StaffCurrentTicketHeroProps {
   ticket: Ticket;
   t: TFn;
   onShowDetails: () => void;
+  canReadUserData: boolean;
 }
 
 function statusBadgeClass(status: string): string {
@@ -37,7 +48,8 @@ export function StaffCurrentTicketHero({
   unitId,
   ticket,
   t,
-  onShowDetails
+  onShowDetails,
+  canReadUserData
 }: StaffCurrentTicketHeroProps) {
   const [tagsModalOpen, setTagsModalOpen] = useState(false);
   const [tagsModalSession, setTagsModalSession] = useState(0);
@@ -102,6 +114,24 @@ export function StaffCurrentTicketHero({
         .sort()
         .join(','),
     [client?.definitions]
+  );
+
+  const docDataPreview = useMemo(
+    () =>
+      getDocumentsDataPreviewString(ticket, 500, canReadUserData, {
+        ocrFailed: t('ticket_user_data.ocr_failed_preview', {
+          defaultValue:
+            'Document not read at the kiosk after 2 camera attempts. Verify identity at the counter.'
+        }),
+        customSkipped: t('ticket_user_data.custom_skipped_preview', {
+          defaultValue:
+            'Visitor did not provide the requested data on the kiosk. Verify as needed.'
+        }),
+        idDocumentOcr: t('ticket_user_data.id_document_ocr', {
+          defaultValue: 'Document (OCR line)'
+        })
+      }),
+    [t, ticket, canReadUserData]
   );
 
   const displayName = client
@@ -281,6 +311,51 @@ export function StaffCurrentTicketHero({
                 )}
               </div>
             )}
+
+            {ticketHasDocumentsData(ticket, canReadUserData) &&
+              !ticket.preRegistration && (
+                <div className='border-border/60 bg-muted/20 rounded-lg border p-2.5'>
+                  <div className='text-muted-foreground mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold tracking-wide uppercase'>
+                    <span>
+                      {t('ticket_user_data.badge', {
+                        defaultValue: 'Kiosk'
+                      })}
+                    </span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            className='h-7 w-7 shrink-0'
+                            onClick={onShowDetails}
+                          >
+                            <Info className='h-3.5 w-3.5' />
+                            <span className='sr-only'>
+                              {t('ticket_user_data.badge_aria', {
+                                defaultValue: 'Open document data (kiosk)'
+                              })}
+                            </span>
+                          </Button>
+                        </TooltipTrigger>
+                        {docDataPreview ? (
+                          <TooltipContent
+                            className='max-w-[min(20rem,85vw)]'
+                            side='left'
+                          >
+                            <p className='text-xs wrap-break-word'>
+                              {docDataPreview}
+                            </p>
+                          </TooltipContent>
+                        ) : null}
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <p className='text-muted-foreground line-clamp-2 text-sm wrap-break-word'>
+                    {docDataPreview}
+                  </p>
+                </div>
+              )}
           </div>
         </div>
       </div>

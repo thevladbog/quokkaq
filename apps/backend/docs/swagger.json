@@ -1838,6 +1838,13 @@
                     "createdAt": {
                         "type": "string"
                     },
+                    "documentsData": {
+                        "description": "DocumentsData stores kiosk-provided key/value (document OCR, custom fields). PII: see OpenAPI / DWH policy; staff access requires permission tickets.user_data.read.\n- documentsData is cleared by a scheduled job when documentsDataExpiresAt is in the past (sensitive or document mode with retention).\n- documentsDataExpiresAt: set at creation for document/sensitive custom flows; may be null for non-sensitive custom data (no auto-expiry from cron).",
+                        "type": "object"
+                    },
+                    "documentsDataExpiresAt": {
+                        "type": "string"
+                    },
                     "estimatedWaitSeconds": {
                         "description": "EstimatedWaitSeconds is the estimated seconds until this ticket is called (computed on-the-fly).",
                         "type": "integer"
@@ -4307,11 +4314,15 @@
                     "gridRowSpan": {
                         "type": "integer"
                     },
+                    "iconKey": {
+                        "description": "IconKey optional Lucide key for kiosk tiles when ImageUrl is empty (e.g. \"health\", \"document\").",
+                        "type": "string"
+                    },
                     "id": {
                         "type": "string"
                     },
                     "identificationMode": {
-                        "description": "IdentificationMode selects the kiosk identification step: none|phone|qr|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column.",
+                        "description": "IdentificationMode selects the kiosk identification step: none|phone|qr|document|custom|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column.",
                         "type": "string"
                     },
                     "imageUrl": {
@@ -4319,6 +4330,14 @@
                     },
                     "isLeaf": {
                         "type": "boolean"
+                    },
+                    "kioskDocumentSettings": {
+                        "description": "KioskDocumentSettings: JSON, e.g. { \"retentionDays\": 1–30 } for identificationMode=document.",
+                        "type": "object"
+                    },
+                    "kioskIdentificationConfig": {
+                        "description": "KioskIdentificationConfig: JSON (capture, labels, api key field, showInQueuePreview, sensitive+retention for identificationMode=custom). Validated in service layer.",
+                        "type": "object"
                     },
                     "maxServiceTime": {
                         "description": "In seconds (service-time SLA — copied to Ticket.MaxServiceTime on in_service)",
@@ -4355,6 +4374,10 @@
                     "restrictedServiceZoneId": {
                         "description": "RestrictedServiceZoneID: when set, this leaf service is only offered in that service_zone's waiting pool (child of UnitID subdivision).",
                         "type": "string"
+                    },
+                    "sortOrder": {
+                        "description": "Display order within the unit (kiosk and lists). Lower = earlier. Independent of `units.sort_order`.",
+                        "type": "integer"
                     },
                     "textColor": {
                         "type": "string"
@@ -4854,6 +4877,13 @@
                         "type": "string"
                     },
                     "createdAt": {
+                        "type": "string"
+                    },
+                    "documentsData": {
+                        "description": "DocumentsData stores kiosk-provided key/value (document OCR, custom fields). PII: see OpenAPI / DWH policy; staff access requires permission tickets.user_data.read.\n- documentsData is cleared by a scheduled job when documentsDataExpiresAt is in the past (sensitive or document mode with retention).\n- documentsDataExpiresAt: set at creation for document/sensitive custom flows; may be null for non-sensitive custom data (no auto-expiry from cron).",
+                        "type": "object"
+                    },
+                    "documentsDataExpiresAt": {
                         "type": "string"
                     },
                     "estimatedWaitSeconds": {

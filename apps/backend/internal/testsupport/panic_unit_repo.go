@@ -22,6 +22,9 @@ func (PanicUnitRepo) FindByID(string) (*models.Unit, error) { panic("unexpected"
 func (PanicUnitRepo) FindByIDLight(string) (*models.Unit, error) {
 	panic("unexpected")
 }
+func (PanicUnitRepo) FindByIDLightTxForUpdate(*gorm.DB, string) (*models.Unit, error) {
+	panic("unexpected")
+}
 func (PanicUnitRepo) Update(*models.Unit) error                           { panic("unexpected") }
 func (PanicUnitRepo) UpdateConfig(string, json.RawMessage) error          { panic("unexpected") }
 func (PanicUnitRepo) Delete(string) error                                 { panic("unexpected") }

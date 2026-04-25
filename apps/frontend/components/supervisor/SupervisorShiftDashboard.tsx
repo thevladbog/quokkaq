@@ -37,6 +37,7 @@ export function SupervisorShiftDashboard({
   onForceRelease,
   forceReleasePending,
   onShowTicketDetails,
+  services,
   serviceZoneMode,
   workplaceZones,
   selectedWorkplaceId,
@@ -44,7 +45,8 @@ export function SupervisorShiftDashboard({
   workplacesLoading,
   dashboardUnitId,
   activityUnitId,
-  activityQueryEnabled
+  activityQueryEnabled,
+  canReadUserData
 }: {
   unitName: string | undefined;
   stats: DashboardStats | undefined;
@@ -58,6 +60,7 @@ export function SupervisorShiftDashboard({
   onForceRelease: (counter: ShiftCounterRow) => void;
   forceReleasePending: boolean;
   onShowTicketDetails: (ticket: Ticket & { service?: Service }) => void;
+  services: Service[];
   serviceZoneMode?: boolean;
   workplaceZones?: SupervisorWorkplaceZone[];
   selectedWorkplaceId?: string | null;
@@ -68,6 +71,7 @@ export function SupervisorShiftDashboard({
   /** Unit id for activity API (matches counters scope). */
   activityUnitId: string | null;
   activityQueryEnabled: boolean;
+  canReadUserData: boolean;
 }) {
   const t = useTranslations('supervisor.dashboardUi');
   const tStaffSupport = useTranslations('staff.support');
@@ -164,8 +168,10 @@ export function SupervisorShiftDashboard({
             counters={counters}
             countersLoading={countersLoading}
             onShowTicketDetails={onShowTicketDetails}
+            services={services}
             onForceRelease={onForceRelease}
             releasePending={forceReleasePending}
+            canReadUserData={canReadUserData}
           />
         </TabsContent>
 

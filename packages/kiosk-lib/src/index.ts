@@ -5,6 +5,7 @@ export * from './mrz';
 export * from './ru-driving-license';
 export * from './cp1251-decode';
 export { formatIcaOmrzForKiosk } from './mrz-format';
+export { extractIcaOmrzFromOcrText } from './mrz-ocr-extract';
 export {
   buildKioskTicketEscPos,
   KIOSK_TICKET_RECEIPT_WIDTH_DOTS,

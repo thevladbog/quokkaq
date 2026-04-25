@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   BookingModelSchema,
+  createTicketRequestSchema,
   DesktopTerminalKindSchema,
   DesktopTerminalSchema,
   effectiveDesktopTerminalKind,
   KioskConfigSchema,
+  KioskTauriLocalDeviceV1Schema,
+  ServiceModelSchema,
   TicketModelSchema,
   UnitKindSchema,
   UserModelSchema
@@ -147,11 +150,26 @@ describe('KioskConfigSchema', () => {
     expect(r.success).toBe(true);
   });
 
-  it('accepts isAlwaysPrintTicket for kiosk', () => {
-    const r = KioskConfigSchema.safeParse({ isAlwaysPrintTicket: false });
+  it('passthrough keeps legacy print keys in parsed kiosk (migration)', () => {
+    const r = KioskConfigSchema.safeParse({ printerIp: '192.168.0.1' });
     expect(r.success).toBe(true);
     if (r.success) {
-      expect(r.data.isAlwaysPrintTicket).toBe(false);
+      expect((r.data as { printerIp?: string }).printerIp).toBe('192.168.0.1');
+    }
+  });
+
+  it('parses KioskTauriLocalDeviceV1', () => {
+    const r = KioskTauriLocalDeviceV1Schema.safeParse({
+      v: 1,
+      unitId: 'u1',
+      printerIp: '10.0.0.1',
+      isPrintEnabled: true
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.v).toBe(1);
+      expect(r.data.unitId).toBe('u1');
+      expect(r.data.printerIp).toBe('10.0.0.1');
     }
   });
 
@@ -201,6 +219,31 @@ describe('KioskConfigSchema', () => {
       expect(r.data.kioskAttractSignageMode).toBe('playlist');
       expect(r.data.kioskAttractSlideDurationSec).toBe(8);
     }
+  });
+
+  it('accepts serviceGridLayout manual | auto', () => {
+    expect(
+      KioskConfigSchema.safeParse({ serviceGridLayout: 'manual' }).success
+    ).toBe(true);
+    const r = KioskConfigSchema.safeParse({ serviceGridLayout: 'auto' });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.serviceGridLayout).toBe('auto');
+    }
+    expect(
+      KioskConfigSchema.safeParse({ serviceGridLayout: 'grid' }).success
+    ).toBe(false);
+  });
+
+  it('accepts kioskBaseTheme presets', () => {
+    const r = KioskConfigSchema.safeParse({ kioskBaseTheme: 'dark' });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.kioskBaseTheme).toBe('dark');
+    }
+    expect(
+      KioskConfigSchema.safeParse({ kioskBaseTheme: 'invalid' }).success
+    ).toBe(false);
   });
 });
 
@@ -401,6 +444,91 @@ describe('TicketModelSchema', () => {
 
   it('fails when required fields are missing', () => {
     const r = TicketModelSchema.safeParse({ id: 'ticket-1' });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe('createTicketRequestSchema (documentsData)', () => {
+  it('accepts serviceId and documentsData only', () => {
+    const r = createTicketRequestSchema.safeParse({
+      serviceId: '  svc-1  ',
+      documentsData: { idDocumentOcr: 'LINE' }
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.serviceId).toBe('svc-1');
+      expect(r.data.documentsData).toEqual({ idDocumentOcr: 'LINE' });
+    }
+  });
+
+  it('rejects documentsData with clientId', () => {
+    const r = createTicketRequestSchema.safeParse({
+      serviceId: 's1',
+      clientId: 'c1',
+      documentsData: { k: 1 }
+    });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe('ServiceModelSchema (kiosk identification)', () => {
+  it('accepts custom mode and kiosk config blobs', () => {
+    const r = ServiceModelSchema.safeParse({
+      id: 's1',
+      unitId: 'u1',
+      name: 'Test',
+      isLeaf: true,
+      prebook: false,
+      offerIdentification: false,
+      identificationMode: 'custom',
+      kioskDocumentSettings: { retentionDays: 7 },
+      kioskIdentificationConfig: {
+        sensitive: false,
+        showInQueuePreview: true
+      }
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('rejects kioskDocumentSettings retentionDays out of range', () => {
+    const r = ServiceModelSchema.safeParse({
+      id: 's1',
+      unitId: 'u1',
+      name: 'Test',
+      isLeaf: true,
+      prebook: false,
+      offerIdentification: false,
+      identificationMode: 'document',
+      kioskDocumentSettings: { retentionDays: 31 }
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects kioskIdentificationConfig sensitive without valid retention', () => {
+    const r = ServiceModelSchema.safeParse({
+      id: 's1',
+      unitId: 'u1',
+      name: 'Test',
+      isLeaf: true,
+      prebook: false,
+      offerIdentification: false,
+      identificationMode: 'custom',
+      kioskIdentificationConfig: { sensitive: true }
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects empty apiFieldKey when set', () => {
+    const r = ServiceModelSchema.safeParse({
+      id: 's1',
+      unitId: 'u1',
+      name: 'Test',
+      isLeaf: true,
+      prebook: false,
+      offerIdentification: false,
+      identificationMode: 'custom',
+      kioskIdentificationConfig: { apiFieldKey: '   ' }
+    });
     expect(r.success).toBe(false);
   });
 });

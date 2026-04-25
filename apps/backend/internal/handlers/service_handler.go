@@ -70,6 +70,12 @@ func (h *ServiceHandler) CreateService(w http.ResponseWriter, r *http.Request) {
 			writeQuotaExceeded(w, "services", err)
 		case errors.Is(err, services.ErrDuplicateCalendarSlotKey):
 			http.Error(w, err.Error(), http.StatusConflict)
+		case repository.IsNotFound(err):
+			http.Error(w, "unit not found", http.StatusBadRequest)
+		case errors.Is(err, repository.ErrServiceUnitIDRequired),
+			errors.Is(err, services.ErrKioskConfigRetentionOutOfRange),
+			errors.Is(err, services.ErrKioskConfigRetentionRequiredWhenSensitive):
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -166,6 +172,11 @@ func (h *ServiceHandler) UpdateService(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, services.ErrDuplicateCalendarSlotKey) {
 			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		if errors.Is(err, services.ErrKioskConfigRetentionOutOfRange) ||
+			errors.Is(err, services.ErrKioskConfigRetentionRequiredWhenSensitive) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		if repository.IsNotFound(err) {

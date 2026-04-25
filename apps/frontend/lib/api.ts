@@ -718,6 +718,11 @@ export const unitsApi = {
         serviceId: normalized.serviceId,
         kioskIdentifiedUserId: normalized.kioskIdentifiedUserId
       } as orvalTc.HandlersCreateTicketRequest;
+    } else if (normalized.documentsData) {
+      body = {
+        serviceId: normalized.serviceId,
+        documentsData: normalized.documentsData
+      } as orvalTc.HandlersCreateTicketRequest;
     } else if (normalized.visitorPhone && normalized.visitorLocale) {
       body = {
         serviceId: normalized.serviceId,
@@ -969,8 +974,12 @@ export const ticketsApi = {
 
   getByUnitId: (unitId: string) => unitsApi.getTickets(unitId),
 
-  getById: async (id: string) => {
-    const res = await orvalTc.getTicketsId(id);
+  getById: async (id: string, opts?: { visitorToken?: string | null }) => {
+    const tok = opts?.visitorToken?.trim();
+    const res = await orvalTc.getTicketsId(id, {
+      ...(tok ? { headers: { 'X-Visitor-Token': tok } } : {}),
+      cache: 'no-store' as const
+    });
     return TicketModelSchema.parse(res.data);
   },
 

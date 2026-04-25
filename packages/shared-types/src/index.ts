@@ -102,6 +102,11 @@ export type ServiceModel = {
   descriptionRu?: string | null;
   descriptionEn?: string | null;
   imageUrl?: string | null;
+  /**
+   * Optional Lucide key for the kiosk tile when `imageUrl` is empty, e.g. `health`, `document`.
+   * @see `resolveKioskServiceIcon` on the frontend.
+   */
+  iconKey?: string | null;
   backgroundColor?: string | null;
   textColor?: string | null;
   prefix?: string | null;
@@ -111,9 +116,25 @@ export type ServiceModel = {
   maxServiceTime?: number | null;
   prebook?: boolean;
   offerIdentification?: boolean;
-  /** Kiosk identification step: none | phone | qr | login | badge */
-  identificationMode?: 'none' | 'phone' | 'qr' | 'login' | 'badge';
+  /** Kiosk identification step: none | phone | qr | document | custom | login | badge */
+  identificationMode?:
+    | 'none'
+    | 'phone'
+    | 'qr'
+    | 'document'
+    | 'custom'
+    | 'login'
+    | 'badge';
+  /** Retention (days, 1–30) for `identificationMode=document` — stored on the service, applies to ticket.documentsData TTL. */
+  kioskDocumentSettings?: unknown;
+  /**
+   * Custom identification flow (labels, `capture`, sensitive+retention, etc.).
+   * `capture` for `identificationMode=custom` may include e.g. `{ kind: "barcode", manualInputMode: "none"|"numeric"|"alphanumeric", numericMaxLength?: number, showOnScreenKeyboard?: boolean }`.
+   */
+  kioskIdentificationConfig?: unknown;
   isLeaf?: boolean;
+  /** Order within the unit for kiosk and lists; lower = earlier. */
+  sortOrder?: number;
   gridRow?: number | null;
   gridCol?: number | null;
   gridRowSpan?: number | null;
@@ -122,6 +143,50 @@ export type ServiceModel = {
   /** Optional label for [QQ] calendar SUMMARY when service names collide (Yandex CalDAV). */
   calendarSlotKey?: string | null;
 };
+
+/** Document-mode kiosk JSON on the service; aligns with backend `validateKioskDocumentSettingsJSON`. */
+export const KioskDocumentSettingsSchema = z
+  .object({
+    retentionDays: z.coerce.number().int().min(1).max(30).optional()
+  })
+  .passthrough();
+
+/**
+ * Custom identification kiosk JSON on the service; aligns with backend
+ * `validateKioskIdentificationConfigJSON` (retention when sensitive, non-empty apiFieldKey).
+ */
+export const KioskIdentificationConfigSchema = z
+  .object({
+    sensitive: z.boolean().optional(),
+    retentionDays: z.coerce.number().int().optional(),
+    retention_days: z.coerce.number().int().optional(),
+    apiFieldKey: z.string().optional(),
+    showInQueuePreview: z.boolean().optional(),
+    skippable: z.boolean().optional(),
+    capture: z.record(z.string(), z.unknown()).optional(),
+    userInstruction: z.record(z.string(), z.unknown()).optional(),
+    operatorLabel: z.record(z.string(), z.unknown()).optional()
+  })
+  .passthrough()
+  .superRefine((data, ctx) => {
+    if (data.sensitive === true) {
+      const d = data.retentionDays ?? data.retention_days ?? 0;
+      if (d < 1 || d > 30) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'retention must be 1-30 when sensitive is true',
+          path: ['retentionDays']
+        });
+      }
+    }
+    if (data.apiFieldKey !== undefined && data.apiFieldKey.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'apiFieldKey must not be empty when set',
+        path: ['apiFieldKey']
+      });
+    }
+  });
 
 export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
   id: z.string(),
@@ -139,6 +204,7 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
   descriptionRu: z.string().nullable().optional(),
   descriptionEn: z.string().nullable().optional(),
   imageUrl: z.string().nullable().optional(),
+  iconKey: z.string().nullable().optional(),
   backgroundColor: z.string().nullable().optional(),
   textColor: z.string().nullable().optional(),
   prefix: z.string().nullable().optional(),
@@ -149,9 +215,12 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
   prebook: z.boolean().optional(),
   offerIdentification: z.boolean().optional(),
   identificationMode: z
-    .enum(['none', 'phone', 'qr', 'login', 'badge'])
+    .enum(['none', 'phone', 'qr', 'document', 'custom', 'login', 'badge'])
     .optional(),
+  kioskDocumentSettings: KioskDocumentSettingsSchema.optional(),
+  kioskIdentificationConfig: KioskIdentificationConfigSchema.optional(),
   isLeaf: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
   gridRow: z.number().nullable().optional(),
   gridCol: z.number().nullable().optional(),
   gridRowSpan: z.number().nullable().optional(),
@@ -464,6 +533,104 @@ export type KioskAttractInactivityMode = z.infer<
   typeof KioskAttractInactivityModeField
 >;
 
+/**
+ * Printer + local hardware stored only in Tauri (localStorage), keyed by `unitId`.
+ * Not part of `KioskConfig` (server) — use {@link mergeKioskWithTauriLocalDevice} on the kiosk.
+ */
+export const KioskTauriLocalDeviceV1Schema = z.object({
+  v: z.literal(1),
+  unitId: z.string().min(1),
+  isPrintEnabled: z.boolean().optional(),
+  isAlwaysPrintTicket: z.boolean().optional(),
+  printerConnection: z.enum(['network', 'system']).optional(),
+  systemPrinterName: z.string().optional(),
+  printerIp: z.string().optional(),
+  printerPort: z.string().optional(),
+  printerType: z.string().optional(),
+  printerLogoUrl: z.string().optional(),
+  serialPath: z.string().optional(),
+  serialBaud: z.number().int().positive().optional()
+});
+
+export type KioskTauriLocalDeviceV1 = z.infer<
+  typeof KioskTauriLocalDeviceV1Schema
+>;
+
+/**
+ * Merged config for kiosk **runtime** (Tauri + browser): server `KioskConfig` with device-only overlay
+ * (printer, serial) applied. Used for printing, receipt QR, and paper-out polling.
+ */
+export type KioskConfigForDeviceRuntime = KioskConfig & {
+  isPrintEnabled?: boolean;
+  isAlwaysPrintTicket?: boolean;
+  printerConnection?: 'network' | 'system';
+  systemPrinterName?: string;
+  printerIp?: string;
+  printerPort?: string;
+  printerType?: string;
+  printerLogoUrl?: string;
+  /** Tauri: serial ID scanner, from `KioskTauriLocalDeviceV1` only. */
+  serialPath?: string;
+  serialBaud?: number;
+};
+
+/**
+ * Merges API `KioskConfig` with Tauri-local device state. `v` / `unitId` on local are not merged into kiosk.
+ */
+export function mergeKioskWithTauriLocalDevice(
+  server: KioskConfig | undefined,
+  local: KioskTauriLocalDeviceV1 | null
+): KioskConfigForDeviceRuntime {
+  const s = { ...(server ?? {}) } as KioskConfig;
+  if (!local) {
+    return s as KioskConfigForDeviceRuntime;
+  }
+  const { v, unitId, ...fromLocal } = local;
+  return { ...s, ...fromLocal } as KioskConfigForDeviceRuntime;
+}
+
+/**
+ * If no local device config yet, copy print-related fields from legacy `config.kiosk` (API may still return old keys).
+ * Does not set `serialPath` (never on server). Caller persists the result.
+ */
+export function migrateKioskTauriLocalFromServerKiosk(
+  unitId: string,
+  legacy: KioskConfigForDeviceRuntime
+): KioskTauriLocalDeviceV1 {
+  return {
+    v: 1,
+    unitId,
+    isPrintEnabled: legacy.isPrintEnabled,
+    isAlwaysPrintTicket: legacy.isAlwaysPrintTicket,
+    printerConnection: legacy.printerConnection,
+    systemPrinterName: legacy.systemPrinterName,
+    printerIp: legacy.printerIp,
+    printerPort: legacy.printerPort,
+    printerType: legacy.printerType,
+    printerLogoUrl: legacy.printerLogoUrl
+  };
+}
+
+/** @internal Whether legacy (API `config.kiosk` with passthrough / old data) has print fields to import into Tauri. */
+export function hasLegacyKioskPrintFields(
+  legacy: KioskConfig | undefined | null
+): boolean {
+  if (!legacy) {
+    return false;
+  }
+  const k = legacy as KioskConfigForDeviceRuntime;
+  return (
+    k.isPrintEnabled !== undefined ||
+    k.isAlwaysPrintTicket !== undefined ||
+    k.printerConnection !== undefined ||
+    (k.systemPrinterName?.trim() ?? '') !== '' ||
+    (k.printerIp?.trim() ?? '') !== '' ||
+    (k.printerPort?.trim() ?? '') !== '' ||
+    (k.printerType?.trim() ?? '') !== '' ||
+    (k.printerLogoUrl?.trim() ?? '') !== ''
+  );
+}
+
 /** Runtime shape for `UnitConfig.kiosk` (matches {@link KioskConfig}). */
 export const KioskConfigSchema = z
   .object({
@@ -472,27 +639,30 @@ export const KioskConfigSchema = z
     welcomeSubtitle: z.string().optional(),
     headerText: z.string().optional(),
     footerText: z.string().optional(),
-    printerConnection: z.enum(['network', 'system']).optional(),
-    systemPrinterName: z.string().optional(),
-    printerIp: z.string().optional(),
-    printerPort: z.string().optional(),
     showHeader: z.boolean().optional(),
     showFooter: z.boolean().optional(),
     isCustomColorsEnabled: z.boolean().optional(),
     headerColor: z.string().optional(),
     bodyColor: z.string().optional(),
     serviceGridColor: z.string().optional(),
-    logoUrl: z.string().optional(),
-    printerLogoUrl: z.string().optional(),
-    printerType: z.string().optional(),
-    isPrintEnabled: z.boolean().optional(),
     /**
-     * When true (default) and a receipt print target is configured, print the ticket
-     * automatically on success. When false, show a manual "Print" control on the success
-     * screen instead (QuokkaQ Kiosk / Tauri with a target only).
+     * Kiosk look preset when `isCustomColorsEnabled` is false. Does not override manual header/body/grid
+     * when custom colors are on. Distinct from the accessibility "high contrast" toggle.
      */
-    isAlwaysPrintTicket: z.boolean().optional(),
-    feedbackUrl: z.string().optional(),
+    kioskBaseTheme: z
+      .enum([
+        'warm-light',
+        'cool-light',
+        'dark',
+        'high-contrast-preset'
+      ] as const)
+      .optional(),
+    /**
+     * Kiosk service grid: `manual` = positions from `Service.gridRow` / `gridCol` (8×8); `auto` = client lays out
+     * from sorted services without requiring manual placement. Default: `manual` when unset.
+     */
+    serviceGridLayout: z.enum(['manual', 'auto']).optional(),
+    logoUrl: z.string().optional(),
     isPreRegistrationEnabled: z.boolean().optional(),
     /**
      * When true, kiosk shows the “I have an appointment / check-in” path (code, phone, scan).
@@ -867,6 +1037,21 @@ export type ClientVisitTransferEvent = z.infer<
   typeof ClientVisitTransferEventSchema
 >;
 
+/** Key for document-OCR line merged into `ticket.documentsData` (CreateTicket from kiosk / document mode). */
+export const KIOSK_ID_DOCUMENT_OCR_KEY = 'idDocumentOcr';
+
+/**
+ * When true, OCR failed after max scan attempts. Shown in staff/operator UIs
+ * (not on public kiosk or visitor ticket page). Value is boolean.
+ */
+export const KIOSK_ID_DOCUMENT_OCR_FAILED_KEY = 'idDocumentOcrFailed';
+
+/**
+ * When true, the visitor used "Skip" on custom identification. Staff-facing only
+ * (not on public kiosk or visitor ticket page). Value is boolean.
+ */
+export const KIOSK_ID_CUSTOM_DATA_SKIPPED_KEY = 'idCustomDataSkipped';
+
 export const TicketModelSchema = z.object({
   id: z.string(),
   queueNumber: z.string(),
@@ -891,6 +1076,10 @@ export const TicketModelSchema = z.object({
   visitorPhoneKnown: z.boolean().optional(),
   /** Kiosk: mandatory SMS capture step (consent + phone) before closing the success dialog. */
   smsPostTicketStepRequired: z.boolean().optional(),
+  /** User-provided identification payload (OCR / custom). Omitted in API for viewers without `tickets.user_data.read`. */
+  documentsData: z.record(z.string(), z.unknown()).optional(),
+  /** Server-side TTL anchor for cron cleanup (may be null for non-sensitive custom). */
+  documentsDataExpiresAt: z.string().nullable().optional(),
   visitorToken: z.string().optional(),
   service: z
     .object({
@@ -1082,6 +1271,13 @@ export interface AdScreenConfig {
   recentCallsHistoryLimit?: number;
 }
 
+/** @see KioskConfigSchema `kioskBaseTheme` */
+export type KioskBaseTheme =
+  | 'warm-light'
+  | 'cool-light'
+  | 'dark'
+  | 'high-contrast-preset';
+
 export interface KioskConfig {
   pin?: string;
   /** Main screen hero headline above the service grid (kiosk home). */
@@ -1090,31 +1286,24 @@ export interface KioskConfig {
   welcomeSubtitle?: string;
   headerText?: string;
   footerText?: string;
-  printerConnection?: 'network' | 'system';
-  systemPrinterName?: string;
-  printerIp?: string;
-  printerPort?: string;
   showHeader?: boolean;
   showFooter?: boolean;
   isCustomColorsEnabled?: boolean;
   headerColor?: string;
   bodyColor?: string;
   serviceGridColor?: string;
+  /**
+   * Surfaces when custom colors are off. Ignored (except schema round-trip) while `isCustomColorsEnabled` is true.
+   * `high-contrast-preset` is a fixed palette for bright environments — not the a11y high-contrast control.
+   */
+  kioskBaseTheme?: KioskBaseTheme;
+  /**
+   * `manual` = 8×8 from service grid fields (default). `auto` = client lays out from the sorted service list
+   * without requiring manual cell placement.
+   */
+  serviceGridLayout?: 'manual' | 'auto';
   /** Logo in the kiosk UI (color is fine). */
   logoUrl?: string;
-  /**
-   * Optional logo raster for thermal receipts only. Prefer high-contrast black-and-white (PNG, JPEG, BMP, SVG, WebP).
-   * When empty, `logoUrl` is used for printing as well.
-   */
-  printerLogoUrl?: string;
-  printerType?: string;
-  isPrintEnabled?: boolean;
-  /**
-   * When not false, issue ticket receipt after creation automatically if a print target
-   * exists. When false, the kiosk shows a manual print action on the success screen.
-   */
-  isAlwaysPrintTicket?: boolean;
-  feedbackUrl?: string;
   isPreRegistrationEnabled?: boolean;
   isAppointmentCheckinEnabled?: boolean;
   isAppointmentPhoneLookupEnabled?: boolean;
@@ -1211,7 +1400,9 @@ export const createTicketRequestSchema = z
     clientId: z.string().optional(),
     visitorPhone: z.string().optional(),
     visitorLocale: kioskVisitorLocaleSchema.optional(),
-    kioskIdentifiedUserId: z.string().uuid().optional()
+    kioskIdentifiedUserId: z.string().uuid().optional(),
+    /** JSON object: document or custom identification only; size enforced on server. */
+    documentsData: z.record(z.string(), z.unknown()).optional()
   })
   .superRefine((data, ctx) => {
     const cid = (data.clientId ?? '').trim();
@@ -1220,13 +1411,23 @@ export const createTicketRequestSchema = z
     const hasPhone = phone.length > 0;
     const hasLocale = data.visitorLocale !== undefined;
     const hasKid = (data.kioskIdentifiedUserId ?? '').trim().length > 0;
+    const hasDocs =
+      data.documentsData && Object.keys(data.documentsData).length > 0;
 
-    if (hasKid && (hasClient || hasPhone)) {
+    if (hasKid && (hasClient || hasPhone || hasDocs)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message:
-          'kioskIdentifiedUserId cannot be combined with clientId or visitor phone',
+          'kioskIdentifiedUserId cannot be combined with clientId, visitor phone, or documentsData',
         path: ['kioskIdentifiedUserId']
+      });
+    }
+    if (hasDocs && (hasClient || hasPhone)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'documentsData cannot be combined with clientId or visitor phone',
+        path: ['documentsData']
       });
     }
     if (hasClient && hasPhone) {
@@ -1262,6 +1463,7 @@ export const createTicketRequestSchema = z
       visitorPhone?: string;
       visitorLocale?: z.infer<typeof kioskVisitorLocaleSchema>;
       kioskIdentifiedUserId?: string;
+      documentsData?: Record<string, unknown>;
     } = { serviceId };
     if (cid) {
       out.clientId = cid;
@@ -1272,6 +1474,9 @@ export const createTicketRequestSchema = z
     }
     if (kid) {
       out.kioskIdentifiedUserId = kid;
+    }
+    if (data.documentsData && Object.keys(data.documentsData).length > 0) {
+      out.documentsData = data.documentsData;
     }
     return out;
   });
@@ -1290,6 +1495,7 @@ export type CreateTicketInUnitMutationVariables =
       visitorPhone?: never;
       visitorLocale?: never;
       kioskIdentifiedUserId?: never;
+      documentsData?: never;
     }
   | {
       unitId: string;
@@ -1298,6 +1504,7 @@ export type CreateTicketInUnitMutationVariables =
       visitorPhone?: never;
       visitorLocale?: never;
       kioskIdentifiedUserId?: never;
+      documentsData?: never;
     }
   | {
       unitId: string;
@@ -1306,6 +1513,7 @@ export type CreateTicketInUnitMutationVariables =
       visitorLocale: z.infer<typeof kioskVisitorLocaleSchema>;
       clientId?: never;
       kioskIdentifiedUserId?: never;
+      documentsData?: never;
     }
   | {
       unitId: string;
@@ -1314,6 +1522,16 @@ export type CreateTicketInUnitMutationVariables =
       clientId?: never;
       visitorPhone?: never;
       visitorLocale?: never;
+      documentsData?: never;
+    }
+  | {
+      unitId: string;
+      serviceId: string;
+      documentsData: Record<string, unknown>;
+      clientId?: never;
+      visitorPhone?: never;
+      visitorLocale?: never;
+      kioskIdentifiedUserId?: never;
     };
 
 /** POST /units/{unitId}/call-next — matches backend handlers.CallNextRequest after trim/dedupe. */

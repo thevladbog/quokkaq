@@ -21,6 +21,7 @@ export const PermAccessStatsSubdivision = 'access.statistics.subdivision';
 export const PermAccessStatsZone = 'access.statistics.zone';
 export const PermTicketsRead = 'tickets.read';
 export const PermTicketsWrite = 'tickets.write';
+export const PermTicketsViewUserData = 'tickets.user_data.read';
 export const PermCounterOperate = 'counter.operate';
 export const PermSurveyManage = 'survey.manage';
 export const PermCalendarManage = 'calendar.manage';
@@ -45,6 +46,7 @@ const LEGACY_TO_CANONICAL: Record<string, string> = {
   ACCESS_STATISTICS_ZONE: PermAccessStatsZone,
   TICKETS_READ: PermTicketsRead,
   TICKETS_WRITE: PermTicketsWrite,
+  TICKETS_USER_DATA_READ: PermTicketsViewUserData,
   COUNTER_OPERATE: PermCounterOperate,
   SURVEY_MANAGE: PermSurveyManage,
   CALENDAR_MANAGE: PermCalendarManage,

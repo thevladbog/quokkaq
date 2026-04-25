@@ -183,3 +183,185 @@ export function useKioskBarcodeWedge(
     };
   }, [active, maxSeg, mode]);
 }
+
+type DocumentOcrWedgeOptions = {
+  /** MRZ: ICAO lines, 88/90 run-on, 2/3 line assembly. */
+  enableMrz: boolean;
+  /** RU driving license: pipe / longText-style segments. */
+  enableRu: boolean;
+};
+
+/**
+ * One keyboard-wedge stream for the kiosk document OCR dialog. Avoids two
+ * `useKioskBarcodeWedge` listeners; MRZ assembly runs first, then a raw RU
+ * line is emitted when still unmatched.
+ */
+export function useKioskDocumentOcrWedge(
+  active: boolean,
+  onLine: (s: string) => void,
+  { enableMrz, enableRu }: DocumentOcrWedgeOptions
+) {
+  const buf = useRef('');
+  const firstAt = useRef(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mrzLineBuf = useRef<string[]>([]);
+  const lastMrzLineAt = useRef(0);
+  const onLineRef = useRef(onLine);
+  useEffect(() => {
+    onLineRef.current = onLine;
+  }, [onLine]);
+
+  const clearTimer = () => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+  };
+
+  useEffect(() => {
+    if (!active) {
+      buf.current = '';
+      mrzLineBuf.current = [];
+      firstAt.current = 0;
+      clearTimer();
+    }
+  }, [active]);
+
+  useEffect(() => {
+    if (!active) {
+      return undefined;
+    }
+    if (!enableMrz && !enableRu) {
+      return undefined;
+    }
+
+    const emit = (s: string) => {
+      const t = s.trim();
+      if (t) {
+        onLineRef.current(t);
+      }
+    };
+
+    const pushMrzLine = (line: string) => {
+      const now = Date.now();
+      if (now - lastMrzLineAt.current > MRZ_LINE_STALE_MS) {
+        mrzLineBuf.current = [];
+      }
+      lastMrzLineAt.current = now;
+      const norm = line.toUpperCase().replace(/[^0-9A-Z<]+/g, '');
+      if (!norm) {
+        return false;
+      }
+      mrzLineBuf.current.push(norm);
+      if (mrzLineBuf.current.length > 3) {
+        mrzLineBuf.current = mrzLineBuf.current.slice(-3);
+      }
+      if (mrzLineBuf.current.length === 2) {
+        const [a, b] = mrzLineBuf.current;
+        if (a!.length >= 20 && b!.length >= 20) {
+          emit([a, b].join('\n'));
+          mrzLineBuf.current = [];
+          return true;
+        }
+      } else if (mrzLineBuf.current.length === 3) {
+        const [a, b, c] = mrzLineBuf.current;
+        if (a!.length >= 15) {
+          emit([a, b, c].join('\n'));
+          mrzLineBuf.current = [];
+          return true;
+        }
+      }
+      return false;
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) {
+        return;
+      }
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        const raw = buf.current;
+        const cur = raw.toUpperCase().replace(/[^0-9A-Z<]+/g, '');
+
+        let emitted = false;
+        if (enableMrz) {
+          if (cur.length === 88 || cur.length === 90) {
+            emit(cur);
+            emitted = true;
+          } else if (cur) {
+            emitted = pushMrzLine(cur);
+          }
+        } else if (enableRu && raw) {
+          emit(raw);
+          emitted = true;
+        }
+        buf.current = '';
+        firstAt.current = 0;
+        clearTimer();
+        if (emitted) {
+          return;
+        }
+        if (enableMrz && !enableRu) {
+          return;
+        }
+        // RU: Enter — prefer idle flush for unmarked long lines; avoid treating a
+        // first MRZ line (no |) as RU when both parsers are on.
+        if (enableRu && raw.trim() && (!enableMrz || raw.includes('|'))) {
+          emit(raw);
+        }
+        return;
+      }
+
+      if (e.key.length !== 1) {
+        return;
+      }
+      const ch = e.key;
+      const charOk = enableMrz
+        ? enableRu
+          ? isLongTextChar(ch)
+          : isMrzChar(ch)
+        : isLongTextChar(ch);
+      if (!charOk) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      const now = Date.now();
+      if (!firstAt.current || now - firstAt.current > WEDGE_MAX_MS) {
+        buf.current = '';
+        firstAt.current = now;
+      }
+      if (buf.current.length < LONG_MAX) {
+        if (enableMrz && !enableRu) {
+          buf.current += ch === ' ' ? ' ' : ch.toUpperCase();
+        } else {
+          buf.current += ch;
+        }
+      }
+      if (enableMrz && !enableRu) {
+        return;
+      }
+      if (!enableRu) {
+        return;
+      }
+      if (timer.current) {
+        clearTimeout(timer.current);
+      }
+      timer.current = setTimeout(() => {
+        timer.current = null;
+        if (buf.current) {
+          emit(buf.current);
+          buf.current = '';
+          firstAt.current = 0;
+        }
+      }, WEDGE_MAX_MS);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      clearTimer();
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [active, enableMrz, enableRu]);
+}

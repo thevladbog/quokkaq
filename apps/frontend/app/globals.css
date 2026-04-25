@@ -8,6 +8,10 @@
   .z-layer-dialog {
     z-index: 110;
   }
+  /** e.g. kiosk full-screen camera preview (above stacked dialogs) */
+  .z-layer-kiosk-camera {
+    z-index: 130;
+  }
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -169,6 +173,46 @@
   --color-kiosk-ink: oklch(0.3 0.035 55);
   --color-kiosk-ink-muted: oklch(0.44 0.028 55);
   --color-kiosk-border: oklch(0.9 0.012 75);
+  /* On warm/cream *card* surfaces (default service tiles, etc.); matches kiosk-ink on light pages. */
+  --color-kiosk-surface-ink: oklch(0.3 0.035 55);
+  --color-kiosk-surface-ink-muted: oklch(0.48 0.03 55);
+  --color-kiosk-surface-border: oklch(0.82 0.015 75);
+  /* Service tiles with no per-service `backgroundColor` (warm home preset). */
+  --kiosk-tile-default-fill: oklch(0.98 0.01 75);
+  --kiosk-tile-shine-light: linear-gradient(
+    145deg,
+    rgba(253, 218, 178, 0.28) 0%,
+    rgba(255, 255, 255, 0.1) 42%,
+    transparent 60%
+  );
+}
+
+/* Kiosk: base theme presets (see `kioskBaseTheme` on `data-kiosk-base-theme`) */
+.kiosk-a11y-root[data-kiosk-base-theme='cool-light'] {
+  --color-kiosk-ink: oklch(0.28 0.055 264);
+  --color-kiosk-ink-muted: oklch(0.44 0.04 264);
+  --color-kiosk-border: oklch(0.88 0.025 264);
+  --color-kiosk-surface-ink: oklch(0.28 0.055 264);
+  --color-kiosk-surface-ink-muted: oklch(0.48 0.04 264);
+  --color-kiosk-surface-border: oklch(0.8 0.02 264);
+  /* Default service tiles: cool neutral, aligned with #f0f4ff / #e8eef6 page surfaces. */
+  --kiosk-tile-default-fill: oklch(0.987 0.012 256);
+  --kiosk-tile-shine-light: linear-gradient(
+    145deg,
+    rgba(200, 215, 255, 0.34) 0%,
+    rgba(255, 255, 255, 0.22) 44%,
+    transparent 60%
+  );
+}
+.kiosk-a11y-root[data-kiosk-base-theme='dark'],
+.kiosk-a11y-root[data-kiosk-base-theme='high-contrast-preset'] {
+  /* Page chrome: light ink on #1a… — default tiles stay cream, need dark type on those cards. */
+  --color-kiosk-ink: oklch(0.97 0.01 100);
+  --color-kiosk-ink-muted: oklch(0.72 0.02 100);
+  --color-kiosk-border: oklch(0.4 0.01 100);
+  --color-kiosk-surface-ink: oklch(0.3 0.035 55);
+  --color-kiosk-surface-ink-muted: oklch(0.5 0.03 55);
+  --color-kiosk-surface-border: oklch(0.75 0.02 60);
 }
 
 /* Kiosk: fluid typography on service tiles (@container/kiosk-tile on the card) */
@@ -205,6 +249,13 @@
 
   .kiosk-hc .kiosk-tile-a11y:focus-visible {
     outline-color: #fde047;
+  }
+
+  /* A11y high-contrast: unmistakable vs base dark theme (palette in kiosk-hc-palette). */
+  .kiosk-a11y-root.kiosk-hc {
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+      inset 0 3px 0 0 #f59e0b;
   }
 }
 

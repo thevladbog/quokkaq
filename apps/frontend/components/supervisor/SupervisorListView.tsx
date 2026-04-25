@@ -18,7 +18,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { Ticket, Service } from '@/lib/api';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Loader2, Info, LogOut } from 'lucide-react';
 import {
@@ -26,6 +26,7 @@ import {
   isTicketOverWait
 } from './supervisor-queue-utils';
 import { useTicketTimer } from '@/lib/ticket-timer';
+import { shouldShowUserDataInQueueList } from '@/lib/ticket-user-data-visibility';
 import type { ShiftCounterRow } from './SupervisorWorkstationMonitoring';
 
 function TableWaitCell({ ticket }: { ticket: Ticket }) {
@@ -46,19 +47,28 @@ export function SupervisorListView({
   counters,
   countersLoading,
   onShowTicketDetails,
+  services,
   onForceRelease,
-  releasePending
+  releasePending,
+  canReadUserData
 }: {
   queue: (Ticket & { service?: Service })[] | undefined;
   queueLoading: boolean;
   counters: ShiftCounterRow[] | undefined;
   countersLoading: boolean;
   onShowTicketDetails: (ticket: Ticket & { service?: Service }) => void;
+  services: Service[];
   onForceRelease: (counter: ShiftCounterRow) => void;
   releasePending: boolean;
+  canReadUserData: boolean;
 }) {
   const locale = useLocale();
   const t = useTranslations('supervisor.dashboardUi');
+  const getService = useCallback(
+    (id: string | undefined) =>
+      id ? services.find((s) => s.id === id) : undefined,
+    [services]
+  );
   const sorted = useMemo(() => {
     const list = queue ?? [];
     return [...list].sort((a, b) => {
@@ -133,7 +143,12 @@ export function SupervisorListView({
                         )}
                       </TableCell>
                       <TableCell>
-                        {ticket.preRegistration ? (
+                        {ticket.preRegistration ||
+                        shouldShowUserDataInQueueList(
+                          ticket,
+                          getService,
+                          canReadUserData
+                        ) ? (
                           <Button
                             type='button'
                             size='icon'

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
-import { Ticket } from '@/lib/api';
+import { Ticket, type Service } from '@/lib/api';
 import { logger } from '@/lib/logger';
 import { useTicketTimer } from '@/lib/ticket-timer';
 import { StaffServiceScopeSelector } from '@/components/staff/StaffServiceScopeSelector';
@@ -26,6 +26,16 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Info, ListChecks, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  getDocumentsDataPreviewString,
+  shouldShowUserDataInQueueList
+} from '@/lib/ticket-user-data-visibility';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 
 type TFn = (
   key: string,
@@ -35,6 +45,8 @@ type TFn = (
 export interface StaffQueuePanelProps {
   t: TFn;
   unitId: string;
+  /** False when the operator lacks `tickets.user_data.read` for this unit. */
+  canReadUserData: boolean;
   /** When true, picking tickets and creating tickets from the panel are blocked. */
   counterOnBreak?: boolean;
   waitingTickets: Ticket[];
@@ -61,6 +73,7 @@ export interface StaffQueuePanelProps {
   currentTicket: Ticket | undefined;
   onPickTicket: (ticket: Ticket) => Promise<void>;
   onShowDetails: (ticket: Ticket) => void;
+  services: Service[];
 }
 
 function visitorDisplayName(ticket: Ticket, t: TFn): string {
@@ -95,7 +108,9 @@ export function StaffQueuePanel({
   setInProgressTicketId,
   currentTicket,
   onPickTicket,
-  onShowDetails
+  onShowDetails,
+  services,
+  canReadUserData
 }: StaffQueuePanelProps) {
   const [scopeOpen, setScopeOpen] = useState(false);
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
@@ -109,142 +124,156 @@ export function StaffQueuePanel({
     });
   }, [waitingTickets]);
 
+  const serviceById = useMemo(
+    () => new Map(services.map((service) => [service.id, service])),
+    [services]
+  );
+
+  const getServiceForTicket = useCallback(
+    (id: string | undefined) => (id ? serviceById.get(id) : undefined),
+    [serviceById]
+  );
+
   return (
     <>
-      <Card className='border-border/70 shadow-sm lg:sticky lg:top-4 lg:max-h-[calc(100vh-5rem)] lg:self-start lg:overflow-hidden'>
-        <CardHeader className='border-border/50 space-y-1.5 border-b py-2'>
-          <div className='flex items-start justify-between gap-2'>
-            <div className='min-w-0 flex-1'>
-              <CardTitle className='text-sm leading-tight font-semibold'>
-                {t('queue.title')}
-              </CardTitle>
-              <CardDescription className='text-[11px] leading-snug'>
-                {t('queue.description')}
-              </CardDescription>
-            </div>
-            <div className='flex shrink-0 flex-col items-end gap-1'>
-              {scopeLeaves.length > 0 && (
-                <Button
-                  type='button'
-                  variant='outline'
-                  size='sm'
-                  className='h-7 gap-1 px-2 text-xs'
-                  onClick={() => setScopeOpen(true)}
-                >
-                  <ListChecks className='h-3.5 w-3.5' />
-                  {t('scope.configure')}
-                </Button>
-              )}
-              {leafServicesForCreate.length > 0 && (
-                <Button
-                  type='button'
-                  variant='outline'
-                  size='sm'
-                  className='h-7 gap-1 px-2 text-xs'
-                  disabled={counterOnBreak || createTicketPending}
-                  onClick={() => {
-                    setCreateTicketModalKey((k) => k + 1);
-                    setCreateTicketOpen(true);
-                  }}
-                >
-                  <Plus className='h-3.5 w-3.5' />
-                  {t('queue.create_ticket_menu')}
-                </Button>
-              )}
-            </div>
-          </div>
-          <p className='text-muted-foreground text-[10px] leading-tight'>
-            {t('queue.sorted_by_wait')}
-          </p>
-          <div className='border-border/40 bg-muted/10 flex flex-col gap-1 rounded-md border px-2 py-1.5'>
-            <div className='flex items-center justify-between gap-2'>
-              <Label
-                htmlFor='staff-queue-show-all'
-                className='text-foreground cursor-pointer text-[11px] leading-snug font-normal'
-              >
-                {t('queue.list_show_all')}
-              </Label>
-              <Switch
-                id='staff-queue-show-all'
-                checked={showAllTicketsInQueue}
-                onCheckedChange={onShowAllTicketsInQueueChange}
-              />
+      <TooltipProvider>
+        <Card className='border-border/70 shadow-sm lg:sticky lg:top-4 lg:max-h-[calc(100vh-5rem)] lg:self-start lg:overflow-hidden'>
+          <CardHeader className='border-border/50 space-y-1.5 border-b py-2'>
+            <div className='flex items-start justify-between gap-2'>
+              <div className='min-w-0 flex-1'>
+                <CardTitle className='text-sm leading-tight font-semibold'>
+                  {t('queue.title')}
+                </CardTitle>
+                <CardDescription className='text-[11px] leading-snug'>
+                  {t('queue.description')}
+                </CardDescription>
+              </div>
+              <div className='flex shrink-0 flex-col items-end gap-1'>
+                {scopeLeaves.length > 0 && (
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    className='h-7 gap-1 px-2 text-xs'
+                    onClick={() => setScopeOpen(true)}
+                  >
+                    <ListChecks className='h-3.5 w-3.5' />
+                    {t('scope.configure')}
+                  </Button>
+                )}
+                {leafServicesForCreate.length > 0 && (
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    className='h-7 gap-1 px-2 text-xs'
+                    disabled={counterOnBreak || createTicketPending}
+                    onClick={() => {
+                      setCreateTicketModalKey((k) => k + 1);
+                      setCreateTicketOpen(true);
+                    }}
+                  >
+                    <Plus className='h-3.5 w-3.5' />
+                    {t('queue.create_ticket_menu')}
+                  </Button>
+                )}
+              </div>
             </div>
             <p className='text-muted-foreground text-[10px] leading-tight'>
-              {showAllTicketsInQueue
-                ? t('queue.list_show_all_hint')
-                : t('queue.list_scoped_hint')}
+              {t('queue.sorted_by_wait')}
             </p>
-            {onOnlyMyZoneChange ? (
-              <div className='flex items-center justify-between gap-2 pt-0.5'>
+            <div className='border-border/40 bg-muted/10 flex flex-col gap-1 rounded-md border px-2 py-1.5'>
+              <div className='flex items-center justify-between gap-2'>
                 <Label
-                  htmlFor='staff-queue-only-my-zone'
+                  htmlFor='staff-queue-show-all'
                   className='text-foreground cursor-pointer text-[11px] leading-snug font-normal'
                 >
-                  {t('queue.only_my_zone')}
+                  {t('queue.list_show_all')}
                 </Label>
                 <Switch
-                  id='staff-queue-only-my-zone'
-                  checked={onlyMyZone}
-                  onCheckedChange={onOnlyMyZoneChange}
+                  id='staff-queue-show-all'
+                  checked={showAllTicketsInQueue}
+                  onCheckedChange={onShowAllTicketsInQueueChange}
                 />
               </div>
-            ) : null}
-            {onOnlyMyZoneChange ? (
               <p className='text-muted-foreground text-[10px] leading-tight'>
-                {onlyMyZone
-                  ? t('queue.only_my_zone_hint_on')
-                  : t('queue.only_my_zone_hint_off')}
+                {showAllTicketsInQueue
+                  ? t('queue.list_show_all_hint')
+                  : t('queue.list_scoped_hint')}
               </p>
-            ) : null}
-          </div>
-        </CardHeader>
-        <CardContent className='max-h-[min(70vh,32rem)] overflow-y-auto pt-2 lg:max-h-[calc(100vh-10rem)]'>
-          <div className='space-y-1.5'>
-            {sortedWaiting.length > 0 ? (
-              sortedWaiting.map((ticket) => (
-                <StaffQueueTicketRow
-                  key={ticket.id}
-                  ticket={ticket}
-                  serviceLabel={
-                    serviceNames[ticket.serviceId] ||
-                    ticket.serviceId ||
-                    t('queue.uncategorized')
-                  }
-                  visitorName={visitorDisplayName(ticket, t)}
-                  onCall={async () => {
-                    setInProgressTicketId(ticket.id);
-                    try {
-                      await onPickTicket(ticket);
-                    } catch (e) {
-                      logger.error('Failed to pick ticket from staff queue', {
-                        ticketId: ticket.id,
-                        queueNumber: ticket.queueNumber,
-                        serviceId: ticket.serviceId,
-                        error: e
-                      });
-                    } finally {
-                      setInProgressTicketId(null);
+              {onOnlyMyZoneChange ? (
+                <div className='flex items-center justify-between gap-2 pt-0.5'>
+                  <Label
+                    htmlFor='staff-queue-only-my-zone'
+                    className='text-foreground cursor-pointer text-[11px] leading-snug font-normal'
+                  >
+                    {t('queue.only_my_zone')}
+                  </Label>
+                  <Switch
+                    id='staff-queue-only-my-zone'
+                    checked={onlyMyZone}
+                    onCheckedChange={onOnlyMyZoneChange}
+                  />
+                </div>
+              ) : null}
+              {onOnlyMyZoneChange ? (
+                <p className='text-muted-foreground text-[10px] leading-tight'>
+                  {onlyMyZone
+                    ? t('queue.only_my_zone_hint_on')
+                    : t('queue.only_my_zone_hint_off')}
+                </p>
+              ) : null}
+            </div>
+          </CardHeader>
+          <CardContent className='max-h-[min(70vh,32rem)] overflow-y-auto pt-2 lg:max-h-[calc(100vh-10rem)]'>
+            <div className='space-y-1.5'>
+              {sortedWaiting.length > 0 ? (
+                sortedWaiting.map((ticket) => (
+                  <StaffQueueTicketRow
+                    key={ticket.id}
+                    ticket={ticket}
+                    serviceLabel={
+                      serviceNames[ticket.serviceId] ||
+                      ticket.serviceId ||
+                      t('queue.uncategorized')
                     }
-                  }}
-                  disabled={
-                    counterOnBreak ||
-                    pickPending ||
-                    Boolean(inProgressTicketId) ||
-                    !!currentTicket
-                  }
-                  t={t}
-                  onShowDetails={() => onShowDetails(ticket)}
-                />
-              ))
-            ) : (
-              <div className='text-muted-foreground py-6 text-center text-sm'>
-                {t('queue.noTickets')}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                    visitorName={visitorDisplayName(ticket, t)}
+                    onCall={async () => {
+                      setInProgressTicketId(ticket.id);
+                      try {
+                        await onPickTicket(ticket);
+                      } catch (e) {
+                        logger.error('Failed to pick ticket from staff queue', {
+                          ticketId: ticket.id,
+                          queueNumber: ticket.queueNumber,
+                          serviceId: ticket.serviceId,
+                          error: e
+                        });
+                      } finally {
+                        setInProgressTicketId(null);
+                      }
+                    }}
+                    disabled={
+                      counterOnBreak ||
+                      pickPending ||
+                      Boolean(inProgressTicketId) ||
+                      !!currentTicket
+                    }
+                    t={t}
+                    onShowDetails={() => onShowDetails(ticket)}
+                    getServiceForTicket={getServiceForTicket}
+                    canReadUserData={canReadUserData}
+                  />
+                ))
+              ) : (
+                <div className='text-muted-foreground py-6 text-center text-sm'>
+                  {t('queue.noTickets')}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </TooltipProvider>
 
       <StaffCreateTicketModal
         key={createTicketModalKey}
@@ -291,7 +320,9 @@ function StaffQueueTicketRow({
   onCall,
   disabled,
   t,
-  onShowDetails
+  onShowDetails,
+  getServiceForTicket,
+  canReadUserData
 }: {
   ticket: Ticket;
   serviceLabel: string;
@@ -300,6 +331,8 @@ function StaffQueueTicketRow({
   disabled: boolean;
   t: TFn;
   onShowDetails: () => void;
+  getServiceForTicket: (id: string | undefined) => Service | undefined;
+  canReadUserData: boolean;
 }) {
   const { background, formatTime, elapsed, isOverdue, isWarning } =
     useTicketTimer(ticket.createdAt || undefined, ticket.maxWaitingTime);
@@ -308,6 +341,34 @@ function StaffQueueTicketRow({
   const preRegistrationDetailsLabel = t('pre_registration.details_title', {
     defaultValue: 'Pre-registration Details'
   });
+  const userDataDetailsLabel = t('user_data_queue.details_label', {
+    defaultValue: 'Kiosk and document data'
+  });
+  const preReg = Boolean(ticket.preRegistration);
+  const userQueuePreview = shouldShowUserDataInQueueList(
+    ticket,
+    getServiceForTicket,
+    canReadUserData
+  );
+  const showInfo = preReg || userQueuePreview;
+  const docPreview = getDocumentsDataPreviewString(
+    ticket,
+    500,
+    canReadUserData,
+    {
+      ocrFailed: t('ticket_user_data.ocr_failed_preview', {
+        defaultValue:
+          'Document not read at the kiosk after 2 camera attempts. Verify identity at the counter.'
+      }),
+      customSkipped: t('ticket_user_data.custom_skipped_preview', {
+        defaultValue:
+          'Visitor did not provide the requested data on the kiosk. Verify as needed.'
+      }),
+      idDocumentOcr: t('ticket_user_data.id_document_ocr', {
+        defaultValue: 'Document (OCR line)'
+      })
+    }
+  );
 
   return (
     <div
@@ -364,21 +425,35 @@ function StaffQueueTicketRow({
           )}
         </div>
         <div className='flex items-center gap-1'>
-          {ticket.preRegistration && (
-            <Button
-              type='button'
-              size='sm'
-              variant='ghost'
-              className='h-8 w-8 p-0'
-              aria-label={preRegistrationDetailsLabel}
-              title={preRegistrationDetailsLabel}
-              onClick={(e) => {
-                e.stopPropagation();
-                onShowDetails();
-              }}
-            >
-              <Info className='h-3.5 w-3.5' aria-hidden />
-            </Button>
+          {showInfo && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='ghost'
+                  className='h-8 w-8 p-0'
+                  aria-label={
+                    preReg ? preRegistrationDetailsLabel : userDataDetailsLabel
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onShowDetails();
+                  }}
+                >
+                  <Info className='h-3.5 w-3.5' aria-hidden />
+                </Button>
+              </TooltipTrigger>
+              {userQueuePreview && docPreview ? (
+                <TooltipContent
+                  side='left'
+                  className='max-w-[min(18rem,70vw)]'
+                  sideOffset={4}
+                >
+                  <p className='text-xs break-all'>{docPreview}</p>
+                </TooltipContent>
+              ) : null}
+            </Tooltip>
           )}
           <Button
             size='sm'

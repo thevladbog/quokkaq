@@ -33,6 +33,37 @@ describe('parseIcaOmrz TD3', () => {
     }
   });
 
+  it('treats leading 3< as P< (common OCR for TD3 line1)', () => {
+    const l1Good = 'P<UTOMUSTERMANN<<ERIKA<<<<<<<<<<<<<<<<<<<<<<';
+    const l1Ocr = '3' + l1Good.slice(1);
+    const doc = 'C01X00T4<';
+    const dchk = icaoCheckDigit(doc);
+    const dob = '800101';
+    const dobc = icaoCheckDigit(dob);
+    const exp = '300101';
+    const expc = icaoCheckDigit(exp);
+    const l2 = `${doc}${dchk}UTO${dob}${dobc}M${exp}${expc}<<<<<<<<<<<<<<<0`;
+    const a = parseIcaOmrz([l1Good, l2]);
+    const b = parseIcaOmrz([l1Ocr, l2]);
+    expect(a.ok && b.ok).toBe(true);
+    if (a.ok && b.ok) {
+      expect(b.value.lastName).toBe(a.value.lastName);
+    }
+  });
+
+  it('strips non-ICAO characters (Cyrillic, em dash) before parsing', () => {
+    const l1 = 'P<UTOMUSTERMANN<<ERIKA<<<<<<<<<<<<<<<<<<<<<<';
+    const doc = 'C01X00T4<';
+    const dchk = icaoCheckDigit(doc);
+    const dob = '800101';
+    const dobc = icaoCheckDigit(dob);
+    const exp = '300101';
+    const expc = icaoCheckDigit(exp);
+    const l2 = `${doc}${dchk}UTO${dob}${dobc}M${exp}${expc}<<<<<<<<<<<<<<<0`;
+    const r = parseIcaOmrz([`— ${l1} (ВО) `, l2]);
+    expect(r.ok).toBe(true);
+  });
+
   it('accepts 88-char single paste (no newlines)', () => {
     const l1 = 'P<UTOMUSTERMANN<<ERIKA<<<<<<<<<<<<<<<<<<<<<<';
     const doc = 'C01X00T4<';

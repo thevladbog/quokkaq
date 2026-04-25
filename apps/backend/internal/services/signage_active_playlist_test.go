@@ -23,6 +23,9 @@ func (r *testUnitLightRepo) FindByIDLight(string) (*models.Unit, error) {
 	}
 	return &models.Unit{ID: "u1", Timezone: "UTC"}, nil
 }
+func (r *testUnitLightRepo) FindByIDLightTxForUpdate(_ *gorm.DB, id string) (*models.Unit, error) {
+	return r.FindByIDLight(id)
+}
 
 // apTestSignage is a minimal fake for [SignageService.ActivePlaylist] paths.
 type apTestSignage struct {

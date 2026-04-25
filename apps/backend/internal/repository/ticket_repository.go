@@ -234,6 +234,9 @@ type TicketRepository interface {
 
 	// ClaimVisitorWelcomeIfUnset sets visitor_welcome_notified_at when it was null (idempotency for welcome channel).
 	ClaimVisitorWelcomeIfUnset(ticketID string) (ok bool, err error)
+
+	// ClearExpiredTicketDocuments nulls documents_data and documents_data_expires_at for rows past TTL.
+	ClearExpiredTicketDocuments() (int64, error)
 }
 
 // ServiceWaitingCount holds the waiting queue length for a single service.
@@ -260,6 +263,15 @@ func (r *ticketRepository) Create(ticket *models.Ticket) error {
 
 func (r *ticketRepository) CreateTx(tx *gorm.DB, ticket *models.Ticket) error {
 	return tx.Create(ticket).Error
+}
+
+func (r *ticketRepository) ClearExpiredTicketDocuments() (int64, error) {
+	res := r.db.Exec(`UPDATE tickets SET documents_data = NULL, documents_data_expires_at = NULL
+		WHERE documents_data_expires_at IS NOT NULL AND documents_data_expires_at < NOW()`)
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	return res.RowsAffected, nil
 }
 
 func (r *ticketRepository) CreateTicketHistory(history *models.TicketHistory) error {
