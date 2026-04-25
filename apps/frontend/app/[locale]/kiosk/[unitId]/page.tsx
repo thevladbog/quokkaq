@@ -169,7 +169,12 @@ export default function UnitKioskPage() {
     useState<UnitETASnapshot | null>(null);
   const isTicketModalOpenRef = useRef(false);
   const createdTicketRef = useRef<Ticket | null>(null);
-  const [idOcrOpen, setIdOcrOpen] = useState(false);
+  const [documentOcrOpen, setDocumentOcrOpen] = useState(false);
+  /** Service waiting for document OCR success before creating a ticket (identificationMode=document). */
+  const [pendingDocumentService, setPendingDocumentService] =
+    useState<Service | null>(null);
+  const [isKioskDocumentOcrDisabledOpen, setIsKioskDocumentOcrDisabledOpen] =
+    useState(false);
   /** Last "Use text" from document scan — visible strip + prefill into phone / pre-reg where applicable. */
   const [kioskOcrResultText, setKioskOcrResultText] = useState('');
   const [browserOnline, setBrowserOnline] = useState(
@@ -511,9 +516,7 @@ export default function UnitKioskPage() {
   const attractMode = getKioskAttractMode(kioskCfg);
   const beforeIdleSec = kioskCfg?.sessionIdleBeforeWarningSec ?? 45;
   const idleCountdownSec = kioskCfg?.sessionIdleCountdownSec ?? 15;
-  const idOcrBlocking =
-    Boolean(unit?.operations?.kioskIdOcr && kioskCfg?.idOcrEnabled) &&
-    idOcrOpen;
+  const documentOcrModalBlocking = documentOcrOpen;
   const kioskNoModalBlockers = Boolean(
     unit &&
     !unitQueryError &&
@@ -525,9 +528,10 @@ export default function UnitKioskPage() {
     !isRedemptionModalOpen &&
     !isKioskQrIdentificationOpen &&
     !isKioskQrCheckinDisabledOpen &&
+    !isKioskDocumentOcrDisabledOpen &&
     !isPhoneIdentificationOpen &&
     !isEmployeeIdentificationOpen &&
-    !idOcrBlocking
+    !documentOcrModalBlocking
   );
   const sessionIdleBaseEnabled = kioskNoModalBlockers && !showAttract;
   const sessionIdleEnabled =
@@ -542,6 +546,9 @@ export default function UnitKioskPage() {
     setPendingEmployeeService(null);
     setIsKioskQrIdentificationOpen(false);
     setIsKioskQrCheckinDisabledOpen(false);
+    setIsKioskDocumentOcrDisabledOpen(false);
+    setDocumentOcrOpen(false);
+    setPendingDocumentService(null);
     setIsRedemptionModalOpen(false);
     setIsPinModalOpen(false);
     setMessage('');
@@ -732,6 +739,7 @@ export default function UnitKioskPage() {
     !isRedemptionModalOpen &&
     !isKioskQrIdentificationOpen &&
     !isKioskQrCheckinDisabledOpen &&
+    !isKioskDocumentOcrDisabledOpen &&
     !isPhoneIdentificationOpen &&
     !isEmployeeIdentificationOpen
   );
@@ -759,20 +767,16 @@ export default function UnitKioskPage() {
         : 'bg-kiosk-border/40 text-kiosk-ink hover:bg-kiosk-border/55'
   );
 
-  const showKioskIdOcr = Boolean(
-    unit?.operations?.kioskIdOcr && kioskCfg?.idOcrEnabled
-  );
   const showOfflineShell = Boolean(
     unit?.operations?.kioskOfflineMode && kioskCfg?.offlineModeEnabled
   );
   /** Strips sit above modals (lower z) — hide when a full dialog covers the grid or the OCR tool is open. */
   const showKioskOcrResultStrip = Boolean(
-    showKioskIdOcr &&
     kioskOcrResultText.trim() &&
     !isPhoneIdentificationOpen &&
     !isRedemptionModalOpen &&
     !isKioskQrIdentificationOpen &&
-    !idOcrOpen
+    !documentOcrOpen
   );
   const topBarLeading = (
     <>
@@ -828,16 +832,6 @@ export default function UnitKioskPage() {
             ? t('network.online', { defaultValue: 'Online' })
             : t('network.offline', { defaultValue: 'No network' })}
         </span>
-      ) : null}
-      {showKioskIdOcr ? (
-        <Button
-          type='button'
-          variant='secondary'
-          className={kioskHeaderPillClass}
-          onClick={() => setIdOcrOpen(true)}
-        >
-          {t('id_ocr.action', { defaultValue: 'Scan document' })}
-        </Button>
       ) : null}
       {appointmentCheckinEnabled ? (
         <Button
@@ -907,12 +901,17 @@ export default function UnitKioskPage() {
       successPeopleAhead ?? 'x',
       isPhoneIdentificationOpen,
       isEmployeeIdentificationOpen,
-      isKioskQrIdentificationOpen
+      isKioskQrIdentificationOpen,
+      documentOcrOpen
     ].join(':');
     if (key === ttsKeyRef.current) {
       return;
     }
     ttsKeyRef.current = key;
+    if (documentOcrOpen) {
+      tts.speak(tA11y('screen_document_ocr'));
+      return;
+    }
     if (isKioskQrIdentificationOpen) {
       tts.speak(tA11y('screen_qr_checkin'));
       return;
@@ -957,7 +956,8 @@ export default function UnitKioskPage() {
     tA11y,
     isPhoneIdentificationOpen,
     isEmployeeIdentificationOpen,
-    isKioskQrIdentificationOpen
+    isKioskQrIdentificationOpen,
+    documentOcrOpen
   ]);
 
   const handleClockClick = () => {
@@ -1274,6 +1274,15 @@ export default function UnitKioskPage() {
         }
         setKioskPrIdentModalKey((k) => k + 1);
         setIsKioskQrIdentificationOpen(true);
+        return;
+      }
+      if (mode === 'document') {
+        if (!unit?.operations?.kioskIdOcr || !kioskCfg?.idOcrEnabled) {
+          setIsKioskDocumentOcrDisabledOpen(true);
+          return;
+        }
+        setPendingDocumentService(service);
+        setDocumentOcrOpen(true);
         return;
       }
       if (mode === 'login' || mode === 'badge') {
@@ -1876,6 +1885,11 @@ export default function UnitKioskPage() {
                             onDarkServiceGrid={serviceGridIsDark}
                             onSelect={handleServiceSelection}
                             onA11yFocus={handleA11yTileVocalize}
+                            showDocumentIdHint={
+                              service.isLeaf &&
+                              getServiceIdentificationMode(service) ===
+                                'document'
+                            }
                           />
                         </div>
                       );
@@ -1916,6 +1930,10 @@ export default function UnitKioskPage() {
                         onDarkServiceGrid={serviceGridIsDark}
                         onSelect={handleServiceSelection}
                         onA11yFocus={handleA11yTileVocalize}
+                        showDocumentIdHint={
+                          service.isLeaf &&
+                          getServiceIdentificationMode(service) === 'document'
+                        }
                       />
                     </div>
                   );
@@ -2333,16 +2351,56 @@ export default function UnitKioskPage() {
           </KioskDialogContent>
         </Dialog>
 
-        {showKioskIdOcr && unitId ? (
+        <Dialog
+          open={isKioskDocumentOcrDisabledOpen}
+          onOpenChange={setIsKioskDocumentOcrDisabledOpen}
+        >
+          <KioskDialogContent className='max-w-md'>
+            <DialogHeader>
+              <DialogTitle>
+                {t('document_ocr_unavailable_title', {
+                  defaultValue: 'Document scan unavailable'
+                })}
+              </DialogTitle>
+            </DialogHeader>
+            <p className='text-muted-foreground text-sm leading-relaxed'>
+              {t('document_ocr_unavailable')}
+            </p>
+            <DialogFooter className='sm:justify-end'>
+              <Button
+                type='button'
+                onClick={() => {
+                  setIsKioskDocumentOcrDisabledOpen(false);
+                  setSelectedServicePath([]);
+                }}
+              >
+                {t('document_ocr_unavailable_ok')}
+              </Button>
+            </DialogFooter>
+          </KioskDialogContent>
+        </Dialog>
+
+        {unitId && documentOcrOpen ? (
           <KioskIdOcrDialog
-            open={idOcrOpen}
-            onOpenChange={setIdOcrOpen}
+            open={documentOcrOpen}
+            onOpenChange={(v) => {
+              setDocumentOcrOpen(v);
+              if (!v) {
+                setPendingDocumentService(null);
+              }
+            }}
             unitId={unitId}
             preferNative={kioskCfg?.idOcrPreferNative !== false}
             wedgeMrz={kioskCfg?.idOcrWedgeMrz !== false}
             wedgeRu={kioskCfg?.idOcrWedgeRuDriverLicense !== false}
             onUseText={(text) => {
               setKioskOcrResultText(text);
+              const svc = pendingDocumentService;
+              if (svc) {
+                setPendingDocumentService(null);
+                setDocumentOcrOpen(false);
+                void createTicketForService(svc);
+              }
               void (async () => {
                 try {
                   await navigator.clipboard.writeText(text);

@@ -116,8 +116,8 @@ export type ServiceModel = {
   maxServiceTime?: number | null;
   prebook?: boolean;
   offerIdentification?: boolean;
-  /** Kiosk identification step: none | phone | qr | login | badge */
-  identificationMode?: 'none' | 'phone' | 'qr' | 'login' | 'badge';
+  /** Kiosk identification step: none | phone | qr | document | login | badge */
+  identificationMode?: 'none' | 'phone' | 'qr' | 'document' | 'login' | 'badge';
   isLeaf?: boolean;
   /** Order within the unit for kiosk and lists; lower = earlier. */
   sortOrder?: number;
@@ -157,7 +157,7 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
   prebook: z.boolean().optional(),
   offerIdentification: z.boolean().optional(),
   identificationMode: z
-    .enum(['none', 'phone', 'qr', 'login', 'badge'])
+    .enum(['none', 'phone', 'qr', 'document', 'login', 'badge'])
     .optional(),
   isLeaf: z.boolean().optional(),
   sortOrder: z.number().int().optional(),

@@ -1478,7 +1478,13 @@ function ServiceForm({
           <Select
             value={getServiceIdentificationMode(formValues as Service)}
             onValueChange={(v) => {
-              const mode = v as 'none' | 'phone' | 'qr' | 'login' | 'badge';
+              const mode = v as
+                | 'none'
+                | 'phone'
+                | 'qr'
+                | 'document'
+                | 'login'
+                | 'badge';
               setFormValues((prev) => ({
                 ...prev,
                 identificationMode: mode,
@@ -1501,6 +1507,9 @@ function ServiceForm({
               </SelectItem>
               <SelectItem value='qr'>
                 {tRoot('forms.fields.kiosk_identification_mode_qr')}
+              </SelectItem>
+              <SelectItem value='document'>
+                {tRoot('forms.fields.kiosk_identification_mode_document')}
               </SelectItem>
               <SelectItem value='login'>
                 {tRoot('forms.fields.kiosk_identification_mode_login')}

@@ -6,9 +6,10 @@ import {
   type CSSProperties,
   type KeyboardEvent
 } from 'react';
-import { ChevronRight, ImageOff, Ticket } from 'lucide-react';
+import { ChevronRight, FileText, ImageOff, Ticket } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
+import { useTranslations } from 'next-intl';
 import { getLocalizedName, cn } from '@/lib/utils';
 import type { Service } from '@/lib/api';
 import { relativeLuminanceFromCssColor } from '@/lib/kiosk-wcag-contrast';
@@ -30,6 +31,8 @@ type KioskServiceTileProps = {
   onDarkServiceGrid?: boolean;
   /** Optional: e.g. speak service title when the tile is focused (keyboard a11y + TTS). */
   onA11yFocus?: (service: Service) => void;
+  /** Leaf + identification document: short secondary line under the title. */
+  showDocumentIdHint?: boolean;
 };
 
 const cardClassBaseFrame =
@@ -163,6 +166,41 @@ function KioskTileKindIndicator({
   );
 }
 
+const DOC_TICKET_ICON_SIZE = 'size-6 shrink-0 sm:size-7';
+const docTicketStrokeW = 2.4 as const;
+
+function KioskDocumentIdBottomBar({
+  label,
+  highContrast,
+  textColor,
+  backgroundColor
+}: {
+  label: string;
+  highContrast?: boolean;
+  textColor?: string;
+  backgroundColor: string;
+}) {
+  const tone = kioskTileKindIconClass(textColor, backgroundColor, highContrast);
+  return (
+    <div
+      className={cn(
+        'pointer-events-none absolute bottom-2 left-2 z-20 flex min-h-0 max-w-[min(12rem,calc(100%-3.25rem))] items-center gap-1.5 sm:bottom-3 sm:left-3 sm:max-w-[min(14rem,calc(100%-3.5rem))]',
+        tone
+      )}
+      role='note'
+    >
+      <FileText
+        className={cn(DOC_TICKET_ICON_SIZE)}
+        strokeWidth={docTicketStrokeW}
+        aria-hidden
+      />
+      <span className='line-clamp-2 min-w-0 flex-1 text-left text-[0.65rem] leading-tight sm:text-xs'>
+        {label}
+      </span>
+    </div>
+  );
+}
+
 type TileImageProps = { imageUrl: string; title: string };
 
 function firstGraphemeForLabel(title: string): string {
@@ -268,8 +306,10 @@ export function KioskServiceTile({
   tileKind,
   highContrast,
   onDarkServiceGrid,
-  onA11yFocus
+  onA11yFocus,
+  showDocumentIdHint
 }: KioskServiceTileProps) {
+  const t = useTranslations('kiosk.service_tile');
   const title = getLocalizedName(
     service.name,
     service.nameRu || '',
@@ -362,7 +402,9 @@ export function KioskServiceTile({
           className={cn(
             'relative z-10 flex h-full min-h-0 w-full min-w-0 flex-col items-center justify-center gap-0.5 overflow-hidden px-2.5 py-2 text-center sm:gap-1 sm:px-3 sm:py-2.5 md:px-4',
             '@min-[12rem]/kiosk-tile:flex-row @min-[12rem]/kiosk-tile:items-center @min-[12rem]/kiosk-tile:justify-center @min-[12rem]/kiosk-tile:gap-4 @min-[12rem]/kiosk-tile:px-4 @min-[16rem]/kiosk-tile:gap-5',
-            tileKind ? 'pb-7 @min-[12rem]/kiosk-tile:pb-8' : ''
+            tileKind || showDocumentIdHint
+              ? 'pb-7 @min-[12rem]/kiosk-tile:pb-8'
+              : ''
           )}
         >
           <KioskNoImageGlyph
@@ -376,6 +418,16 @@ export function KioskServiceTile({
             {description ? <p className={descClass}>{description}</p> : null}
           </div>
         </div>
+        {showDocumentIdHint ? (
+          <KioskDocumentIdBottomBar
+            label={t('document_id_hint', {
+              defaultValue: 'Have a government-issued ID ready.'
+            })}
+            highContrast={highContrast}
+            textColor={fg}
+            backgroundColor={displayBg}
+          />
+        ) : null}
         <KioskTileKindIndicator
           tileKind={tileKind}
           highContrast={highContrast}
@@ -429,6 +481,16 @@ export function KioskServiceTile({
           </div>
         </div>
       </div>
+      {showDocumentIdHint ? (
+        <KioskDocumentIdBottomBar
+          label={t('document_id_hint', {
+            defaultValue: 'Have a government-issued ID ready.'
+          })}
+          highContrast={highContrast}
+          textColor={fg}
+          backgroundColor={displayBg}
+        />
+      ) : null}
       <KioskTileKindIndicator
         tileKind={tileKind}
         highContrast={highContrast}

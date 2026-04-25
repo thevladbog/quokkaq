@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Loader2, Scan } from 'lucide-react';
+import { Loader2, Scan, ScanLine } from 'lucide-react';
 import {
   formatIcaOmrzForKiosk,
   formatRuDrivingLicenseText,
@@ -18,11 +18,14 @@ import {
 } from '@/components/ui/dialog';
 import { KioskDialogContent } from '@/components/kiosk/kiosk-dialog-content';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 import { isTauriKiosk } from '@/lib/kiosk-print';
-import { useKioskBarcodeWedge } from '@/hooks/use-kiosk-barcode-wedge';
+import { useKioskDocumentOcrWedge } from '@/hooks/use-kiosk-barcode-wedge';
 import { useKioskSerialScannerStream } from '@/hooks/use-kiosk-serial-scanner';
-import { cn } from '@/lib/utils';
+import {
+  KIOSK_TAURI_DEVICE_CHANGED_EVENT,
+  readKioskTauriLocalDevice
+} from '@/lib/kiosk-tauri-device-config';
 
 type KioskIdOcrDialogProps = {
   open: boolean;
@@ -32,7 +35,7 @@ type KioskIdOcrDialogProps = {
   /** When true and the shell is Tauri, call native tesseract. */
   preferNative: boolean;
   onUseText: (text: string) => void;
-  /** Default true when unset: show MRZ and RU barcode tabs (plan + id OCR). */
+  /** Default true when unset: MRZ + RU via wedge/serial. */
   wedgeMrz?: boolean;
   wedgeRu?: boolean;
 };
@@ -50,7 +53,6 @@ const AUTO_SCAN_MS = 3200;
 const AUTO_APPLY_MIN_LEN = 32;
 const AUTO_APPLY_MIN_CONF = 58;
 const NATIVE_STABLE_MATCHES = 2;
-/** Heuristic: one long read is enough to apply (no confidence from native CLI). */
 const NATIVE_ONE_SHOT_MIN_LEN = 200;
 
 function normalizeOcrStability(s: string): string {
@@ -86,17 +88,92 @@ export function KioskIdOcrDialog({
   wedgeRu = true
 }: KioskIdOcrDialogProps) {
   const t = useTranslations('kiosk.id_ocr');
+  const [deviceCfgEpoch, setDeviceCfgEpoch] = useState(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [subTab, setSubTab] = useState('camera');
   const busyRef = useRef(false);
   const hasAutoClosedRef = useRef(false);
   const lastAutoNormRef = useRef<string>('');
   const nativeStreakRef = useRef(0);
+  const wedgeActive = open && (wedgeMrz || wedgeRu);
+  const hasSerialPath = (() => {
+    void deviceCfgEpoch;
+    return Boolean(readKioskTauriLocalDevice(unitId).serialPath?.trim());
+  })();
+  const showSerialCallout = isTauriKiosk() && hasSerialPath;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+    const bump = () => setDeviceCfgEpoch((n) => n + 1);
+    window.addEventListener(KIOSK_TAURI_DEVICE_CHANGED_EVENT, bump);
+    return () => {
+      window.removeEventListener(KIOSK_TAURI_DEVICE_CHANGED_EVENT, bump);
+    };
+  }, [unitId]);
+
+  const processScanLine = useCallback(
+    (line: string) => {
+      setErr(null);
+      if (wedgeMrz) {
+        const m = buildMrzText(line);
+        if (m) {
+          setText(m);
+          return;
+        }
+      }
+      if (wedgeRu) {
+        const p = parseRuDrivingLicenseBarcode(line);
+        if (p.documentId && p.lastName) {
+          setText(formatRuDrivingLicenseText(p));
+          return;
+        }
+        if (p.documentId || p.trailer) {
+          setText(
+            formatRuDrivingLicenseText(p) ||
+              t('ru_partial', { defaultValue: 'Partial data' })
+          );
+          return;
+        }
+        if (wedgeMrz) {
+          setErr(
+            t('document_scan_mrz_ru_mismatch', {
+              defaultValue:
+                'Not MRZ. For RU license, ensure the scan line includes the barcode separator (|), or use the camera.'
+            })
+          );
+        } else {
+          setErr(
+            t('ru_error', {
+              defaultValue:
+                'Unrecognized code. Open text or base64 of pipe-separated data.'
+            })
+          );
+        }
+        return;
+      }
+      if (wedgeMrz) {
+        setErr(
+          t('mrz_error', {
+            defaultValue:
+              'Could not read MRZ. Check two/three short lines, or 88/90 characters.'
+          })
+        );
+      }
+    },
+    [t, wedgeMrz, wedgeRu]
+  );
+
+  useKioskDocumentOcrWedge(wedgeActive, processScanLine, {
+    enableMrz: wedgeMrz,
+    enableRu: wedgeRu
+  });
+  useKioskSerialScannerStream(wedgeActive, processScanLine, unitId);
 
   const applyIfEligible = useCallback(
     (
@@ -121,7 +198,6 @@ export function KioskIdOcrDialog({
           onOpenChange(false);
           return;
         }
-        // Low confidence: same stability path as native (two matching reads)
       }
       const n = normalizeOcrStability(ttrim);
       if (n.length >= NATIVE_ONE_SHOT_MIN_LEN) {
@@ -150,55 +226,6 @@ export function KioskIdOcrDialog({
     [onOpenChange, onUseText]
   );
 
-  const applyMrzRaw = useCallback(
-    (raw: string) => {
-      setErr(null);
-      const out = buildMrzText(raw);
-      if (out) {
-        setText(out);
-      } else {
-        setErr(
-          t('mrz_error', {
-            defaultValue: 'Could not read MRZ. Scan two lines, or 88/90 chars.'
-          })
-        );
-      }
-    },
-    [t]
-  );
-
-  const applyRuRaw = useCallback(
-    (raw: string) => {
-      setErr(null);
-      const p = parseRuDrivingLicenseBarcode(raw);
-      if (p.documentId && p.lastName) {
-        setText(formatRuDrivingLicenseText(p));
-        return;
-      }
-      if (p.documentId || p.trailer) {
-        setText(
-          formatRuDrivingLicenseText(p) ||
-            t('ru_partial', { defaultValue: 'Partial data' })
-        );
-        return;
-      }
-      setErr(
-        t('ru_error', {
-          defaultValue:
-            'Unrecognized code. Open text or base64 of pipe-separated data.'
-        })
-      );
-    },
-    [t]
-  );
-
-  const mrzActive = open && wedgeMrz && subTab === 'mrz';
-  const ruActive = open && wedgeRu && subTab === 'ru';
-  useKioskBarcodeWedge(mrzActive, applyMrzRaw, { mode: 'mrz' });
-  useKioskBarcodeWedge(ruActive, applyRuRaw, { mode: 'longText' });
-  useKioskSerialScannerStream(mrzActive, applyMrzRaw, unitId);
-  useKioskSerialScannerStream(ruActive, applyRuRaw, unitId);
-
   useEffect(() => {
     if (!open) {
       if (streamRef.current) {
@@ -221,13 +248,9 @@ export function KioskIdOcrDialog({
       hasAutoClosedRef.current = false;
       lastAutoNormRef.current = '';
       nativeStreakRef.current = 0;
-      setSubTab('camera');
       return;
     }
     void (async () => {
-      if (subTab !== 'camera') {
-        return;
-      }
       try {
         const s = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment' },
@@ -263,7 +286,7 @@ export function KioskIdOcrDialog({
         el.srcObject = null;
       }
     };
-  }, [open, subTab, t]);
+  }, [open, t]);
 
   const runRecognize = useCallback(
     async (source: 'manual' | 'auto' = 'manual') => {
@@ -346,7 +369,7 @@ export function KioskIdOcrDialog({
   );
 
   useEffect(() => {
-    if (!open || subTab !== 'camera' || !stream || hasAutoClosedRef.current) {
+    if (!open || !stream || hasAutoClosedRef.current) {
       return;
     }
     const id = window.setInterval(() => {
@@ -363,10 +386,7 @@ export function KioskIdOcrDialog({
       window.clearInterval(id);
       window.clearTimeout(boot);
     };
-  }, [open, subTab, stream, runRecognize]);
-
-  const showWedge = wedgeMrz || wedgeRu;
-  const nTabColumns = 1 + (wedgeMrz ? 1 : 0) + (wedgeRu ? 1 : 0);
+  }, [open, stream, runRecognize]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -376,99 +396,49 @@ export function KioskIdOcrDialog({
       >
         <DialogHeader>
           <DialogTitle>
-            {t('title', { defaultValue: 'Document scan' })}
+            {t('title', { defaultValue: 'ID document' })}
           </DialogTitle>
           <p className='text-muted-foreground text-sm leading-relaxed'>
             {t('hint', {
               defaultValue:
-                'The image is processed in memory and is not saved on this device. The camera re-reads periodically; good reads can copy text and close. You can rescan if needed.'
+                'The image is processed in memory and is not saved. Good reads can copy text and close. Nothing is sent automatically without your next step on this kiosk.'
             })}
           </p>
         </DialogHeader>
 
-        {showWedge ? (
-          <Tabs value={subTab} onValueChange={setSubTab} className='w-full'>
-            <TabsList
-              className={cn(
-                'grid w-full',
-                nTabColumns === 2 && 'grid-cols-2',
-                nTabColumns === 3 && 'grid-cols-3'
-              )}
-            >
-              <TabsTrigger value='camera' type='button'>
-                {t('tab_camera', { defaultValue: 'Camera' })}
-              </TabsTrigger>
-              {wedgeMrz ? (
-                <TabsTrigger value='mrz' type='button'>
-                  {t('tab_mrz', { defaultValue: 'ICAO (MRZ)' })}
-                </TabsTrigger>
-              ) : null}
-              {wedgeRu ? (
-                <TabsTrigger value='ru' type='button'>
-                  {t('tab_ru_dl', { defaultValue: 'RU license' })}
-                </TabsTrigger>
-              ) : null}
-            </TabsList>
-            <TabsContent value='camera' className='pt-2'>
-              <div className='bg-muted/40 relative flex aspect-video w-full max-w-full items-center justify-center overflow-hidden rounded-lg'>
-                {err && !stream && subTab === 'camera' ? (
-                  <p className='text-destructive px-3 text-center text-sm'>
-                    {err}
-                  </p>
-                ) : (
-                  <video
-                    ref={videoRef}
-                    className='h-full w-full object-contain'
-                    playsInline
-                    muted
-                    aria-label={t('title', { defaultValue: 'Camera preview' })}
-                  />
-                )}
-                {stream && subTab === 'camera' ? (
-                  <div
-                    className='pointer-events-none absolute inset-x-0 bottom-2 flex items-center justify-center'
-                    aria-hidden
-                  >
-                    {busy ? (
-                      <div className='text-muted-foreground border-background/80 flex items-center gap-2 rounded-full border bg-white/80 px-3 py-1 text-xs shadow-sm dark:bg-zinc-900/85'>
-                        <Loader2 className='h-3.5 w-3.5 shrink-0 animate-spin' />
-                        {t('status_scanning', { defaultValue: 'Reading…' })}
-                      </div>
-                    ) : (
-                      <div className='text-muted-foreground border-background/60 flex max-w-[95%] items-center justify-center gap-1.5 rounded-full border bg-white/70 px-2 py-1 text-center text-[0.7rem] shadow-sm sm:text-xs dark:bg-zinc-900/80'>
-                        <Scan className='h-3.5 w-3.5 shrink-0' />
-                        {t('status_hold_doc', {
-                          defaultValue:
-                            'Keep the document steady — scanning automatically'
-                        })}
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-              </div>
-            </TabsContent>
-            {wedgeMrz ? (
-              <TabsContent value='mrz' className='space-y-2 pt-2'>
-                <p className='text-muted-foreground text-sm'>
-                  {t('mrz_hint', {
-                    defaultValue:
-                      'Use the 2 or 3 MRZ lines from your passport/ID, or 88/90 characters at once.'
-                  })}
-                </p>
-              </TabsContent>
-            ) : null}
-            {wedgeRu ? (
-              <TabsContent value='ru' className='space-y-2 pt-2'>
-                <p className='text-muted-foreground text-sm'>
-                  {t('ru_hint', {
-                    defaultValue:
-                      'Point the scanner at the RU license barcode. Open or base64; data stays in this session only.'
-                  })}
-                </p>
-              </TabsContent>
-            ) : null}
-          </Tabs>
-        ) : (
+        {showSerialCallout ? (
+          <div
+            className='border-border bg-muted/30 flex items-start gap-3 rounded-lg border p-3'
+            aria-label={t('serial_scanner_aria', {
+              defaultValue: 'USB serial scanner'
+            })}
+          >
+            <div className='text-muted-foreground border-border bg-background/80 flex h-10 w-10 shrink-0 items-center justify-center rounded-md border'>
+              <ScanLine className='h-5 w-5' aria-hidden />
+            </div>
+            <p className='text-muted-foreground min-w-0 text-sm leading-relaxed'>
+              {t('serial_scanner_hint', {
+                defaultValue:
+                  'A serial scanner is configured. Scan the MRZ or barcode; text appears in the result area below.'
+              })}
+            </p>
+          </div>
+        ) : null}
+
+        {showSerialCallout ? (
+          <div className='flex items-center gap-3 py-0.5'>
+            <Separator className='flex-1' />
+            <span className='text-muted-foreground text-xs font-medium tracking-wide uppercase'>
+              {t('or_label', { defaultValue: 'Or' })}
+            </span>
+            <Separator className='flex-1' />
+          </div>
+        ) : null}
+
+        <div className='pt-0.5'>
+          <p className='text-muted-foreground mb-1.5 text-sm font-medium'>
+            {t('camera_section_label', { defaultValue: 'Camera' })}
+          </p>
           <div className='bg-muted/40 relative flex aspect-video w-full max-w-full items-center justify-center overflow-hidden rounded-lg'>
             {err && !stream ? (
               <p className='text-destructive px-3 text-center text-sm'>{err}</p>
@@ -496,23 +466,19 @@ export function KioskIdOcrDialog({
                     <Scan className='h-3.5 w-3.5 shrink-0' />
                     {t('status_hold_doc', {
                       defaultValue:
-                        'Keep the document steady — scanning automatically'
+                        'Keep the document steady — scanning in the background'
                     })}
                   </div>
                 )}
               </div>
             ) : null}
           </div>
-        )}
+        </div>
 
-        {showWedge && subTab === 'camera' && err && stream ? (
-          <p className='text-destructive text-center text-sm'>{err}</p>
-        ) : null}
-        {showWedge && (subTab === 'mrz' || subTab === 'ru') && err ? (
-          <p className='text-destructive text-center text-sm'>{err}</p>
-        ) : null}
-        {!showWedge && err && stream ? (
-          <p className='text-destructive text-center text-sm'>{err}</p>
+        {err && stream ? (
+          <p className='text-destructive text-center text-sm' role='alert'>
+            {err}
+          </p>
         ) : null}
 
         {text ? (
@@ -535,19 +501,17 @@ export function KioskIdOcrDialog({
             {t('close', { defaultValue: 'Close' })}
           </Button>
           <div className='flex flex-wrap justify-end gap-2'>
-            {subTab === 'camera' ? (
-              <Button
-                type='button'
-                variant='outline'
-                onClick={() => {
-                  void runRecognize('manual');
-                }}
-                disabled={busy || !stream}
-              >
-                {busy ? <Loader2 className='h-4 w-4 animate-spin' /> : null}
-                {t('capture_again', { defaultValue: 'Rescan' })}
-              </Button>
-            ) : null}
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => {
+                void runRecognize('manual');
+              }}
+              disabled={busy || !stream}
+            >
+              {busy ? <Loader2 className='h-4 w-4 animate-spin' /> : null}
+              {t('capture_again', { defaultValue: 'Rescan' })}
+            </Button>
             <Button
               type='button'
               variant='secondary'

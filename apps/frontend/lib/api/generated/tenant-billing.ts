@@ -151,7 +151,7 @@ export interface ModelsService {
   /** IconKey optional Lucide key for kiosk tiles when ImageUrl is empty (e.g. "health", "document"). */
   iconKey?: string;
   id?: string;
-  /** IdentificationMode selects the kiosk identification step: none|phone|qr|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column. */
+  /** IdentificationMode selects the kiosk identification step: none|phone|qr|document|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column. */
   identificationMode?: string;
   imageUrl?: string;
   isLeaf?: boolean;

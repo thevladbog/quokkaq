@@ -2759,6 +2759,19 @@ WHERE code = 'starter' AND (features->>'kiosk_employee_idp') IS NULL;`).Error; e
 		return fmt.Errorf("failed to run v1.8.14_services_icon_key migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.8.15_services_identification_mode_document", func(db *gorm.DB) error {
+		if err := db.Exec(`ALTER TABLE services DROP CONSTRAINT IF EXISTS chk_services_identification_mode;`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`ALTER TABLE services ADD CONSTRAINT chk_services_identification_mode CHECK (identification_mode IN ('none','phone','qr','document','login','badge'));`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.15_services_identification_mode_document migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

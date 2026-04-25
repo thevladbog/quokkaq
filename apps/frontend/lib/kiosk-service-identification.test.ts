@@ -9,7 +9,14 @@ function svc(p: Partial<Service>): Service {
 /** Contract checks for leaf services with `identificationMode: none` — kiosk issues a ticket without a pre-step. */
 describe('getServiceIdentificationMode', () => {
   it('returns explicit modes from the service', () => {
-    for (const m of ['none', 'phone', 'qr', 'login', 'badge'] as const) {
+    for (const m of [
+      'none',
+      'phone',
+      'qr',
+      'document',
+      'login',
+      'badge'
+    ] as const) {
       expect(
         getServiceIdentificationMode(
           svc({ identificationMode: m, offerIdentification: true })

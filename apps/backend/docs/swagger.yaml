@@ -2912,7 +2912,7 @@ components:
                 id:
                     type: string
                 identificationMode:
-                    description: 'IdentificationMode selects the kiosk identification step: none|phone|qr|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column.'
+                    description: 'IdentificationMode selects the kiosk identification step: none|phone|qr|document|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column.'
                     type: string
                 imageUrl:
                     type: string
