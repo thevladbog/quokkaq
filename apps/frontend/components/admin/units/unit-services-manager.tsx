@@ -1,6 +1,13 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  createElement,
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState
+} from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import {
@@ -59,6 +66,12 @@ import {
 } from '@/lib/service-tree';
 import { cn, serviceTitleForLocale } from '@/lib/utils';
 import { getServiceIdentificationMode } from '@/lib/kiosk-service-identification';
+import {
+  isKioskServiceIconPresetValue,
+  KIOSK_SERVICE_ICON_PRESETS,
+  normalizeKioskServiceIconKey,
+  resolveKioskServiceIcon
+} from '@/lib/kiosk-service-icon';
 import type { Service } from '@quokkaq/shared-types';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -587,6 +600,7 @@ function buildInitialFormValues(
       descriptionRu: editingService.descriptionRu ?? '',
       descriptionEn: editingService.descriptionEn ?? '',
       imageUrl: editingService.imageUrl ?? '',
+      iconKey: normalizeKioskServiceIconKey(editingService.iconKey) || '',
       backgroundColor: editingService.backgroundColor ?? '',
       textColor: editingService.textColor ?? '',
       prefix: editingService.prefix ?? '',
@@ -617,6 +631,7 @@ function buildInitialFormValues(
       descriptionRu: '',
       descriptionEn: '',
       imageUrl: '',
+      iconKey: '',
       backgroundColor: '',
       textColor: '',
       prefix: '',
@@ -644,6 +659,7 @@ function snapshotServiceFormValues(v: Partial<Service>): string {
     descriptionRu: v.descriptionRu ?? '',
     descriptionEn: v.descriptionEn ?? '',
     imageUrl: v.imageUrl ?? '',
+    iconKey: v.iconKey ?? '',
     backgroundColor: v.backgroundColor ?? '',
     textColor: v.textColor ?? '',
     prefix: v.prefix ?? '',
@@ -666,6 +682,88 @@ function areServiceFormValuesEqual(
   b: Partial<Service>
 ): boolean {
   return snapshotServiceFormValues(a) === snapshotServiceFormValues(b);
+}
+
+function KioskServiceIconKeySelect({
+  tServices,
+  value,
+  onValueChange
+}: {
+  tServices: (key: string, values?: Record<string, string>) => string;
+  value: string;
+  onValueChange: (iconKey: string) => void;
+}) {
+  const iconKeyForSelect = value.trim();
+  const isUnknownUnlisted = Boolean(
+    iconKeyForSelect && !isKioskServiceIconPresetValue(iconKeyForSelect)
+  );
+  const selectValue = !iconKeyForSelect ? '__none__' : iconKeyForSelect;
+
+  return (
+    <Select
+      value={selectValue}
+      onValueChange={(v) => onValueChange(v === '__none__' ? '' : v)}
+    >
+      <SelectTrigger
+        id='serviceIconKey'
+        className='h-auto min-h-9 w-full max-w-md py-2.5 text-left'
+      >
+        <SelectValue placeholder={tServices('kiosk_icon_key_placeholder')} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem
+          value='__none__'
+          textValue={tServices('kiosk_icon_key_none')}
+        >
+          <span className='text-muted-foreground'>
+            {tServices('kiosk_icon_key_none')}
+          </span>
+        </SelectItem>
+        {isUnknownUnlisted ? (
+          <SelectItem
+            value={iconKeyForSelect}
+            textValue={tServices('kiosk_icon_key_custom_unknown', {
+              value: iconKeyForSelect
+            })}
+          >
+            <div className='flex w-full min-w-0 items-center gap-2.5'>
+              {createElement(resolveKioskServiceIcon(iconKeyForSelect), {
+                className: 'text-muted-foreground size-4 shrink-0',
+                strokeWidth: 2,
+                'aria-hidden': true
+              })}
+              <span className='min-w-0 text-left text-sm leading-snug break-all'>
+                {tServices('kiosk_icon_key_custom_unknown', {
+                  value: iconKeyForSelect
+                })}
+              </span>
+            </div>
+          </SelectItem>
+        ) : null}
+        {KIOSK_SERVICE_ICON_PRESETS.map((p) => {
+          const Icon = p.icon;
+          return (
+            <SelectItem
+              key={p.value}
+              value={p.value}
+              textValue={tServices(p.i18nKey)}
+            >
+              <div className='flex w-full min-w-0 items-center gap-2.5'>
+                <Icon
+                  className='text-muted-foreground size-4 shrink-0'
+                  strokeWidth={2}
+                  aria-hidden
+                />
+                <span className='min-w-0 flex-1 truncate text-left text-sm leading-snug'>
+                  {tServices(p.i18nKey)}
+                </span>
+              </div>
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
 }
 
 function ServiceForm({
@@ -794,6 +892,11 @@ function ServiceForm({
         formValues.identificationMode ??
         getServiceIdentificationMode(formValues);
       const offerIdent = idMode === 'phone';
+      const iconRaw = (formValues.iconKey ?? '').trim();
+      const iconKeyPayload =
+        iconRaw === ''
+          ? null
+          : normalizeKioskServiceIconKey(iconRaw) || iconRaw;
       const payloadBase = {
         ...formValues,
         name: nameRuTrim,
@@ -803,7 +906,8 @@ function ServiceForm({
         offerIdentification: offerIdent,
         isLeaf: formValues.isLeaf ?? false,
         restrictedServiceZoneId: restrictedPayload,
-        calendarSlotKey: payloadCalendarSlotKey
+        calendarSlotKey: payloadCalendarSlotKey,
+        iconKey: iconKeyPayload
       };
       if (editingService) {
         await updateServiceMutation.mutateAsync({
@@ -952,6 +1056,20 @@ function ServiceForm({
         />
         <p className='text-muted-foreground text-xs'>
           {tRoot('forms.fields.image_url_hint')}
+        </p>
+      </div>
+
+      <div className='space-y-2'>
+        <Label htmlFor='serviceIconKey'>{tServices('kiosk_icon_key')}</Label>
+        <KioskServiceIconKeySelect
+          tServices={tServices}
+          value={formValues.iconKey ?? ''}
+          onValueChange={(iconKey) =>
+            setFormValues((prev) => ({ ...prev, iconKey }))
+          }
+        />
+        <p className='text-muted-foreground text-xs'>
+          {tServices('kiosk_icon_key_help')}
         </p>
       </div>
 

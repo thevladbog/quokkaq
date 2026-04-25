@@ -102,6 +102,11 @@ export type ServiceModel = {
   descriptionRu?: string | null;
   descriptionEn?: string | null;
   imageUrl?: string | null;
+  /**
+   * Optional Lucide key for the kiosk tile when `imageUrl` is empty, e.g. `health`, `document`.
+   * @see `resolveKioskServiceIcon` on the frontend.
+   */
+  iconKey?: string | null;
   backgroundColor?: string | null;
   textColor?: string | null;
   prefix?: string | null;
@@ -141,6 +146,7 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
   descriptionRu: z.string().nullable().optional(),
   descriptionEn: z.string().nullable().optional(),
   imageUrl: z.string().nullable().optional(),
+  iconKey: z.string().nullable().optional(),
   backgroundColor: z.string().nullable().optional(),
   textColor: z.string().nullable().optional(),
   prefix: z.string().nullable().optional(),
@@ -579,6 +585,18 @@ export const KioskConfigSchema = z
     headerColor: z.string().optional(),
     bodyColor: z.string().optional(),
     serviceGridColor: z.string().optional(),
+    /**
+     * Kiosk look preset when `isCustomColorsEnabled` is false. Does not override manual header/body/grid
+     * when custom colors are on. Distinct from the accessibility "high contrast" toggle.
+     */
+    kioskBaseTheme: z
+      .enum([
+        'warm-light',
+        'cool-light',
+        'dark',
+        'high-contrast-preset'
+      ] as const)
+      .optional(),
     /**
      * Kiosk service grid: `manual` = positions from `Service.gridRow` / `gridCol` (8×8); `auto` = client lays out
      * from sorted services without requiring manual placement. Default: `manual` when unset.
@@ -1174,6 +1192,13 @@ export interface AdScreenConfig {
   recentCallsHistoryLimit?: number;
 }
 
+/** @see KioskConfigSchema `kioskBaseTheme` */
+export type KioskBaseTheme =
+  | 'warm-light'
+  | 'cool-light'
+  | 'dark'
+  | 'high-contrast-preset';
+
 export interface KioskConfig {
   pin?: string;
   /** Main screen hero headline above the service grid (kiosk home). */
@@ -1188,6 +1213,11 @@ export interface KioskConfig {
   headerColor?: string;
   bodyColor?: string;
   serviceGridColor?: string;
+  /**
+   * Surfaces when custom colors are off. Ignored (except schema round-trip) while `isCustomColorsEnabled` is true.
+   * `high-contrast-preset` is a fixed palette for bright environments — not the a11y high-contrast control.
+   */
+  kioskBaseTheme?: KioskBaseTheme;
   /**
    * `manual` = 8×8 from service grid fields (default). `auto` = client lays out from the sorted service list
    * without requiring manual cell placement.

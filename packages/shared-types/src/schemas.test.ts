@@ -232,6 +232,17 @@ describe('KioskConfigSchema', () => {
       KioskConfigSchema.safeParse({ serviceGridLayout: 'grid' }).success
     ).toBe(false);
   });
+
+  it('accepts kioskBaseTheme presets', () => {
+    const r = KioskConfigSchema.safeParse({ kioskBaseTheme: 'dark' });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.kioskBaseTheme).toBe('dark');
+    }
+    expect(
+      KioskConfigSchema.safeParse({ kioskBaseTheme: 'invalid' }).success
+    ).toBe(false);
+  });
 });
 
 describe('UserModelSchema', () => {

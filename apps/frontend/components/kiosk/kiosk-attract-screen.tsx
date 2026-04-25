@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatAppDate, formatAppTime } from '@/lib/format-datetime';
+import { formatSlaDuration } from '@/lib/format-sla-duration';
+import { relativeLuminanceFromCssColor } from '@/lib/kiosk-wcag-contrast';
 import {
   ContentPlayer,
   type ContentSlide
@@ -42,8 +44,18 @@ export function KioskAttractScreen({
   defaultImageSeconds
 }: KioskAttractScreenProps) {
   const tA = useTranslations('kiosk.attract');
+  const tStats = useTranslations('statistics');
   const reduceMotion = useReducedMotion();
   const hasAds = contentSlides.length > 0;
+
+  /** Match kiosk page: on dark `bodyBackground`, kiosk-ink can stay a dark token (e.g. custom theme without data attr). */
+  const useLightText = useMemo(() => {
+    if (highContrast) {
+      return true;
+    }
+    const lum = relativeLuminanceFromCssColor(bodyBackground);
+    return lum != null && lum < 0.45;
+  }, [highContrast, bodyBackground]);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -53,41 +65,108 @@ export function KioskAttractScreen({
     };
   }, []);
 
-  const textMain = highContrast ? 'text-white' : 'text-kiosk-ink';
-  const textMuted = highContrast ? 'text-zinc-300' : 'text-kiosk-ink-muted';
+  const textMain = useLightText ? 'text-white' : 'text-kiosk-ink';
+  const textMuted = useLightText ? 'text-zinc-200' : 'text-kiosk-ink-muted';
 
   const qLen = eta?.queueLength;
   const qWait = eta?.estimatedWaitMinutes;
   const showMeta =
     showQueueDepth && eta && (qLen != null || qWait != null || qLen === 0);
 
+  /** API sends fractional “minutes”; convert to whole seconds, then “Xm Ys” via formatSlaDuration. */
+  const waitSecondsRounded =
+    qWait != null && qWait > 0 ? Math.max(0, Math.round(qWait * 60)) : 0;
+  const showWaitCard = waitSecondsRounded > 0;
+  const showQueueCountCard = qLen != null && qLen > 0;
+  const showEmptyCard = qLen === 0;
+  const hasTwoColumnRow =
+    (showQueueCountCard && showWaitCard) || (showEmptyCard && showWaitCard);
+  const waitAlone = showWaitCard && !showQueueCountCard && !showEmptyCard;
+
+  const badgeClass = cn(
+    'flex min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-0.5 rounded-2xl px-3 py-2.5 text-center sm:px-4 sm:py-3',
+    useLightText
+      ? 'border border-white/20 bg-white/8'
+      : 'border border-kiosk-ink/10 bg-kiosk-border/25',
+    hasAds && 'py-2',
+    'min-w-28 sm:min-w-36'
+  );
+
+  const waitFormatted = showWaitCard
+    ? formatSlaDuration(waitSecondsRounded, tStats)
+    : '';
+
   const queueMetaNode = showMeta ? (
     <div
       className={cn(
-        'w-full max-w-md rounded-2xl px-4 py-2.5 text-center text-sm sm:text-base',
-        highContrast
-          ? 'border border-white/20 bg-white/5'
-          : 'bg-kiosk-border/20',
-        hasAds && 'py-1.5 text-sm'
+        'flex w-full max-w-2xl flex-wrap items-stretch justify-center gap-2 sm:max-w-3xl sm:gap-3',
+        hasTwoColumnRow && 'sm:flex-nowrap'
       )}
     >
-      {qLen != null && qLen > 0 ? (
-        <p className={textMain}>
-          {tA('queue_length', { n: qLen, defaultValue: 'In queue: {n}' })}
-        </p>
+      {showEmptyCard ? (
+        <div
+          className={cn(
+            badgeClass,
+            hasTwoColumnRow && 'min-w-0',
+            !showWaitCard && 'w-full max-w-sm'
+          )}
+        >
+          <p className={cn('text-sm sm:text-base', textMain)} role='status'>
+            {tA('queue_empty', { defaultValue: 'No one in queue' })}
+          </p>
+        </div>
       ) : null}
-      {qLen === 0 ? (
-        <p className={textMain}>
-          {tA('queue_empty', { defaultValue: 'No one in queue' })}
-        </p>
-      ) : null}
-      {qWait != null && qWait > 0 ? (
-        <p className={cn('mt-0.5', textMuted)}>
-          {tA('wait_minutes', {
-            minutes: qWait,
-            defaultValue: 'Approx. wait: {minutes} min'
+      {showQueueCountCard && qLen != null ? (
+        <div
+          className={cn(
+            badgeClass,
+            hasTwoColumnRow && 'min-w-0',
+            !showWaitCard && 'w-full max-w-sm'
+          )}
+          role='status'
+          aria-label={tA('queue_length', {
+            n: qLen,
+            defaultValue: 'In queue: {n}'
           })}
-        </p>
+        >
+          <span className={cn('text-xs font-medium sm:text-sm', textMuted)}>
+            {tA('queue_badge_label', { defaultValue: 'In queue' })}
+          </span>
+          <span
+            className={cn(
+              'text-2xl font-bold tabular-nums sm:text-3xl',
+              textMain
+            )}
+          >
+            {qLen}
+          </span>
+        </div>
+      ) : null}
+      {showWaitCard ? (
+        <div
+          className={cn(
+            badgeClass,
+            waitAlone && 'w-full max-w-sm',
+            hasTwoColumnRow && 'min-w-0'
+          )}
+          role='status'
+          aria-label={tA('wait_badge_aria', {
+            time: waitFormatted,
+            defaultValue: 'Approx. wait: {time}'
+          })}
+        >
+          <span className={cn('text-xs font-medium sm:text-sm', textMuted)}>
+            {tA('wait_badge_label', { defaultValue: 'Approx. wait' })}
+          </span>
+          <span
+            className={cn(
+              'text-2xl font-bold tabular-nums sm:text-3xl',
+              textMain
+            )}
+          >
+            {waitFormatted}
+          </span>
+        </div>
       ) : null}
     </div>
   ) : null;
@@ -177,7 +256,7 @@ export function KioskAttractScreen({
             <div
               className={cn(
                 'text-xs',
-                highContrast ? 'text-zinc-400' : 'text-kiosk-ink-muted'
+                useLightText ? 'text-zinc-300' : 'text-kiosk-ink-muted'
               )}
             >
               {formatAppDate(currentTime, intlLocale, 'full', '')}

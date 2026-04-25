@@ -50,3 +50,15 @@ func TestMergeServiceJSONPatch_updatesNameWhenSent(t *testing.T) {
 		t.Fatalf("name: got %q", merged.Name)
 	}
 }
+
+func TestMergeServiceJSONPatch_iconKey(t *testing.T) {
+	existing := models.Service{ID: "x", UnitID: "u", Name: "N"}
+	merged := existing
+	raw := map[string]json.RawMessage{"iconKey": json.RawMessage(`"health"`)}
+	if err := MergeServiceJSONPatch(&merged, raw); err != nil {
+		t.Fatal(err)
+	}
+	if merged.IconKey == nil || *merged.IconKey != "health" {
+		t.Fatalf("iconKey: got %#v", merged.IconKey)
+	}
+}

@@ -26,14 +26,17 @@ import { toast } from 'sonner';
 import { LogoUpload } from '@/components/ui/logo-upload';
 import type {
   KioskAttractInactivityMode,
+  KioskBaseTheme,
   KioskConfig
 } from '@quokkaq/shared-types';
+import { normalizeKioskBaseThemeId } from '@/lib/kiosk-base-theme';
 import { useKioskHeaderFields } from '@/hooks/use-kiosk-header-fields';
 import { KioskAttractSignageAdminBlock } from '@/components/admin/units/kiosk-attract-signage-admin';
 import { Link } from '@/src/i18n/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info } from 'lucide-react';
 import type { KioskAttractSignageMode } from '@/lib/kiosk-attract-config';
+import { KioskSettingsHexColorField } from '@/components/kiosk/kiosk-hex-color-field';
 
 interface KioskSettingsProps {
   unitId: string;
@@ -45,6 +48,11 @@ interface KioskSettingsProps {
    * For a service zone, pass the parent subdivision id; otherwise the unit id.
    */
   branchUnitIdForSignage: string;
+  /**
+   * From `unit.operations.kioskIdOcr`. When `false`, the main OCR switch cannot be turned on
+   * (feature not in plan); set off is still allowed. Omit/`undefined` = do not block (e.g. legacy data).
+   */
+  kioskIdOcrInPlan?: boolean;
 }
 
 function attractSignageInit(k: KioskConfig): {
@@ -90,7 +98,8 @@ export function KioskSettings({
   unitId,
   unitName,
   currentConfig,
-  branchUnitIdForSignage
+  branchUnitIdForSignage,
+  kioskIdOcrInPlan
 }: KioskSettingsProps) {
   const t = useTranslations('admin.kiosk_settings');
   const patchKioskMutation = usePatchKioskConfig();
@@ -141,6 +150,9 @@ export function KioskSettings({
   const [serviceGridColor, setServiceGridColor] = useState(
     kioskConfig.serviceGridColor || '#ffffff'
   );
+  const [kioskBaseTheme, setKioskBaseTheme] = useState<KioskBaseTheme>(() =>
+    normalizeKioskBaseThemeId(kioskConfig.kioskBaseTheme)
+  );
   const [serviceGridLayout, setServiceGridLayout] = useState<'manual' | 'auto'>(
     kioskConfig.serviceGridLayout === 'auto' ? 'auto' : 'manual'
   );
@@ -168,6 +180,21 @@ export function KioskSettings({
   const [ticketSuccessAutoCloseSec, setTicketSuccessAutoCloseSec] = useState(
     kioskConfig.ticketSuccessAutoCloseSec ?? 12
   );
+  const [idOcrEnabled, setIdOcrEnabled] = useState(
+    Boolean((kioskConfig as KioskConfig | undefined)?.idOcrEnabled)
+  );
+  const [idOcrPreferNative, setIdOcrPreferNative] = useState(
+    (kioskConfig as KioskConfig | undefined)?.idOcrPreferNative !== false
+  );
+  const [idOcrWedgeMrz, setIdOcrWedgeMrz] = useState(
+    (kioskConfig as KioskConfig | undefined)?.idOcrWedgeMrz !== false
+  );
+  const [idOcrWedgeRuDriverLicense, setIdOcrWedgeRuDriverLicense] = useState(
+    (kioskConfig as KioskConfig | undefined)?.idOcrWedgeRuDriverLicense !==
+      false
+  );
+
+  const ocrMainSwitchDisabled = kioskIdOcrInPlan === false && !idOcrEnabled;
 
   // Sync state with currentConfig when it changes - REMOVED
   // We now use a key on the component to reset state when config changes.
@@ -207,6 +234,7 @@ export function KioskSettings({
         isAppointmentCheckinEnabled,
         isAppointmentPhoneLookupEnabled,
         isCustomColorsEnabled,
+        kioskBaseTheme,
         headerColor,
         bodyColor,
         serviceGridColor,
@@ -230,7 +258,11 @@ export function KioskSettings({
         kioskAttractSlideDurationSec:
           attractSignage.slideDurationSec === ''
             ? undefined
-            : attractSignage.slideDurationSec
+            : attractSignage.slideDurationSec,
+        idOcrEnabled,
+        idOcrPreferNative,
+        idOcrWedgeMrz,
+        idOcrWedgeRuDriverLicense
       }
     };
 
@@ -333,78 +365,91 @@ export function KioskSettings({
               />
             </div>
 
+            {!isCustomColorsEnabled ? (
+              <div className='space-y-2'>
+                <Label htmlFor='kiosk-base-theme'>
+                  {t('kiosk_base_theme_label')}
+                </Label>
+                <Select
+                  value={kioskBaseTheme}
+                  onValueChange={(v) => setKioskBaseTheme(v as KioskBaseTheme)}
+                >
+                  <SelectTrigger
+                    id='kiosk-base-theme'
+                    className='w-full max-w-md'
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='warm-light'>
+                      {t('kiosk_base_theme_warm')}
+                    </SelectItem>
+                    <SelectItem value='cool-light'>
+                      {t('kiosk_base_theme_cool')}
+                    </SelectItem>
+                    <SelectItem value='dark'>
+                      {t('kiosk_base_theme_dark')}
+                    </SelectItem>
+                    <SelectItem value='high-contrast-preset'>
+                      {t('kiosk_base_theme_hc')}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className={ksHint}>{t('kiosk_base_theme_help')}</p>
+              </div>
+            ) : null}
+
             {isCustomColorsEnabled && (
               <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
                 <div className='space-y-2'>
                   <Label htmlFor='header-color'>
                     {t('header_color', { defaultValue: 'Header Color' })}
                   </Label>
-                  <div className='flex items-center gap-2'>
-                    <Input
-                      id='header-color'
-                      type='color'
-                      value={headerColor}
-                      onChange={(e) => setHeaderColor(e.target.value)}
-                      className='h-10 w-12 cursor-pointer p-1'
-                    />
-                    <Input
-                      type='text'
-                      value={headerColor}
-                      onChange={(e) => setHeaderColor(e.target.value)}
-                      className='flex-1'
-                      placeholder={t('color_placeholder', {
-                        defaultValue: '#ffffff'
-                      })}
-                    />
-                  </div>
+                  <KioskSettingsHexColorField
+                    textInputId='header-color'
+                    value={headerColor}
+                    onValueChange={setHeaderColor}
+                    textPlaceholder={t('color_placeholder', {
+                      defaultValue: '#ffffff'
+                    })}
+                    popoverA11yLabel={t('header_color', {
+                      defaultValue: 'Header Color'
+                    })}
+                  />
                 </div>
 
                 <div className='space-y-2'>
                   <Label htmlFor='body-color'>
                     {t('body_color', { defaultValue: 'Body Color' })}
                   </Label>
-                  <div className='flex items-center gap-2'>
-                    <Input
-                      id='body-color'
-                      type='color'
-                      value={bodyColor}
-                      onChange={(e) => setBodyColor(e.target.value)}
-                      className='h-10 w-12 cursor-pointer p-1'
-                    />
-                    <Input
-                      type='text'
-                      value={bodyColor}
-                      onChange={(e) => setBodyColor(e.target.value)}
-                      className='flex-1'
-                      placeholder={t('color_placeholder', {
-                        defaultValue: '#f3f4f6'
-                      })}
-                    />
-                  </div>
+                  <KioskSettingsHexColorField
+                    textInputId='body-color'
+                    value={bodyColor}
+                    onValueChange={setBodyColor}
+                    textPlaceholder={t('color_placeholder', {
+                      defaultValue: '#f3f4f6'
+                    })}
+                    popoverA11yLabel={t('body_color', {
+                      defaultValue: 'Body Color'
+                    })}
+                  />
                 </div>
 
                 <div className='space-y-2'>
                   <Label htmlFor='grid-color'>
                     {t('grid_color', { defaultValue: 'Service Grid Color' })}
                   </Label>
-                  <div className='flex items-center gap-2'>
-                    <Input
-                      id='grid-color'
-                      type='color'
-                      value={serviceGridColor}
-                      onChange={(e) => setServiceGridColor(e.target.value)}
-                      className='h-10 w-12 cursor-pointer p-1'
-                    />
-                    <Input
-                      type='text'
-                      value={serviceGridColor}
-                      onChange={(e) => setServiceGridColor(e.target.value)}
-                      className='flex-1'
-                      placeholder={t('color_placeholder', {
-                        defaultValue: '#ffffff'
-                      })}
-                    />
-                  </div>
+                  <KioskSettingsHexColorField
+                    textInputId='grid-color'
+                    value={serviceGridColor}
+                    onValueChange={setServiceGridColor}
+                    textPlaceholder={t('color_placeholder', {
+                      defaultValue: '#ffffff'
+                    })}
+                    popoverA11yLabel={t('grid_color', {
+                      defaultValue: 'Service Grid Color'
+                    })}
+                  />
                 </div>
               </div>
             )}
@@ -740,6 +785,75 @@ export function KioskSettings({
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className='space-y-2 border-t pt-4'>
+            {kioskIdOcrInPlan === false ? (
+              <Alert>
+                <Info className='h-4 w-4' />
+                <AlertDescription className='text-muted-foreground'>
+                  {t('id_ocr_plan_unavailable', {
+                    defaultValue:
+                      'The kiosk_id_ocr plan feature is off for this tenant. Enable the feature on the subscription, then turn on OCR here.'
+                  })}
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            <div className='flex items-center justify-between gap-2'>
+              <div>
+                <Label htmlFor='admin-kiosk-id-ocr'>{t('id_ocr_enable')}</Label>
+                <p className={ksHint}>{t('id_ocr_enable_hint')}</p>
+              </div>
+              <Switch
+                id='admin-kiosk-id-ocr'
+                checked={idOcrEnabled}
+                disabled={ocrMainSwitchDisabled}
+                onCheckedChange={setIdOcrEnabled}
+              />
+            </div>
+            {idOcrEnabled ? (
+              <div className='space-y-2 border-t pt-2'>
+                <div className='flex items-center justify-between gap-2'>
+                  <div>
+                    <Label htmlFor='admin-kiosk-id-ocr-wedge-mrz'>
+                      {t('id_ocr_wedge_mrz')}
+                    </Label>
+                    <p className={ksHint}>{t('id_ocr_wedge_mrz_hint')}</p>
+                  </div>
+                  <Switch
+                    id='admin-kiosk-id-ocr-wedge-mrz'
+                    checked={idOcrWedgeMrz}
+                    onCheckedChange={setIdOcrWedgeMrz}
+                  />
+                </div>
+                <div className='flex items-center justify-between gap-2'>
+                  <div>
+                    <Label htmlFor='admin-kiosk-id-ocr-ru'>
+                      {t('id_ocr_wedge_ru')}
+                    </Label>
+                    <p className={ksHint}>{t('id_ocr_wedge_ru_hint')}</p>
+                  </div>
+                  <Switch
+                    id='admin-kiosk-id-ocr-ru'
+                    checked={idOcrWedgeRuDriverLicense}
+                    onCheckedChange={setIdOcrWedgeRuDriverLicense}
+                  />
+                </div>
+                <div className='flex items-center justify-between gap-2 border-t pt-2'>
+                  <div>
+                    <Label htmlFor='admin-kiosk-id-ocr-native'>
+                      {t('id_ocr_prefer_native')}
+                    </Label>
+                    <p className={ksHint}>{t('id_ocr_prefer_native_hint')}</p>
+                  </div>
+                  <Switch
+                    id='admin-kiosk-id-ocr-native'
+                    checked={idOcrPreferNative}
+                    onCheckedChange={setIdOcrPreferNative}
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <Button

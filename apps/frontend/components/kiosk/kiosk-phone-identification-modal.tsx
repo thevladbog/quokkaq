@@ -5,12 +5,8 @@ import { useTranslations } from 'next-intl';
 import { Loader2, Delete } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog';
+import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { KioskDialogContent } from '@/components/kiosk/kiosk-dialog-content';
 
 /** ITU-T E.164 max significant digits (excluding country code nuances). */
 const MAX_PHONE_DIGITS = 15;
@@ -23,21 +19,30 @@ export interface KioskPhoneIdentificationModalProps {
   onConfirm: (e164StyleInput: string) => void;
   isPending: boolean;
   errorMessage?: string;
+  /** Text from the last document OCR; digits can be offered as a one-tap numpad fill. */
+  kioskOcrText?: string;
 }
 
 function KioskPhoneIdentificationModalBody({
   onSkip,
   onConfirm,
   isPending,
-  errorMessage
+  errorMessage,
+  kioskOcrText
 }: {
   onSkip: () => void;
   onConfirm: (e164StyleInput: string) => void;
   isPending: boolean;
   errorMessage?: string;
+  kioskOcrText?: string;
 }) {
   const t = useTranslations('kiosk.phone_identification');
+  const tOcr = useTranslations('kiosk.id_ocr');
   const [digits, setDigits] = useState('');
+
+  const ocrDigitRun = (kioskOcrText || '')
+    .replace(/\D/g, '')
+    .slice(-MAX_PHONE_DIGITS);
 
   const display = digits.length > 0 ? `+${digits}` : '+';
 
@@ -64,12 +69,12 @@ function KioskPhoneIdentificationModalBody({
 
   return (
     <>
-      <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-2 sm:px-5 sm:pt-5'>
-        <DialogHeader className='mb-3 space-y-0 sm:mb-4'>
+      <div className='flex min-h-0 flex-1 flex-col overflow-hidden overscroll-contain px-4 pt-4 pb-2 sm:px-5 sm:pt-5'>
+        <DialogHeader className='mb-3 shrink-0 space-y-0 sm:mb-4'>
           <DialogTitle className='text-center text-xl leading-tight sm:text-2xl'>
             {t('title', { defaultValue: 'Phone number' })}
           </DialogTitle>
-          <p className='text-kiosk-ink-muted text-center text-sm sm:text-base'>
+          <p className='text-muted-foreground text-center text-sm sm:text-base'>
             {t('subtitle', {
               defaultValue:
                 'Optional identification. Enter your number or skip.'
@@ -77,7 +82,7 @@ function KioskPhoneIdentificationModalBody({
           </p>
         </DialogHeader>
 
-        <div className='mb-3 flex justify-center sm:mb-4'>
+        <div className='mb-3 flex shrink-0 justify-center sm:mb-4'>
           {/* Not an <input>: avoids browser selecting “+” on open (Yandex/search popups on touch kiosks). */}
           <div
             dir='ltr'
@@ -96,8 +101,27 @@ function KioskPhoneIdentificationModalBody({
         </div>
 
         {errorMessage ? (
-          <div className='text-destructive bg-destructive/10 mb-2 rounded-md px-2 py-2 text-center text-sm leading-snug font-medium sm:mb-3 sm:px-3 sm:text-base'>
+          <div className='text-destructive bg-destructive/10 mb-2 shrink-0 rounded-md px-2 py-2 text-center text-sm leading-snug font-medium sm:mb-3 sm:px-3 sm:text-base'>
             {errorMessage}
+          </div>
+        ) : null}
+
+        {ocrDigitRun ? (
+          <div className='mb-2 shrink-0 sm:mb-3'>
+            <Button
+              type='button'
+              variant='secondary'
+              className='h-12 w-full text-sm font-medium sm:h-14 sm:text-base'
+              onClick={() => {
+                setDigits(ocrDigitRun);
+              }}
+              disabled={isPending}
+            >
+              {tOcr('phone_use_digits', {
+                defaultValue: 'Use digits from last scan: {n}',
+                n: ocrDigitRun
+              })}
+            </Button>
           </div>
         ) : null}
       </div>
@@ -152,7 +176,7 @@ function KioskPhoneIdentificationModalBody({
           <Button
             type='button'
             variant='outline'
-            className='text-kiosk-ink kiosk-touch-min h-[4.5rem] min-h-12 flex-1 text-base sm:h-[5rem] sm:text-lg'
+            className='kiosk-touch-min h-[4.5rem] min-h-12 flex-1 text-base sm:h-[5rem] sm:text-lg'
             onClick={onSkip}
             disabled={isPending}
           >
@@ -182,7 +206,8 @@ export function KioskPhoneIdentificationModal({
   onSkip,
   onConfirm,
   isPending,
-  errorMessage
+  errorMessage,
+  kioskOcrText
 }: KioskPhoneIdentificationModalProps) {
   const handleOpenChange = (open: boolean) => {
     if (!open) {
@@ -192,7 +217,7 @@ export function KioskPhoneIdentificationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent
+      <KioskDialogContent
         className='flex max-h-[min(92dvh,720px)] w-[calc(100%-1rem)] max-w-[440px] flex-col gap-0 overflow-hidden p-0 sm:max-w-[440px]'
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
@@ -202,8 +227,9 @@ export function KioskPhoneIdentificationModal({
           onConfirm={onConfirm}
           isPending={isPending}
           errorMessage={errorMessage}
+          kioskOcrText={kioskOcrText}
         />
-      </DialogContent>
+      </KioskDialogContent>
     </Dialog>
   );
 }

@@ -38,6 +38,8 @@ import {
   testKioskSerialPort
 } from '@/lib/kiosk-scanner-agent';
 import { Link } from '@/src/i18n/navigation';
+import { useKioskChrome } from '@/contexts/kiosk-chrome-context';
+import { cn } from '@/lib/utils';
 import {
   isTauriKiosk,
   listPrintersViaTauri,
@@ -48,8 +50,13 @@ import {
 import { useKioskHeaderFields } from '@/hooks/use-kiosk-header-fields';
 import type {
   KioskAttractInactivityMode,
+  KioskBaseTheme,
   KioskConfig
 } from '@quokkaq/shared-types';
+import {
+  getKioskBaseThemeSurfaces,
+  normalizeKioskBaseThemeId
+} from '@/lib/kiosk-base-theme';
 import {
   ensureKioskTauriLocalMigrated,
   patchKioskTauriLocalDevice,
@@ -57,6 +64,7 @@ import {
   writeKioskTauriLocalDevice
 } from '@/lib/kiosk-tauri-device-config';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { KioskSettingsHexColorField } from '@/components/kiosk/kiosk-hex-color-field';
 import {
   evaluateKioskConfigSurfaces,
   type KioskColorContrastCheck,
@@ -99,22 +107,13 @@ function KioskSettingsColorColumn({
   return (
     <div className='space-y-2'>
       <Label htmlFor={inputId}>{label}</Label>
-      <div className='flex items-center gap-2'>
-        <Input
-          id={inputId}
-          type='color'
-          value={color}
-          onChange={(e) => onColorChange(e.target.value)}
-          className='h-10 w-12 cursor-pointer p-1'
-        />
-        <Input
-          type='text'
-          value={color}
-          onChange={(e) => onColorChange(e.target.value)}
-          className='flex-1'
-          placeholder={textPlaceholder}
-        />
-      </div>
+      <KioskSettingsHexColorField
+        textInputId={inputId}
+        value={color}
+        onValueChange={onColorChange}
+        textPlaceholder={textPlaceholder}
+        popoverA11yLabel={label}
+      />
       <p
         className={
           check.passNormal
@@ -186,12 +185,17 @@ export function KioskSettingsSheet({
   unitPending
 }: KioskSettingsSheetProps) {
   const t = useTranslations('kiosk.settings');
+  const { modalsDark } = useKioskChrome();
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent
         side='right'
-        className='w-full overflow-y-auto sm:w-[600px] sm:max-w-[800px] sm:px-12'
+        className={cn(
+          'w-full overflow-y-auto sm:w-[600px] sm:max-w-[800px] sm:px-12',
+          modalsDark &&
+            'dark text-foreground border-l-zinc-600/45 bg-zinc-950/98'
+        )}
       >
         <SheetHeader>
           <SheetTitle>{t('title')}</SheetTitle>
@@ -316,6 +320,9 @@ function KioskSettingsForm({
   );
   const [serviceGridColor, setServiceGridColor] = useState(
     (k0 as KioskConfig | undefined)?.serviceGridColor || '#ffffff'
+  );
+  const [kioskBaseTheme, setKioskBaseTheme] = useState<KioskBaseTheme>(() =>
+    normalizeKioskBaseThemeId((k0 as KioskConfig | undefined)?.kioskBaseTheme)
   );
   const [sessionIdleBeforeWarningSec, setSessionIdleBeforeWarningSec] =
     useState(
@@ -531,14 +538,33 @@ function KioskSettingsForm({
           ? 'loading'
           : 'degraded';
 
+  const previewSurfaces = useMemo(() => {
+    if (isCustomColorsEnabled) {
+      return {
+        header: headerColor,
+        body: bodyColor,
+        serviceGrid: serviceGridColor
+      };
+    }
+    return {
+      ...getKioskBaseThemeSurfaces(normalizeKioskBaseThemeId(kioskBaseTheme))
+    };
+  }, [
+    isCustomColorsEnabled,
+    headerColor,
+    bodyColor,
+    serviceGridColor,
+    kioskBaseTheme
+  ]);
+
   const colorA11y = useMemo(
     () =>
       evaluateKioskConfigSurfaces({
-        headerBackground: headerColor,
-        bodyBackground: bodyColor,
-        gridBackground: serviceGridColor
+        headerBackground: previewSurfaces.header,
+        bodyBackground: previewSurfaces.body,
+        gridBackground: previewSurfaces.serviceGrid
       }),
-    [headerColor, bodyColor, serviceGridColor]
+    [previewSurfaces]
   );
 
   const canSaveKioskColors = !isCustomColorsEnabled || colorA11y.canSave;
@@ -604,6 +630,7 @@ function KioskSettingsForm({
         isAppointmentCheckinEnabled,
         isAppointmentPhoneLookupEnabled,
         isCustomColorsEnabled,
+        kioskBaseTheme,
         headerColor,
         bodyColor,
         serviceGridColor,
@@ -830,6 +857,41 @@ function KioskSettingsForm({
               onCheckedChange={setIsCustomColorsEnabled}
             />
           </div>
+          {!isCustomColorsEnabled ? (
+            <div className='space-y-2'>
+              <Label htmlFor='sheet-kiosk-base-theme'>
+                {tAdmin('kiosk_base_theme_label')}
+              </Label>
+              <Select
+                value={kioskBaseTheme}
+                onValueChange={(v) => setKioskBaseTheme(v as KioskBaseTheme)}
+              >
+                <SelectTrigger
+                  id='sheet-kiosk-base-theme'
+                  className='w-full max-w-md'
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='warm-light'>
+                    {tAdmin('kiosk_base_theme_warm')}
+                  </SelectItem>
+                  <SelectItem value='cool-light'>
+                    {tAdmin('kiosk_base_theme_cool')}
+                  </SelectItem>
+                  <SelectItem value='dark'>
+                    {tAdmin('kiosk_base_theme_dark')}
+                  </SelectItem>
+                  <SelectItem value='high-contrast-preset'>
+                    {tAdmin('kiosk_base_theme_hc')}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className='text-muted-foreground text-xs'>
+                {tAdmin('kiosk_base_theme_help')}
+              </p>
+            </div>
+          ) : null}
           {isCustomColorsEnabled && (
             <>
               <p className='text-muted-foreground text-xs'>

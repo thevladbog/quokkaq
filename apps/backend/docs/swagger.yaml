@@ -2906,6 +2906,9 @@ components:
                     type: integer
                 gridRowSpan:
                     type: integer
+                iconKey:
+                    description: IconKey optional Lucide key for kiosk tiles when ImageUrl is empty (e.g. "health", "document").
+                    type: string
                 id:
                     type: string
                 identificationMode:

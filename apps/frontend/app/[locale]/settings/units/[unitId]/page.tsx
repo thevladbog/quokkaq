@@ -417,6 +417,7 @@ export default function UnitPage({ params }: UnitPageProps) {
                 unitName={getUnitDisplayName(unit, locale)}
                 currentConfig={unit.config || {}}
                 branchUnitIdForSignage={unit.parentId ?? unitId}
+                kioskIdOcrInPlan={unit.operations?.kioskIdOcr}
               />
             </PermissionGuard>
           </TabsContent>
@@ -767,6 +768,7 @@ export default function UnitPage({ params }: UnitPageProps) {
               unitName={getUnitDisplayName(unit, locale)}
               currentConfig={unit.config || {}}
               branchUnitIdForSignage={unit.parentId ?? unitId}
+              kioskIdOcrInPlan={unit.operations?.kioskIdOcr}
             />
             <div className='mt-10'>
               <UnitEmployeeIdpSettings unitId={unitId} />

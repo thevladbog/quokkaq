@@ -2746,6 +2746,19 @@ WHERE code = 'starter' AND (features->>'kiosk_employee_idp') IS NULL;`).Error; e
 		return fmt.Errorf("failed to run v1.8.13_services_sort_order migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.8.14_services_icon_key", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE services
+			ADD COLUMN IF NOT EXISTS icon_key text;
+		`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.14_services_icon_key migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

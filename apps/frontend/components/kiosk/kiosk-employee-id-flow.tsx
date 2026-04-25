@@ -67,8 +67,8 @@ export function KioskEmployeeIdFlow({
         <p className='text-muted-foreground text-center text-sm sm:text-base'>
           {t('login_hint')}
         </p>
-        <div className='border-foreground/20 min-h-14 w-full min-w-0 rounded border-2 p-3 text-2xl break-words'>
-          {login}
+        <div className='border-foreground/20 min-h-16 w-full min-w-0 rounded border-2 p-3 text-2xl leading-snug break-words'>
+          {login || '\u00a0'}
         </div>
         <KioskTouchKeyboard
           onKey={(ch) => setLogin((x) => x + ch)}

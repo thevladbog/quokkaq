@@ -21,7 +21,11 @@ import { useKioskA11y } from '@/contexts/kiosk-accessibility-context';
 import { cn } from '@/lib/utils';
 import type { KioskA11yAudioState } from '@/hooks/use-kiosk-a11y-audio';
 
-type Props = { audio: KioskA11yAudioState };
+type Props = {
+  audio: KioskA11yAudioState;
+  /** e.g. `kioskBaseTheme: dark` — use dark-surface control styling when HC is off. */
+  onDarkBaseKioskPage?: boolean;
+};
 
 const rowBtn =
   'kiosk-touch-min flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-0 text-base font-semibold';
@@ -29,11 +33,17 @@ const rowBtn =
 /**
  * Placed in the welcome hero (beside the main title): opens a popover downward with font, contrast, TTS, and speak-aloud.
  */
-export function KioskAccessibilityToolbar({ audio }: Props) {
+export function KioskAccessibilityToolbar({
+  audio,
+  onDarkBaseKioskPage = false
+}: Props) {
   const t = useTranslations('kiosk.a11y');
   const a = useKioskA11y();
   const [open, setOpen] = useState(false);
   const hc = a.highContrast;
+  const dark = !hc && onDarkBaseKioskPage;
+  /** In-popover chrome: match HC look on a dark `kioskBaseTheme` as well. */
+  const d = hc || dark;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -47,7 +57,9 @@ export function KioskAccessibilityToolbar({ audio }: Props) {
             'focus-visible:ring-2 focus-visible:ring-offset-2',
             hc
               ? 'border-amber-400/70 bg-zinc-900/95 text-white ring-1 shadow-black/50 ring-amber-400/40 hover:bg-zinc-800 focus-visible:ring-amber-400/90'
-              : 'border-kiosk-ink/35 text-kiosk-ink hover:border-kiosk-ink/50 hover:bg-kiosk-border/15 focus-visible:ring-kiosk-ink/40 bg-white shadow-[0_4px_16px_rgba(29,27,25,0.12)]'
+              : dark
+                ? 'border-white/30 bg-zinc-900/90 text-white ring-1 shadow-black/30 ring-white/10 hover:border-white/45 hover:bg-zinc-800 focus-visible:ring-white/50'
+                : 'border-kiosk-ink/35 text-kiosk-ink hover:border-kiosk-ink/50 hover:bg-kiosk-border/15 focus-visible:ring-kiosk-ink/40 bg-white shadow-[0_4px_16px_rgba(29,27,25,0.12)]'
           )}
           aria-label={t('fab_open')}
           aria-expanded={open}
@@ -65,8 +77,9 @@ export function KioskAccessibilityToolbar({ audio }: Props) {
         sideOffset={8}
         className={cn(
           'z-[120] max-h-[min(80dvh,36rem)] w-[min(100vw-1.5rem,22rem)] overflow-y-auto p-0 shadow-lg',
-          hc
-            ? 'border border-white/20 bg-zinc-950 text-zinc-50'
+          d
+            ? 'border border-white/15 text-zinc-100 ' +
+                (hc ? 'bg-zinc-950' : 'bg-zinc-900')
             : 'bg-popover text-popover-foreground'
         )}
         onOpenAutoFocus={(e) => e.preventDefault()}
@@ -80,7 +93,7 @@ export function KioskAccessibilityToolbar({ audio }: Props) {
           <p
             className={cn(
               'text-sm font-semibold',
-              hc ? 'text-zinc-100' : 'text-foreground'
+              d ? 'text-zinc-100' : 'text-foreground'
             )}
           >
             {t('menu_title')}
@@ -93,7 +106,7 @@ export function KioskAccessibilityToolbar({ audio }: Props) {
               onClick={() => a.cycleFontStep()}
               className={cn(
                 rowBtn,
-                hc
+                d
                   ? 'bg-white/10 text-white hover:bg-white/15'
                   : 'bg-kiosk-border/30 text-kiosk-ink hover:bg-kiosk-border/45'
               )}
@@ -106,7 +119,7 @@ export function KioskAccessibilityToolbar({ audio }: Props) {
               <span
                 className={cn(
                   'text-xs font-medium',
-                  hc ? 'text-zinc-400' : 'text-kiosk-ink-muted'
+                  d ? 'text-zinc-400' : 'text-kiosk-ink-muted'
                 )}
               >
                 {t('font_size_short')}
@@ -119,11 +132,11 @@ export function KioskAccessibilityToolbar({ audio }: Props) {
               onClick={() => a.toggleHighContrast()}
               className={cn(
                 rowBtn,
-                hc
+                d
                   ? 'bg-white/10 text-white hover:bg-white/15'
                   : 'bg-kiosk-border/30 text-kiosk-ink hover:bg-kiosk-border/45',
                 a.highContrast &&
-                  (hc
+                  (d
                     ? 'ring-2 ring-amber-400/90 ring-offset-2 ring-offset-zinc-950'
                     : 'ring-offset-background ring-2 ring-amber-500/90 ring-offset-2')
               )}
@@ -139,7 +152,7 @@ export function KioskAccessibilityToolbar({ audio }: Props) {
           <div
             className={cn(
               'flex min-h-12 items-center justify-between gap-3 rounded-xl px-3 py-2',
-              hc ? 'bg-white/10' : 'bg-kiosk-border/20'
+              d ? 'bg-white/10' : 'bg-kiosk-border/20'
             )}
           >
             <div className='flex min-w-0 items-center gap-2'>
@@ -147,21 +160,21 @@ export function KioskAccessibilityToolbar({ audio }: Props) {
                 <Volume2
                   className={cn(
                     'size-5 shrink-0',
-                    hc ? 'text-zinc-100' : 'text-kiosk-ink'
+                    d ? 'text-zinc-100' : 'text-kiosk-ink'
                   )}
                 />
               ) : (
                 <VolumeX
                   className={cn(
                     'size-5 shrink-0',
-                    hc ? 'text-zinc-400' : 'text-kiosk-ink/60'
+                    d ? 'text-zinc-400' : 'text-kiosk-ink/60'
                   )}
                 />
               )}
               <span
                 className={cn(
                   'text-sm font-medium',
-                  hc ? 'text-zinc-100' : 'text-kiosk-ink'
+                  d ? 'text-zinc-100' : 'text-kiosk-ink'
                 )}
               >
                 {t('tts_short')}
@@ -179,14 +192,14 @@ export function KioskAccessibilityToolbar({ audio }: Props) {
             <div
               className={cn(
                 'flex min-h-12 flex-col gap-2 rounded-xl px-3 py-2 sm:flex-row sm:items-center sm:justify-between',
-                hc ? 'bg-white/10' : 'bg-kiosk-border/20'
+                d ? 'bg-white/10' : 'bg-kiosk-border/20'
               )}
             >
               <div className='flex min-w-0 items-start gap-2 sm:min-w-0 sm:flex-1'>
                 <Megaphone
                   className={cn(
                     'mt-0.5 size-4 shrink-0 sm:mt-1',
-                    hc ? 'text-zinc-200' : 'text-kiosk-ink'
+                    d ? 'text-zinc-200' : 'text-kiosk-ink'
                   )}
                   aria-hidden
                 />
@@ -194,7 +207,7 @@ export function KioskAccessibilityToolbar({ audio }: Props) {
                   <p
                     className={cn(
                       'text-sm font-medium',
-                      hc ? 'text-zinc-100' : 'text-kiosk-ink'
+                      d ? 'text-zinc-100' : 'text-kiosk-ink'
                     )}
                   >
                     {t('speak_aloud_label')}
@@ -202,7 +215,7 @@ export function KioskAccessibilityToolbar({ audio }: Props) {
                   <p
                     className={cn(
                       'line-clamp-2 text-xs leading-tight',
-                      hc ? 'text-zinc-400' : 'text-kiosk-ink-muted'
+                      d ? 'text-zinc-400' : 'text-kiosk-ink-muted'
                     )}
                   >
                     {t('headphone_state', {

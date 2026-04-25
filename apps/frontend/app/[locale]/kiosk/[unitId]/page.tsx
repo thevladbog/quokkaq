@@ -19,11 +19,11 @@ import {
 } from '@/lib/api';
 import {
   Dialog,
-  DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
+import { KioskDialogContent } from '@/components/kiosk/kiosk-dialog-content';
 import { ArrowLeft, ChevronLeft, ChevronRight, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -33,8 +33,15 @@ import { useRouter } from '@/src/i18n/navigation';
 import { useLocale } from 'next-intl';
 import { getLocalizedName, cn } from '@/lib/utils';
 import { KIOSK_FORCED_HIGH_CONTRAST } from '@/lib/kiosk-hc-palette';
+import { relativeLuminanceFromCssColor } from '@/lib/kiosk-wcag-contrast';
+import {
+  getKioskBaseThemeDataAttribute,
+  normalizeKioskBaseThemeId,
+  resolveKioskPageSurfaceHexColors
+} from '@/lib/kiosk-base-theme';
 import { KioskAccessibilityToolbar } from '@/components/kiosk/kiosk-accessibility-toolbar';
 import { useKioskA11y } from '@/contexts/kiosk-accessibility-context';
+import { KioskChromeProvider } from '@/contexts/kiosk-chrome-context';
 import { useKioskA11yAudio } from '@/hooks/use-kiosk-a11y-audio';
 import { useKioskSpeech } from '@/hooks/use-kiosk-speech';
 import KioskLanguageSwitcher from '@/components/KioskLanguageSwitcher';
@@ -117,6 +124,7 @@ import {
 } from '@/lib/kiosk-attract-config';
 import { useKioskPrinterPaperOutPoll } from '@/hooks/use-kiosk-printer-paper-poll';
 import { KioskIdOcrDialog } from '@/components/kiosk/kiosk-id-ocr-dialog';
+import { KioskOcrResultStrip } from '@/components/kiosk/kiosk-ocr-result-strip';
 import { useKioskTelemetryPing } from '@/hooks/use-kiosk-telemetry-ping';
 import {
   persistKioskServiceTreeSnapshot,
@@ -162,6 +170,8 @@ export default function UnitKioskPage() {
   const isTicketModalOpenRef = useRef(false);
   const createdTicketRef = useRef<Ticket | null>(null);
   const [idOcrOpen, setIdOcrOpen] = useState(false);
+  /** Last "Use text" from document scan — visible strip + prefill into phone / pre-reg where applicable. */
+  const [kioskOcrResultText, setKioskOcrResultText] = useState('');
   const [browserOnline, setBrowserOnline] = useState(
     () => typeof window === 'undefined' || navigator.onLine
   );
@@ -582,25 +592,55 @@ export default function UnitKioskPage() {
   const attractScreenVisible =
     showAttract && kioskNoModalBlockers && attractMode !== 'off';
 
-  const isCustomColorsEnabled =
-    unit?.config?.kiosk?.isCustomColorsEnabled || false;
-  const kcKiosk = unit?.config?.kiosk;
+  const isCustomColorsEnabled = Boolean(kioskCfg?.isCustomColorsEnabled);
   const useHcSurfaces = a11y.highContrast;
-  const headerColor = useHcSurfaces
-    ? KIOSK_FORCED_HIGH_CONTRAST.headerBackground
-    : isCustomColorsEnabled
-      ? kcKiosk?.headerColor || '#fff9f4'
-      : '#fff9f4';
-  const bodyColor = useHcSurfaces
-    ? KIOSK_FORCED_HIGH_CONTRAST.bodyBackground
-    : isCustomColorsEnabled
-      ? kcKiosk?.bodyColor || '#fef8f3'
-      : '#fef8f3';
-  const serviceGridColor = useHcSurfaces
-    ? KIOSK_FORCED_HIGH_CONTRAST.serviceGridBackground
-    : isCustomColorsEnabled
-      ? kcKiosk?.serviceGridColor || '#f2ebe6'
-      : '#f2ebe6';
+  const kioskSurfaces = useMemo(() => {
+    if (useHcSurfaces) {
+      return {
+        header: KIOSK_FORCED_HIGH_CONTRAST.headerBackground,
+        body: KIOSK_FORCED_HIGH_CONTRAST.bodyBackground,
+        serviceGrid: KIOSK_FORCED_HIGH_CONTRAST.serviceGridBackground
+      };
+    }
+    return resolveKioskPageSurfaceHexColors({
+      kiosk: kioskCfg,
+      isCustomColorsEnabled
+    });
+  }, [kioskCfg, isCustomColorsEnabled, useHcSurfaces]);
+  const headerColor = kioskSurfaces.header;
+  const bodyColor = kioskSurfaces.body;
+  const serviceGridColor = kioskSurfaces.serviceGrid;
+  const kioskOnDarkBasePage = useMemo(() => {
+    if (useHcSurfaces) {
+      return false;
+    }
+    const lum = relativeLuminanceFromCssColor(bodyColor);
+    return lum != null && lum < 0.45;
+  }, [useHcSurfaces, bodyColor]);
+  /** Dark canvas behind tiles: use luminance even in a11y HC (grid is then forced dark) so default tiles can match. */
+  const serviceGridIsDark = useMemo(() => {
+    const lum = relativeLuminanceFromCssColor(serviceGridColor);
+    return lum != null && lum < 0.45;
+  }, [serviceGridColor]);
+  const gridChromeDark = useMemo(
+    () => serviceGridIsDark && !useHcSurfaces,
+    [serviceGridIsDark, useHcSurfaces]
+  );
+  const dataKioskBaseTheme = useMemo((): string | undefined => {
+    if (useHcSurfaces || isCustomColorsEnabled) {
+      return undefined;
+    }
+    return getKioskBaseThemeDataAttribute(
+      normalizeKioskBaseThemeId(kioskCfg?.kioskBaseTheme)
+    );
+  }, [useHcSurfaces, isCustomColorsEnabled, kioskCfg?.kioskBaseTheme]);
+  const useLightKioskHeaderText = useMemo(() => {
+    if (useHcSurfaces) {
+      return true;
+    }
+    const lum = relativeLuminanceFromCssColor(headerColor);
+    return lum != null && lum < 0.45;
+  }, [useHcSurfaces, headerColor]);
 
   const successTicketServiceLabel = useMemo(() => {
     if (!createdTicket) {
@@ -714,7 +754,9 @@ export default function UnitKioskPage() {
     'kiosk-touch-min h-12 min-w-[3.5rem] rounded-full border-0 px-4 text-base font-semibold shadow-sm',
     useHcSurfaces
       ? 'bg-white/12 text-white hover:bg-white/20'
-      : 'bg-kiosk-border/40 text-kiosk-ink hover:bg-kiosk-border/55'
+      : useLightKioskHeaderText
+        ? 'border border-white/25 bg-white/10 text-white hover:border-white/35 hover:bg-white/16'
+        : 'bg-kiosk-border/40 text-kiosk-ink hover:bg-kiosk-border/55'
   );
 
   const showKioskIdOcr = Boolean(
@@ -723,7 +765,15 @@ export default function UnitKioskPage() {
   const showOfflineShell = Boolean(
     unit?.operations?.kioskOfflineMode && kioskCfg?.offlineModeEnabled
   );
-
+  /** Strips sit above modals (lower z) — hide when a full dialog covers the grid or the OCR tool is open. */
+  const showKioskOcrResultStrip = Boolean(
+    showKioskIdOcr &&
+    kioskOcrResultText.trim() &&
+    !isPhoneIdentificationOpen &&
+    !isRedemptionModalOpen &&
+    !isKioskQrIdentificationOpen &&
+    !idOcrOpen
+  );
   const topBarLeading = (
     <>
       {kioskCfg?.logoUrl ? (
@@ -765,9 +815,13 @@ export default function UnitKioskPage() {
         <span
           className={cn(
             'kiosk-touch-min flex h-10 max-w-[11rem] shrink-0 items-center justify-center rounded-full px-2.5 text-center text-xs font-semibold sm:max-w-none sm:px-3 sm:text-sm',
-            browserOnline
-              ? 'bg-emerald-600/15 text-emerald-900'
-              : 'bg-amber-600/25 text-amber-950'
+            useLightKioskHeaderText
+              ? browserOnline
+                ? 'bg-emerald-500/20 text-emerald-200'
+                : 'bg-amber-500/25 text-amber-100'
+              : browserOnline
+                ? 'bg-emerald-600/15 text-emerald-900'
+                : 'bg-amber-600/25 text-amber-950'
           )}
         >
           {browserOnline
@@ -1331,912 +1385,1030 @@ export default function UnitKioskPage() {
     }
   };
 
-  return (
-    <div
-      className={cn(
-        'kiosk-motion-root kiosk-a11y-root flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4',
-        useHcSurfaces ? 'text-zinc-100' : 'text-kiosk-ink',
-        useHcSurfaces && 'kiosk-hc'
-      )}
-      data-kiosk-font-step={a11y.fontStep}
-      data-kiosk-hc={useHcSurfaces ? 'true' : 'false'}
-      style={{ backgroundColor: bodyColor }}
-    >
-      <KioskTopBar
-        intlLocale={intlLocale}
-        currentTime={currentTime}
-        onClockClick={handleClockClick}
-        headerColor={headerColor}
-        useLightHeaderText={useHcSurfaces}
-        leading={topBarLeading}
-        beforeClock={topBarBeforeClock}
-      />
+  const modalsDark = useHcSurfaces || kioskOnDarkBasePage;
 
-      {unitQueryError && !unit ? (
-        <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
-          <div className='max-w-md px-4 text-center'>
-            <h2 className='mb-2 text-2xl font-bold tracking-tight sm:text-3xl'>
-              {t('unitLoadErrorTitle')}
-            </h2>
-            <p className='text-kiosk-ink-muted mb-6 text-base'>
-              {t('unitLoadErrorMessage')}
-            </p>
-            <div className='flex flex-col items-center gap-3 sm:flex-row sm:justify-center'>
-              <Button
-                className='rounded-full px-8'
-                disabled={!unitId}
-                onClick={invalidateUnitQuery}
-              >
-                {t('retryServices')}
-              </Button>
-              {isTauriKiosk() ? (
-                <Button
-                  variant='outline'
-                  className='border-kiosk-border/60 rounded-full px-8'
-                  onClick={() => void handleResetDesktopPairing()}
-                >
-                  {t('desktop_reset_pairing')}
-                </Button>
-              ) : null}
-            </div>
-            {isTauriKiosk() ? (
-              <p className='text-kiosk-ink-muted mt-4 text-sm'>
-                {t('desktop_reset_pairing_short')}
+  return (
+    <KioskChromeProvider modalsDark={modalsDark}>
+      <div
+        className={cn(
+          'kiosk-motion-root kiosk-a11y-root flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4',
+          showKioskOcrResultStrip && 'pb-[min(32vh,22rem)]',
+          useHcSurfaces ? 'text-zinc-100' : 'text-kiosk-ink',
+          useHcSurfaces && 'kiosk-hc'
+        )}
+        data-kiosk-font-step={a11y.fontStep}
+        data-kiosk-hc={useHcSurfaces ? 'true' : 'false'}
+        {...(dataKioskBaseTheme
+          ? { 'data-kiosk-base-theme': dataKioskBaseTheme }
+          : {})}
+        style={{ backgroundColor: bodyColor }}
+      >
+        <KioskTopBar
+          intlLocale={intlLocale}
+          currentTime={currentTime}
+          onClockClick={handleClockClick}
+          headerColor={headerColor}
+          useLightHeaderText={useLightKioskHeaderText}
+          leading={topBarLeading}
+          beforeClock={topBarBeforeClock}
+        />
+
+        {unitQueryError && !unit ? (
+          <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
+            <div className='max-w-md px-4 text-center'>
+              <h2 className='mb-2 text-2xl font-bold tracking-tight sm:text-3xl'>
+                {t('unitLoadErrorTitle')}
+              </h2>
+              <p className='text-kiosk-ink-muted mb-6 text-base'>
+                {t('unitLoadErrorMessage')}
               </p>
-            ) : null}
-          </div>
-        </div>
-      ) : unitPending && !unit ? (
-        <div className='flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden px-4'>
-          <div className='text-center'>
-            <div className='kiosk-a11y-respect-motion border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
-            <p className='text-kiosk-ink-muted'>{t('loading')}</p>
-            {unitSlowLoad ? (
-              <>
-                <p className='text-kiosk-ink-muted mt-4 max-w-md text-sm'>
-                  {t('stillLoadingKioskHint')}
-                </p>
+              <div className='flex flex-col items-center gap-3 sm:flex-row sm:justify-center'>
+                <Button
+                  className='rounded-full px-8'
+                  disabled={!unitId}
+                  onClick={invalidateUnitQuery}
+                >
+                  {t('retryServices')}
+                </Button>
                 {isTauriKiosk() ? (
                   <Button
                     variant='outline'
-                    className='border-kiosk-border/60 mt-4 rounded-full px-8'
+                    className='border-kiosk-border/60 rounded-full px-8'
                     onClick={() => void handleResetDesktopPairing()}
                   >
                     {t('desktop_reset_pairing')}
                   </Button>
                 ) : null}
-              </>
-            ) : null}
-          </div>
-        </div>
-      ) : !unit ? (
-        <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
-          <div className='max-w-md px-4 text-center'>
-            <h2 className='mb-2 text-2xl font-bold tracking-tight sm:text-3xl'>
-              {t('unitLoadErrorTitle')}
-            </h2>
-            <p className='text-kiosk-ink-muted mb-6 text-base'>
-              {t('unitLoadErrorMessage')}
-            </p>
-            <div className='flex flex-col items-center gap-3 sm:flex-row sm:justify-center'>
-              <Button
-                className='rounded-full px-8'
-                disabled={!unitId}
-                onClick={invalidateUnitQuery}
-              >
-                {t('retryServices')}
-              </Button>
+              </div>
               {isTauriKiosk() ? (
-                <Button
-                  variant='outline'
-                  className='border-kiosk-border/60 rounded-full px-8'
-                  onClick={() => void handleResetDesktopPairing()}
-                >
-                  {t('desktop_reset_pairing')}
-                </Button>
+                <p className='text-kiosk-ink-muted mt-4 text-sm'>
+                  {t('desktop_reset_pairing_short')}
+                </p>
               ) : null}
             </div>
           </div>
-        </div>
-      ) : unit.kind === 'service_zone' && !unit.parentId ? (
-        <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4'>
-          <p className='text-kiosk-ink-muted text-center text-base'>
-            {t('kiosk_zone_missing_parent', {
-              defaultValue:
-                'This service zone is not linked to a parent branch. Kiosk cannot load services.'
-            })}
-          </p>
-        </div>
-      ) : servicesLoading ? (
-        <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
-          <div className='text-center'>
-            <div className='kiosk-a11y-respect-motion border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
-            <p className='text-kiosk-ink-muted'>{t('loading')}</p>
+        ) : unitPending && !unit ? (
+          <div className='flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden px-4'>
+            <div className='text-center'>
+              <div className='kiosk-a11y-respect-motion border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
+              <p className='text-kiosk-ink-muted'>{t('loading')}</p>
+              {unitSlowLoad ? (
+                <>
+                  <p className='text-kiosk-ink-muted mt-4 max-w-md text-sm'>
+                    {t('stillLoadingKioskHint')}
+                  </p>
+                  {isTauriKiosk() ? (
+                    <Button
+                      variant='outline'
+                      className='border-kiosk-border/60 mt-4 rounded-full px-8'
+                      onClick={() => void handleResetDesktopPairing()}
+                    >
+                      {t('desktop_reset_pairing')}
+                    </Button>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
           </div>
-        </div>
-      ) : servicesQueryError ? (
-        <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
-          <div className='max-w-md px-4 text-center'>
-            <h2 className='mb-2 text-2xl font-bold tracking-tight sm:text-3xl'>
-              {t('servicesUnavailableTitle', {
-                defaultValue: 'Services unavailable'
-              })}
-            </h2>
-            <p className='text-kiosk-ink-muted mb-6 text-base'>
-              {t('servicesUnavailableMessage', {
+        ) : !unit ? (
+          <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
+            <div className='max-w-md px-4 text-center'>
+              <h2 className='mb-2 text-2xl font-bold tracking-tight sm:text-3xl'>
+                {t('unitLoadErrorTitle')}
+              </h2>
+              <p className='text-kiosk-ink-muted mb-6 text-base'>
+                {t('unitLoadErrorMessage')}
+              </p>
+              <div className='flex flex-col items-center gap-3 sm:flex-row sm:justify-center'>
+                <Button
+                  className='rounded-full px-8'
+                  disabled={!unitId}
+                  onClick={invalidateUnitQuery}
+                >
+                  {t('retryServices')}
+                </Button>
+                {isTauriKiosk() ? (
+                  <Button
+                    variant='outline'
+                    className='border-kiosk-border/60 rounded-full px-8'
+                    onClick={() => void handleResetDesktopPairing()}
+                  >
+                    {t('desktop_reset_pairing')}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : unit.kind === 'service_zone' && !unit.parentId ? (
+          <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4'>
+            <p className='text-kiosk-ink-muted text-center text-base'>
+              {t('kiosk_zone_missing_parent', {
                 defaultValue:
-                  "We could not load this unit's services. Check the connection and try again."
+                  'This service zone is not linked to a parent branch. Kiosk cannot load services.'
               })}
             </p>
-            <div className='flex flex-col items-center gap-3 sm:flex-row sm:justify-center'>
-              <Button
-                className='rounded-full px-8'
-                onClick={() => void refetchServicesTree()}
-              >
-                {t('retryServices', { defaultValue: 'Try again' })}
-              </Button>
-              {isTauriKiosk() ? (
-                <Button
-                  variant='outline'
-                  className='border-kiosk-border/60 rounded-full px-8'
-                  onClick={() => void handleResetDesktopPairing()}
-                >
-                  {t('desktop_reset_pairing')}
-                </Button>
-              ) : null}
+          </div>
+        ) : servicesLoading ? (
+          <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
+            <div className='text-center'>
+              <div className='kiosk-a11y-respect-motion border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
+              <p className='text-kiosk-ink-muted'>{t('loading')}</p>
             </div>
           </div>
-        </div>
-      ) : visibleServices.length === 0 ? (
-        <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
-          <div className='max-w-md px-4 text-center'>
-            <h2 className='mb-2 text-2xl font-bold tracking-tight sm:text-3xl'>
-              {selectedServicePath.length > 0
-                ? getLocalizedName(
-                    selectedServicePath[selectedServicePath.length - 1].name,
-                    selectedServicePath[selectedServicePath.length - 1].nameRu,
-                    selectedServicePath[selectedServicePath.length - 1].nameEn,
-                    locale
-                  )
-                : t('selectService')}
-            </h2>
-            <p className='text-kiosk-ink-muted mb-6 text-base'>
-              {t('noServicesAvailable', {
-                defaultValue: 'No services available at this level'
-              })}
-            </p>
-            <Button className='rounded-full px-8' onClick={handleGoBack}>
-              {selectedServicePath.length > 0
-                ? t('back')
-                : t('changeLocation', { defaultValue: 'Change Location' })}
-            </Button>
+        ) : servicesQueryError ? (
+          <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
+            <div className='max-w-md px-4 text-center'>
+              <h2 className='mb-2 text-2xl font-bold tracking-tight sm:text-3xl'>
+                {t('servicesUnavailableTitle', {
+                  defaultValue: 'Services unavailable'
+                })}
+              </h2>
+              <p className='text-kiosk-ink-muted mb-6 text-base'>
+                {t('servicesUnavailableMessage', {
+                  defaultValue:
+                    "We could not load this unit's services. Check the connection and try again."
+                })}
+              </p>
+              <div className='flex flex-col items-center gap-3 sm:flex-row sm:justify-center'>
+                <Button
+                  className='rounded-full px-8'
+                  onClick={() => void refetchServicesTree()}
+                >
+                  {t('retryServices', { defaultValue: 'Try again' })}
+                </Button>
+                {isTauriKiosk() ? (
+                  <Button
+                    variant='outline'
+                    className='border-kiosk-border/60 rounded-full px-8'
+                    onClick={() => void handleResetDesktopPairing()}
+                  >
+                    {t('desktop_reset_pairing')}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
           </div>
-        </div>
-      ) : (
-        <>
-          <KioskWelcomeHero
-            title={heroTitle}
-            subtitle={heroSubtitle}
-            highContrast={useHcSurfaces}
-            accessory={<KioskAccessibilityToolbar audio={kioskAudio} />}
-          />
+        ) : visibleServices.length === 0 ? (
+          <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
+            <div className='max-w-md px-4 text-center'>
+              <h2 className='mb-2 text-2xl font-bold tracking-tight sm:text-3xl'>
+                {selectedServicePath.length > 0
+                  ? getLocalizedName(
+                      selectedServicePath[selectedServicePath.length - 1].name,
+                      selectedServicePath[selectedServicePath.length - 1]
+                        .nameRu,
+                      selectedServicePath[selectedServicePath.length - 1]
+                        .nameEn,
+                      locale
+                    )
+                  : t('selectService')}
+              </h2>
+              <p className='text-kiosk-ink-muted mb-6 text-base'>
+                {t('noServicesAvailable', {
+                  defaultValue: 'No services available at this level'
+                })}
+              </p>
+              <Button className='rounded-full px-8' onClick={handleGoBack}>
+                {selectedServicePath.length > 0
+                  ? t('back')
+                  : t('changeLocation', { defaultValue: 'Change Location' })}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <KioskWelcomeHero
+              title={heroTitle}
+              subtitle={heroSubtitle}
+              highContrast={useHcSurfaces}
+              onDarkKioskPage={kioskOnDarkBasePage}
+              accessory={
+                <KioskAccessibilityToolbar
+                  audio={kioskAudio}
+                  onDarkBaseKioskPage={kioskOnDarkBasePage}
+                />
+              }
+            />
 
-          {/* Navigation breadcrumbs and buttons */}
-          <div
-            className={cn(
-              'mb-2 flex shrink-0 items-center justify-between rounded-xl border px-3 py-2 sm:mb-3 sm:px-4',
-              useHcSurfaces
-                ? 'border-white/20 bg-zinc-800/80'
-                : 'border-kiosk-border/50 bg-white/40'
-            )}
-          >
+            {/* Navigation breadcrumbs and buttons */}
             <div
               className={cn(
-                'flex min-w-0 items-center overflow-x-auto text-sm font-medium',
-                useHcSurfaces ? 'text-zinc-300' : 'text-kiosk-ink-muted'
+                'mb-2 flex shrink-0 items-center justify-between rounded-xl border px-3 py-2 sm:mb-3 sm:px-4',
+                useHcSurfaces
+                  ? 'border-white/20 bg-zinc-800/80'
+                  : kioskOnDarkBasePage
+                    ? 'border border-white/12 bg-zinc-900/60'
+                    : 'border-kiosk-border/50 bg-white/40'
               )}
             >
-              <span className='mr-2 shrink-0 opacity-70'>#</span>
-              {selectedServicePath.length === 0 ? (
-                <span className={useHcSurfaces ? 'text-zinc-200' : undefined}>
-                  {t('services', { defaultValue: 'Services' })}
+              <div
+                className={cn(
+                  'flex min-w-0 items-center overflow-x-auto text-sm font-medium',
+                  useHcSurfaces
+                    ? 'text-zinc-300'
+                    : kioskOnDarkBasePage
+                      ? 'text-zinc-400'
+                      : 'text-kiosk-ink-muted'
+                )}
+              >
+                <span
+                  className={cn(
+                    'mr-2 shrink-0',
+                    useHcSurfaces
+                      ? 'opacity-70'
+                      : kioskOnDarkBasePage
+                        ? 'text-zinc-500'
+                        : 'opacity-70'
+                  )}
+                >
+                  #
                 </span>
-              ) : (
-                selectedServicePath.map((service, index) => (
-                  <div key={index} className='flex items-center'>
-                    {index > 0 && (
-                      <Separator
-                        orientation='vertical'
-                        className='bg-kiosk-border mx-2 h-4'
-                      />
+                {selectedServicePath.length === 0 ? (
+                  <span
+                    className={cn(
+                      !useHcSurfaces && kioskOnDarkBasePage && 'text-zinc-200',
+                      !useHcSurfaces &&
+                        !kioskOnDarkBasePage &&
+                        'text-kiosk-ink',
+                      useHcSurfaces && 'text-zinc-200'
                     )}
-                    <span
-                      className={cn(
-                        'whitespace-nowrap',
-                        useHcSurfaces ? 'text-white' : 'text-kiosk-ink'
+                  >
+                    {t('services', { defaultValue: 'Services' })}
+                  </span>
+                ) : (
+                  selectedServicePath.map((service, index) => (
+                    <div key={index} className='flex items-center'>
+                      {index > 0 && (
+                        <Separator
+                          orientation='vertical'
+                          className={cn(
+                            'mx-2 h-4',
+                            useHcSurfaces || kioskOnDarkBasePage
+                              ? 'bg-white/20'
+                              : 'bg-kiosk-border'
+                          )}
+                        />
                       )}
-                    >
-                      {getLocalizedName(
-                        service.name,
-                        service.nameRu,
-                        service.nameEn,
-                        locale
-                      )}
-                    </span>
-                  </div>
-                ))
-              )}
+                      <span
+                        className={cn(
+                          'whitespace-nowrap',
+                          useHcSurfaces
+                            ? 'text-white'
+                            : kioskOnDarkBasePage
+                              ? 'text-zinc-100'
+                              : 'text-kiosk-ink'
+                        )}
+                      >
+                        {getLocalizedName(
+                          service.name,
+                          service.nameRu,
+                          service.nameEn,
+                          locale
+                        )}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className='ml-3 flex shrink-0 items-center gap-2'>
+                {selectedServicePath.length > 1 && (
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    className={cn(
+                      'kiosk-touch-min h-12 min-w-12 gap-2 rounded-full sm:px-4',
+                      gridChromeDark &&
+                        'border border-white/30 bg-zinc-900/50 text-zinc-100 shadow-sm hover:border-white/40 hover:bg-zinc-800/60 hover:text-white'
+                    )}
+                    onClick={() => setSelectedServicePath([])}
+                  >
+                    <Home className='size-5 shrink-0' />
+                    {t('home', { defaultValue: 'Home' })}
+                  </Button>
+                )}
+                {selectedServicePath.length > 0 && (
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    className={cn(
+                      'kiosk-touch-min h-12 min-w-12 gap-2 rounded-full sm:px-4',
+                      gridChromeDark &&
+                        'border border-white/30 bg-zinc-900/50 text-zinc-100 shadow-sm hover:border-white/40 hover:bg-zinc-800/60 hover:text-white'
+                    )}
+                    onClick={handleGoBack}
+                  >
+                    <ArrowLeft className='size-5 shrink-0' />
+                    {t('back', { defaultValue: 'Back' })}
+                  </Button>
+                )}
+              </div>
             </div>
 
-            <div className='ml-3 flex shrink-0 items-center gap-2'>
-              {selectedServicePath.length > 1 && (
-                <Button
-                  variant='outline'
-                  size='sm'
-                  className='kiosk-touch-min h-12 min-w-12 gap-2 rounded-full sm:px-4'
-                  onClick={() => setSelectedServicePath([])}
-                >
-                  <Home className='size-5 shrink-0' />
-                  {t('home', { defaultValue: 'Home' })}
-                </Button>
-              )}
-              {selectedServicePath.length > 0 && (
-                <Button
-                  variant='outline'
-                  size='sm'
-                  className='kiosk-touch-min h-12 min-w-12 gap-2 rounded-full sm:px-4'
-                  onClick={handleGoBack}
-                >
-                  <ArrowLeft className='size-5 shrink-0' />
-                  {t('back', { defaultValue: 'Back' })}
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Services grid — fills remaining viewport height; no page scroll */}
-          {useAutoKioskLayout ? (
-            <div
-              className='flex min-h-0 w-full min-w-0 flex-1 flex-col gap-2 overflow-hidden rounded-2xl p-2 sm:gap-3 sm:p-3 md:p-4'
-              style={{ backgroundColor: serviceGridColor }}
-            >
-              {autolayoutPageCount > 1 ? (
-                <div
-                  className='flex w-full shrink-0 flex-col items-center justify-center gap-2'
-                  role='navigation'
-                  aria-label={t('autolayout_pagination_aria', {
-                    defaultValue: 'Service pages'
-                  })}
-                >
-                  <div className='flex w-full items-center justify-center gap-2 sm:gap-4'>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      className='kiosk-touch-min h-12 min-w-12 gap-1 rounded-full px-4 sm:px-5'
-                      disabled={autolayoutPageClamped <= 0}
-                      onClick={() =>
-                        setKioskAutolayoutPage((p) => Math.max(0, p - 1))
-                      }
-                      aria-label={t('autolayout_prev_aria', {
-                        defaultValue: 'Previous page'
-                      })}
-                    >
-                      <ChevronLeft className='size-5 shrink-0' aria-hidden />
-                      <span className='hidden min-[400px]:inline'>
-                        {t('autolayout_prev', { defaultValue: 'Previous' })}
-                      </span>
-                    </Button>
-                    <span
-                      className={cn(
-                        'text-sm font-medium tabular-nums sm:text-base',
-                        useHcSurfaces ? 'text-zinc-200' : 'text-kiosk-ink'
-                      )}
-                    >
-                      {t('autolayout_page_status', {
-                        current: autolayoutPageClamped + 1,
-                        total: autolayoutPageCount
-                      })}
-                    </span>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      className='kiosk-touch-min h-12 min-w-12 gap-1 rounded-full px-4 sm:px-5'
-                      disabled={
-                        autolayoutPageClamped >= autolayoutPageCount - 1
-                      }
-                      onClick={() =>
-                        setKioskAutolayoutPage((p) =>
-                          Math.min(autolayoutPageCount - 1, p + 1)
-                        )
-                      }
-                      aria-label={t('autolayout_next_aria', {
-                        defaultValue: 'Next page'
-                      })}
-                    >
-                      <span className='hidden min-[400px]:inline'>
-                        {t('autolayout_next', { defaultValue: 'Next' })}
-                      </span>
-                      <ChevronRight className='size-5 shrink-0' aria-hidden />
-                    </Button>
-                  </div>
+            {/* Services grid — fills remaining viewport height; no page scroll */}
+            {useAutoKioskLayout ? (
+              <div
+                className='flex min-h-0 w-full min-w-0 flex-1 flex-col gap-2 overflow-hidden rounded-2xl p-2 sm:gap-3 sm:p-3 md:p-4'
+                style={{ backgroundColor: serviceGridColor }}
+              >
+                {autolayoutPageCount > 1 ? (
                   <div
-                    className='flex max-w-full flex-wrap items-center justify-center gap-2 sm:gap-2.5'
-                    role='group'
-                    aria-label={t('autolayout_page_dots_group_aria', {
-                      defaultValue: 'Jump to page'
+                    className='flex w-full shrink-0 flex-col items-center justify-center gap-2'
+                    role='navigation'
+                    aria-label={t('autolayout_pagination_aria', {
+                      defaultValue: 'Service pages'
                     })}
                   >
-                    {Array.from(
-                      { length: autolayoutPageCount },
-                      (_, pageIndex) => (
-                        <button
-                          key={pageIndex}
-                          type='button'
-                          className={cn(
-                            'flex h-12 w-12 shrink-0 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-                            useHcSurfaces
-                              ? 'focus-visible:ring-amber-400 focus-visible:ring-offset-zinc-900'
-                              : 'focus-visible:ring-kiosk-ink focus-visible:ring-offset-amber-50/80'
-                          )}
-                          aria-label={t('autolayout_page_dot_aria', {
-                            page: pageIndex + 1
-                          })}
-                          aria-current={
-                            pageIndex === autolayoutPageClamped
-                              ? 'page'
-                              : undefined
-                          }
-                          onClick={() => setKioskAutolayoutPage(pageIndex)}
-                        >
-                          <span
+                    <div className='flex w-full items-center justify-center gap-2 sm:gap-4'>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        className={cn(
+                          'kiosk-touch-min h-12 min-w-12 gap-1 rounded-full px-4 sm:px-5',
+                          gridChromeDark &&
+                            'border border-white/30 bg-zinc-900/50 text-zinc-100 shadow-sm hover:border-white/40 hover:bg-zinc-800/60 hover:text-white'
+                        )}
+                        disabled={autolayoutPageClamped <= 0}
+                        onClick={() =>
+                          setKioskAutolayoutPage((p) => Math.max(0, p - 1))
+                        }
+                        aria-label={t('autolayout_prev_aria', {
+                          defaultValue: 'Previous page'
+                        })}
+                      >
+                        <ChevronLeft className='size-5 shrink-0' aria-hidden />
+                        <span className='hidden min-[400px]:inline'>
+                          {t('autolayout_prev', { defaultValue: 'Previous' })}
+                        </span>
+                      </Button>
+                      <span
+                        className={cn(
+                          'text-sm font-medium tabular-nums sm:text-base',
+                          useHcSurfaces
+                            ? 'text-zinc-200'
+                            : gridChromeDark
+                              ? 'text-zinc-200'
+                              : 'text-kiosk-ink'
+                        )}
+                      >
+                        {t('autolayout_page_status', {
+                          current: autolayoutPageClamped + 1,
+                          total: autolayoutPageCount
+                        })}
+                      </span>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        className={cn(
+                          'kiosk-touch-min h-12 min-w-12 gap-1 rounded-full px-4 sm:px-5',
+                          gridChromeDark &&
+                            'border border-white/30 bg-zinc-900/50 text-zinc-100 shadow-sm hover:border-white/40 hover:bg-zinc-800/60 hover:text-white'
+                        )}
+                        disabled={
+                          autolayoutPageClamped >= autolayoutPageCount - 1
+                        }
+                        onClick={() =>
+                          setKioskAutolayoutPage((p) =>
+                            Math.min(autolayoutPageCount - 1, p + 1)
+                          )
+                        }
+                        aria-label={t('autolayout_next_aria', {
+                          defaultValue: 'Next page'
+                        })}
+                      >
+                        <span className='hidden min-[400px]:inline'>
+                          {t('autolayout_next', { defaultValue: 'Next' })}
+                        </span>
+                        <ChevronRight className='size-5 shrink-0' aria-hidden />
+                      </Button>
+                    </div>
+                    <div
+                      className='flex max-w-full flex-wrap items-center justify-center gap-2 sm:gap-2.5'
+                      role='group'
+                      aria-label={t('autolayout_page_dots_group_aria', {
+                        defaultValue: 'Jump to page'
+                      })}
+                    >
+                      {Array.from(
+                        { length: autolayoutPageCount },
+                        (_, pageIndex) => (
+                          <button
+                            key={pageIndex}
+                            type='button'
                             className={cn(
-                              'block h-2.5 w-2.5 rounded-full',
-                              pageIndex === autolayoutPageClamped
-                                ? useHcSurfaces
-                                  ? 'bg-amber-300'
-                                  : 'bg-kiosk-ink'
-                                : useHcSurfaces
-                                  ? 'border border-zinc-500 bg-transparent'
-                                  : 'border-kiosk-ink/35 border bg-transparent'
+                              'flex h-12 w-12 shrink-0 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+                              useHcSurfaces
+                                ? 'focus-visible:ring-amber-400 focus-visible:ring-offset-zinc-900'
+                                : gridChromeDark
+                                  ? 'focus-visible:ring-white/50 focus-visible:ring-offset-zinc-950/90'
+                                  : 'focus-visible:ring-kiosk-ink focus-visible:ring-offset-amber-50/80'
                             )}
-                            aria-hidden
-                          />
-                        </button>
-                      )
-                    )}
+                            aria-label={t('autolayout_page_dot_aria', {
+                              page: pageIndex + 1
+                            })}
+                            aria-current={
+                              pageIndex === autolayoutPageClamped
+                                ? 'page'
+                                : undefined
+                            }
+                            onClick={() => setKioskAutolayoutPage(pageIndex)}
+                          >
+                            <span
+                              className={cn(
+                                'block h-2.5 w-2.5 rounded-full',
+                                pageIndex === autolayoutPageClamped
+                                  ? useHcSurfaces
+                                    ? 'bg-amber-300'
+                                    : gridChromeDark
+                                      ? 'bg-zinc-100'
+                                      : 'bg-kiosk-ink'
+                                  : useHcSurfaces
+                                    ? 'border border-zinc-500 bg-transparent'
+                                    : gridChromeDark
+                                      ? 'border border-zinc-500/80 bg-transparent'
+                                      : 'border-kiosk-ink/35 border bg-transparent'
+                              )}
+                              aria-hidden
+                            />
+                          </button>
+                        )
+                      )}
+                    </div>
                   </div>
-                </div>
-              ) : null}
-              {autolayoutGridDims.rows > 0 && autolayoutGridDims.cols > 0 ? (
-                <div
-                  className='grid min-h-0 w-full min-w-0 flex-1 gap-1.5 overflow-hidden sm:gap-2 md:gap-3'
-                  style={{
-                    gridTemplateColumns: `repeat(${autolayoutGridDims.cols}, minmax(0, 1fr))`,
-                    gridTemplateRows: `repeat(${autolayoutGridDims.rows}, minmax(0, 1fr))`
-                  }}
-                >
-                  {autolayoutSlots.map((slot) => {
-                    if (slot.type === 'empty') {
+                ) : null}
+                {autolayoutGridDims.rows > 0 && autolayoutGridDims.cols > 0 ? (
+                  <div
+                    className='grid min-h-0 w-full min-w-0 flex-1 gap-1.5 overflow-hidden sm:gap-2 md:gap-3'
+                    style={{
+                      gridTemplateColumns: `repeat(${autolayoutGridDims.cols}, minmax(0, 1fr))`,
+                      gridTemplateRows: `repeat(${autolayoutGridDims.rows}, minmax(0, 1fr))`
+                    }}
+                  >
+                    {autolayoutSlots.map((slot) => {
+                      if (slot.type === 'empty') {
+                        return (
+                          <div
+                            key={`empty-${slot.row}-${slot.col}`}
+                            aria-hidden
+                            className='h-full min-h-0 w-full min-w-0'
+                            style={{
+                              gridRow: slot.row + 1,
+                              gridColumn: slot.col + 1
+                            }}
+                          />
+                        );
+                      }
+                      const { service } = slot;
                       return (
                         <div
-                          key={`empty-${slot.row}-${slot.col}`}
-                          aria-hidden
+                          key={service.id}
                           className='h-full min-h-0 w-full min-w-0'
                           style={{
                             gridRow: slot.row + 1,
                             gridColumn: slot.col + 1
                           }}
+                        >
+                          <KioskServiceTile
+                            service={service}
+                            locale={locale}
+                            tileKind={service.isLeaf ? 'leaf' : 'branch'}
+                            highContrast={useHcSurfaces}
+                            onDarkServiceGrid={serviceGridIsDark}
+                            onSelect={handleServiceSelection}
+                            onA11yFocus={handleA11yTileVocalize}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div
+                className='grid min-h-0 w-full min-w-0 flex-1 gap-1.5 overflow-hidden rounded-2xl p-2 sm:gap-2 sm:p-3 md:gap-3 md:p-4'
+                style={{
+                  backgroundColor: serviceGridColor,
+                  gridTemplateColumns: `repeat(${SERVICE_GRID_COLS}, minmax(0, 1fr))`,
+                  gridTemplateRows: `repeat(${SERVICE_GRID_ROWS}, minmax(0, 1fr))`
+                }}
+              >
+                {/* Render services with their exact grid positions */}
+                {visibleServices.map((service) => {
+                  const startRow = (service.gridRow ?? 0) + 1;
+                  const startCol = (service.gridCol ?? 0) + 1;
+                  const rowSpan = service.gridRowSpan || 1;
+                  const colSpan = service.gridColSpan || 1;
+
+                  return (
+                    <div
+                      key={service.id}
+                      className='h-full min-h-0 w-full min-w-0'
+                      style={{
+                        gridRow: `${startRow} / span ${rowSpan}`,
+                        gridColumn: `${startCol} / span ${colSpan}`
+                      }}
+                    >
+                      <KioskServiceTile
+                        service={service}
+                        locale={locale}
+                        tileKind={service.isLeaf ? 'leaf' : 'branch'}
+                        highContrast={useHcSurfaces}
+                        onDarkServiceGrid={serviceGridIsDark}
+                        onSelect={handleServiceSelection}
+                        onA11yFocus={handleA11yTileVocalize}
+                      />
+                    </div>
+                  );
+                })}
+
+                {/* Add empty cells to fill up the grid structure where no services are positioned */}
+                {Array.from({ length: SERVICE_GRID_CELL_COUNT }).map(
+                  (_, index) => {
+                    const row = Math.floor(index / SERVICE_GRID_COLS);
+                    const col = index % SERVICE_GRID_COLS;
+
+                    // Check if this cell is already occupied by a service
+                    const isOccupied = visibleServices.some((service) => {
+                      if (!isServicePlacedOnGrid(service)) {
+                        return false;
+                      }
+
+                      // Check if this cell falls within the service's grid position
+                      return (
+                        row >= (service.gridRow as number) &&
+                        row <
+                          (service.gridRow as number) +
+                            (service.gridRowSpan || 1) &&
+                        col >= (service.gridCol as number) &&
+                        col <
+                          (service.gridCol as number) +
+                            (service.gridColSpan || 1)
+                      );
+                    });
+
+                    // Only render empty cell if not occupied
+                    if (!isOccupied) {
+                      return (
+                        <div
+                          key={`empty-${row}-${col}`}
+                          className='border-0 opacity-0'
+                          style={{
+                            gridRow: `${row + 1}`,
+                            gridColumn: `${col + 1}`
+                          }}
                         />
                       );
                     }
-                    const { service } = slot;
-                    return (
-                      <div
-                        key={service.id}
-                        className='h-full min-h-0 w-full min-w-0'
-                        style={{
-                          gridRow: slot.row + 1,
-                          gridColumn: slot.col + 1
-                        }}
-                      >
-                        <KioskServiceTile
-                          service={service}
-                          locale={locale}
-                          tileKind={service.isLeaf ? 'leaf' : 'branch'}
-                          highContrast={useHcSurfaces}
-                          onSelect={handleServiceSelection}
-                          onA11yFocus={handleA11yTileVocalize}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div
-              className='grid min-h-0 w-full min-w-0 flex-1 gap-1.5 overflow-hidden rounded-2xl p-2 sm:gap-2 sm:p-3 md:gap-3 md:p-4'
-              style={{
-                backgroundColor: serviceGridColor,
-                gridTemplateColumns: `repeat(${SERVICE_GRID_COLS}, minmax(0, 1fr))`,
-                gridTemplateRows: `repeat(${SERVICE_GRID_ROWS}, minmax(0, 1fr))`
-              }}
-            >
-              {/* Render services with their exact grid positions */}
-              {visibleServices.map((service) => {
-                const startRow = (service.gridRow ?? 0) + 1;
-                const startCol = (service.gridCol ?? 0) + 1;
-                const rowSpan = service.gridRowSpan || 1;
-                const colSpan = service.gridColSpan || 1;
 
-                return (
-                  <div
-                    key={service.id}
-                    className='h-full min-h-0 w-full min-w-0'
-                    style={{
-                      gridRow: `${startRow} / span ${rowSpan}`,
-                      gridColumn: `${startCol} / span ${colSpan}`
-                    }}
-                  >
-                    <KioskServiceTile
-                      service={service}
-                      locale={locale}
-                      tileKind={service.isLeaf ? 'leaf' : 'branch'}
-                      highContrast={useHcSurfaces}
-                      onSelect={handleServiceSelection}
-                      onA11yFocus={handleA11yTileVocalize}
-                    />
-                  </div>
-                );
-              })}
-
-              {/* Add empty cells to fill up the grid structure where no services are positioned */}
-              {Array.from({ length: SERVICE_GRID_CELL_COUNT }).map(
-                (_, index) => {
-                  const row = Math.floor(index / SERVICE_GRID_COLS);
-                  const col = index % SERVICE_GRID_COLS;
-
-                  // Check if this cell is already occupied by a service
-                  const isOccupied = visibleServices.some((service) => {
-                    if (!isServicePlacedOnGrid(service)) {
-                      return false;
-                    }
-
-                    // Check if this cell falls within the service's grid position
-                    return (
-                      row >= (service.gridRow as number) &&
-                      row <
-                        (service.gridRow as number) +
-                          (service.gridRowSpan || 1) &&
-                      col >= (service.gridCol as number) &&
-                      col <
-                        (service.gridCol as number) + (service.gridColSpan || 1)
-                    );
-                  });
-
-                  // Only render empty cell if not occupied
-                  if (!isOccupied) {
-                    return (
-                      <div
-                        key={`empty-${row}-${col}`}
-                        className='border-0 opacity-0'
-                        style={{
-                          gridRow: `${row + 1}`,
-                          gridColumn: `${col + 1}`
-                        }}
-                      />
-                    );
+                    return null;
                   }
-
-                  return null;
-                }
-              )}
-            </div>
-          )}
-        </>
-      )}
-
-      {createdTicket ? (
-        <KioskTicketSuccessOverlay
-          open={isTicketModalOpen}
-          onClose={closeTicketSuccessModal}
-          a11yLive={tA11y('success_live', {
-            number: String(createdTicket.queueNumber)
-          })}
-          logoUrl={unit?.config?.kiosk?.logoUrl}
-          showTicketHeader={showTicketHeader}
-          headerText={kioskCfg?.headerText}
-          serviceName={successTicketServiceLabel}
-          queueNumber={String(createdTicket.queueNumber)}
-          successEtaMinutes={successEtaMinutes}
-          successPeopleAhead={successPeopleAhead}
-          serviceZoneName={
-            createdTicket.serviceZoneName?.trim()
-              ? createdTicket.serviceZoneName.trim()
-              : null
-          }
-          showTicketFooter={showTicketFooter}
-          footerText={kioskCfg?.footerText}
-          qrValue={`${baseAppUrl}/${locale}/ticket/${createdTicket.id}`}
-          highContrast={useHcSurfaces}
-          bodyBackground={bodyColor}
-          smsBlocking={kioskSmsBlocking}
-          closeButtonLabel={
-            kioskSmsBlocking
-              ? `${t('close')} (…)`
-              : `${t('close')} (${countdown})`
-          }
-          showPrintTicketButton={showTicketManualPrintAction}
-          onPrintTicket={() => {
-            void onTicketManualPrint();
-          }}
-          printTicketPending={ticketManualPrintBusy}
-        >
-          {kioskSmsBlocking && createdTicket ? (
-            <div
-              className={cn(
-                'border-t pt-4',
-                useHcSurfaces ? 'border-white/20' : 'border-t-border'
-              )}
-              data-testid='kiosk-sms-capture'
-            >
-              <p className='mb-2 text-center text-sm font-medium'>
-                {t('sms_post_ticket.title')}
-              </p>
-              <p
-                className={cn(
-                  'mb-3 text-center text-xs sm:text-sm',
-                  useHcSurfaces ? 'text-zinc-400' : 'text-muted-foreground'
                 )}
-              >
-                {t('sms_post_ticket.subtitle')}
-              </p>
-              <div className='mb-3 flex items-start gap-2'>
-                <Checkbox
-                  id='kiosk-sms-consent'
-                  checked={kioskSmsAgreed}
-                  onCheckedChange={(c) => {
-                    setKioskSmsAgreed(c === true);
-                    setKioskSmsError(null);
-                  }}
-                  className='mt-1'
-                />
-                <label
-                  htmlFor='kiosk-sms-consent'
-                  className={cn(
-                    'text-left text-xs sm:text-sm',
-                    useHcSurfaces ? 'text-zinc-300' : 'text-muted-foreground'
-                  )}
-                >
-                  {t('sms_post_ticket.consent_label')}
-                </label>
               </div>
+            )}
+          </>
+        )}
+
+        {createdTicket ? (
+          <KioskTicketSuccessOverlay
+            open={isTicketModalOpen}
+            onClose={closeTicketSuccessModal}
+            a11yLive={tA11y('success_live', {
+              number: String(createdTicket.queueNumber)
+            })}
+            logoUrl={unit?.config?.kiosk?.logoUrl}
+            showTicketHeader={showTicketHeader}
+            headerText={kioskCfg?.headerText}
+            serviceName={successTicketServiceLabel}
+            queueNumber={String(createdTicket.queueNumber)}
+            successEtaMinutes={successEtaMinutes}
+            successPeopleAhead={successPeopleAhead}
+            serviceZoneName={
+              createdTicket.serviceZoneName?.trim()
+                ? createdTicket.serviceZoneName.trim()
+                : null
+            }
+            showTicketFooter={showTicketFooter}
+            footerText={kioskCfg?.footerText}
+            qrValue={`${baseAppUrl}/${locale}/ticket/${createdTicket.id}`}
+            highContrast={useHcSurfaces}
+            bodyBackground={bodyColor}
+            smsBlocking={kioskSmsBlocking}
+            closeButtonLabel={
+              kioskSmsBlocking
+                ? `${t('close')} (…)`
+                : `${t('close')} (${countdown})`
+            }
+            showPrintTicketButton={showTicketManualPrintAction}
+            onPrintTicket={() => {
+              void onTicketManualPrint();
+            }}
+            printTicketPending={ticketManualPrintBusy}
+          >
+            {kioskSmsBlocking && createdTicket ? (
               <div
                 className={cn(
-                  'mb-3 flex w-full items-center justify-center rounded-md border px-2 font-mono text-2xl font-bold select-none sm:text-3xl',
-                  useHcSurfaces
-                    ? 'border-white/20 bg-white/5'
-                    : 'border-input bg-background'
+                  'border-t pt-4',
+                  modalsDark ? 'border-white/20' : 'border-t-border'
                 )}
-                style={{ minHeight: '3.5rem' }}
-                role='status'
-                aria-live='polite'
-                aria-label={
-                  kioskSmsDigits.length > 0
-                    ? tA11y('sms_phone_entry', { n: `+${kioskSmsDigits}` })
-                    : tA11y('sms_phone_entry_empty')
-                }
+                data-testid='kiosk-sms-capture'
               >
-                {kioskSmsDigits.length > 0 ? `+${kioskSmsDigits}` : '+'}
-              </div>
-              {kioskSmsError ? (
-                <p className='text-destructive mb-2 text-center text-xs sm:text-sm'>
-                  {kioskSmsError}
+                <p
+                  className={cn(
+                    'mb-2 text-center text-sm font-medium',
+                    modalsDark && 'text-zinc-100'
+                  )}
+                >
+                  {t('sms_post_ticket.title')}
                 </p>
-              ) : null}
-              <div className='mb-3 grid w-full max-w-sm grid-cols-3 gap-2 sm:gap-3'>
-                {[
-                  '1',
-                  '2',
-                  '3',
-                  '4',
-                  '5',
-                  '6',
-                  '7',
-                  '8',
-                  '9',
-                  '',
-                  '0',
-                  '⌫'
-                ].map((d, i) => (
-                  <span key={i} className='min-h-0 min-w-0 [contain:size]'>
-                    {d ? (
-                      <Button
-                        type='button'
-                        variant='outline'
-                        className='h-[4.5rem] w-full min-w-0 px-0 text-xl font-bold sm:h-[5rem] sm:text-2xl'
-                        disabled={kioskSmsBusy}
-                        aria-label={
-                          d === '⌫'
-                            ? tA11y('sms_numpad_backspace')
-                            : tA11y('sms_numpad_digit', { d })
-                        }
-                        onClick={() => {
-                          if (d === '⌫') {
-                            setKioskSmsDigits((prev) => prev.slice(0, -1));
-                            return;
-                          }
-                          setKioskSmsDigits((prev) =>
-                            prev.length >= KIOSK_SMS_MAX ? prev : prev + d
-                          );
-                        }}
-                      >
-                        {d}
-                      </Button>
-                    ) : (
-                      <span className='block' />
+                <p
+                  className={cn(
+                    'mb-3 text-center text-xs sm:text-sm',
+                    modalsDark ? 'text-zinc-400' : 'text-muted-foreground'
+                  )}
+                >
+                  {t('sms_post_ticket.subtitle')}
+                </p>
+                <div className='mb-3 flex items-start gap-2'>
+                  <Checkbox
+                    id='kiosk-sms-consent'
+                    checked={kioskSmsAgreed}
+                    onCheckedChange={(c) => {
+                      setKioskSmsAgreed(c === true);
+                      setKioskSmsError(null);
+                    }}
+                    className='mt-1'
+                  />
+                  <label
+                    htmlFor='kiosk-sms-consent'
+                    className={cn(
+                      'text-left text-xs sm:text-sm',
+                      modalsDark ? 'text-zinc-300' : 'text-muted-foreground'
                     )}
-                  </span>
-                ))}
-              </div>
-              <div className='grid w-full gap-2 sm:grid-cols-2'>
-                <Button
-                  type='button'
-                  variant='outline'
-                  className='w-full'
-                  disabled={kioskSmsBusy}
-                  onClick={() => void handleKioskSmsDecline()}
-                >
-                  {t('sms_post_ticket.not_now')}
-                </Button>
-                <Button
-                  type='button'
-                  className='w-full'
-                  disabled={
-                    kioskSmsBusy || !kioskSmsAgreed || kioskSmsDigits.length < 5
+                  >
+                    {t('sms_post_ticket.consent_label')}
+                  </label>
+                </div>
+                <div
+                  className={cn(
+                    'mb-3 flex w-full items-center justify-center rounded-md border px-2 font-mono text-2xl font-bold select-none sm:text-3xl',
+                    modalsDark
+                      ? 'border-white/20 bg-white/5 text-zinc-50'
+                      : 'border-input bg-background'
+                  )}
+                  style={{ minHeight: '3.5rem' }}
+                  role='status'
+                  aria-live='polite'
+                  aria-label={
+                    kioskSmsDigits.length > 0
+                      ? tA11y('sms_phone_entry', { n: `+${kioskSmsDigits}` })
+                      : tA11y('sms_phone_entry_empty')
                   }
-                  onClick={() => void handleKioskSmsConfirm()}
                 >
-                  {kioskSmsBusy
-                    ? t('sms_post_ticket.sending')
-                    : t('sms_post_ticket.send')}
-                </Button>
+                  {kioskSmsDigits.length > 0 ? `+${kioskSmsDigits}` : '+'}
+                </div>
+                {kioskSmsError ? (
+                  <p className='text-destructive mb-2 text-center text-xs sm:text-sm'>
+                    {kioskSmsError}
+                  </p>
+                ) : null}
+                <div className='mb-3 grid w-full max-w-sm grid-cols-3 gap-2 sm:gap-3'>
+                  {[
+                    '1',
+                    '2',
+                    '3',
+                    '4',
+                    '5',
+                    '6',
+                    '7',
+                    '8',
+                    '9',
+                    '',
+                    '0',
+                    '⌫'
+                  ].map((d, i) => (
+                    <span key={i} className='min-h-0 min-w-0 [contain:size]'>
+                      {d ? (
+                        <Button
+                          type='button'
+                          variant='outline'
+                          className={cn(
+                            'h-[4.5rem] w-full min-w-0 px-0 text-xl font-bold sm:h-[5rem] sm:text-2xl',
+                            modalsDark &&
+                              'border-white/30 bg-white/5 text-zinc-50 hover:bg-white/10'
+                          )}
+                          disabled={kioskSmsBusy}
+                          aria-label={
+                            d === '⌫'
+                              ? tA11y('sms_numpad_backspace')
+                              : tA11y('sms_numpad_digit', { d })
+                          }
+                          onClick={() => {
+                            if (d === '⌫') {
+                              setKioskSmsDigits((prev) => prev.slice(0, -1));
+                              return;
+                            }
+                            setKioskSmsDigits((prev) =>
+                              prev.length >= KIOSK_SMS_MAX ? prev : prev + d
+                            );
+                          }}
+                        >
+                          {d}
+                        </Button>
+                      ) : (
+                        <span className='block' />
+                      )}
+                    </span>
+                  ))}
+                </div>
+                <div className='grid w-full gap-2 sm:grid-cols-2'>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    className={cn(
+                      'w-full',
+                      modalsDark &&
+                        'border-white/30 bg-white/5 text-zinc-50 hover:bg-white/10'
+                    )}
+                    disabled={kioskSmsBusy}
+                    onClick={() => void handleKioskSmsDecline()}
+                  >
+                    {t('sms_post_ticket.not_now')}
+                  </Button>
+                  <Button
+                    type='button'
+                    className={cn(
+                      'w-full',
+                      modalsDark &&
+                        'bg-white text-zinc-900 hover:bg-zinc-100 disabled:opacity-50'
+                    )}
+                    disabled={
+                      kioskSmsBusy ||
+                      !kioskSmsAgreed ||
+                      kioskSmsDigits.length < 5
+                    }
+                    onClick={() => void handleKioskSmsConfirm()}
+                  >
+                    {kioskSmsBusy
+                      ? t('sms_post_ticket.sending')
+                      : t('sms_post_ticket.send')}
+                  </Button>
+                </div>
               </div>
-            </div>
-          ) : null}
-        </KioskTicketSuccessOverlay>
-      ) : null}
+            ) : null}
+          </KioskTicketSuccessOverlay>
+        ) : null}
 
-      <PinCodeModal
-        isOpen={isPinModalOpen}
-        onClose={() => setIsPinModalOpen(false)}
-        onSuccess={() => setIsSettingsOpen(true)}
-        correctPin={unit?.config?.kiosk?.pin || '0000'}
-      />
+        <PinCodeModal
+          isOpen={isPinModalOpen}
+          onClose={() => setIsPinModalOpen(false)}
+          onSuccess={() => setIsSettingsOpen(true)}
+          correctPin={unit?.config?.kiosk?.pin || '0000'}
+        />
 
-      <KioskSettingsSheet
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        unitId={unitId!}
-        unitName={unit ? getUnitDisplayName(unit, locale) : ''}
-        currentConfig={unit?.config}
-        hasUnit={Boolean(unit)}
-        unitQueryError={unitQueryError}
-        unitPending={unitPending}
-        onLock={() => {
-          setIsSettingsOpen(false);
-          setIsLocked(true);
-        }}
-        isLocked={isLocked}
-        onUnlock={() => {
-          setIsLocked(false);
-          setIsSettingsOpen(false);
-        }}
-      />
+        <KioskSettingsSheet
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          unitId={unitId!}
+          unitName={unit ? getUnitDisplayName(unit, locale) : ''}
+          currentConfig={unit?.config}
+          hasUnit={Boolean(unit)}
+          unitQueryError={unitQueryError}
+          unitPending={unitPending}
+          onLock={() => {
+            setIsSettingsOpen(false);
+            setIsLocked(true);
+          }}
+          isLocked={isLocked}
+          onUnlock={() => {
+            setIsLocked(false);
+            setIsSettingsOpen(false);
+          }}
+        />
 
-      <KioskSessionIdleBar
-        open={showIdleWarning}
-        remainingSec={idleRemainingSec}
-        countdownSec={idleCountdownSec}
-        onContinue={continueIdleSession}
-        highContrast={a11y.highContrast}
-        bottomOffset={BOTTOM_STATUS_STRIP_PX}
-      />
+        <KioskSessionIdleBar
+          open={showIdleWarning}
+          remainingSec={idleRemainingSec}
+          countdownSec={idleCountdownSec}
+          onContinue={continueIdleSession}
+          highContrast={a11y.highContrast}
+          bottomOffset={BOTTOM_STATUS_STRIP_PX}
+        />
 
-      <KioskBuildStatusBar
-        appVersion={appVersion}
-        status={buildStatus}
-        highContrast={a11y.highContrast}
-      />
+        <KioskBuildStatusBar
+          appVersion={appVersion}
+          status={buildStatus}
+          highContrast={a11y.highContrast}
+        />
 
-      {attractScreenVisible ? (
-        <KioskAttractScreen
-          onDismiss={() => {
-            setShowAttract(false);
-            if (attractMode !== 'attract_only') {
-              continueIdleSession();
+        {attractScreenVisible ? (
+          <KioskAttractScreen
+            onDismiss={() => {
+              setShowAttract(false);
+              if (attractMode !== 'attract_only') {
+                continueIdleSession();
+              }
+            }}
+            intlLocale={intlLocale}
+            currentTime={currentTime}
+            logoUrl={kioskCfg?.logoUrl}
+            highContrast={a11y.highContrast}
+            bodyBackground={bodyColor}
+            showQueueDepth={getShowQueueDepthOnAttract(kioskCfg)}
+            eta={unitEtaSnapshot}
+            contentSlides={contentSlides}
+            defaultImageSeconds={defaultImageSeconds}
+          />
+        ) : null}
+
+        {serverKioskFrozen ? (
+          <div
+            className='bg-background/95 fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 p-6 text-center backdrop-blur-sm'
+            role='alert'
+          >
+            <h1 className='text-2xl font-semibold'>
+              {t('server_frozen_title')}
+            </h1>
+            <p className='text-muted-foreground max-w-md text-sm'>
+              {t('server_frozen_message')}
+            </p>
+          </div>
+        ) : null}
+
+        <LockScreen
+          isLocked={isLocked}
+          onUnlockRequest={() => setIsPinModalOpen(true)}
+        />
+
+        <KioskPhoneIdentificationModal
+          isOpen={isPhoneIdentificationOpen}
+          sessionKey={phoneIdentificationSessionKey}
+          onSkip={handlePhoneIdentificationSkip}
+          onConfirm={handlePhoneIdentificationConfirm}
+          isPending={createTicketMutation.isPending}
+          errorMessage={phoneIdentificationError || undefined}
+          kioskOcrText={kioskOcrResultText}
+        />
+
+        <Dialog
+          open={isEmployeeIdentificationOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setIsEmployeeIdentificationOpen(false);
+              setPendingEmployeeService(null);
+              setEmployeeIdSubmode('badge');
+              setEmployeeCreateTicketError('');
             }
           }}
-          intlLocale={intlLocale}
-          currentTime={currentTime}
-          logoUrl={kioskCfg?.logoUrl}
-          highContrast={a11y.highContrast}
-          bodyBackground={bodyColor}
-          showQueueDepth={getShowQueueDepthOnAttract(kioskCfg)}
-          eta={unitEtaSnapshot}
-          contentSlides={contentSlides}
-          defaultImageSeconds={defaultImageSeconds}
-        />
-      ) : null}
-
-      {serverKioskFrozen ? (
-        <div
-          className='bg-background/95 fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 p-6 text-center backdrop-blur-sm'
-          role='alert'
         >
-          <h1 className='text-2xl font-semibold'>{t('server_frozen_title')}</h1>
-          <p className='text-muted-foreground max-w-md text-sm'>
-            {t('server_frozen_message')}
-          </p>
-        </div>
-      ) : null}
-
-      <LockScreen
-        isLocked={isLocked}
-        onUnlockRequest={() => setIsPinModalOpen(true)}
-      />
-
-      <KioskPhoneIdentificationModal
-        isOpen={isPhoneIdentificationOpen}
-        sessionKey={phoneIdentificationSessionKey}
-        onSkip={handlePhoneIdentificationSkip}
-        onConfirm={handlePhoneIdentificationConfirm}
-        isPending={createTicketMutation.isPending}
-        errorMessage={phoneIdentificationError || undefined}
-      />
-
-      <Dialog
-        open={isEmployeeIdentificationOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setIsEmployeeIdentificationOpen(false);
-            setPendingEmployeeService(null);
-            setEmployeeIdSubmode('badge');
-            setEmployeeCreateTicketError('');
-          }
-        }}
-      >
-        <DialogContent
-          className='flex max-w-[min(100vw-1.5rem,64rem)] flex-col overflow-hidden sm:max-w-5xl'
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-        >
-          <DialogHeader>
-            <DialogTitle>{tEmployee('dialog_title')}</DialogTitle>
-          </DialogHeader>
-          {employeeCreateTicketError ? (
-            <p className='text-destructive text-sm' role='alert'>
-              {employeeCreateTicketError}
-            </p>
-          ) : null}
-          {kioskApiUnitId && pendingEmployeeService ? (
-            <KioskEmployeeIdFlow
-              unitId={kioskApiUnitId}
-              service={pendingEmployeeService}
-              mode={employeeIdSubmode}
-              onBack={() => {
-                setIsEmployeeIdentificationOpen(false);
-                setPendingEmployeeService(null);
-                setEmployeeIdSubmode('badge');
-                setEmployeeCreateTicketError('');
-              }}
-              onIdentified={(userId) => {
-                const svc = pendingEmployeeService;
-                if (!svc) {
-                  return;
+          <KioskDialogContent
+            className='flex max-w-[min(100vw-1.5rem,64rem)] flex-col overflow-hidden sm:max-w-5xl'
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onEscapeKeyDown={(e) => e.preventDefault()}
+          >
+            <DialogHeader>
+              <DialogTitle>{tEmployee('dialog_title')}</DialogTitle>
+            </DialogHeader>
+            {employeeCreateTicketError ? (
+              <p className='text-destructive text-sm' role='alert'>
+                {employeeCreateTicketError}
+              </p>
+            ) : null}
+            {kioskApiUnitId && pendingEmployeeService ? (
+              <KioskEmployeeIdFlow
+                unitId={kioskApiUnitId}
+                service={pendingEmployeeService}
+                mode={employeeIdSubmode}
+                onBack={() => {
+                  setIsEmployeeIdentificationOpen(false);
+                  setPendingEmployeeService(null);
+                  setEmployeeIdSubmode('badge');
+                  setEmployeeCreateTicketError('');
+                }}
+                onIdentified={(userId) => {
+                  const svc = pendingEmployeeService;
+                  if (!svc) {
+                    return;
+                  }
+                  void createTicketForService(
+                    svc,
+                    { kioskIdentifiedUserId: userId },
+                    'employeeModal'
+                  );
+                }}
+                onUseKeyboard={
+                  getServiceIdentificationMode(pendingEmployeeService) ===
+                  'badge'
+                    ? () => setEmployeeIdSubmode('login')
+                    : undefined
                 }
-                void createTicketForService(
-                  svc,
-                  { kioskIdentifiedUserId: userId },
-                  'employeeModal'
-                );
-              }}
-              onUseKeyboard={
-                getServiceIdentificationMode(pendingEmployeeService) === 'badge'
-                  ? () => setEmployeeIdSubmode('login')
-                  : undefined
-              }
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
+              />
+            ) : null}
+          </KioskDialogContent>
+        </Dialog>
 
-      <Dialog
-        open={isKioskQrCheckinDisabledOpen}
-        onOpenChange={setIsKioskQrCheckinDisabledOpen}
-      >
-        <DialogContent className='max-w-md'>
-          <DialogHeader>
-            <DialogTitle>{t('pre_registration.title_appointment')}</DialogTitle>
-          </DialogHeader>
-          <p className='text-kiosk-ink-muted text-sm leading-relaxed'>
-            {t('qr_checkin_unavailable')}
-          </p>
-          <DialogFooter className='sm:justify-end'>
-            <Button
-              type='button'
-              onClick={() => {
-                setIsKioskQrCheckinDisabledOpen(false);
-                setSelectedServicePath([]);
-              }}
-            >
-              {t('qr_checkin_unavailable_ok')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <Dialog
+          open={isKioskQrCheckinDisabledOpen}
+          onOpenChange={setIsKioskQrCheckinDisabledOpen}
+        >
+          <KioskDialogContent className='max-w-md'>
+            <DialogHeader>
+              <DialogTitle>
+                {t('pre_registration.title_appointment')}
+              </DialogTitle>
+            </DialogHeader>
+            <p className='text-muted-foreground text-sm leading-relaxed'>
+              {t('qr_checkin_unavailable')}
+            </p>
+            <DialogFooter className='sm:justify-end'>
+              <Button
+                type='button'
+                onClick={() => {
+                  setIsKioskQrCheckinDisabledOpen(false);
+                  setSelectedServicePath([]);
+                }}
+              >
+                {t('qr_checkin_unavailable_ok')}
+              </Button>
+            </DialogFooter>
+          </KioskDialogContent>
+        </Dialog>
 
-      {showKioskIdOcr && unitId ? (
-        <KioskIdOcrDialog
-          open={idOcrOpen}
-          onOpenChange={setIdOcrOpen}
-          unitId={unitId}
-          preferNative={kioskCfg?.idOcrPreferNative !== false}
-          wedgeMrz={kioskCfg?.idOcrWedgeMrz !== false}
-          wedgeRu={kioskCfg?.idOcrWedgeRuDriverLicense !== false}
-          onUseText={(text) => {
-            void (async () => {
-              try {
-                await navigator.clipboard.writeText(text);
-                toast.success(
-                  t('id_ocr.pasted', {
-                    defaultValue:
-                      'OCR text copied. Paste where needed (long-press or Ctrl+V).'
-                  })
-                );
-              } catch {
-                toast.info(text.slice(0, 800));
-              }
-            })();
+        {showKioskIdOcr && unitId ? (
+          <KioskIdOcrDialog
+            open={idOcrOpen}
+            onOpenChange={setIdOcrOpen}
+            unitId={unitId}
+            preferNative={kioskCfg?.idOcrPreferNative !== false}
+            wedgeMrz={kioskCfg?.idOcrWedgeMrz !== false}
+            wedgeRu={kioskCfg?.idOcrWedgeRuDriverLicense !== false}
+            onUseText={(text) => {
+              setKioskOcrResultText(text);
+              void (async () => {
+                try {
+                  await navigator.clipboard.writeText(text);
+                  toast.success(
+                    t('id_ocr.result_saved', {
+                      defaultValue:
+                        'Text is shown at the bottom of the screen. Clipboard was updated if the browser allows it.'
+                    })
+                  );
+                } catch {
+                  toast.info(
+                    t('id_ocr.result_saved_no_clipboard', {
+                      defaultValue:
+                        'Text is shown at the bottom of the screen. Clipboard was not available.'
+                    })
+                  );
+                }
+              })();
+            }}
+          />
+        ) : null}
+
+        <PreRegRedemptionModal
+          key={
+            isKioskQrIdentificationOpen
+              ? `kiosk-qr-${kioskPrIdentModalKey}`
+              : redeemModalKey
+          }
+          isOpen={isRedemptionModalOpen || isKioskQrIdentificationOpen}
+          onClose={() => {
+            setIsRedemptionModalOpen(false);
+            setIsKioskQrIdentificationOpen(false);
+            setRedeemAutoFromDeeplink(false);
+          }}
+          unitId={kioskApiUnitId ?? unitId!}
+          initialCode={isKioskQrIdentificationOpen ? undefined : deeplinkPrCode}
+          showPhoneTab={showPhoneForAppointment}
+          autoRedeemFromDeeplink={
+            redeemAutoFromDeeplink && !isKioskQrIdentificationOpen
+          }
+          kioskOcrText={kioskOcrResultText}
+          onSuccess={async (ticket) => {
+            let full: Ticket = ticket;
+            try {
+              full = await ticketsApi.getById(ticket.id);
+            } catch {
+              // keep redeem payload
+            }
+            const svc =
+              unitServicesTree?.find((s) => s.id === full.serviceId) ??
+              ({
+                id: full.serviceId,
+                name: '',
+                isLeaf: true
+              } as Service);
+            openTicketSuccessFlow(full, svc);
           }}
         />
-      ) : null}
 
-      <PreRegRedemptionModal
-        key={
-          isKioskQrIdentificationOpen
-            ? `kiosk-qr-${kioskPrIdentModalKey}`
-            : redeemModalKey
-        }
-        isOpen={isRedemptionModalOpen || isKioskQrIdentificationOpen}
-        onClose={() => {
-          setIsRedemptionModalOpen(false);
-          setIsKioskQrIdentificationOpen(false);
-          setRedeemAutoFromDeeplink(false);
-        }}
-        unitId={kioskApiUnitId ?? unitId!}
-        initialCode={isKioskQrIdentificationOpen ? undefined : deeplinkPrCode}
-        showPhoneTab={showPhoneForAppointment}
-        autoRedeemFromDeeplink={
-          redeemAutoFromDeeplink && !isKioskQrIdentificationOpen
-        }
-        onSuccess={async (ticket) => {
-          let full: Ticket = ticket;
-          try {
-            full = await ticketsApi.getById(ticket.id);
-          } catch {
-            // keep redeem payload
-          }
-          const svc =
-            unitServicesTree?.find((s) => s.id === full.serviceId) ??
-            ({
-              id: full.serviceId,
-              name: '',
-              isLeaf: true
-            } as Service);
-          openTicketSuccessFlow(full, svc);
-        }}
-      />
-    </div>
+        {showKioskOcrResultStrip ? (
+          <KioskOcrResultStrip
+            text={kioskOcrResultText}
+            onClear={() => setKioskOcrResultText('')}
+          />
+        ) : null}
+      </div>
+    </KioskChromeProvider>
   );
 }

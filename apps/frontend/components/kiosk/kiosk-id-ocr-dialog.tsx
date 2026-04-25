@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Scan } from 'lucide-react';
 import {
   formatIcaOmrzForKiosk,
   formatRuDrivingLicenseText,
@@ -12,11 +12,11 @@ import {
 } from '@quokkaq/kiosk-lib';
 import {
   Dialog,
-  DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
+import { KioskDialogContent } from '@/components/kiosk/kiosk-dialog-content';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { isTauriKiosk } from '@/lib/kiosk-print';
@@ -44,6 +44,17 @@ function canvasToJpegBase64(c: HTMLCanvasElement): string {
     return b64;
   }
   return b64.slice(i + 1);
+}
+
+const AUTO_SCAN_MS = 3200;
+const AUTO_APPLY_MIN_LEN = 32;
+const AUTO_APPLY_MIN_CONF = 58;
+const NATIVE_STABLE_MATCHES = 2;
+/** Heuristic: one long read is enough to apply (no confidence from native CLI). */
+const NATIVE_ONE_SHOT_MIN_LEN = 200;
+
+function normalizeOcrStability(s: string): string {
+  return s.replace(/\s+/g, ' ').trim();
 }
 
 function buildMrzText(raw: string): string {
@@ -82,6 +93,62 @@ export function KioskIdOcrDialog({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [subTab, setSubTab] = useState('camera');
+  const busyRef = useRef(false);
+  const hasAutoClosedRef = useRef(false);
+  const lastAutoNormRef = useRef<string>('');
+  const nativeStreakRef = useRef(0);
+
+  const applyIfEligible = useCallback(
+    (
+      raw: string,
+      meta: { confidence?: number; ocr: 'tesseract_js' | 'tesseract_cli' },
+      source: 'manual' | 'auto'
+    ) => {
+      if (source !== 'auto' || hasAutoClosedRef.current) {
+        return;
+      }
+      const ttrim = raw.trim();
+      if (!ttrim) {
+        return;
+      }
+      if (meta.ocr === 'tesseract_js' && meta.confidence != null) {
+        if (
+          meta.confidence >= AUTO_APPLY_MIN_CONF &&
+          ttrim.length >= AUTO_APPLY_MIN_LEN
+        ) {
+          hasAutoClosedRef.current = true;
+          onUseText(ttrim);
+          onOpenChange(false);
+          return;
+        }
+        // Low confidence: same stability path as native (two matching reads)
+      }
+      const n = normalizeOcrStability(ttrim);
+      if (n.length >= NATIVE_ONE_SHOT_MIN_LEN) {
+        hasAutoClosedRef.current = true;
+        onUseText(n);
+        onOpenChange(false);
+        return;
+      }
+      if (n.length < AUTO_APPLY_MIN_LEN) {
+        lastAutoNormRef.current = '';
+        nativeStreakRef.current = 0;
+        return;
+      }
+      if (n === lastAutoNormRef.current) {
+        nativeStreakRef.current += 1;
+      } else {
+        lastAutoNormRef.current = n;
+        nativeStreakRef.current = 1;
+      }
+      if (nativeStreakRef.current >= NATIVE_STABLE_MATCHES) {
+        hasAutoClosedRef.current = true;
+        onUseText(n);
+        onOpenChange(false);
+      }
+    },
+    [onOpenChange, onUseText]
+  );
 
   const applyMrzRaw = useCallback(
     (raw: string) => {
@@ -150,6 +217,10 @@ export function KioskIdOcrDialog({
       setText('');
       setErr(null);
       setBusy(false);
+      busyRef.current = false;
+      hasAutoClosedRef.current = false;
+      lastAutoNormRef.current = '';
+      nativeStreakRef.current = 0;
       setSubTab('camera');
       return;
     }
@@ -194,58 +265,112 @@ export function KioskIdOcrDialog({
     };
   }, [open, subTab, t]);
 
-  const runRecognize = async () => {
-    const v = videoRef.current;
-    if (!v || v.videoWidth < 2) {
-      setErr(t('error_primes', { defaultValue: 'Wait for the camera.' }));
-      return;
-    }
-    setBusy(true);
-    setErr(null);
-    setText('');
-    const canvas = document.createElement('canvas');
-    const w = Math.min(1600, v.videoWidth);
-    const scale = w / v.videoWidth;
-    canvas.width = w;
-    canvas.height = Math.round(v.videoHeight * scale);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      setBusy(false);
-      setErr(t('error', { defaultValue: 'Could not read image.' }));
-      return;
-    }
-    ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-    const b64 = canvasToJpegBase64(canvas);
-    try {
-      if (preferNative && isTauriKiosk()) {
-        const r = await runKioskOcrTauriFromBase64(b64);
-        setText((r.text ?? '').trim());
-      } else {
-        const Tesseract = (await import('tesseract.js')).default;
-        const { data: odata } = await Tesseract.recognize(canvas, 'eng+rus', {
-          logger: () => {
-            // quiet
-          }
-        });
-        setText((odata.text ?? '').trim());
+  const runRecognize = useCallback(
+    async (source: 'manual' | 'auto' = 'manual') => {
+      if (source === 'auto' && (busyRef.current || hasAutoClosedRef.current)) {
+        return;
       }
-    } catch (e) {
-      setErr(
-        e instanceof Error
-          ? e.message
-          : t('error', { defaultValue: 'Could not read text.' })
-      );
-    } finally {
-      setBusy(false);
+      const v = videoRef.current;
+      if (!v || v.videoWidth < 2) {
+        if (source === 'manual') {
+          setErr(t('error_primes', { defaultValue: 'Wait for the camera.' }));
+        }
+        return;
+      }
+      busyRef.current = true;
+      setBusy(true);
+      if (source === 'manual') {
+        setErr(null);
+        setText('');
+        lastAutoNormRef.current = '';
+        nativeStreakRef.current = 0;
+      }
+      const canvas = document.createElement('canvas');
+      const w = Math.min(1600, v.videoWidth);
+      const scale = w / v.videoWidth;
+      canvas.width = w;
+      canvas.height = Math.round(v.videoHeight * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        busyRef.current = false;
+        setBusy(false);
+        if (source === 'manual') {
+          setErr(t('error', { defaultValue: 'Could not read image.' }));
+        }
+        return;
+      }
+      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+      const b64 = canvasToJpegBase64(canvas);
+      try {
+        if (preferNative && isTauriKiosk()) {
+          const r = await runKioskOcrTauriFromBase64(b64);
+          const out = (r.text ?? '').trim();
+          setText(out);
+          if (out) {
+            applyIfEligible(out, { ocr: 'tesseract_cli' }, source);
+          }
+        } else {
+          const T = (await import('tesseract.js')).default;
+          const { data: odata } = await T.recognize(canvas, 'eng+rus', {
+            logger: () => {
+              // quiet
+            }
+          });
+          const out = (odata.text ?? '').trim();
+          setText(out);
+          if (out) {
+            applyIfEligible(
+              out,
+              {
+                confidence: odata.confidence,
+                ocr: 'tesseract_js'
+              },
+              source
+            );
+          }
+        }
+      } catch (e) {
+        if (source === 'manual') {
+          setErr(
+            e instanceof Error
+              ? e.message
+              : t('error', { defaultValue: 'Could not read text.' })
+          );
+        }
+      } finally {
+        busyRef.current = false;
+        setBusy(false);
+      }
+    },
+    [applyIfEligible, preferNative, t]
+  );
+
+  useEffect(() => {
+    if (!open || subTab !== 'camera' || !stream || hasAutoClosedRef.current) {
+      return;
     }
-  };
+    const id = window.setInterval(() => {
+      if (!busyRef.current && !hasAutoClosedRef.current) {
+        void runRecognize('auto');
+      }
+    }, AUTO_SCAN_MS);
+    const boot = window.setTimeout(() => {
+      if (!busyRef.current) {
+        void runRecognize('auto');
+      }
+    }, 900);
+    return () => {
+      window.clearInterval(id);
+      window.clearTimeout(boot);
+    };
+  }, [open, subTab, stream, runRecognize]);
 
   const showWedge = wedgeMrz || wedgeRu;
   const nTabColumns = 1 + (wedgeMrz ? 1 : 0) + (wedgeRu ? 1 : 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
+      <KioskDialogContent
         className='max-w-lg'
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
@@ -253,10 +378,10 @@ export function KioskIdOcrDialog({
           <DialogTitle>
             {t('title', { defaultValue: 'Document scan' })}
           </DialogTitle>
-          <p className='text-muted-foreground text-sm'>
+          <p className='text-muted-foreground text-sm leading-relaxed'>
             {t('hint', {
               defaultValue:
-                'The image is processed in memory and is not saved on this device.'
+                'The image is processed in memory and is not saved on this device. The camera re-reads periodically; good reads can copy text and close. You can rescan if needed.'
             })}
           </p>
         </DialogHeader>
@@ -285,7 +410,7 @@ export function KioskIdOcrDialog({
               ) : null}
             </TabsList>
             <TabsContent value='camera' className='pt-2'>
-              <div className='bg-muted/40 flex aspect-video w-full max-w-full items-center justify-center overflow-hidden rounded-lg'>
+              <div className='bg-muted/40 relative flex aspect-video w-full max-w-full items-center justify-center overflow-hidden rounded-lg'>
                 {err && !stream && subTab === 'camera' ? (
                   <p className='text-destructive px-3 text-center text-sm'>
                     {err}
@@ -299,6 +424,27 @@ export function KioskIdOcrDialog({
                     aria-label={t('title', { defaultValue: 'Camera preview' })}
                   />
                 )}
+                {stream && subTab === 'camera' ? (
+                  <div
+                    className='pointer-events-none absolute inset-x-0 bottom-2 flex items-center justify-center'
+                    aria-hidden
+                  >
+                    {busy ? (
+                      <div className='text-muted-foreground border-background/80 flex items-center gap-2 rounded-full border bg-white/80 px-3 py-1 text-xs shadow-sm dark:bg-zinc-900/85'>
+                        <Loader2 className='h-3.5 w-3.5 shrink-0 animate-spin' />
+                        {t('status_scanning', { defaultValue: 'Reading…' })}
+                      </div>
+                    ) : (
+                      <div className='text-muted-foreground border-background/60 flex max-w-[95%] items-center justify-center gap-1.5 rounded-full border bg-white/70 px-2 py-1 text-center text-[0.7rem] shadow-sm sm:text-xs dark:bg-zinc-900/80'>
+                        <Scan className='h-3.5 w-3.5 shrink-0' />
+                        {t('status_hold_doc', {
+                          defaultValue:
+                            'Keep the document steady — scanning automatically'
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
             </TabsContent>
             {wedgeMrz ? (
@@ -323,7 +469,7 @@ export function KioskIdOcrDialog({
             ) : null}
           </Tabs>
         ) : (
-          <div className='bg-muted/40 flex aspect-video w-full max-w-full items-center justify-center overflow-hidden rounded-lg'>
+          <div className='bg-muted/40 relative flex aspect-video w-full max-w-full items-center justify-center overflow-hidden rounded-lg'>
             {err && !stream ? (
               <p className='text-destructive px-3 text-center text-sm'>{err}</p>
             ) : (
@@ -335,6 +481,27 @@ export function KioskIdOcrDialog({
                 aria-label={t('title', { defaultValue: 'Camera preview' })}
               />
             )}
+            {stream ? (
+              <div
+                className='pointer-events-none absolute inset-x-0 bottom-2 flex items-center justify-center'
+                aria-hidden
+              >
+                {busy ? (
+                  <div className='text-muted-foreground border-background/80 flex items-center gap-2 rounded-full border bg-white/80 px-3 py-1 text-xs shadow-sm dark:bg-zinc-900/85'>
+                    <Loader2 className='h-3.5 w-3.5 shrink-0 animate-spin' />
+                    {t('status_scanning', { defaultValue: 'Reading…' })}
+                  </div>
+                ) : (
+                  <div className='text-muted-foreground border-background/60 flex max-w-[95%] items-center justify-center gap-1.5 rounded-full border bg-white/70 px-2 py-1 text-center text-[0.7rem] shadow-sm sm:text-xs dark:bg-zinc-900/80'>
+                    <Scan className='h-3.5 w-3.5 shrink-0' />
+                    {t('status_hold_doc', {
+                      defaultValue:
+                        'Keep the document steady — scanning automatically'
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -371,16 +538,19 @@ export function KioskIdOcrDialog({
             {subTab === 'camera' ? (
               <Button
                 type='button'
-                onClick={runRecognize}
+                variant='outline'
+                onClick={() => {
+                  void runRecognize('manual');
+                }}
                 disabled={busy || !stream}
               >
                 {busy ? <Loader2 className='h-4 w-4 animate-spin' /> : null}
-                {t('capture', { defaultValue: 'Capture' })}
+                {t('capture_again', { defaultValue: 'Rescan' })}
               </Button>
             ) : null}
             <Button
               type='button'
-              variant='default'
+              variant='secondary'
               disabled={!text.trim() || busy}
               onClick={() => {
                 onUseText(text.trim());
@@ -391,7 +561,7 @@ export function KioskIdOcrDialog({
             </Button>
           </div>
         </DialogFooter>
-      </DialogContent>
+      </KioskDialogContent>
     </Dialog>
   );
 }

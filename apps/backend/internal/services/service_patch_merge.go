@@ -68,6 +68,12 @@ func MergeServiceJSONPatch(dst *models.Service, raw map[string]json.RawMessage) 
 				return fmt.Errorf("imageUrl: %w", err)
 			}
 			dst.ImageUrl = p
+		case "iconKey":
+			var p *string
+			if err := json.Unmarshal(v, &p); err != nil {
+				return fmt.Errorf("iconKey: %w", err)
+			}
+			dst.IconKey = p
 		case "backgroundColor":
 			var p *string
 			if err := json.Unmarshal(v, &p); err != nil {

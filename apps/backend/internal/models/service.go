@@ -3,16 +3,18 @@ package models
 import "time"
 
 type Service struct {
-	ID              string  `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	UnitID          string  `gorm:"not null" json:"unitId"`
-	ParentID        *string `json:"parentId,omitempty"`
-	Name            string  `gorm:"not null" json:"name"`
-	NameRu          *string `json:"nameRu,omitempty"`
-	NameEn          *string `json:"nameEn,omitempty"`
-	Description     *string `json:"description,omitempty"`
-	DescriptionRu   *string `json:"descriptionRu,omitempty"`
-	DescriptionEn   *string `json:"descriptionEn,omitempty"`
-	ImageUrl        *string `json:"imageUrl,omitempty"`
+	ID            string  `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	UnitID        string  `gorm:"not null" json:"unitId"`
+	ParentID      *string `json:"parentId,omitempty"`
+	Name          string  `gorm:"not null" json:"name"`
+	NameRu        *string `json:"nameRu,omitempty"`
+	NameEn        *string `json:"nameEn,omitempty"`
+	Description   *string `json:"description,omitempty"`
+	DescriptionRu *string `json:"descriptionRu,omitempty"`
+	DescriptionEn *string `json:"descriptionEn,omitempty"`
+	ImageUrl      *string `json:"imageUrl,omitempty"`
+	// IconKey optional Lucide key for kiosk tiles when ImageUrl is empty (e.g. "health", "document").
+	IconKey         *string `json:"iconKey,omitempty" gorm:"column:icon_key"`
 	BackgroundColor *string `json:"backgroundColor,omitempty"`
 	TextColor       *string `json:"textColor,omitempty"`
 	Prefix          *string `json:"prefix,omitempty"`

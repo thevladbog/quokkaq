@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { KIOSK_FORCED_HIGH_CONTRAST } from '@/lib/kiosk-hc-palette';
+import { relativeLuminanceFromCssColor } from '@/lib/kiosk-wcag-contrast';
 
 const QRCode = dynamic(() => import('react-qr-code'), { ssr: false });
 
@@ -69,6 +70,15 @@ export function KioskTicketSuccessOverlay({
 }: KioskTicketSuccessOverlayProps) {
   const t = useTranslations('kiosk');
 
+  /** A11y HC, or any dark `bodyBackground` (base dark / custom) — not only `data-kiosk-base-theme`. */
+  const useLightOnBody = useMemo(() => {
+    if (highContrast) {
+      return true;
+    }
+    const lum = relativeLuminanceFromCssColor(bodyBackground);
+    return lum != null && lum < 0.45;
+  }, [highContrast, bodyBackground]);
+
   useEffect(() => {
     if (!open) {
       return;
@@ -84,12 +94,12 @@ export function KioskTicketSuccessOverlay({
     return null;
   }
 
-  const textMain = highContrast ? 'text-white' : 'text-kiosk-ink';
-  const textMuted = highContrast ? 'text-zinc-300' : 'text-kiosk-ink-muted';
-  const qrBox = highContrast
-    ? 'bg-white p-3 shadow-sm'
+  const textMain = useLightOnBody ? 'text-white' : 'text-kiosk-ink';
+  const textMuted = useLightOnBody ? 'text-zinc-300' : 'text-kiosk-ink-muted';
+  const qrBox = useLightOnBody
+    ? 'bg-white p-3 shadow-sm ring-1 ring-white/25 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.65)]'
     : 'bg-white p-3 shadow-sm ring-1 ring-black/5';
-  const metaCard = highContrast
+  const metaCard = useLightOnBody
     ? 'rounded-2xl border border-white/20 bg-white/5 px-4 py-3'
     : 'bg-kiosk-border/15 rounded-2xl px-4 py-3';
 
@@ -117,7 +127,7 @@ export function KioskTicketSuccessOverlay({
             <div
               className='flex w-full items-center justify-center'
               style={
-                highContrast
+                useLightOnBody
                   ? { backgroundColor: KIOSK_FORCED_HIGH_CONTRAST.logoSurround }
                   : undefined
               }
@@ -125,7 +135,7 @@ export function KioskTicketSuccessOverlay({
               <div
                 className={cn(
                   'h-14 w-auto sm:h-16 md:h-20',
-                  highContrast && 'rounded-lg p-2'
+                  useLightOnBody && 'rounded-lg p-2'
                 )}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -219,7 +229,7 @@ export function KioskTicketSuccessOverlay({
           <Separator
             className={cn(
               'my-1 w-full max-w-2xl',
-              highContrast && 'bg-white/20'
+              useLightOnBody && 'bg-white/20'
             )}
           />
 
@@ -251,7 +261,7 @@ export function KioskTicketSuccessOverlay({
               <Separator
                 className={cn(
                   'w-full max-w-2xl',
-                  highContrast && 'bg-white/20'
+                  useLightOnBody && 'bg-white/20'
                 )}
               />
               <p
@@ -269,7 +279,7 @@ export function KioskTicketSuccessOverlay({
             <div
               className={cn(
                 'w-full max-w-lg pb-2',
-                highContrast &&
+                useLightOnBody &&
                   'text-zinc-200 [&_label.text-muted-foreground]:text-zinc-300 [&_p.text-muted-foreground]:text-zinc-400'
               )}
             >
@@ -282,8 +292,8 @@ export function KioskTicketSuccessOverlay({
       <div
         className={cn(
           'shrink-0 border-t px-4 py-3 sm:px-6 sm:py-4',
-          highContrast
-            ? 'border-white/20 bg-black/20'
+          useLightOnBody
+            ? 'border-white/20 bg-zinc-950/90 backdrop-blur-sm'
             : 'bg-background/80 border-border backdrop-blur-sm',
           'pb-[max(0.75rem,env(safe-area-inset-bottom))]'
         )}
@@ -292,7 +302,11 @@ export function KioskTicketSuccessOverlay({
           {showPrintTicketButton && onPrintTicket ? (
             <Button
               type='button'
-              className='kiosk-touch-min h-14 min-h-14 w-full text-lg font-semibold sm:h-16 sm:min-h-16 sm:text-xl'
+              className={cn(
+                'kiosk-touch-min h-14 min-h-14 w-full text-lg font-semibold sm:h-16 sm:min-h-16 sm:text-xl',
+                useLightOnBody &&
+                  'bg-white text-zinc-900 hover:bg-zinc-100 disabled:opacity-50'
+              )}
               onClick={onPrintTicket}
               disabled={!!printTicketPending || closeDisabled || smsBlocking}
               aria-label={t('ticket.print_action')}
@@ -305,7 +319,11 @@ export function KioskTicketSuccessOverlay({
           <Button
             type='button'
             variant='secondary'
-            className='kiosk-touch-min h-12 min-h-12 w-full text-base font-semibold sm:h-14 sm:min-h-14 sm:text-lg'
+            className={cn(
+              'kiosk-touch-min h-12 min-h-12 w-full text-base font-semibold sm:h-14 sm:min-h-14 sm:text-lg',
+              useLightOnBody &&
+                'border-2 border-white/35 bg-white/10 text-zinc-50 shadow-none hover:bg-white/18'
+            )}
             onClick={onClose}
             disabled={closeDisabled || smsBlocking}
             aria-label={t('close')}

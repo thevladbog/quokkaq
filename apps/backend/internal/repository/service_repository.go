@@ -209,6 +209,7 @@ var updatableServiceColumns = []string{
 	"description_ru",
 	"description_en",
 	"image_url",
+	"icon_key",
 	"background_color",
 	"text_color",
 	"prefix",
