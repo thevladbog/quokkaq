@@ -1788,7 +1788,7 @@ export default function UnitKioskPage() {
             {/* Services grid — fills remaining viewport height; no page scroll */}
             {useAutoKioskLayout ? (
               <div
-                className='flex min-h-0 w-full min-w-0 flex-1 flex-col gap-2 overflow-hidden rounded-2xl p-2 sm:gap-3 sm:p-3 md:p-4'
+                className='flex min-h-0 w-full min-w-0 flex-1 flex-col gap-2 overflow-clip rounded-2xl px-3 py-5 [overflow-clip-margin:14px] sm:gap-3 sm:px-4 sm:py-6 md:px-5 md:py-7'
                 style={{ backgroundColor: serviceGridColor }}
               >
                 {autolayoutPageCount > 1 ? (
@@ -1918,7 +1918,7 @@ export default function UnitKioskPage() {
                 ) : null}
                 {autolayoutGridDims.rows > 0 && autolayoutGridDims.cols > 0 ? (
                   <div
-                    className='grid min-h-0 w-full min-w-0 flex-1 gap-1.5 overflow-hidden sm:gap-2 md:gap-3'
+                    className='grid min-h-0 w-full min-w-0 flex-1 gap-1.5 sm:gap-2 md:gap-3'
                     style={{
                       gridTemplateColumns: `repeat(${autolayoutGridDims.cols}, minmax(0, 1fr))`,
                       gridTemplateRows: `repeat(${autolayoutGridDims.rows}, minmax(0, 1fr))`
@@ -1970,7 +1970,7 @@ export default function UnitKioskPage() {
               </div>
             ) : (
               <div
-                className='grid min-h-0 w-full min-w-0 flex-1 gap-1.5 overflow-hidden rounded-2xl p-2 sm:gap-2 sm:p-3 md:gap-3 md:p-4'
+                className='grid min-h-0 w-full min-w-0 flex-1 gap-1.5 overflow-clip rounded-2xl px-3 py-5 [overflow-clip-margin:14px] sm:gap-2 sm:px-4 sm:py-6 md:gap-3 md:px-5 md:py-7'
                 style={{
                   backgroundColor: serviceGridColor,
                   gridTemplateColumns: `repeat(${SERVICE_GRID_COLS}, minmax(0, 1fr))`,
