@@ -120,40 +120,40 @@ function isOk(r: import('./mrz').ParseIcaOmrzResult): r is ParseOk {
   return r.ok === true;
 }
 
-let best: { score: number; value: ParsedICAO } | null = null;
-
-function offerCandidate(r: import('./mrz').ParseIcaOmrzResult): void {
-  if (!isOk(r)) {
-    return;
-  }
-  const sc = scoreCandidate(r.value);
-  if (!best || sc > best.score) {
-    best = { score: sc, value: r.value };
-  }
-}
-
-/** All 88- and 90-char starts; same as two-line / three-line array forms in {@link parseIcaOmrz}. */
-function offerAllAlnumWindowCandidates(alnum: string): void {
-  for (let i = 0; i + 88 <= alnum.length; i++) {
-    offerCandidate(parseIcaOmrz([alnum.slice(i, i + 88)]));
-  }
-  for (let i = 0; i + 90 <= alnum.length; i++) {
-    offerCandidate(parseIcaOmrz([alnum.slice(i, i + 90)]));
-  }
-}
-
 /**
  * Finds TD1 (3×30) or TD3 (2×44) MRZ inside noisy Tesseract (or other) text.
  * Picks the **highest-scoring** parse over all line breaks and all 88/90 window shifts
  * (fixes left-truncated TD1 where the first working window was `...BYREV<<...` instead of `I<RUSBOGATYREV<<...`).
  */
 export function extractIcaOmrzFromOcrText(raw: string): string {
+  const acc: { best: { score: number; value: ParsedICAO } | null } = {
+    best: null
+  };
+
+  const offerCandidate = (r: import('./mrz').ParseIcaOmrzResult): void => {
+    if (!isOk(r)) {
+      return;
+    }
+    const sc = scoreCandidate(r.value);
+    if (!acc.best || sc > acc.best.score) {
+      acc.best = { score: sc, value: r.value };
+    }
+  };
+
+  /** All 88- and 90-char starts; same as two-line / three-line array forms in {@link parseIcaOmrz}. */
+  const offerAllAlnumWindowCandidates = (alnum: string): void => {
+    for (let i = 0; i + 88 <= alnum.length; i++) {
+      offerCandidate(parseIcaOmrz([alnum.slice(i, i + 88)]));
+    }
+    for (let i = 0; i + 90 <= alnum.length; i++) {
+      offerCandidate(parseIcaOmrz([alnum.slice(i, i + 90)]));
+    }
+  };
+
   const t0 = String(raw).trim();
   if (!t0) {
     return '';
   }
-
-  best = null;
 
   const lines0 = t0
     .split('\n')
@@ -203,11 +203,11 @@ export function extractIcaOmrzFromOcrText(raw: string): string {
     offerAllAlnumWindowCandidates(alnum);
   }
 
-  if (!best) {
+  if (!acc.best) {
     return '';
   }
-  if (!isAcceptableIcaOmrzCandidate(best.value)) {
+  if (!isAcceptableIcaOmrzCandidate(acc.best.value)) {
     return '';
   }
-  return formatIcaOmrzForKiosk(best.value);
+  return formatIcaOmrzForKiosk(acc.best.value);
 }
