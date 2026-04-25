@@ -1054,6 +1054,7 @@ export default function StaffWorkspacePage({
               await refetch();
             }}
             onShowDetails={openDetails}
+            services={services}
           />
         </div>
       </div>

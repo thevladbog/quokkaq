@@ -6,14 +6,16 @@ const LegacyGlobalRoleAdmin = "admin"
 
 // Company-scoped (tenant-wide) permissions.
 const (
-	PermTenantAdmin    = "tenant.admin"
-	PermUsersManage    = "users.manage"
-	PermUnitsManage    = "units.manage"
-	PermTicketsRead    = "tickets.read"
-	PermTicketsWrite   = "tickets.write"
-	PermStatisticsRead = "statistics.read"
-	PermSupportReports = "support.reports"
-	PermKioskManage    = "kiosk.manage"
+	PermTenantAdmin  = "tenant.admin"
+	PermUsersManage  = "users.manage"
+	PermUnitsManage  = "units.manage"
+	PermTicketsRead  = "tickets.read"
+	PermTicketsWrite = "tickets.write"
+	// PermTicketsViewUserData allows reading ticket.documentsData (OCR / custom user-provided fields) in API and staff UI. Separate from future partner/integration export APIs.
+	PermTicketsViewUserData = "tickets.user_data.read"
+	PermStatisticsRead      = "statistics.read"
+	PermSupportReports      = "support.reports"
+	PermKioskManage         = "kiosk.manage"
 	// PermUnitEmployeeIdpManage allows configuring the external employee IdP (badge/login) for a unit.
 	PermUnitEmployeeIdpManage = "unit.employee_idp.manage"
 	PermCounterOperate        = "counter.operate"
@@ -60,6 +62,7 @@ func All() []string {
 		PermUnitsManage,
 		PermTicketsRead,
 		PermTicketsWrite,
+		PermTicketsViewUserData,
 		PermStatisticsRead,
 		PermSupportReports,
 		PermKioskManage,

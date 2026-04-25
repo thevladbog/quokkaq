@@ -49,7 +49,6 @@ function canvasToJpegBase64(c: HTMLCanvasElement): string {
   return b64.slice(i + 1);
 }
 
-const AUTO_SCAN_MS = 3200;
 const AUTO_APPLY_MIN_LEN = 32;
 const AUTO_APPLY_MIN_CONF = 58;
 const NATIVE_STABLE_MATCHES = 2;
@@ -92,9 +91,9 @@ export function KioskIdOcrDialog({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [errKind, setErrKind] = useState<'error' | 'soft'>('error');
   const busyRef = useRef(false);
   const hasAutoClosedRef = useRef(false);
   const lastAutoNormRef = useRef<string>('');
@@ -102,7 +101,7 @@ export function KioskIdOcrDialog({
   const wedgeActive = open && (wedgeMrz || wedgeRu);
   const hasSerialPath = (() => {
     void deviceCfgEpoch;
-    return Boolean(readKioskTauriLocalDevice(unitId).serialPath?.trim());
+    return Boolean(readKioskTauriLocalDevice(unitId)?.serialPath?.trim());
   })();
   const showSerialCallout = isTauriKiosk() && hasSerialPath;
 
@@ -117,24 +116,37 @@ export function KioskIdOcrDialog({
     };
   }, [unitId]);
 
+  const finishWithText = useCallback(
+    (s: string) => {
+      if (hasAutoClosedRef.current) {
+        return;
+      }
+      hasAutoClosedRef.current = true;
+      onUseText(s);
+      onOpenChange(false);
+    },
+    [onOpenChange, onUseText]
+  );
+
   const processScanLine = useCallback(
     (line: string) => {
       setErr(null);
+      setErrKind('error');
       if (wedgeMrz) {
         const m = buildMrzText(line);
         if (m) {
-          setText(m);
+          finishWithText(m);
           return;
         }
       }
       if (wedgeRu) {
         const p = parseRuDrivingLicenseBarcode(line);
         if (p.documentId && p.lastName) {
-          setText(formatRuDrivingLicenseText(p));
+          finishWithText(formatRuDrivingLicenseText(p));
           return;
         }
         if (p.documentId || p.trailer) {
-          setText(
+          finishWithText(
             formatRuDrivingLicenseText(p) ||
               t('ru_partial', { defaultValue: 'Partial data' })
           );
@@ -166,7 +178,7 @@ export function KioskIdOcrDialog({
         );
       }
     },
-    [t, wedgeMrz, wedgeRu]
+    [t, finishWithText, wedgeMrz, wedgeRu]
   );
 
   useKioskDocumentOcrWedge(wedgeActive, processScanLine, {
@@ -175,13 +187,13 @@ export function KioskIdOcrDialog({
   });
   useKioskSerialScannerStream(wedgeActive, processScanLine, unitId);
 
-  const applyIfEligible = useCallback(
+  /** If OCR is good enough, issue ticket / continue without a second button. */
+  const tryApplyOcrResult = useCallback(
     (
       raw: string,
-      meta: { confidence?: number; ocr: 'tesseract_js' | 'tesseract_cli' },
-      source: 'manual' | 'auto'
+      meta: { confidence?: number; ocr: 'tesseract_js' | 'tesseract_cli' }
     ) => {
-      if (source !== 'auto' || hasAutoClosedRef.current) {
+      if (hasAutoClosedRef.current) {
         return;
       }
       const ttrim = raw.trim();
@@ -193,17 +205,13 @@ export function KioskIdOcrDialog({
           meta.confidence >= AUTO_APPLY_MIN_CONF &&
           ttrim.length >= AUTO_APPLY_MIN_LEN
         ) {
-          hasAutoClosedRef.current = true;
-          onUseText(ttrim);
-          onOpenChange(false);
+          finishWithText(ttrim);
           return;
         }
       }
       const n = normalizeOcrStability(ttrim);
       if (n.length >= NATIVE_ONE_SHOT_MIN_LEN) {
-        hasAutoClosedRef.current = true;
-        onUseText(n);
-        onOpenChange(false);
+        finishWithText(n);
         return;
       }
       if (n.length < AUTO_APPLY_MIN_LEN) {
@@ -218,12 +226,10 @@ export function KioskIdOcrDialog({
         nativeStreakRef.current = 1;
       }
       if (nativeStreakRef.current >= NATIVE_STABLE_MATCHES) {
-        hasAutoClosedRef.current = true;
-        onUseText(n);
-        onOpenChange(false);
+        finishWithText(n);
       }
     },
-    [onOpenChange, onUseText]
+    [finishWithText]
   );
 
   useEffect(() => {
@@ -241,8 +247,8 @@ export function KioskIdOcrDialog({
         }
       }
       setStream(null);
-      setText('');
       setErr(null);
+      setErrKind('error');
       setBusy(false);
       busyRef.current = false;
       hasAutoClosedRef.current = false;
@@ -266,6 +272,7 @@ export function KioskIdOcrDialog({
           });
         }
       } catch (e) {
+        setErrKind('error');
         setErr(
           e instanceof Error
             ? e.message
@@ -288,105 +295,98 @@ export function KioskIdOcrDialog({
     };
   }, [open, t]);
 
-  const runRecognize = useCallback(
-    async (source: 'manual' | 'auto' = 'manual') => {
-      if (source === 'auto' && (busyRef.current || hasAutoClosedRef.current)) {
-        return;
-      }
-      const v = videoRef.current;
-      if (!v || v.videoWidth < 2) {
-        if (source === 'manual') {
-          setErr(t('error_primes', { defaultValue: 'Wait for the camera.' }));
-        }
-        return;
-      }
-      busyRef.current = true;
-      setBusy(true);
-      if (source === 'manual') {
-        setErr(null);
-        setText('');
-        lastAutoNormRef.current = '';
-        nativeStreakRef.current = 0;
-      }
-      const canvas = document.createElement('canvas');
-      const w = Math.min(1600, v.videoWidth);
-      const scale = w / v.videoWidth;
-      canvas.width = w;
-      canvas.height = Math.round(v.videoHeight * scale);
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        busyRef.current = false;
-        setBusy(false);
-        if (source === 'manual') {
-          setErr(t('error', { defaultValue: 'Could not read image.' }));
-        }
-        return;
-      }
-      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-      const b64 = canvasToJpegBase64(canvas);
-      try {
-        if (preferNative && isTauriKiosk()) {
-          const r = await runKioskOcrTauriFromBase64(b64);
-          const out = (r.text ?? '').trim();
-          setText(out);
-          if (out) {
-            applyIfEligible(out, { ocr: 'tesseract_cli' }, source);
-          }
-        } else {
-          const T = (await import('tesseract.js')).default;
-          const { data: odata } = await T.recognize(canvas, 'eng+rus', {
-            logger: () => {
-              // quiet
-            }
-          });
-          const out = (odata.text ?? '').trim();
-          setText(out);
-          if (out) {
-            applyIfEligible(
-              out,
-              {
-                confidence: odata.confidence,
-                ocr: 'tesseract_js'
-              },
-              source
-            );
-          }
-        }
-      } catch (e) {
-        if (source === 'manual') {
-          setErr(
-            e instanceof Error
-              ? e.message
-              : t('error', { defaultValue: 'Could not read text.' })
-          );
-        }
-      } finally {
-        busyRef.current = false;
-        setBusy(false);
-      }
-    },
-    [applyIfEligible, preferNative, t]
-  );
-
-  useEffect(() => {
-    if (!open || !stream || hasAutoClosedRef.current) {
+  const runRecognize = useCallback(async () => {
+    if (busyRef.current || hasAutoClosedRef.current) {
       return;
     }
-    const id = window.setInterval(() => {
-      if (!busyRef.current && !hasAutoClosedRef.current) {
-        void runRecognize('auto');
+    const v = videoRef.current;
+    if (!v || v.videoWidth < 2) {
+      setErrKind('error');
+      setErr(t('error_primes', { defaultValue: 'Wait for the camera.' }));
+      return;
+    }
+    busyRef.current = true;
+    setBusy(true);
+    setErr(null);
+    setErrKind('error');
+    const canvas = document.createElement('canvas');
+    const w = Math.min(1600, v.videoWidth);
+    const scale = w / v.videoWidth;
+    canvas.width = w;
+    canvas.height = Math.round(v.videoHeight * scale);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      busyRef.current = false;
+      setBusy(false);
+      setErrKind('error');
+      setErr(t('error', { defaultValue: 'Could not read image.' }));
+      return;
+    }
+    ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+    const b64 = canvasToJpegBase64(canvas);
+    try {
+      let out = '';
+      let ocrMeta: {
+        confidence?: number;
+        ocr: 'tesseract_js' | 'tesseract_cli';
+      };
+      if (preferNative && isTauriKiosk()) {
+        const r = await runKioskOcrTauriFromBase64(b64);
+        out = (r.text ?? '').trim();
+        ocrMeta = { ocr: 'tesseract_cli' };
+      } else {
+        const T = (await import('tesseract.js')).default;
+        const { data: odata } = await T.recognize(canvas, 'eng+rus', {
+          logger: () => {
+            // quiet
+          }
+        });
+        out = (odata.text ?? '').trim();
+        ocrMeta = { ocr: 'tesseract_js', confidence: odata.confidence };
       }
-    }, AUTO_SCAN_MS);
-    const boot = window.setTimeout(() => {
-      if (!busyRef.current) {
-        void runRecognize('auto');
+      if (out) {
+        tryApplyOcrResult(out, ocrMeta);
       }
-    }, 900);
-    return () => {
-      window.clearInterval(id);
-      window.clearTimeout(boot);
-    };
-  }, [open, stream, runRecognize]);
+      if (hasAutoClosedRef.current) {
+        return;
+      }
+      if (!out) {
+        setErrKind('soft');
+        setErr(
+          t('no_text_ocr', {
+            defaultValue:
+              'No text was read. Try again with better light and a steady frame.'
+          })
+        );
+      } else if (nativeStreakRef.current >= 1 && lastAutoNormRef.current) {
+        setErrKind('soft');
+        setErr(
+          t('confirm_scan_again', {
+            defaultValue:
+              'Not confident yet — use the same framing and tap the button again to confirm the read.'
+          })
+        );
+      } else {
+        setErrKind('soft');
+        setErr(
+          t('weak_ocr', {
+            defaultValue:
+              'The text is not clear enough. Adjust light and the document, then try again, or use the USB scanner if available.'
+          })
+        );
+      }
+    } catch (e) {
+      setErrKind('error');
+      setErr(
+        e instanceof Error
+          ? e.message
+          : t('error', { defaultValue: 'Could not read text.' })
+      );
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }, [preferNative, t, tryApplyOcrResult]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -401,7 +401,7 @@ export function KioskIdOcrDialog({
           <p className='text-muted-foreground text-sm leading-relaxed'>
             {t('hint', {
               defaultValue:
-                'The image is processed in memory and is not saved. Good reads can copy text and close. Nothing is sent automatically without your next step on this kiosk.'
+                'The image is processed in memory and is not stored on the device. Tap start scan, hold the document steady, then a successful read continues to your ticket. No text is sent until then.'
             })}
           </p>
         </DialogHeader>
@@ -419,7 +419,7 @@ export function KioskIdOcrDialog({
             <p className='text-muted-foreground min-w-0 text-sm leading-relaxed'>
               {t('serial_scanner_hint', {
                 defaultValue:
-                  'A serial scanner is configured. Scan the MRZ or barcode; text appears in the result area below.'
+                  'A serial scanner is configured. Scan the MRZ or license barcode — a good read will continue automatically.'
               })}
             </p>
           </div>
@@ -464,9 +464,9 @@ export function KioskIdOcrDialog({
                 ) : (
                   <div className='text-muted-foreground border-background/60 flex max-w-[95%] items-center justify-center gap-1.5 rounded-full border bg-white/70 px-2 py-1 text-center text-[0.7rem] shadow-sm sm:text-xs dark:bg-zinc-900/80'>
                     <Scan className='h-3.5 w-3.5 shrink-0' />
-                    {t('status_hold_doc', {
+                    {t('status_ready', {
                       defaultValue:
-                        'Keep the document steady — scanning in the background'
+                        'Frame the document, then tap the scan button (no background scanning).'
                     })}
                   </div>
                 )}
@@ -476,19 +476,16 @@ export function KioskIdOcrDialog({
         </div>
 
         {err && stream ? (
-          <p className='text-destructive text-center text-sm' role='alert'>
+          <p
+            className={
+              errKind === 'soft'
+                ? 'text-foreground/85 text-center text-sm'
+                : 'text-destructive text-center text-sm'
+            }
+            role={errKind === 'error' ? 'alert' : 'status'}
+          >
             {err}
           </p>
-        ) : null}
-
-        {text ? (
-          <textarea
-            className='border-input bg-background max-h-40 w-full rounded-md border p-2 text-sm'
-            readOnly
-            value={text}
-            rows={5}
-            aria-label={t('result_aria', { defaultValue: 'Recognized text' })}
-          />
         ) : null}
 
         <DialogFooter className='gap-2 sm:justify-between'>
@@ -503,25 +500,22 @@ export function KioskIdOcrDialog({
           <div className='flex flex-wrap justify-end gap-2'>
             <Button
               type='button'
-              variant='outline'
+              variant='default'
+              className='gap-2'
               onClick={() => {
-                void runRecognize('manual');
+                void runRecognize();
               }}
               disabled={busy || !stream}
             >
-              {busy ? <Loader2 className='h-4 w-4 animate-spin' /> : null}
-              {t('capture_again', { defaultValue: 'Rescan' })}
-            </Button>
-            <Button
-              type='button'
-              variant='secondary'
-              disabled={!text.trim() || busy}
-              onClick={() => {
-                onUseText(text.trim());
-                onOpenChange(false);
-              }}
-            >
-              {t('use_text', { defaultValue: 'Use text' })}
+              {busy ? (
+                <Loader2
+                  className='h-4 w-4 shrink-0 animate-spin'
+                  aria-hidden
+                />
+              ) : (
+                <Scan className='h-4 w-4' aria-hidden />
+              )}
+              {t('start_scan', { defaultValue: 'Start scan' })}
             </Button>
           </div>
         </DialogFooter>

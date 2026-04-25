@@ -94,6 +94,9 @@ func (s *serviceService) CreateService(service *models.Service) error {
 		return errors.New("unit ID is required")
 	}
 	syncServiceIdentificationFields(service)
+	if err := ValidateServiceKioskFields(service); err != nil {
+		return err
+	}
 	service.CalendarSlotKey = normalizeCalendarSlotKeyPtr(service.CalendarSlotKey)
 	if err := s.assertCalendarSlotKeyUnique(service.UnitID, service.CalendarSlotKey, ""); err != nil {
 		return err
@@ -147,6 +150,9 @@ func (s *serviceService) UpdateService(service *models.Service) error {
 	// Never persist a caller-supplied unit change; keep the row's unit.
 	service.UnitID = existing.UnitID
 	syncServiceIdentificationFields(service)
+	if err := ValidateServiceKioskFields(service); err != nil {
+		return err
+	}
 
 	key := effectiveCalendarSlotKeyForUpdate(service, existing)
 	if err := s.assertCalendarSlotKeyUnique(service.UnitID, key, service.ID); err != nil {

@@ -9,6 +9,10 @@ import { visitorTagPillStyles } from '@/lib/visitor-tag-styles';
 import { VisitorPhotoFrame } from '@/components/staff/VisitorPhotoFrame';
 import { StaffVisitorTagsEditModal } from '@/components/staff/StaffVisitorTagsEditModal';
 import { cn } from '@/lib/utils';
+import {
+  getDocumentsDataPreviewString,
+  ticketHasDocumentsData
+} from '@/lib/ticket-user-data-visibility';
 
 type TFn = (
   key: string,
@@ -279,6 +283,34 @@ export function StaffCurrentTicketHero({
                     &quot;{ticket.preRegistration.comment}&quot;
                   </div>
                 )}
+              </div>
+            )}
+
+            {ticketHasDocumentsData(ticket) && !ticket.preRegistration && (
+              <div className='border-border/60 bg-muted/20 rounded-lg border p-2.5'>
+                <div className='text-muted-foreground mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold tracking-wide uppercase'>
+                  <span>
+                    {t('ticket_user_data.badge', {
+                      defaultValue: 'Kiosk data'
+                    })}
+                  </span>
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    className='h-7 w-7 shrink-0'
+                    onClick={onShowDetails}
+                  >
+                    <Info className='h-3.5 w-3.5' />
+                    <span className='sr-only'>
+                      {t('ticket_user_data.badge_aria', {
+                        defaultValue: 'Open kiosk and document data'
+                      })}
+                    </span>
+                  </Button>
+                </div>
+                <p className='text-muted-foreground line-clamp-2 text-sm wrap-break-word'>
+                  {getDocumentsDataPreviewString(ticket, 160)}
+                </p>
               </div>
             )}
           </div>

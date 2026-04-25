@@ -5,6 +5,7 @@ export type KioskIdentificationMode =
   | 'phone'
   | 'qr'
   | 'document'
+  | 'custom'
   | 'login'
   | 'badge';
 
@@ -16,6 +17,7 @@ export function getServiceIdentificationMode(
     m === 'phone' ||
     m === 'qr' ||
     m === 'document' ||
+    m === 'custom' ||
     m === 'login' ||
     m === 'badge' ||
     m === 'none'

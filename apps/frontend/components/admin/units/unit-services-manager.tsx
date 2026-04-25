@@ -65,7 +65,10 @@ import {
   type ServiceZoneFilter
 } from '@/lib/service-tree';
 import { cn, serviceTitleForLocale } from '@/lib/utils';
-import { getServiceIdentificationMode } from '@/lib/kiosk-service-identification';
+import {
+  getServiceIdentificationMode,
+  type KioskIdentificationMode
+} from '@/lib/kiosk-service-identification';
 import {
   isKioskServiceIconPresetValue,
   KIOSK_SERVICE_ICON_PRESETS,
@@ -79,6 +82,7 @@ import {
   Gauge,
   Pencil,
   Plus,
+  Settings2,
   Ticket,
   Timer,
   Trash2,
@@ -92,12 +96,94 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from '@/components/ui/dialog';
 
 interface UnitServicesManagerProps {
   unitId: string;
 }
 
 const UNIT_SERVICES_TABLE_COL_COUNT = 7;
+
+type KioskIdentConfigForm = {
+  capture?: { kind?: string };
+  operatorLabel?: { ru?: string; en?: string };
+  apiFieldKey?: string;
+  showInQueuePreview?: boolean;
+  sensitive?: boolean;
+  retentionDays?: number;
+};
+
+function defaultKioskIdentConfigForm(): KioskIdentConfigForm {
+  return {
+    capture: { kind: 'keyboard_ru_en' },
+    operatorLabel: { ru: '', en: '' },
+    apiFieldKey: 'value',
+    showInQueuePreview: false,
+    sensitive: false
+  };
+}
+
+function parseKioskIdentConfigForm(raw: unknown): KioskIdentConfigForm {
+  if (raw && typeof raw === 'object') {
+    return {
+      ...defaultKioskIdentConfigForm(),
+      ...(raw as KioskIdentConfigForm)
+    };
+  }
+  return defaultKioskIdentConfigForm();
+}
+
+const CAPTURE_KIND_OPTIONS = [
+  { value: 'keyboard_ru_en', i18nKey: 'kiosk_custom_capture_keyboard_ru_en' },
+  { value: 'digits', i18nKey: 'kiosk_custom_capture_digits' },
+  { value: 'barcode', i18nKey: 'kiosk_custom_capture_barcode' }
+] as const;
+
+function buildKioskPayloadsForServiceForm(
+  idMode: KioskIdentificationMode,
+  formValues: Partial<Service>
+): { kioskDocumentSettings: unknown; kioskIdentificationConfig: unknown } {
+  const docRaw = formValues.kioskDocumentSettings;
+  let retentionFromDoc = 7;
+  if (docRaw && typeof docRaw === 'object' && 'retentionDays' in docRaw) {
+    const n = Math.floor(
+      Number((docRaw as { retentionDays?: number }).retentionDays)
+    );
+    if (!Number.isNaN(n)) {
+      retentionFromDoc = n;
+    }
+  }
+  const docRetention = Math.max(1, Math.min(30, retentionFromDoc));
+  const kioskDocumentSettings =
+    idMode === 'document' ? { retentionDays: docRetention } : null;
+
+  const ident = parseKioskIdentConfigForm(formValues.kioskIdentificationConfig);
+  if (idMode !== 'custom') {
+    return { kioskDocumentSettings, kioskIdentificationConfig: null };
+  }
+  const kic: Record<string, unknown> = {
+    capture: ident.capture || { kind: 'keyboard_ru_en' },
+    operatorLabel: {
+      ru: (ident.operatorLabel?.ru ?? '').trim(),
+      en: (ident.operatorLabel?.en ?? '').trim()
+    },
+    apiFieldKey: (ident.apiFieldKey ?? 'value').trim() || 'value',
+    showInQueuePreview: !!ident.showInQueuePreview,
+    sensitive: !!ident.sensitive
+  };
+  if (ident.sensitive) {
+    let rd = Math.floor(ident.retentionDays ?? 7);
+    if (Number.isNaN(rd)) rd = 7;
+    kic.retentionDays = Math.max(1, Math.min(30, rd));
+  }
+  return { kioskDocumentSettings, kioskIdentificationConfig: kic };
+}
 
 export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
   const [selectedUnitId] = useState<string>(unitId);
@@ -619,7 +705,16 @@ function buildInitialFormValues(
       gridRow: editingService.gridRow ?? undefined,
       gridCol: editingService.gridCol ?? undefined,
       gridRowSpan: editingService.gridRowSpan ?? undefined,
-      gridColSpan: editingService.gridColSpan ?? undefined
+      gridColSpan: editingService.gridColSpan ?? undefined,
+      kioskDocumentSettings: (
+        editingService as { kioskDocumentSettings?: unknown }
+      ).kioskDocumentSettings ?? {
+        retentionDays: 7
+      },
+      kioskIdentificationConfig: parseKioskIdentConfigForm(
+        (editingService as { kioskIdentificationConfig?: unknown })
+          .kioskIdentificationConfig
+      )
     };
   }
   if (isCreating) {
@@ -644,7 +739,9 @@ function buildInitialFormValues(
       isLeaf: false,
       parentId: '',
       restrictedServiceZoneId: null,
-      calendarSlotKey: ''
+      calendarSlotKey: '',
+      kioskDocumentSettings: { retentionDays: 7 },
+      kioskIdentificationConfig: defaultKioskIdentConfigForm()
     };
   }
   return {};
@@ -673,7 +770,11 @@ function snapshotServiceFormValues(v: Partial<Service>): string {
     parentId: v.parentId ?? '',
     restrictedServiceZoneId: v.restrictedServiceZoneId ?? null,
     calendarSlotKey: v.calendarSlotKey ?? '',
-    sortOrder: v.sortOrder ?? 0
+    sortOrder: v.sortOrder ?? 0,
+    kioskKiosk: JSON.stringify([
+      v.kioskDocumentSettings ?? null,
+      v.kioskIdentificationConfig ?? null
+    ])
   });
 }
 
@@ -830,6 +931,9 @@ function ServiceForm({
     }));
   }, []);
 
+  const [docSettingsOpen, setDocSettingsOpen] = useState(false);
+  const [customSettingsOpen, setCustomSettingsOpen] = useState(false);
+
   // Helper to check if a service is a descendant of the editing service
   const isDescendant = useCallback(
     (candidateId: string, ancestorId: string | undefined): boolean => {
@@ -889,8 +993,11 @@ function ServiceForm({
       const payloadCalendarSlotKey =
         formValues.calendarSlotKey === '' ? null : formValues.calendarSlotKey;
       const idMode =
-        formValues.identificationMode ??
-        getServiceIdentificationMode(formValues);
+        (formValues.identificationMode as
+          | KioskIdentificationMode
+          | undefined) ?? getServiceIdentificationMode(formValues as Service);
+      const { kioskDocumentSettings, kioskIdentificationConfig } =
+        buildKioskPayloadsForServiceForm(idMode, formValues);
       const offerIdent = idMode === 'phone';
       const iconRaw = (formValues.iconKey ?? '').trim();
       const iconKeyPayload =
@@ -907,7 +1014,9 @@ function ServiceForm({
         isLeaf: formValues.isLeaf ?? false,
         restrictedServiceZoneId: restrictedPayload,
         calendarSlotKey: payloadCalendarSlotKey,
-        iconKey: iconKeyPayload
+        iconKey: iconKeyPayload,
+        kioskDocumentSettings,
+        kioskIdentificationConfig
       };
       if (editingService) {
         await updateServiceMutation.mutateAsync({
@@ -1483,6 +1592,7 @@ function ServiceForm({
                 | 'phone'
                 | 'qr'
                 | 'document'
+                | 'custom'
                 | 'login'
                 | 'badge';
               setFormValues((prev) => ({
@@ -1511,6 +1621,11 @@ function ServiceForm({
               <SelectItem value='document'>
                 {tRoot('forms.fields.kiosk_identification_mode_document')}
               </SelectItem>
+              <SelectItem value='custom'>
+                {tRoot('forms.fields.kiosk_identification_mode_custom', {
+                  defaultValue: 'Other (manual / custom field)'
+                })}
+              </SelectItem>
               <SelectItem value='login'>
                 {tRoot('forms.fields.kiosk_identification_mode_login')}
               </SelectItem>
@@ -1522,7 +1637,333 @@ function ServiceForm({
           <p className='text-muted-foreground text-xs'>
             {tRoot('forms.fields.kiosk_identification_mode_help')}
           </p>
+          {(() => {
+            const m = getServiceIdentificationMode(formValues as Service);
+            if (m !== 'document' && m !== 'custom') {
+              return null;
+            }
+            return (
+              <div className='mt-1 flex items-center gap-2'>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='outline'
+                  onClick={() =>
+                    m === 'document'
+                      ? setDocSettingsOpen(true)
+                      : setCustomSettingsOpen(true)
+                  }
+                >
+                  <Settings2
+                    className='text-muted-foreground mr-1.5 size-3.5'
+                    aria-hidden
+                  />
+                  {m === 'document'
+                    ? tServices('kiosk_gear_document', {
+                        defaultValue: 'Document & retention…'
+                      })
+                    : tServices('kiosk_gear_custom', {
+                        defaultValue: 'Custom field settings…'
+                      })}
+                </Button>
+              </div>
+            );
+          })()}
         </div>
+
+        <Dialog open={docSettingsOpen} onOpenChange={setDocSettingsOpen}>
+          <DialogContent className='max-w-md'>
+            <DialogHeader>
+              <DialogTitle>
+                {tServices('kiosk_doc_settings_title', {
+                  defaultValue: 'ID document data retention'
+                })}
+              </DialogTitle>
+            </DialogHeader>
+            <p className='text-muted-foreground text-sm'>
+              {tServices('kiosk_doc_settings_hint', {
+                defaultValue:
+                  'Data entered from document OCR is stored on the ticket for 1–30 days, then removed automatically. DWH/exports: see product policy in API docs.'
+              })}
+            </p>
+            <div className='space-y-1.5'>
+              <Label htmlFor='kioskDocRetentionDays'>
+                {tServices('kiosk_doc_retention_days', {
+                  defaultValue: 'Retention (days, 1–30)'
+                })}
+              </Label>
+              <Input
+                id='kioskDocRetentionDays'
+                type='number'
+                min={1}
+                max={30}
+                value={(() => {
+                  const s = formValues.kioskDocumentSettings;
+                  if (s && typeof s === 'object' && 'retentionDays' in s) {
+                    return (s as { retentionDays?: number }).retentionDays ?? 7;
+                  }
+                  return 7;
+                })()}
+                onChange={(e) => {
+                  const n = Math.max(
+                    1,
+                    Math.min(30, Math.floor(Number(e.target.value) || 7))
+                  );
+                  setFormValues((p) => ({
+                    ...p,
+                    kioskDocumentSettings: { retentionDays: n }
+                  }));
+                }}
+              />
+            </div>
+            <DialogFooter>
+              <Button type='button' onClick={() => setDocSettingsOpen(false)}>
+                {tRoot('general.done', { defaultValue: 'Done' })}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={customSettingsOpen} onOpenChange={setCustomSettingsOpen}>
+          <DialogContent className='max-h-[85vh] max-w-md overflow-y-auto'>
+            <DialogHeader>
+              <DialogTitle>
+                {tServices('kiosk_custom_settings_title', {
+                  defaultValue: 'Custom identification'
+                })}
+              </DialogTitle>
+            </DialogHeader>
+            {(() => {
+              const c = parseKioskIdentConfigForm(
+                formValues.kioskIdentificationConfig
+              );
+              return (
+                <div className='space-y-4 text-sm'>
+                  <div className='space-y-1.5'>
+                    <Label htmlFor='kioskCapKind'>
+                      {tServices('kiosk_custom_capture', {
+                        defaultValue: 'Capture on kiosk'
+                      })}
+                    </Label>
+                    <Select
+                      value={
+                        c.capture?.kind === 'ocr'
+                          ? 'keyboard_ru_en'
+                          : (c.capture?.kind ?? 'keyboard_ru_en')
+                      }
+                      onValueChange={(val) => {
+                        setFormValues((p) => {
+                          const cur = parseKioskIdentConfigForm(
+                            p.kioskIdentificationConfig
+                          );
+                          return {
+                            ...p,
+                            kioskIdentificationConfig: {
+                              ...cur,
+                              capture: { kind: val }
+                            }
+                          };
+                        });
+                      }}
+                    >
+                      <SelectTrigger id='kioskCapKind' className='w-full'>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CAPTURE_KIND_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {tServices(o.i18nKey, { defaultValue: o.value })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+                    <div className='space-y-1.5'>
+                      <Label htmlFor='kioskOpLabelRu'>
+                        {tServices('kiosk_custom_label_ru', {
+                          defaultValue: 'Field label (RU)'
+                        })}
+                      </Label>
+                      <Input
+                        id='kioskOpLabelRu'
+                        value={c.operatorLabel?.ru ?? ''}
+                        onChange={(e) => {
+                          setFormValues((p) => {
+                            const cur = parseKioskIdentConfigForm(
+                              p.kioskIdentificationConfig
+                            );
+                            return {
+                              ...p,
+                              kioskIdentificationConfig: {
+                                ...cur,
+                                operatorLabel: {
+                                  ...cur.operatorLabel,
+                                  ru: e.target.value
+                                }
+                              }
+                            };
+                          });
+                        }}
+                      />
+                    </div>
+                    <div className='space-y-1.5'>
+                      <Label htmlFor='kioskOpLabelEn'>
+                        {tServices('kiosk_custom_label_en', {
+                          defaultValue: 'Field label (EN)'
+                        })}
+                      </Label>
+                      <Input
+                        id='kioskOpLabelEn'
+                        value={c.operatorLabel?.en ?? ''}
+                        onChange={(e) => {
+                          setFormValues((p) => {
+                            const cur = parseKioskIdentConfigForm(
+                              p.kioskIdentificationConfig
+                            );
+                            return {
+                              ...p,
+                              kioskIdentificationConfig: {
+                                ...cur,
+                                operatorLabel: {
+                                  ...cur.operatorLabel,
+                                  en: e.target.value
+                                }
+                              }
+                            };
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className='space-y-1.5'>
+                    <Label htmlFor='kioskApiKey'>
+                      {tServices('kiosk_custom_api_field', {
+                        defaultValue: 'JSON key for the value (apiFieldKey)'
+                      })}
+                    </Label>
+                    <Input
+                      id='kioskApiKey'
+                      className='font-mono'
+                      value={c.apiFieldKey ?? 'value'}
+                      onChange={(e) => {
+                        setFormValues((p) => {
+                          const cur = parseKioskIdentConfigForm(
+                            p.kioskIdentificationConfig
+                          );
+                          return {
+                            ...p,
+                            kioskIdentificationConfig: {
+                              ...cur,
+                              apiFieldKey: e.target.value
+                            }
+                          };
+                        });
+                      }}
+                    />
+                  </div>
+                  <div className='flex items-center gap-2'>
+                    <Checkbox
+                      id='kioskShowPreview'
+                      checked={!!c.showInQueuePreview}
+                      onCheckedChange={(v) => {
+                        setFormValues((p) => {
+                          const cur = parseKioskIdentConfigForm(
+                            p.kioskIdentificationConfig
+                          );
+                          return {
+                            ...p,
+                            kioskIdentificationConfig: {
+                              ...cur,
+                              showInQueuePreview: v === true
+                            }
+                          };
+                        });
+                      }}
+                    />
+                    <Label htmlFor='kioskShowPreview' className='font-normal'>
+                      {tServices('kiosk_custom_show_in_queue', {
+                        defaultValue:
+                          'Show value preview in staff queue (with permission)'
+                      })}
+                    </Label>
+                  </div>
+                  <div className='flex items-center gap-2'>
+                    <Checkbox
+                      id='kioskSensitive'
+                      checked={!!c.sensitive}
+                      onCheckedChange={(v) => {
+                        setFormValues((p) => {
+                          const cur = parseKioskIdentConfigForm(
+                            p.kioskIdentificationConfig
+                          );
+                          return {
+                            ...p,
+                            kioskIdentificationConfig: {
+                              ...cur,
+                              sensitive: v === true
+                            }
+                          };
+                        });
+                      }}
+                    />
+                    <Label htmlFor='kioskSensitive' className='font-normal'>
+                      {tServices('kiosk_custom_sensitive', {
+                        defaultValue:
+                          'Sensitive data (DWH/aggregates excluded; retention 1–30d)'
+                      })}
+                    </Label>
+                  </div>
+                  {c.sensitive ? (
+                    <div className='space-y-1.5'>
+                      <Label htmlFor='kioskSensitiveRetention'>
+                        {tServices('kiosk_custom_retention_days', {
+                          defaultValue: 'Retention (days, 1–30)'
+                        })}
+                      </Label>
+                      <Input
+                        id='kioskSensitiveRetention'
+                        type='number'
+                        min={1}
+                        max={30}
+                        value={c.retentionDays ?? 7}
+                        onChange={(e) => {
+                          const n = Math.max(
+                            1,
+                            Math.min(
+                              30,
+                              Math.floor(Number(e.target.value) || 7)
+                            )
+                          );
+                          setFormValues((p) => {
+                            const cur = parseKioskIdentConfigForm(
+                              p.kioskIdentificationConfig
+                            );
+                            return {
+                              ...p,
+                              kioskIdentificationConfig: {
+                                ...cur,
+                                retentionDays: n
+                              }
+                            };
+                          });
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })()}
+            <DialogFooter>
+              <Button
+                type='button'
+                onClick={() => setCustomSettingsOpen(false)}
+              >
+                {tRoot('general.done', { defaultValue: 'Done' })}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <div className='flex items-start gap-2'>
           <Checkbox

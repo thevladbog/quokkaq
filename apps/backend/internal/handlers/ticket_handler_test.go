@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -18,10 +19,10 @@ type postVisitorSkipTicketSvc struct {
 	getByID func(id string) (*models.Ticket, error)
 }
 
-func (m *postVisitorSkipTicketSvc) CreateTicket(string, string, *string, *string, *string, *string, *string) (*models.Ticket, error) {
+func (m *postVisitorSkipTicketSvc) CreateTicket(string, string, *string, *string, *string, *json.RawMessage, *string, *string) (*models.Ticket, error) {
 	return nil, errors.New("unimplemented")
 }
-func (m *postVisitorSkipTicketSvc) CreateTicketWithFunnelOverride(string, string, *string, *string, *string, *string, *string, *string) (*models.Ticket, error) {
+func (m *postVisitorSkipTicketSvc) CreateTicketWithFunnelOverride(string, string, *string, *string, *string, *json.RawMessage, *string, *string, *string) (*models.Ticket, error) {
 	return nil, errors.New("unimplemented")
 }
 func (m *postVisitorSkipTicketSvc) CreateTicketWithPreRegistration(string, string, string, *string) (*models.Ticket, error) {

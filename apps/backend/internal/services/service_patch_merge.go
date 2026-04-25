@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -183,6 +184,28 @@ func MergeServiceJSONPatch(dst *models.Service, raw map[string]json.RawMessage) 
 			if err := json.Unmarshal(v, &dst.SortOrder); err != nil {
 				return fmt.Errorf("sortOrder: %w", err)
 			}
+		case "kioskDocumentSettings":
+			b := bytesTrimJSON(v)
+			if len(b) == 0 || string(b) == "null" {
+				dst.KioskDocumentSettings = nil
+				break
+			}
+			var p json.RawMessage
+			if err := json.Unmarshal(b, &p); err != nil {
+				return fmt.Errorf("kioskDocumentSettings: %w", err)
+			}
+			dst.KioskDocumentSettings = p
+		case "kioskIdentificationConfig":
+			b := bytesTrimJSON(v)
+			if len(b) == 0 || string(b) == "null" {
+				dst.KioskIdentificationConfig = nil
+				break
+			}
+			var p json.RawMessage
+			if err := json.Unmarshal(b, &p); err != nil {
+				return fmt.Errorf("kioskIdentificationConfig: %w", err)
+			}
+			dst.KioskIdentificationConfig = p
 		default:
 			// Ignore unknown keys so generated clients can add read-only metadata without breaking updates.
 			continue
@@ -190,3 +213,5 @@ func MergeServiceJSONPatch(dst *models.Service, raw map[string]json.RawMessage) 
 	}
 	return nil
 }
+
+func bytesTrimJSON(v json.RawMessage) []byte { return bytes.TrimSpace(v) }

@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Service struct {
 	ID            string  `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
@@ -27,9 +30,13 @@ type Service struct {
 	// When non-empty (after trim), it must be unique per unit — enforced by DB partial unique index and create/update validation.
 	CalendarSlotKey     *string `json:"calendarSlotKey,omitempty" gorm:"column:calendar_slot_key"`
 	OfferIdentification bool    `gorm:"default:false" json:"offerIdentification"`
-	// IdentificationMode selects the kiosk identification step: none|phone|qr|document|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column.
+	// IdentificationMode selects the kiosk identification step: none|phone|qr|document|custom|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column.
 	IdentificationMode string `gorm:"not null;default:'none';column:identification_mode" json:"identificationMode"`
-	IsLeaf             bool   `gorm:"default:false" json:"isLeaf"`
+	// KioskDocumentSettings: JSON, e.g. { "retentionDays": 1–30 } for identificationMode=document.
+	KioskDocumentSettings json.RawMessage `gorm:"type:jsonb;column:kiosk_document_settings" json:"kioskDocumentSettings,omitempty" swaggertype:"object"`
+	// KioskIdentificationConfig: JSON (capture, labels, api key field, showInQueuePreview, sensitive+retention for identificationMode=custom). Validated in service layer.
+	KioskIdentificationConfig json.RawMessage `gorm:"type:jsonb;column:kiosk_identification_config" json:"kioskIdentificationConfig,omitempty" swaggertype:"object"`
+	IsLeaf                    bool            `gorm:"default:false" json:"isLeaf"`
 	// RestrictedServiceZoneID: when set, this leaf service is only offered in that service_zone's waiting pool (child of UnitID subdivision).
 	RestrictedServiceZoneID *string `json:"restrictedServiceZoneId,omitempty" gorm:"column:restricted_service_zone_id"`
 	// Display order within the unit (kiosk and lists). Lower = earlier. Independent of `units.sort_order`.

@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   BookingModelSchema,
+  createTicketRequestSchema,
   DesktopTerminalKindSchema,
   DesktopTerminalSchema,
   effectiveDesktopTerminalKind,
   KioskConfigSchema,
   KioskTauriLocalDeviceV1Schema,
+  ServiceModelSchema,
   TicketModelSchema,
   UnitKindSchema,
   UserModelSchema
@@ -443,5 +445,48 @@ describe('TicketModelSchema', () => {
   it('fails when required fields are missing', () => {
     const r = TicketModelSchema.safeParse({ id: 'ticket-1' });
     expect(r.success).toBe(false);
+  });
+});
+
+describe('createTicketRequestSchema (documentsData)', () => {
+  it('accepts serviceId and documentsData only', () => {
+    const r = createTicketRequestSchema.safeParse({
+      serviceId: '  svc-1  ',
+      documentsData: { idDocumentOcr: 'LINE' }
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.serviceId).toBe('svc-1');
+      expect(r.data.documentsData).toEqual({ idDocumentOcr: 'LINE' });
+    }
+  });
+
+  it('rejects documentsData with clientId', () => {
+    const r = createTicketRequestSchema.safeParse({
+      serviceId: 's1',
+      clientId: 'c1',
+      documentsData: { k: 1 }
+    });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe('ServiceModelSchema (kiosk identification)', () => {
+  it('accepts custom mode and kiosk config blobs', () => {
+    const r = ServiceModelSchema.safeParse({
+      id: 's1',
+      unitId: 'u1',
+      name: 'Test',
+      isLeaf: true,
+      prebook: false,
+      offerIdentification: false,
+      identificationMode: 'custom',
+      kioskDocumentSettings: { retentionDays: 7 },
+      kioskIdentificationConfig: {
+        sensitive: false,
+        showInQueuePreview: true
+      }
+    });
+    expect(r.success).toBe(true);
   });
 });

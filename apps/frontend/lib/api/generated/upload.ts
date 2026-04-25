@@ -123,6 +123,16 @@ export interface ModelsUnitOperationsPublic {
   phase?: string;
 }
 
+/**
+ * KioskDocumentSettings: JSON, e.g. { "retentionDays": 1–30 } for identificationMode=document.
+ */
+export type ModelsServiceKioskDocumentSettings = { [key: string]: unknown };
+
+/**
+ * KioskIdentificationConfig: JSON (capture, labels, api key field, showInQueuePreview, sensitive+retention for identificationMode=custom). Validated in service layer.
+ */
+export type ModelsServiceKioskIdentificationConfig = { [key: string]: unknown };
+
 export interface ModelsService {
   backgroundColor?: string;
   /** CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).
@@ -142,10 +152,14 @@ export interface ModelsService {
   /** IconKey optional Lucide key for kiosk tiles when ImageUrl is empty (e.g. "health", "document"). */
   iconKey?: string;
   id?: string;
-  /** IdentificationMode selects the kiosk identification step: none|phone|qr|document|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column. */
+  /** IdentificationMode selects the kiosk identification step: none|phone|qr|document|custom|login|badge. Kept in sync with OfferIdentification: phone ⇔ true legacy column. */
   identificationMode?: string;
   imageUrl?: string;
   isLeaf?: boolean;
+  /** KioskDocumentSettings: JSON, e.g. { "retentionDays": 1–30 } for identificationMode=document. */
+  kioskDocumentSettings?: ModelsServiceKioskDocumentSettings;
+  /** KioskIdentificationConfig: JSON (capture, labels, api key field, showInQueuePreview, sensitive+retention for identificationMode=custom). Validated in service layer. */
+  kioskIdentificationConfig?: ModelsServiceKioskIdentificationConfig;
   /** In seconds (service-time SLA — copied to Ticket.MaxServiceTime on in_service) */
   maxServiceTime?: number;
   /** In seconds (queue-wait SLA — copied to Ticket.MaxWaitingTime on create) */
@@ -288,6 +302,13 @@ export interface ModelsClientVisitTransferEvent {
   transferKind?: string;
 }
 
+/**
+ * DocumentsData stores kiosk-provided key/value (document OCR, custom fields). PII: see OpenAPI / DWH policy; staff access requires permission tickets.user_data.read.
+- documentsData is cleared by a scheduled job when documentsDataExpiresAt is in the past (sensitive or document mode with retention).
+- documentsDataExpiresAt: set at creation for document/sensitive custom flows; may be null for non-sensitive custom data (no auto-expiry from cron).
+ */
+export type ModelsTicketDocumentsData = { [key: string]: unknown };
+
 export interface ModelsTicket {
   booking?: ModelsBooking;
   bookingId?: string;
@@ -299,6 +320,11 @@ export interface ModelsTicket {
   counter?: ModelsCounter;
   counterId?: string;
   createdAt?: string;
+  /** DocumentsData stores kiosk-provided key/value (document OCR, custom fields). PII: see OpenAPI / DWH policy; staff access requires permission tickets.user_data.read.
+  - documentsData is cleared by a scheduled job when documentsDataExpiresAt is in the past (sensitive or document mode with retention).
+  - documentsDataExpiresAt: set at creation for document/sensitive custom flows; may be null for non-sensitive custom data (no auto-expiry from cron). */
+  documentsData?: ModelsTicketDocumentsData;
+  documentsDataExpiresAt?: string;
   /** EstimatedWaitSeconds is the estimated seconds until this ticket is called (computed on-the-fly). */
   estimatedWaitSeconds?: number;
   id?: string;
@@ -1140,6 +1166,13 @@ export interface HandlersTestSMSIntegrationRequest {
 }
 
 /**
+ * DocumentsData stores kiosk-provided key/value (document OCR, custom fields). PII: see OpenAPI / DWH policy; staff access requires permission tickets.user_data.read.
+- documentsData is cleared by a scheduled job when documentsDataExpiresAt is in the past (sensitive or document mode with retention).
+- documentsDataExpiresAt: set at creation for document/sensitive custom flows; may be null for non-sensitive custom data (no auto-expiry from cron).
+ */
+export type HandlersTicketWithExtrasDocumentsData = { [key: string]: unknown };
+
+/**
  * Public ticket with opt-in and kiosk post-ticket flags.
  */
 export interface HandlersTicketWithExtras {
@@ -1153,6 +1186,11 @@ export interface HandlersTicketWithExtras {
   counter?: ModelsCounter;
   counterId?: string;
   createdAt?: string;
+  /** DocumentsData stores kiosk-provided key/value (document OCR, custom fields). PII: see OpenAPI / DWH policy; staff access requires permission tickets.user_data.read.
+  - documentsData is cleared by a scheduled job when documentsDataExpiresAt is in the past (sensitive or document mode with retention).
+  - documentsDataExpiresAt: set at creation for document/sensitive custom flows; may be null for non-sensitive custom data (no auto-expiry from cron). */
+  documentsData?: HandlersTicketWithExtrasDocumentsData;
+  documentsDataExpiresAt?: string;
   /** EstimatedWaitSeconds is the estimated seconds until this ticket is called (computed on-the-fly). */
   estimatedWaitSeconds?: number;
   id?: string;

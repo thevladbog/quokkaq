@@ -37,6 +37,7 @@ export function SupervisorShiftDashboard({
   onForceRelease,
   forceReleasePending,
   onShowTicketDetails,
+  services,
   serviceZoneMode,
   workplaceZones,
   selectedWorkplaceId,
@@ -58,6 +59,7 @@ export function SupervisorShiftDashboard({
   onForceRelease: (counter: ShiftCounterRow) => void;
   forceReleasePending: boolean;
   onShowTicketDetails: (ticket: Ticket & { service?: Service }) => void;
+  services: Service[];
   serviceZoneMode?: boolean;
   workplaceZones?: SupervisorWorkplaceZone[];
   selectedWorkplaceId?: string | null;
@@ -164,6 +166,7 @@ export function SupervisorShiftDashboard({
             counters={counters}
             countersLoading={countersLoading}
             onShowTicketDetails={onShowTicketDetails}
+            services={services}
             onForceRelease={onForceRelease}
             releasePending={forceReleasePending}
           />

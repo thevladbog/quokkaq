@@ -35,6 +35,7 @@
 - Эндпоинты **`auth`** (логин, `/auth/me`, список организаций): сгенерированный [`lib/api/generated/auth.ts`](lib/api/generated/auth.ts) и обёртки [`lib/auth-orval.ts`](lib/auth-orval.ts) (валидация пользователя через `UserModelSchema`).
 - Остальной REST по-прежнему через [`lib/api.ts`](lib/api.ts) и TanStack Query до миграции конкретных ручек в Orval.
 - `shared-types` (Zod) остаётся для форм и ручных контрактов; типы из Orval — отдельный слой, дубли убирать постепенно. Digital Signage: общая валидация сабмитов — [`lib/signage-zod.ts`](lib/signage-zod.ts) и схемы плейлистов/расписаний/фидов/шаблона экрана в `@quokkaq/shared-types`.
+- **Талон и PII:** `documentsData` на **публичной** странице `app/[locale]/ticket/[ticketId]/` приходит только если `GET` идёт с `X-Visitor-Token` (токен кладётся в `sessionStorage` как `visitor_token_{id}` при выдаче талона с киоска/очереди). Обертка: [`ticketsApi.getById` в `lib/api.ts`](lib/api.ts). **Staff/supervisor** — смотрят PII по праву `tickets.user_data.read` (см. `ticket-user-data-visibility.ts`). Runbook: [«Ticket documentsData»](../../docs/operations/ticket-documents-data.md).
 
 ## Digital Signage (админ + `/screen/[unitId]`)
 

@@ -15,9 +15,11 @@ import (
 	"time"
 
 	"quokkaq-go-backend/internal/localeutil"
+	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/phoneutil"
 	"quokkaq-go-backend/internal/publicqueuewidget"
+	"quokkaq-go-backend/internal/rbac"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 	"quokkaq-go-backend/internal/subscriptionfeatures"
@@ -33,6 +35,7 @@ type TicketHandler struct {
 	eta         *services.ETAService
 	unitService services.UnitService
 	userRepo    repository.UserRepository
+	tenantRbac  repository.TenantCatalogPermissionChecker
 	settingsSvc *services.DeploymentSaaSSettingsService
 	survey      services.SurveyService
 	notif       *services.NotificationService
@@ -171,6 +174,76 @@ func (h *TicketHandler) WithUserRepository(ur repository.UserRepository) *Ticket
 	return h
 }
 
+// WithTenantRbac allows checks for rbac.PermTicketsViewUserData (documentsData in ticket JSON). Optional.
+func (h *TicketHandler) WithTenantRbac(tr repository.TenantCatalogPermissionChecker) *TicketHandler {
+	h.tenantRbac = tr
+	return h
+}
+
+// applyTicketUserDataForHTTP keeps documentsData only when the caller may see user-provided PII:
+// public GET may show when X-Visitor-Token matches the ticket; staff when they have tickets.user_data.read; terminal and unauthenticated never.
+// When allowDocumentsWithoutPermission is true, nothing is redacted (e.g. right after create).
+func (h *TicketHandler) applyTicketUserDataForHTTP(r *http.Request, u *models.Unit, t *models.Ticket, allowDocumentsWithoutPermission bool) {
+	if t == nil {
+		return
+	}
+	if allowDocumentsWithoutPermission {
+		return
+	}
+	if v := strings.TrimSpace(r.Header.Get("X-Visitor-Token")); v != "" && t.VisitorToken == v {
+		return
+	}
+	if typ, _ := r.Context().Value(middleware.TokenTypeKey).(string); typ == "terminal" {
+		t.DocumentsData = nil
+		t.DocumentsDataExpiresAt = nil
+		return
+	}
+	uid, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || uid == "" {
+		t.DocumentsData = nil
+		t.DocumentsDataExpiresAt = nil
+		return
+	}
+	if h.userRepo == nil || h.tenantRbac == nil {
+		t.DocumentsData = nil
+		t.DocumentsDataExpiresAt = nil
+		return
+	}
+	unit := u
+	if unit == nil && h.unitService != nil {
+		u2, err := h.unitService.GetUnitByID(t.UnitID)
+		if err != nil {
+			t.DocumentsData = nil
+			t.DocumentsDataExpiresAt = nil
+			return
+		}
+		unit = u2
+	}
+	if unit == nil {
+		t.DocumentsData = nil
+		t.DocumentsDataExpiresAt = nil
+		return
+	}
+	allowed, err := repository.TenantPermissionAllowed(h.userRepo, h.tenantRbac, uid, unit.CompanyID, rbac.PermTicketsViewUserData)
+	if err != nil || !allowed {
+		t.DocumentsData = nil
+		t.DocumentsDataExpiresAt = nil
+	}
+}
+
+func (h *TicketHandler) redactTicketForStaffResponse(r *http.Request, t *models.Ticket) {
+	if t == nil {
+		return
+	}
+	var uu *models.Unit
+	if h.unitService != nil {
+		if u, e := h.unitService.GetUnitByID(t.UnitID); e == nil {
+			uu = u
+		}
+	}
+	h.applyTicketUserDataForHTTP(r, uu, t, false)
+}
+
 func (h *TicketHandler) ticketVisitorPhoneKnown(ticket *models.Ticket) bool {
 	if ticket == nil || ticket.ClientID == nil {
 		return false
@@ -267,6 +340,8 @@ type CreateTicketRequest struct {
 	VisitorLocale *string `json:"visitorLocale,omitempty"`
 	// KioskIdentifiedUserID: optional; resolved user id after employee IdP (badge/login) for this unit's company.
 	KioskIdentifiedUserID *string `json:"kioskIdentifiedUserId,omitempty"`
+	// DocumentsData: optional key/value (document scan or custom identification). Allowed only for services with identificationMode document or custom; expiry is set server-side from service kiosk settings.
+	DocumentsData *json.RawMessage `json:"documentsData,omitempty" swaggertype:"object"`
 }
 
 // CreateTicket godoc
@@ -361,6 +436,13 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		if err := database.DB.Where("unit_id = ? AND idempotency_key = ?", unitID, idempotency).First(&row).Error; err == nil {
 			if prev, perr := h.service.GetTicketByID(row.TicketID); perr == nil {
 				h.enrichTicketQueuePositionAndZone(prev)
+				var uu *models.Unit
+				if h.unitService != nil {
+					if ux, e := h.unitService.GetUnitByID(prev.UnitID); e == nil {
+						uu = ux
+					}
+				}
+				h.applyTicketUserDataForHTTP(r, uu, prev, true)
 				w.WriteHeader(http.StatusOK)
 				RespondJSON(w, h.publicTicketView(r.Context(), prev))
 				return
@@ -369,11 +451,18 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actor := getActorFromRequest(r)
-	ticket, err := h.service.CreateTicket(unitID, serviceID, staffClientID, visitorPhone, visitorLocale, actor, kioskIdentifiedUser)
+	ticket, err := h.service.CreateTicket(unitID, serviceID, staffClientID, visitorPhone, visitorLocale, req.DocumentsData, actor, kioskIdentifiedUser)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrTicketQuotaExhausted):
 			writeQuotaExceeded(w, "tickets_per_month", err)
+			return
+		case errors.Is(err, services.ErrDocumentsDataNotAllowed),
+			errors.Is(err, services.ErrDocumentsDataInvalid),
+			errors.Is(err, services.ErrDocumentsDataPayloadTooLarge),
+			errors.Is(err, services.ErrKioskConfigRetentionOutOfRange),
+			errors.Is(err, services.ErrDocumentsDataWithKioskIdp):
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		case errors.Is(err, services.ErrTicketServiceNotInUnit),
 			errors.Is(err, services.ErrVisitorAnonymousNotAllowed),
@@ -441,6 +530,13 @@ func (h *TicketHandler) GetTicketByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.enrichTicketQueuePositionAndZone(ticket)
+	var uu *models.Unit
+	if h.unitService != nil {
+		if ux, e := h.unitService.GetUnitByID(ticket.UnitID); e == nil {
+			uu = ux
+		}
+	}
+	h.applyTicketUserDataForHTTP(r, uu, ticket, false)
 	RespondJSON(w, h.publicTicketView(r.Context(), ticket))
 }
 
@@ -486,6 +582,15 @@ func (h *TicketHandler) GetTicketsByUnit(w http.ResponseWriter, r *http.Request)
 				}
 			}
 		}
+	}
+	var uu *models.Unit
+	if h.unitService != nil {
+		if ux, e := h.unitService.GetUnitByID(unitID); e == nil {
+			uu = ux
+		}
+	}
+	for i := range tickets {
+		h.applyTicketUserDataForHTTP(r, uu, &tickets[i], false)
 	}
 	RespondJSON(w, tickets)
 }
@@ -546,6 +651,7 @@ func (h *TicketHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.redactTicketForStaffResponse(r, ticket)
 	RespondJSON(w, ticket)
 }
 
@@ -580,6 +686,7 @@ func (h *TicketHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.redactTicketForStaffResponse(r, ticket)
 	RespondJSON(w, ticket)
 }
 
@@ -645,6 +752,7 @@ func (h *TicketHandler) UpdateOperatorComment(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	h.redactTicketForStaffResponse(r, ticket)
 	RespondJSON(w, ticket)
 }
 
@@ -666,6 +774,7 @@ func (h *TicketHandler) Recall(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+	h.redactTicketForStaffResponse(r, ticket)
 	RespondJSON(w, ticket)
 }
 
@@ -712,6 +821,7 @@ func (h *TicketHandler) Pick(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+	h.redactTicketForStaffResponse(r, ticket)
 	RespondJSON(w, ticket)
 }
 
@@ -830,6 +940,7 @@ func (h *TicketHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	h.redactTicketForStaffResponse(r, ticket)
 	RespondJSON(w, ticket)
 }
 
@@ -851,6 +962,7 @@ func (h *TicketHandler) ReturnToQueue(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	h.redactTicketForStaffResponse(r, ticket)
 	RespondJSON(w, ticket)
 }
 
@@ -923,6 +1035,7 @@ func (h *TicketHandler) UpdateTicketVisitor(w http.ResponseWriter, r *http.Reque
 		}
 		return
 	}
+	h.redactTicketForStaffResponse(r, ticket)
 	RespondJSON(w, ticket)
 }
 
@@ -993,6 +1106,7 @@ func (h *TicketHandler) SetVisitorTags(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	h.redactTicketForStaffResponse(r, ticket)
 	RespondJSON(w, ticket)
 }
 
@@ -1052,6 +1166,7 @@ func (h *TicketHandler) VisitorCancelTicket(w http.ResponseWriter, r *http.Reque
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	h.redactTicketForStaffResponse(r, ticket)
 	RespondJSON(w, ticket)
 }
 
@@ -1146,6 +1261,7 @@ func (h *TicketHandler) AttachPhone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.redactTicketForStaffResponse(r, updated)
 	RespondJSON(w, updated)
 }
 
@@ -1436,7 +1552,7 @@ func (h *TicketHandler) JoinVirtualQueue(w http.ResponseWriter, r *http.Request)
 	}
 
 	vq := "virtual_queue"
-	ticket, err := h.service.CreateTicketWithFunnelOverride(unitID, serviceID, nil, visitorPhone, visitorLocale, nil, &vq, nil)
+	ticket, err := h.service.CreateTicketWithFunnelOverride(unitID, serviceID, nil, visitorPhone, visitorLocale, nil, nil, &vq, nil)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrTicketQuotaExhausted):
@@ -1468,6 +1584,13 @@ func (h *TicketHandler) JoinVirtualQueue(w http.ResponseWriter, r *http.Request)
 	}
 	ticketURL := fmt.Sprintf("%s/%s/ticket/%s", baseURL, locale, ticket.ID)
 
+	var uq *models.Unit
+	if h.unitService != nil {
+		if u, e := h.unitService.GetUnitByID(unitID); e == nil {
+			uq = u
+		}
+	}
+	h.applyTicketUserDataForHTTP(r, uq, ticket, false)
 	w.WriteHeader(http.StatusCreated)
 	RespondJSON(w, VirtualQueueJoinResponse{
 		Ticket:        ticket,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
-import { Ticket } from '@/lib/api';
+import { Ticket, type Service } from '@/lib/api';
 import { logger } from '@/lib/logger';
 import { useTicketTimer } from '@/lib/ticket-timer';
 import { StaffServiceScopeSelector } from '@/components/staff/StaffServiceScopeSelector';
@@ -26,6 +26,16 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Info, ListChecks, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  getDocumentsDataPreviewString,
+  shouldShowUserDataInQueueList
+} from '@/lib/ticket-user-data-visibility';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 
 type TFn = (
   key: string,
@@ -61,6 +71,7 @@ export interface StaffQueuePanelProps {
   currentTicket: Ticket | undefined;
   onPickTicket: (ticket: Ticket) => Promise<void>;
   onShowDetails: (ticket: Ticket) => void;
+  services: Service[];
 }
 
 function visitorDisplayName(ticket: Ticket, t: TFn): string {
@@ -95,7 +106,8 @@ export function StaffQueuePanel({
   setInProgressTicketId,
   currentTicket,
   onPickTicket,
-  onShowDetails
+  onShowDetails,
+  services
 }: StaffQueuePanelProps) {
   const [scopeOpen, setScopeOpen] = useState(false);
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
@@ -108,6 +120,12 @@ export function StaffQueuePanel({
       return ta - tb;
     });
   }, [waitingTickets]);
+
+  const getServiceForTicket = useCallback(
+    (id: string | undefined) =>
+      id ? services.find((s) => s.id === id) : undefined,
+    [services]
+  );
 
   return (
     <>
@@ -235,6 +253,7 @@ export function StaffQueuePanel({
                   }
                   t={t}
                   onShowDetails={() => onShowDetails(ticket)}
+                  getServiceForTicket={getServiceForTicket}
                 />
               ))
             ) : (
@@ -291,7 +310,8 @@ function StaffQueueTicketRow({
   onCall,
   disabled,
   t,
-  onShowDetails
+  onShowDetails,
+  getServiceForTicket
 }: {
   ticket: Ticket;
   serviceLabel: string;
@@ -300,6 +320,7 @@ function StaffQueueTicketRow({
   disabled: boolean;
   t: TFn;
   onShowDetails: () => void;
+  getServiceForTicket: (id: string | undefined) => Service | undefined;
 }) {
   const { background, formatTime, elapsed, isOverdue, isWarning } =
     useTicketTimer(ticket.createdAt || undefined, ticket.maxWaitingTime);
@@ -308,6 +329,16 @@ function StaffQueueTicketRow({
   const preRegistrationDetailsLabel = t('pre_registration.details_title', {
     defaultValue: 'Pre-registration Details'
   });
+  const userDataDetailsLabel = t('user_data_queue.details_label', {
+    defaultValue: 'Kiosk and document data'
+  });
+  const preReg = Boolean(ticket.preRegistration);
+  const userQueuePreview = shouldShowUserDataInQueueList(
+    ticket,
+    getServiceForTicket
+  );
+  const showInfo = preReg || userQueuePreview;
+  const docPreview = getDocumentsDataPreviewString(ticket);
 
   return (
     <div
@@ -364,21 +395,44 @@ function StaffQueueTicketRow({
           )}
         </div>
         <div className='flex items-center gap-1'>
-          {ticket.preRegistration && (
-            <Button
-              type='button'
-              size='sm'
-              variant='ghost'
-              className='h-8 w-8 p-0'
-              aria-label={preRegistrationDetailsLabel}
-              title={preRegistrationDetailsLabel}
-              onClick={(e) => {
-                e.stopPropagation();
-                onShowDetails();
-              }}
-            >
-              <Info className='h-3.5 w-3.5' aria-hidden />
-            </Button>
+          {showInfo && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type='button'
+                    size='sm'
+                    variant='ghost'
+                    className='h-8 w-8 p-0'
+                    aria-label={
+                      preReg
+                        ? preRegistrationDetailsLabel
+                        : userDataDetailsLabel
+                    }
+                    title={
+                      preReg
+                        ? preRegistrationDetailsLabel
+                        : userDataDetailsLabel
+                    }
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onShowDetails();
+                    }}
+                  >
+                    <Info className='h-3.5 w-3.5' aria-hidden />
+                  </Button>
+                </TooltipTrigger>
+                {userQueuePreview && docPreview ? (
+                  <TooltipContent
+                    side='left'
+                    className='max-w-[min(18rem,70vw)]'
+                    sideOffset={4}
+                  >
+                    <p className='text-xs break-all'>{docPreview}</p>
+                  </TooltipContent>
+                ) : null}
+              </Tooltip>
+            </TooltipProvider>
           )}
           <Button
             size='sm'

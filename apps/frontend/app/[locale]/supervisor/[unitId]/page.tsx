@@ -14,7 +14,8 @@ import {
   getGetUnitByIDQueryKey,
   getGetUnitsUnitIdChildWorkplacesQueryKey
 } from '@/lib/api/generated/units';
-import { shiftApi, unitsApi, Ticket } from '@/lib/api';
+import { useUnitServices } from '@/lib/hooks';
+import { shiftApi, unitsApi, Ticket, type Service } from '@/lib/api';
 import { useLocale, useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, AlertTriangle } from 'lucide-react';
@@ -168,6 +169,9 @@ export default function ShiftDashboardPage({
     refetchOnMount: 'always'
   });
 
+  const { data: unitServicesData } = useUnitServices(unitId);
+  const servicesForQueuePreview: Service[] = unitServicesData ?? [];
+
   const { data: queue, isLoading: queueLoading } = useQuery({
     queryKey: ['shift-queue', unitId],
     queryFn: () => shiftApi.getQueue(unitId),
@@ -274,6 +278,7 @@ export default function ShiftDashboardPage({
         onForceRelease={handleForceRelease}
         forceReleasePending={forceReleaseMutation.isPending}
         onShowTicketDetails={openDetails}
+        services={servicesForQueuePreview}
         serviceZoneMode={serviceZonePickerMode}
         workplaceZones={
           serviceZonePickerMode

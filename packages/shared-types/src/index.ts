@@ -116,8 +116,19 @@ export type ServiceModel = {
   maxServiceTime?: number | null;
   prebook?: boolean;
   offerIdentification?: boolean;
-  /** Kiosk identification step: none | phone | qr | document | login | badge */
-  identificationMode?: 'none' | 'phone' | 'qr' | 'document' | 'login' | 'badge';
+  /** Kiosk identification step: none | phone | qr | document | custom | login | badge */
+  identificationMode?:
+    | 'none'
+    | 'phone'
+    | 'qr'
+    | 'document'
+    | 'custom'
+    | 'login'
+    | 'badge';
+  /** Retention (days, 1–30) for `identificationMode=document` — stored on the service, applies to ticket.documentsData TTL. */
+  kioskDocumentSettings?: unknown;
+  /** Custom identification flow (labels, capture kind, sensitive+retention, etc.). */
+  kioskIdentificationConfig?: unknown;
   isLeaf?: boolean;
   /** Order within the unit for kiosk and lists; lower = earlier. */
   sortOrder?: number;
@@ -157,8 +168,10 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
   prebook: z.boolean().optional(),
   offerIdentification: z.boolean().optional(),
   identificationMode: z
-    .enum(['none', 'phone', 'qr', 'document', 'login', 'badge'])
+    .enum(['none', 'phone', 'qr', 'document', 'custom', 'login', 'badge'])
     .optional(),
+  kioskDocumentSettings: z.unknown().optional(),
+  kioskIdentificationConfig: z.unknown().optional(),
   isLeaf: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
   gridRow: z.number().nullable().optional(),
@@ -977,6 +990,9 @@ export type ClientVisitTransferEvent = z.infer<
   typeof ClientVisitTransferEventSchema
 >;
 
+/** Key for document-OCR line merged into `ticket.documentsData` (CreateTicket from kiosk / document mode). */
+export const KIOSK_ID_DOCUMENT_OCR_KEY = 'idDocumentOcr';
+
 export const TicketModelSchema = z.object({
   id: z.string(),
   queueNumber: z.string(),
@@ -1001,6 +1017,10 @@ export const TicketModelSchema = z.object({
   visitorPhoneKnown: z.boolean().optional(),
   /** Kiosk: mandatory SMS capture step (consent + phone) before closing the success dialog. */
   smsPostTicketStepRequired: z.boolean().optional(),
+  /** User-provided identification payload (OCR / custom). Omitted in API for viewers without `tickets.user_data.read`. */
+  documentsData: z.record(z.string(), z.unknown()).optional(),
+  /** Server-side TTL anchor for cron cleanup (may be null for non-sensitive custom). */
+  documentsDataExpiresAt: z.string().nullable().optional(),
   visitorToken: z.string().optional(),
   service: z
     .object({
@@ -1321,7 +1341,9 @@ export const createTicketRequestSchema = z
     clientId: z.string().optional(),
     visitorPhone: z.string().optional(),
     visitorLocale: kioskVisitorLocaleSchema.optional(),
-    kioskIdentifiedUserId: z.string().uuid().optional()
+    kioskIdentifiedUserId: z.string().uuid().optional(),
+    /** JSON object: document or custom identification only; size enforced on server. */
+    documentsData: z.record(z.string(), z.unknown()).optional()
   })
   .superRefine((data, ctx) => {
     const cid = (data.clientId ?? '').trim();
@@ -1330,13 +1352,23 @@ export const createTicketRequestSchema = z
     const hasPhone = phone.length > 0;
     const hasLocale = data.visitorLocale !== undefined;
     const hasKid = (data.kioskIdentifiedUserId ?? '').trim().length > 0;
+    const hasDocs =
+      data.documentsData && Object.keys(data.documentsData).length > 0;
 
-    if (hasKid && (hasClient || hasPhone)) {
+    if (hasKid && (hasClient || hasPhone || hasDocs)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message:
-          'kioskIdentifiedUserId cannot be combined with clientId or visitor phone',
+          'kioskIdentifiedUserId cannot be combined with clientId, visitor phone, or documentsData',
         path: ['kioskIdentifiedUserId']
+      });
+    }
+    if (hasDocs && (hasClient || hasPhone)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'documentsData cannot be combined with clientId or visitor phone',
+        path: ['documentsData']
       });
     }
     if (hasClient && hasPhone) {
@@ -1372,6 +1404,7 @@ export const createTicketRequestSchema = z
       visitorPhone?: string;
       visitorLocale?: z.infer<typeof kioskVisitorLocaleSchema>;
       kioskIdentifiedUserId?: string;
+      documentsData?: Record<string, unknown>;
     } = { serviceId };
     if (cid) {
       out.clientId = cid;
@@ -1382,6 +1415,9 @@ export const createTicketRequestSchema = z
     }
     if (kid) {
       out.kioskIdentifiedUserId = kid;
+    }
+    if (data.documentsData && Object.keys(data.documentsData).length > 0) {
+      out.documentsData = data.documentsData;
     }
     return out;
   });
@@ -1400,6 +1436,7 @@ export type CreateTicketInUnitMutationVariables =
       visitorPhone?: never;
       visitorLocale?: never;
       kioskIdentifiedUserId?: never;
+      documentsData?: never;
     }
   | {
       unitId: string;
@@ -1408,6 +1445,7 @@ export type CreateTicketInUnitMutationVariables =
       visitorPhone?: never;
       visitorLocale?: never;
       kioskIdentifiedUserId?: never;
+      documentsData?: never;
     }
   | {
       unitId: string;
@@ -1416,6 +1454,7 @@ export type CreateTicketInUnitMutationVariables =
       visitorLocale: z.infer<typeof kioskVisitorLocaleSchema>;
       clientId?: never;
       kioskIdentifiedUserId?: never;
+      documentsData?: never;
     }
   | {
       unitId: string;
@@ -1424,6 +1463,16 @@ export type CreateTicketInUnitMutationVariables =
       clientId?: never;
       visitorPhone?: never;
       visitorLocale?: never;
+      documentsData?: never;
+    }
+  | {
+      unitId: string;
+      serviceId: string;
+      documentsData: Record<string, unknown>;
+      clientId?: never;
+      visitorPhone?: never;
+      visitorLocale?: never;
+      kioskIdentifiedUserId?: never;
     };
 
 /** POST /units/{unitId}/call-next — matches backend handlers.CallNextRequest after trim/dedupe. */

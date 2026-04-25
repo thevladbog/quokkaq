@@ -51,6 +51,7 @@ import {
   getGetUnitsUnitIdMaterialsQueryKey
 } from '@/lib/api/generated/units';
 import {
+  KIOSK_ID_DOCUMENT_OCR_KEY,
   type KioskConfig,
   type KioskConfigForDeviceRuntime,
   mergeKioskWithTauriLocalDevice
@@ -124,7 +125,7 @@ import {
 } from '@/lib/kiosk-attract-config';
 import { useKioskPrinterPaperOutPoll } from '@/hooks/use-kiosk-printer-paper-poll';
 import { KioskIdOcrDialog } from '@/components/kiosk/kiosk-id-ocr-dialog';
-import { KioskOcrResultStrip } from '@/components/kiosk/kiosk-ocr-result-strip';
+import { KioskCustomIdentificationDialog } from '@/components/kiosk/kiosk-custom-identification-dialog';
 import { useKioskTelemetryPing } from '@/hooks/use-kiosk-telemetry-ping';
 import {
   persistKioskServiceTreeSnapshot,
@@ -145,6 +146,24 @@ export default function UnitKioskPage() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const createTicketMutation = useCreateTicketInUnit();
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null);
+  // Same key as /ticket/[id] and virtual-queue: so status page can send X-Visitor-Token on GET and show documentsData.
+  useEffect(() => {
+    if (
+      typeof window === 'undefined' ||
+      !createdTicket?.id ||
+      !createdTicket.visitorToken
+    ) {
+      return;
+    }
+    try {
+      sessionStorage.setItem(
+        `visitor_token_${createdTicket.id}`,
+        createdTicket.visitorToken
+      );
+    } catch {
+      /* storage full or disabled */
+    }
+  }, [createdTicket]);
   const [ticketManualPrintBusy, setTicketManualPrintBusy] = useState(false);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [autoCloseTimerId, setAutoCloseTimerId] =
@@ -175,6 +194,9 @@ export default function UnitKioskPage() {
     useState<Service | null>(null);
   const [isKioskDocumentOcrDisabledOpen, setIsKioskDocumentOcrDisabledOpen] =
     useState(false);
+  const [customIdentOpen, setCustomIdentOpen] = useState(false);
+  const [pendingCustomService, setPendingCustomService] =
+    useState<Service | null>(null);
   /** Last "Use text" from document scan — visible strip + prefill into phone / pre-reg where applicable. */
   const [kioskOcrResultText, setKioskOcrResultText] = useState('');
   const [browserOnline, setBrowserOnline] = useState(
@@ -770,14 +792,6 @@ export default function UnitKioskPage() {
   const showOfflineShell = Boolean(
     unit?.operations?.kioskOfflineMode && kioskCfg?.offlineModeEnabled
   );
-  /** Strips sit above modals (lower z) — hide when a full dialog covers the grid or the OCR tool is open. */
-  const showKioskOcrResultStrip = Boolean(
-    kioskOcrResultText.trim() &&
-    !isPhoneIdentificationOpen &&
-    !isRedemptionModalOpen &&
-    !isKioskQrIdentificationOpen &&
-    !documentOcrOpen
-  );
   const topBarLeading = (
     <>
       {kioskCfg?.logoUrl ? (
@@ -1192,7 +1206,8 @@ export default function UnitKioskPage() {
     service: Service,
     opts?:
       | { visitorPhone: string; visitorLocale: 'en' | 'ru' }
-      | { kioskIdentifiedUserId: string },
+      | { kioskIdentifiedUserId: string }
+      | { documentsData: Record<string, unknown> },
     failTarget?: 'phoneModal' | 'page' | 'employeeModal'
   ) => {
     setMessage('');
@@ -1204,6 +1219,12 @@ export default function UnitKioskPage() {
           unitId: kioskApiUnitId!,
           serviceId: service.id,
           kioskIdentifiedUserId: opts.kioskIdentifiedUserId
+        });
+      } else if (opts && 'documentsData' in opts) {
+        ticket = await createTicketMutation.mutateAsync({
+          unitId: kioskApiUnitId!,
+          serviceId: service.id,
+          documentsData: opts.documentsData
         });
       } else if (opts && 'visitorPhone' in opts) {
         ticket = await createTicketMutation.mutateAsync({
@@ -1283,6 +1304,11 @@ export default function UnitKioskPage() {
         }
         setPendingDocumentService(service);
         setDocumentOcrOpen(true);
+        return;
+      }
+      if (mode === 'custom') {
+        setPendingCustomService(service);
+        setCustomIdentOpen(true);
         return;
       }
       if (mode === 'login' || mode === 'badge') {
@@ -1401,7 +1427,6 @@ export default function UnitKioskPage() {
       <div
         className={cn(
           'kiosk-motion-root kiosk-a11y-root flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4',
-          showKioskOcrResultStrip && 'pb-[min(32vh,22rem)]',
           useHcSurfaces ? 'text-zinc-100' : 'text-kiosk-ink',
           useHcSurfaces && 'kiosk-hc'
         )}
@@ -2380,6 +2405,34 @@ export default function UnitKioskPage() {
           </KioskDialogContent>
         </Dialog>
 
+        {kioskApiUnitId && (
+          <KioskCustomIdentificationDialog
+            open={customIdentOpen}
+            onOpenChange={(o) => {
+              setCustomIdentOpen(o);
+              if (!o) {
+                setPendingCustomService(null);
+              }
+            }}
+            config={
+              (
+                pendingCustomService as {
+                  kioskIdentificationConfig?: unknown;
+                } | null
+              )?.kioskIdentificationConfig
+            }
+            locale={locale === 'ru' ? 'ru' : 'en'}
+            onConfirm={(data) => {
+              setCustomIdentOpen(false);
+              const svc = pendingCustomService;
+              setPendingCustomService(null);
+              if (svc) {
+                void createTicketForService(svc, { documentsData: data });
+              }
+            }}
+          />
+        )}
+
         {unitId && documentOcrOpen ? (
           <KioskIdOcrDialog
             open={documentOcrOpen}
@@ -2394,27 +2447,30 @@ export default function UnitKioskPage() {
             wedgeMrz={kioskCfg?.idOcrWedgeMrz !== false}
             wedgeRu={kioskCfg?.idOcrWedgeRuDriverLicense !== false}
             onUseText={(text) => {
-              setKioskOcrResultText(text);
               const svc = pendingDocumentService;
               if (svc) {
                 setPendingDocumentService(null);
                 setDocumentOcrOpen(false);
-                void createTicketForService(svc);
+                void createTicketForService(svc, {
+                  documentsData: { [KIOSK_ID_DOCUMENT_OCR_KEY]: text }
+                });
+                return;
               }
+              setKioskOcrResultText(text);
               void (async () => {
                 try {
                   await navigator.clipboard.writeText(text);
                   toast.success(
-                    t('id_ocr.result_saved', {
+                    t('id_ocr.result_clipboard', {
                       defaultValue:
-                        'Text is shown at the bottom of the screen. Clipboard was updated if the browser allows it.'
+                        'OCR text copied. Paste where needed on the next step, or use suggested digits if a button is offered.'
                     })
                   );
                 } catch {
                   toast.info(
-                    t('id_ocr.result_saved_no_clipboard', {
+                    t('id_ocr.result_no_clipboard', {
                       defaultValue:
-                        'Text is shown at the bottom of the screen. Clipboard was not available.'
+                        'Could not access the clipboard. You can re-scan or type on the next step if needed.'
                     })
                   );
                 }
@@ -2459,13 +2515,6 @@ export default function UnitKioskPage() {
             openTicketSuccessFlow(full, svc);
           }}
         />
-
-        {showKioskOcrResultStrip ? (
-          <KioskOcrResultStrip
-            text={kioskOcrResultText}
-            onClear={() => setKioskOcrResultText('')}
-          />
-        ) : null}
       </div>
     </KioskChromeProvider>
   );
