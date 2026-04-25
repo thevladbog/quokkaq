@@ -338,7 +338,16 @@ function StaffQueueTicketRow({
     getServiceForTicket
   );
   const showInfo = preReg || userQueuePreview;
-  const docPreview = getDocumentsDataPreviewString(ticket);
+  const docPreview = getDocumentsDataPreviewString(ticket, 500, {
+    ocrFailed: t('ticket_user_data.ocr_failed_preview', {
+      defaultValue:
+        'Document not read at the kiosk after 2 camera attempts. Verify identity at the counter.'
+    }),
+    customSkipped: t('ticket_user_data.custom_skipped_preview', {
+      defaultValue:
+        'Visitor did not provide the requested data on the kiosk. Verify as needed.'
+    })
+  });
 
   return (
     <div

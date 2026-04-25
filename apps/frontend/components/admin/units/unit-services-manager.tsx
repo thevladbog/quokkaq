@@ -33,6 +33,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -103,6 +104,11 @@ import {
   DialogTitle,
   DialogFooter
 } from '@/components/ui/dialog';
+import {
+  adminClampNumericMaxLength,
+  getKioskBarcodeManualInputMode,
+  type KioskCustomManualInputMode
+} from '@/lib/kiosk-custom-ident-input';
 
 interface UnitServicesManagerProps {
   unitId: string;
@@ -111,8 +117,21 @@ interface UnitServicesManagerProps {
 const UNIT_SERVICES_TABLE_COL_COUNT = 7;
 
 type KioskIdentConfigForm = {
-  capture?: { kind?: string };
+  capture?: {
+    kind?: string;
+    /** When `kind` is `barcode`: how to constrain manual / wedge entry. */
+    manualInputMode?: KioskCustomManualInputMode;
+    /** When `manualInputMode` is `numeric` (1–64). */
+    numericMaxLength?: number;
+    /**
+     * When `kind` is `barcode`: if false, field is `readOnly` to suppress on-screen
+     * keyboard; scanner/serial can still set the value. Default true.
+     */
+    showOnScreenKeyboard?: boolean;
+  };
   operatorLabel?: { ru?: string; en?: string };
+  userInstruction?: { ru?: string; en?: string };
+  skippable?: boolean;
   apiFieldKey?: string;
   showInQueuePreview?: boolean;
   sensitive?: boolean;
@@ -123,6 +142,8 @@ function defaultKioskIdentConfigForm(): KioskIdentConfigForm {
   return {
     capture: { kind: 'keyboard_ru_en' },
     operatorLabel: { ru: '', en: '' },
+    userInstruction: { ru: '', en: '' },
+    skippable: false,
     apiFieldKey: 'value',
     showInQueuePreview: false,
     sensitive: false
@@ -130,10 +151,36 @@ function defaultKioskIdentConfigForm(): KioskIdentConfigForm {
 }
 
 function parseKioskIdentConfigForm(raw: unknown): KioskIdentConfigForm {
-  if (raw && typeof raw === 'object') {
+  let parsed: unknown = raw;
+  if (typeof raw === 'string') {
+    try {
+      const j = JSON.parse(raw) as unknown;
+      parsed = j;
+    } catch {
+      return defaultKioskIdentConfigForm();
+    }
+  }
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const p = parsed as KioskIdentConfigForm;
+    const d = defaultKioskIdentConfigForm();
+    const capture = {
+      ...d.capture,
+      ...(p.capture || {})
+    } as KioskIdentConfigForm['capture'];
+    // Normalize `manualInputMode` / `manual_input_mode` on barcode so the UI + PUT payload match DB.
+    const captureMerged =
+      capture?.kind === 'barcode'
+        ? {
+            ...capture,
+            manualInputMode: getKioskBarcodeManualInputMode({ capture } as {
+              capture: unknown;
+            })
+          }
+        : capture;
     return {
-      ...defaultKioskIdentConfigForm(),
-      ...(raw as KioskIdentConfigForm)
+      ...d,
+      ...p,
+      capture: captureMerged
     };
   }
   return defaultKioskIdentConfigForm();
@@ -144,6 +191,18 @@ const CAPTURE_KIND_OPTIONS = [
   { value: 'digits', i18nKey: 'kiosk_custom_capture_digits' },
   { value: 'barcode', i18nKey: 'kiosk_custom_capture_barcode' }
 ] as const;
+
+const CAPTURE_BARCODE_MANUAL_MODES: {
+  value: KioskCustomManualInputMode;
+  i18nKey: string;
+}[] = [
+  { value: 'none', i18nKey: 'kiosk_custom_barcode_manual_none' },
+  {
+    value: 'alphanumeric',
+    i18nKey: 'kiosk_custom_barcode_manual_alphanumeric'
+  },
+  { value: 'numeric', i18nKey: 'kiosk_custom_barcode_manual_numeric' }
+];
 
 function buildKioskPayloadsForServiceForm(
   idMode: KioskIdentificationMode,
@@ -167,12 +226,38 @@ function buildKioskPayloadsForServiceForm(
   if (idMode !== 'custom') {
     return { kioskDocumentSettings, kioskIdentificationConfig: null };
   }
+  const captureKind = ident.capture?.kind ?? 'keyboard_ru_en';
+  let builtCapture: Record<string, unknown>;
+  if (captureKind === 'barcode') {
+    const mode: KioskCustomManualInputMode =
+      ident.capture?.manualInputMode ?? 'alphanumeric';
+    const showKbd = ident.capture?.showOnScreenKeyboard;
+    builtCapture = {
+      kind: 'barcode',
+      manualInputMode: mode,
+      showOnScreenKeyboard: showKbd !== false
+    };
+    if (mode === 'numeric') {
+      builtCapture.numericMaxLength = adminClampNumericMaxLength(
+        ident.capture?.numericMaxLength
+      );
+    }
+  } else if (captureKind === 'digits') {
+    builtCapture = { kind: 'digits' };
+  } else {
+    builtCapture = { kind: 'keyboard_ru_en' };
+  }
   const kic: Record<string, unknown> = {
-    capture: ident.capture || { kind: 'keyboard_ru_en' },
+    capture: builtCapture,
     operatorLabel: {
       ru: (ident.operatorLabel?.ru ?? '').trim(),
       en: (ident.operatorLabel?.en ?? '').trim()
     },
+    userInstruction: {
+      ru: (ident.userInstruction?.ru ?? '').trim(),
+      en: (ident.userInstruction?.en ?? '').trim()
+    },
+    skippable: !!ident.skippable,
     apiFieldKey: (ident.apiFieldKey ?? 'value').trim() || 'value',
     showInQueuePreview: !!ident.showInQueuePreview,
     sensitive: !!ident.sensitive
@@ -933,6 +1018,34 @@ function ServiceForm({
 
   const [docSettingsOpen, setDocSettingsOpen] = useState(false);
   const [customSettingsOpen, setCustomSettingsOpen] = useState(false);
+  const [kioskCustomLabelEnOpen, setKioskCustomLabelEnOpen] = useState(() => {
+    if (!editingService) {
+      return false;
+    }
+    return !!parseKioskIdentConfigForm(
+      (editingService as { kioskIdentificationConfig?: unknown })
+        .kioskIdentificationConfig
+    ).operatorLabel?.en?.trim();
+  });
+  const [kioskCustomInstructionEnOpen, setKioskCustomInstructionEnOpen] =
+    useState(() => {
+      if (!editingService) {
+        return false;
+      }
+      return !!parseKioskIdentConfigForm(
+        (editingService as { kioskIdentificationConfig?: unknown })
+          .kioskIdentificationConfig
+      ).userInstruction?.en?.trim();
+    });
+
+  const syncKioskIdentModalEnBlockVisibility = useCallback(
+    (kioskIdConfig: unknown) => {
+      const c = parseKioskIdentConfigForm(kioskIdConfig);
+      setKioskCustomLabelEnOpen(!!c.operatorLabel?.en?.trim());
+      setKioskCustomInstructionEnOpen(!!c.userInstruction?.en?.trim());
+    },
+    []
+  );
 
   // Helper to check if a service is a descendant of the editing service
   const isDescendant = useCallback(
@@ -998,19 +1111,19 @@ function ServiceForm({
           | undefined) ?? getServiceIdentificationMode(formValues as Service);
       const { kioskDocumentSettings, kioskIdentificationConfig } =
         buildKioskPayloadsForServiceForm(idMode, formValues);
-      const offerIdent = idMode === 'phone';
       const iconRaw = (formValues.iconKey ?? '').trim();
       const iconKeyPayload =
         iconRaw === ''
           ? null
           : normalizeKioskServiceIconKey(iconRaw) || iconRaw;
+      // identificationMode is canonical; do not send offerIdentification — random merge
+      // order on the server could let offerIdentification:false clear custom/document.
       const payloadBase = {
         ...formValues,
         name: nameRuTrim,
         nameRu: nameRuTrim,
         prebook: formValues.prebook ?? false,
         identificationMode: idMode,
-        offerIdentification: offerIdent,
         isLeaf: formValues.isLeaf ?? false,
         restrictedServiceZoneId: restrictedPayload,
         calendarSlotKey: payloadCalendarSlotKey,
@@ -1025,7 +1138,6 @@ function ServiceForm({
           sortOrder: formValues.sortOrder ?? 0,
           prebook: formValues.prebook ?? editingService.prebook ?? false,
           identificationMode: idMode,
-          offerIdentification: offerIdent,
           isLeaf: formValues.isLeaf ?? editingService.isLeaf ?? false
         });
       } else {
@@ -1648,11 +1760,16 @@ function ServiceForm({
                   type='button'
                   size='sm'
                   variant='outline'
-                  onClick={() =>
-                    m === 'document'
-                      ? setDocSettingsOpen(true)
-                      : setCustomSettingsOpen(true)
-                  }
+                  onClick={() => {
+                    if (m === 'document') {
+                      setDocSettingsOpen(true);
+                    } else {
+                      syncKioskIdentModalEnBlockVisibility(
+                        formValues.kioskIdentificationConfig
+                      );
+                      setCustomSettingsOpen(true);
+                    }
+                  }}
                 >
                   <Settings2
                     className='text-muted-foreground mr-1.5 size-3.5'
@@ -1724,7 +1841,17 @@ function ServiceForm({
           </DialogContent>
         </Dialog>
 
-        <Dialog open={customSettingsOpen} onOpenChange={setCustomSettingsOpen}>
+        <Dialog
+          open={customSettingsOpen}
+          onOpenChange={(open) => {
+            setCustomSettingsOpen(open);
+            if (open) {
+              syncKioskIdentModalEnBlockVisibility(
+                formValues.kioskIdentificationConfig
+              );
+            }
+          }}
+        >
           <DialogContent className='max-h-[85vh] max-w-md overflow-y-auto'>
             <DialogHeader>
               <DialogTitle>
@@ -1756,6 +1883,20 @@ function ServiceForm({
                           const cur = parseKioskIdentConfigForm(
                             p.kioskIdentificationConfig
                           );
+                          if (val === 'barcode') {
+                            return {
+                              ...p,
+                              kioskIdentificationConfig: {
+                                ...cur,
+                                capture: {
+                                  kind: 'barcode',
+                                  manualInputMode: 'alphanumeric',
+                                  numericMaxLength: 20,
+                                  showOnScreenKeyboard: true
+                                }
+                              }
+                            };
+                          }
                           return {
                             ...p,
                             kioskIdentificationConfig: {
@@ -1778,15 +1919,170 @@ function ServiceForm({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
-                    <div className='space-y-1.5'>
-                      <Label htmlFor='kioskOpLabelRu'>
-                        {tServices('kiosk_custom_label_ru', {
-                          defaultValue: 'Field label (RU)'
-                        })}
-                      </Label>
+                  {c.capture?.kind === 'barcode' ? (
+                    <>
+                      <div className='space-y-1.5'>
+                        <Label htmlFor='kioskBarcodeManualMode'>
+                          {tServices('kiosk_custom_barcode_keyboard', {
+                            defaultValue: 'Manual input (on-screen keyboard)'
+                          })}
+                        </Label>
+                        <Select
+                          value={
+                            (c.capture?.manualInputMode as
+                              | KioskCustomManualInputMode
+                              | undefined) ?? 'alphanumeric'
+                          }
+                          onValueChange={(val: KioskCustomManualInputMode) => {
+                            setFormValues((p) => {
+                              const cur = parseKioskIdentConfigForm(
+                                p.kioskIdentificationConfig
+                              );
+                              const prevCap = cur.capture ?? {
+                                kind: 'barcode'
+                              };
+                              const next: KioskIdentConfigForm['capture'] = {
+                                ...prevCap,
+                                kind: 'barcode',
+                                manualInputMode: val
+                              };
+                              if (
+                                val === 'numeric' &&
+                                next.numericMaxLength == null
+                              ) {
+                                next.numericMaxLength = 20;
+                              }
+                              if (val !== 'numeric') {
+                                delete (next as { numericMaxLength?: number })
+                                  .numericMaxLength;
+                              }
+                              return {
+                                ...p,
+                                kioskIdentificationConfig: {
+                                  ...cur,
+                                  capture: next
+                                }
+                              };
+                            });
+                          }}
+                        >
+                          <SelectTrigger
+                            id='kioskBarcodeManualMode'
+                            className='w-full'
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CAPTURE_BARCODE_MANUAL_MODES.map((o) => (
+                              <SelectItem key={o.value} value={o.value}>
+                                {tServices(o.i18nKey, {
+                                  defaultValue: o.value
+                                })}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className='text-muted-foreground text-xs'>
+                          {tServices('kiosk_custom_barcode_keyboard_hint', {
+                            defaultValue:
+                              'The visitor can use a connected scanner and/or type. Numeric mode: digits only, max length; alphanumeric: letters and numbers.'
+                          })}
+                        </p>
+                        <div className='flex items-center gap-2 pt-0.5'>
+                          <Checkbox
+                            id='kioskBarcodeShowKbd'
+                            checked={c.capture?.showOnScreenKeyboard !== false}
+                            onCheckedChange={(v) => {
+                              setFormValues((p) => {
+                                const cur = parseKioskIdentConfigForm(
+                                  p.kioskIdentificationConfig
+                                );
+                                const cap: KioskIdentConfigForm['capture'] = {
+                                  ...cur.capture,
+                                  kind: 'barcode',
+                                  showOnScreenKeyboard: v === true
+                                };
+                                return {
+                                  ...p,
+                                  kioskIdentificationConfig: {
+                                    ...cur,
+                                    capture: cap
+                                  }
+                                };
+                              });
+                            }}
+                          />
+                          <Label
+                            htmlFor='kioskBarcodeShowKbd'
+                            className='text-sm leading-snug font-normal'
+                          >
+                            {tServices(
+                              'kiosk_custom_barcode_show_onscreen_kbd',
+                              {
+                                defaultValue:
+                                  'Show on-screen keyboard (off = scanner/serial only; the field is read-only for touch typing)'
+                              }
+                            )}
+                          </Label>
+                        </div>
+                      </div>
+                      {(c.capture?.manualInputMode ?? 'alphanumeric') ===
+                      'numeric' ? (
+                        <div className='space-y-1.5'>
+                          <Label htmlFor='kioskBarcodeNumMax'>
+                            {tServices('kiosk_custom_barcode_num_max', {
+                              defaultValue: 'Max. digits (1–64)'
+                            })}
+                          </Label>
+                          <Input
+                            id='kioskBarcodeNumMax'
+                            type='number'
+                            min={1}
+                            max={64}
+                            value={
+                              adminClampNumericMaxLength(
+                                c.capture?.numericMaxLength
+                              ) || 20
+                            }
+                            onChange={(e) => {
+                              const n = adminClampNumericMaxLength(
+                                Math.floor(Number(e.target.value) || 20)
+                              );
+                              setFormValues((p) => {
+                                const cur = parseKioskIdentConfigForm(
+                                  p.kioskIdentificationConfig
+                                );
+                                return {
+                                  ...p,
+                                  kioskIdentificationConfig: {
+                                    ...cur,
+                                    capture: {
+                                      kind: 'barcode',
+                                      manualInputMode:
+                                        (cur.capture
+                                          ?.manualInputMode as KioskCustomManualInputMode) ??
+                                        'numeric',
+                                      numericMaxLength: n
+                                    }
+                                  }
+                                };
+                              });
+                            }}
+                          />
+                        </div>
+                      ) : null}
+                    </>
+                  ) : null}
+                  <div className='space-y-1.5'>
+                    <Label htmlFor='kioskOpLabelRu'>
+                      {tServices('kiosk_custom_label_ru', {
+                        defaultValue: 'Field label (RU)'
+                      })}
+                    </Label>
+                    <div className='flex gap-2'>
                       <Input
                         id='kioskOpLabelRu'
+                        className='min-w-0 flex-1'
                         value={c.operatorLabel?.ru ?? ''}
                         onChange={(e) => {
                           setFormValues((p) => {
@@ -1806,13 +2102,56 @@ function ServiceForm({
                           });
                         }}
                       />
+                      {!kioskCustomLabelEnOpen ? (
+                        <Button
+                          type='button'
+                          variant='outline'
+                          size='icon'
+                          className='shrink-0'
+                          aria-label={tServices('add_language')}
+                          onClick={() => setKioskCustomLabelEnOpen(true)}
+                        >
+                          <Plus className='size-4' />
+                        </Button>
+                      ) : null}
                     </div>
+                  </div>
+                  {kioskCustomLabelEnOpen ? (
                     <div className='space-y-1.5'>
-                      <Label htmlFor='kioskOpLabelEn'>
-                        {tServices('kiosk_custom_label_en', {
-                          defaultValue: 'Field label (EN)'
-                        })}
-                      </Label>
+                      <div className='flex items-center justify-between gap-2'>
+                        <Label htmlFor='kioskOpLabelEn'>
+                          {tServices('kiosk_custom_label_en', {
+                            defaultValue: 'Field label (EN)'
+                          })}
+                        </Label>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='icon'
+                          className='text-muted-foreground size-8 shrink-0'
+                          aria-label={tServices('remove_english_block')}
+                          onClick={() => {
+                            setKioskCustomLabelEnOpen(false);
+                            setFormValues((p) => {
+                              const cur = parseKioskIdentConfigForm(
+                                p.kioskIdentificationConfig
+                              );
+                              return {
+                                ...p,
+                                kioskIdentificationConfig: {
+                                  ...cur,
+                                  operatorLabel: {
+                                    ...cur.operatorLabel,
+                                    en: ''
+                                  }
+                                }
+                              };
+                            });
+                          }}
+                        >
+                          <X className='size-4' />
+                        </Button>
+                      </div>
                       <Input
                         id='kioskOpLabelEn'
                         value={c.operatorLabel?.en ?? ''}
@@ -1835,6 +2174,137 @@ function ServiceForm({
                         }}
                       />
                     </div>
+                  ) : null}
+                  <div className='space-y-1.5'>
+                    <Label htmlFor='kioskUserInstrRu'>
+                      {tServices('kiosk_custom_instruction_ru', {
+                        defaultValue: 'User instruction (RU)'
+                      })}
+                    </Label>
+                    <div className='flex items-start gap-2'>
+                      <Textarea
+                        id='kioskUserInstrRu'
+                        className='min-h-24 min-w-0 flex-1'
+                        value={c.userInstruction?.ru ?? ''}
+                        onChange={(e) => {
+                          setFormValues((p) => {
+                            const cur = parseKioskIdentConfigForm(
+                              p.kioskIdentificationConfig
+                            );
+                            return {
+                              ...p,
+                              kioskIdentificationConfig: {
+                                ...cur,
+                                userInstruction: {
+                                  ...cur.userInstruction,
+                                  ru: e.target.value
+                                }
+                              }
+                            };
+                          });
+                        }}
+                      />
+                      {!kioskCustomInstructionEnOpen ? (
+                        <Button
+                          type='button'
+                          variant='outline'
+                          size='icon'
+                          className='shrink-0'
+                          aria-label={tServices('add_language')}
+                          onClick={() => setKioskCustomInstructionEnOpen(true)}
+                        >
+                          <Plus className='size-4' />
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                  {kioskCustomInstructionEnOpen ? (
+                    <div className='space-y-1.5'>
+                      <div className='flex items-center justify-between gap-2'>
+                        <Label htmlFor='kioskUserInstrEn'>
+                          {tServices('kiosk_custom_instruction_en', {
+                            defaultValue: 'User instruction (EN)'
+                          })}
+                        </Label>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='icon'
+                          className='text-muted-foreground size-8'
+                          aria-label={tServices('remove_english_block')}
+                          onClick={() => {
+                            setKioskCustomInstructionEnOpen(false);
+                            setFormValues((p) => {
+                              const cur = parseKioskIdentConfigForm(
+                                p.kioskIdentificationConfig
+                              );
+                              return {
+                                ...p,
+                                kioskIdentificationConfig: {
+                                  ...cur,
+                                  userInstruction: {
+                                    ...cur.userInstruction,
+                                    en: ''
+                                  }
+                                }
+                              };
+                            });
+                          }}
+                        >
+                          <X className='size-4' />
+                        </Button>
+                      </div>
+                      <Textarea
+                        id='kioskUserInstrEn'
+                        className='min-h-24'
+                        value={c.userInstruction?.en ?? ''}
+                        onChange={(e) => {
+                          setFormValues((p) => {
+                            const cur = parseKioskIdentConfigForm(
+                              p.kioskIdentificationConfig
+                            );
+                            return {
+                              ...p,
+                              kioskIdentificationConfig: {
+                                ...cur,
+                                userInstruction: {
+                                  ...cur.userInstruction,
+                                  en: e.target.value
+                                }
+                              }
+                            };
+                          });
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                  <div className='flex items-center gap-2'>
+                    <Checkbox
+                      id='kioskCustomSkippable'
+                      checked={!!c.skippable}
+                      onCheckedChange={(v) => {
+                        setFormValues((p) => {
+                          const cur = parseKioskIdentConfigForm(
+                            p.kioskIdentificationConfig
+                          );
+                          return {
+                            ...p,
+                            kioskIdentificationConfig: {
+                              ...cur,
+                              skippable: v === true
+                            }
+                          };
+                        });
+                      }}
+                    />
+                    <Label
+                      htmlFor='kioskCustomSkippable'
+                      className='font-normal'
+                    >
+                      {tServices('kiosk_custom_skippable', {
+                        defaultValue: 'Can be skipped (Skip button on kiosk)'
+                      })}
+                    </Label>
                   </div>
                   <div className='space-y-1.5'>
                     <Label htmlFor='kioskApiKey'>

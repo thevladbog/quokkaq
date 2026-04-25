@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
+import { KioskTouchKeyboard } from '@/components/kiosk/kiosk-touch-keyboard';
 import { unitsApi, type Service } from '@/lib/api';
 import { useKioskBarcodeWedge } from '@/hooks/use-kiosk-barcode-wedge';
 
@@ -26,6 +27,7 @@ export function KioskEmployeeIdFlow({
   onUseKeyboard
 }: Props) {
   const t = useTranslations('kiosk.employee_id');
+  const locale = useLocale();
   const [login, setLogin] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -71,6 +73,8 @@ export function KioskEmployeeIdFlow({
           {login || '\u00a0'}
         </div>
         <KioskTouchKeyboard
+          layoutToggle
+          initialLayout={locale.toLowerCase().startsWith('ru') ? 'ru' : 'en'}
           onKey={(ch) => setLogin((x) => x + ch)}
           onBackspace={() => setLogin((x) => x.slice(0, -1))}
         />
@@ -126,73 +130,6 @@ export function KioskEmployeeIdFlow({
       <Button type='button' variant='outline' onClick={onBack} disabled={busy}>
         {t('back')}
       </Button>
-    </div>
-  );
-}
-
-function KioskTouchKeyboard({
-  onKey,
-  onBackspace
-}: {
-  onKey: (c: string) => void;
-  onBackspace: () => void;
-}) {
-  /** Digits + common email / login symbols (@ . _ -) */
-  const row1 = '1234567890@._-'.split('');
-  const row2 = 'QWERTYUIOP'.split('');
-  const row3 = 'ASDFGHJKL'.split('');
-  const row4 = 'ZXCVBNM'.split('');
-  const keyClass =
-    'kiosk-touch-min h-14 min-w-11 shrink-0 px-0 text-lg font-semibold sm:min-w-12 sm:text-xl';
-  const Key = (ch: string) => (
-    <Button
-      key={ch}
-      type='button'
-      className={keyClass}
-      variant='outline'
-      onClick={() => onKey(ch)}
-    >
-      {ch}
-    </Button>
-  );
-  return (
-    <div className='flex w-full max-w-full min-w-0 flex-col space-y-2 sm:space-y-2.5'>
-      <div className='w-full overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
-        <div className='mx-auto flex min-w-min flex-nowrap justify-center gap-1.5 sm:gap-2'>
-          {row1.map((c) => Key(c))}
-          <Button
-            type='button'
-            className='kiosk-touch-min h-14 min-w-[4.5rem] shrink-0 text-lg sm:min-w-20 sm:text-xl'
-            variant='secondary'
-            onClick={onBackspace}
-          >
-            ⌫
-          </Button>
-        </div>
-      </div>
-      <div className='w-full overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
-        <div className='mx-auto flex min-w-min flex-nowrap justify-center gap-1.5 sm:gap-2'>
-          {row2.map((c) => Key(c))}
-        </div>
-      </div>
-      <div className='w-full overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
-        <div className='mx-auto flex min-w-min flex-nowrap justify-center gap-1.5 pl-3 sm:gap-2 sm:pl-6 md:pl-10'>
-          {row3.map((c) => Key(c))}
-        </div>
-      </div>
-      <div className='w-full overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
-        <div className='mx-auto flex min-w-min flex-nowrap justify-center gap-1.5 pl-6 sm:gap-2 sm:pl-12 md:pl-20'>
-          {row4.map((c) => Key(c))}
-          <Button
-            type='button'
-            className={keyClass}
-            variant='outline'
-            onClick={() => onKey(' ')}
-          >
-            __
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   shouldShowUserDataInQueueList,
   ticketHasDocumentsData
 } from './ticket-user-data-visibility';
+import { KIOSK_ID_DOCUMENT_OCR_FAILED_KEY } from '@quokkaq/shared-types';
 import type { Service, Ticket } from '@quokkaq/shared-types';
 
 const svc = (partial: Partial<Service> & { id: string }): Service =>
@@ -122,5 +123,16 @@ describe('getDocumentsDataPreviewString', () => {
     );
     expect(s.length).toBe(10);
     expect(s.endsWith('…')).toBe(true);
+  });
+
+  it('with flag labels replaces idDocumentOcrFailed', () => {
+    const s = getDocumentsDataPreviewString(
+      {
+        documentsData: { [KIOSK_ID_DOCUMENT_OCR_FAILED_KEY]: true }
+      } as Pick<Ticket, 'documentsData'>,
+      200,
+      { ocrFailed: 'OCR fail msg', customSkipped: 'Skip msg' }
+    );
+    expect(s).toBe('OCR fail msg');
   });
 });

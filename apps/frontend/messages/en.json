@@ -644,8 +644,18 @@
       "kiosk_custom_capture_keyboard_ru_en": "Keyboard (Latin / Cyrillic)",
       "kiosk_custom_capture_digits": "Digits (PIN / ID number)",
       "kiosk_custom_capture_barcode": "Barcode (scanner or typing)",
+      "kiosk_custom_barcode_keyboard": "Manual input (on-screen keyboard)",
+      "kiosk_custom_barcode_keyboard_hint": "Visitors can use a connected scanner and/or type in the same field. Numeric: digits only and a max length. Alphanumeric: letters and numbers. Neutral: any characters (scanner and typing).",
+      "kiosk_custom_barcode_manual_none": "Neutral (no key layout constraint)",
+      "kiosk_custom_barcode_manual_alphanumeric": "Alphanumeric",
+      "kiosk_custom_barcode_manual_numeric": "Numeric (digits only, max length below)",
+      "kiosk_custom_barcode_num_max": "Max. digits (1–64)",
+      "kiosk_custom_barcode_show_onscreen_kbd": "Show on-screen key panel (digits vs letters is set in “Manual input” above; off = no touch entry; use scanner or serial to fill the field)",
       "kiosk_custom_label_ru": "Field label (Russian)",
       "kiosk_custom_label_en": "Field label (English)",
+      "kiosk_custom_instruction_ru": "On-screen instruction for the visitor (Russian, shown first on the kiosk)",
+      "kiosk_custom_instruction_en": "On-screen instruction for the visitor (English, optional; expand with + to edit)",
+      "kiosk_custom_skippable": "Allow “Skip” without entering a value; operator and receipt will show a warning if skipped",
       "kiosk_custom_api_field": "JSON key stored on the ticket (apiFieldKey)",
       "kiosk_custom_show_in_queue": "Show a short preview in the staff queue (requires the “view user-provided data” permission)",
       "kiosk_custom_sensitive": "Sensitive: exclude from internal aggregates and DWH; retention 1–30 days required",
@@ -2351,7 +2361,13 @@
       "badge": "Kiosk",
       "badge_aria": "Open document data (kiosk)",
       "section_title": "Document data",
-      "id_document_ocr": "Document (OCR line)"
+      "id_document_ocr": "Document (OCR line)",
+      "ocr_failed_preview": "Document not read at the kiosk after 2 camera attempts. Verify identity at the counter.",
+      "custom_skipped_preview": "Visitor did not provide the requested data on the kiosk. Verify as needed.",
+      "id_ocr_failed_label": "Document (camera) not read",
+      "id_ocr_failed_value": "Yes — verify identity; the visitor could not complete document scan on the kiosk.",
+      "id_custom_skipped_label": "Custom check-in fields skipped",
+      "id_custom_skipped_value": "Yes — the visitor did not provide the requested data. Confirm at the counter if needed."
     },
     "pre_registration": {
       "badge": "PRE",
@@ -2457,8 +2473,16 @@
     "close": "Close",
     "custom_ident_title": "Additional information",
     "custom_ident_value_label": "Value",
+    "custom_ident_skip": "Skip",
     "custom_ident_cancel": "Cancel",
     "custom_ident_continue": "Continue",
+    "custom_ident_barcode_scan_or_type": "You can use a connected scanner (USB or serial) or type in this field.",
+    "custom_ident_barcode_with_touch_keys": "Use the on-screen keys below, a USB scanner, or a serial reader. The field above shows the value.",
+    "custom_ident_barcode_scan_caption": "Scan barcode",
+    "custom_ident_barcode_field_readonly_hint": "Edit via on-screen keys, scanner, or serial — not the system keyboard.",
+    "custom_ident_barcode_scanner_only": "This step is set to scanner or serial reader only. On-screen typing is disabled in the service settings.",
+    "touch_keyboard_aria_latin": "Latin layout (English letters)",
+    "touch_keyboard_aria_cyrillic": "Russian (Cyrillic) layout",
     "network": {
       "online": "Online",
       "offline": "No network"
@@ -2495,10 +2519,17 @@
     "id_ocr": {
       "action": "Scan document",
       "title": "ID document",
-      "hint": "The image is processed in memory and is not stored. Tap “Start scan”, then a good read will continue to your ticket. Nothing is sent until then.",
+      "hint": "If your document has a barcode, try scanning that first. If that fails, scan the document itself.",
+      "tab_barcode": "Barcode",
+      "tab_document": "Document",
+      "tab_barcode_hint": "Aim the barcode, then start scan. Use the Document tab for the photo or MRZ lines.",
+      "tab_document_hint": "Aim the page (photo, MRZ), then start scan. Use the Barcode tab for 2D codes (e.g. on the back).",
       "or_label": "or",
       "serial_scanner_aria": "USB serial scanner",
-      "serial_scanner_hint": "A serial scanner is configured. Scan the MRZ or license barcode — a good read will continue automatically.",
+      "serial_scanner_hint": "You can also use the reader for the MRZ or a barcode line.",
+      "barcode_use_device_aria": "Use connected scanner for barcode",
+      "barcode_use_device": "Scan with the connected device.",
+      "barcode_use_device_sub": "A successful read will continue this step automatically.",
       "camera_section_label": "Camera",
       "document_scan_mrz_ru_mismatch": "Not MRZ. For a RU license, the scan should include the barcode separator (|), or use the camera step.",
       "capture": "Capture & read",
@@ -2533,7 +2564,9 @@
       "ru_hint": "Point the reader at the barcode. Pipe-separated text or base64; nothing is sent automatically.",
       "mrz_error": "Could not read MRZ. Check two/three short lines, or 88/90 characters.",
       "ru_error": "Unrecognized barcode. Open pipe text or base64, or try again.",
-      "ru_partial": "Partial data"
+      "ru_partial": "Partial data",
+      "barcode_not_found": "No barcode was detected. Move closer, improve the light, keep the code flat, or use the Document tab for OCR/MRZ.",
+      "barcode_not_ru_dl": "A barcode was read, but it is not a RU license code. Use the Document tab for a photo or MRZ, or try again."
     },
     "pin_modal": {
       "enter_pin": "Enter PIN",
@@ -2881,6 +2914,7 @@
   "general": {
     "delete": "Delete",
     "cancel": "Cancel",
+    "done": "Done",
     "update": "Update",
     "create": "Create",
     "save": "Save",
@@ -3205,11 +3239,11 @@
       "activityEvent": {
         "created": "Ticket {queueNumber} issued",
         "called": "Ticket {queueNumber} called",
-        "calledPick": "Ticket {queueNumber} picked at counter",
+        "calledPick": "Ticket {queueNumber} is being called to a counter",
         "recalled": "Ticket {queueNumber} recalled",
         "forceReleased": "Ticket {queueNumber} force-completed",
         "statusTerminal": "Ticket {queueNumber}: {status}",
-        "statusInService": "Ticket {queueNumber} in service",
+        "statusInService": "Ticket {queueNumber} started service",
         "statusChanged": "Ticket {queueNumber}: moved to “{status}”",
         "transferred": "Ticket {queueNumber} transferred",
         "transferredZone": "Ticket {queueNumber} transferred to zone «{zone}» — {service}",
@@ -4583,6 +4617,14 @@
       "later": "Later",
       "upgrade": "Upgrade Plan"
     }
+  },
+  "anomalies": {
+    "kind_arrival_spike": "Arrival spike",
+    "kind_mass_no_show": "High no-show rate",
+    "kind_slow_service": "Slow service",
+    "message_arrival_spike": "New ticket arrivals in the last hour are much higher than usual for this time of day and day of week.",
+    "message_mass_no_show": "No-show tickets completed in the last hour are much higher than usual for this time of day and day of week.",
+    "message_slow_service": "Average service time in the last hour (from call to finish) is much higher than the recent norm."
   },
   "SupervisorTicketListItem": {
     "maxWaiting": "Max: {time}"

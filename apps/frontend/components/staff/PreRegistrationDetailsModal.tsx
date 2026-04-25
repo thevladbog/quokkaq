@@ -11,7 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Ticket } from '@/lib/api';
 import { formatFullName } from '@/lib/format';
 import { useTranslations, useLocale } from 'next-intl';
-import { KIOSK_ID_DOCUMENT_OCR_KEY } from '@quokkaq/shared-types';
+import {
+  KIOSK_ID_CUSTOM_DATA_SKIPPED_KEY,
+  KIOSK_ID_DOCUMENT_OCR_FAILED_KEY,
+  KIOSK_ID_DOCUMENT_OCR_KEY
+} from '@quokkaq/shared-types';
 import {
   Calendar,
   Clock,
@@ -172,17 +176,38 @@ export function PreRegistrationDetailsModal({
               </p>
               {Object.entries(docs).map(([key, value]) => {
                 const isOcr = key === KIOSK_ID_DOCUMENT_OCR_KEY;
+                const isOcrFailed = key === KIOSK_ID_DOCUMENT_OCR_FAILED_KEY;
+                const isCustomSkipped =
+                  key === KIOSK_ID_CUSTOM_DATA_SKIPPED_KEY;
                 const label = isOcr
                   ? tUser('id_document_ocr', {
                       defaultValue: 'Document (OCR line)'
                     })
-                  : key;
+                  : isOcrFailed
+                    ? tUser('id_ocr_failed_label', {
+                        defaultValue: 'Document (camera) not read'
+                      })
+                    : isCustomSkipped
+                      ? tUser('id_custom_skipped_label', {
+                          defaultValue: 'Custom check-in fields skipped'
+                        })
+                      : key;
                 const display =
-                  value === null || value === undefined
-                    ? '—'
-                    : typeof value === 'string'
-                      ? value
-                      : JSON.stringify(value);
+                  isOcrFailed && value === true
+                    ? tUser('id_ocr_failed_value', {
+                        defaultValue:
+                          'Yes — verify identity; the visitor could not complete document scan on the kiosk.'
+                      })
+                    : isCustomSkipped && value === true
+                      ? tUser('id_custom_skipped_value', {
+                          defaultValue:
+                            'Yes — the visitor did not provide the requested data. Confirm at the counter if needed.'
+                        })
+                      : value === null || value === undefined
+                        ? '—'
+                        : typeof value === 'string'
+                          ? value
+                          : JSON.stringify(value);
                 return (
                   <div
                     key={key}

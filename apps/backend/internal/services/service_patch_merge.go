@@ -11,6 +11,9 @@ import (
 // MergeServiceJSONPatch copies only keys present in raw (JSON object) onto dst.
 // Used for PUT /services/:id so sparse bodies (e.g. grid-only updates) do not zero out name, prefix, etc.
 func MergeServiceJSONPatch(dst *models.Service, raw map[string]json.RawMessage) error {
+	// If both are sent, `identificationMode` is the source of truth; do not let legacy
+	// `offerIdentification: false` (random map order) override custom/document/etc.
+	_, hasIdentificationModeInPatch := raw["identificationMode"]
 	for k, v := range raw {
 		switch k {
 		case "id", "children", "parent", "unit":
@@ -128,6 +131,9 @@ func MergeServiceJSONPatch(dst *models.Service, raw map[string]json.RawMessage) 
 			}
 			dst.CalendarSlotKey = p
 		case "offerIdentification":
+			if hasIdentificationModeInPatch {
+				break
+			}
 			if err := json.Unmarshal(v, &dst.OfferIdentification); err != nil {
 				return fmt.Errorf("offerIdentification: %w", err)
 			}

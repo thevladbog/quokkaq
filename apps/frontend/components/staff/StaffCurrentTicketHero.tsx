@@ -3,6 +3,12 @@
 import { useMemo, useState } from 'react';
 import { Info, Tags } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 import { Ticket } from '@/lib/api';
 import { useTicketTimer } from '@/lib/ticket-timer';
 import { visitorTagPillStyles } from '@/lib/visitor-tag-styles';
@@ -106,6 +112,21 @@ export function StaffCurrentTicketHero({
         .sort()
         .join(','),
     [client?.definitions]
+  );
+
+  const docDataPreview = useMemo(
+    () =>
+      getDocumentsDataPreviewString(ticket, 500, {
+        ocrFailed: t('ticket_user_data.ocr_failed_preview', {
+          defaultValue:
+            'Document not read at the kiosk after 2 camera attempts. Verify identity at the counter.'
+        }),
+        customSkipped: t('ticket_user_data.custom_skipped_preview', {
+          defaultValue:
+            'Visitor did not provide the requested data on the kiosk. Verify as needed.'
+        })
+      }),
+    [t, ticket]
   );
 
   const displayName = client
@@ -291,25 +312,41 @@ export function StaffCurrentTicketHero({
                 <div className='text-muted-foreground mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold tracking-wide uppercase'>
                   <span>
                     {t('ticket_user_data.badge', {
-                      defaultValue: 'Kiosk data'
+                      defaultValue: 'Kiosk'
                     })}
                   </span>
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    className='h-7 w-7 shrink-0'
-                    onClick={onShowDetails}
-                  >
-                    <Info className='h-3.5 w-3.5' />
-                    <span className='sr-only'>
-                      {t('ticket_user_data.badge_aria', {
-                        defaultValue: 'Open kiosk and document data'
-                      })}
-                    </span>
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant='ghost'
+                          size='icon'
+                          className='h-7 w-7 shrink-0'
+                          onClick={onShowDetails}
+                        >
+                          <Info className='h-3.5 w-3.5' />
+                          <span className='sr-only'>
+                            {t('ticket_user_data.badge_aria', {
+                              defaultValue: 'Open document data (kiosk)'
+                            })}
+                          </span>
+                        </Button>
+                      </TooltipTrigger>
+                      {docDataPreview ? (
+                        <TooltipContent
+                          className='max-w-[min(20rem,85vw)]'
+                          side='left'
+                        >
+                          <p className='text-xs wrap-break-word'>
+                            {docDataPreview}
+                          </p>
+                        </TooltipContent>
+                      ) : null}
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 <p className='text-muted-foreground line-clamp-2 text-sm wrap-break-word'>
-                  {getDocumentsDataPreviewString(ticket, 160)}
+                  {docDataPreview}
                 </p>
               </div>
             )}

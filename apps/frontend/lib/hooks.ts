@@ -2,7 +2,8 @@ import {
   useQuery,
   useMutation,
   useQueryClient,
-  type Query
+  type Query,
+  type QueryClient
 } from '@tanstack/react-query';
 import { useRouter } from '@/src/i18n/navigation';
 import {
@@ -718,6 +719,44 @@ const filterEmptyValues = <T extends Record<string, unknown>>(
   return filtered;
 };
 
+/** Matches `useUnitServices` (GET /units/:id/services). */
+function getUnitServicesListQueryKey(unitId: string) {
+  return ['units', unitId, 'services'] as const;
+}
+
+/**
+ * Merges the service returned from POST/PUT into the unit’s services list cache so
+ * re-opening the admin form (without a full list refetch) sees nested fields
+ * (e.g. `kioskIdentificationConfig`) that only exist on the create/update response.
+ */
+function mergeServiceIntoUnitServicesListCache(
+  queryClient: QueryClient,
+  service: Service
+) {
+  const unitId = service.unitId;
+  if (!unitId) {
+    return;
+  }
+  queryClient.setQueryData<Service[]>(
+    getUnitServicesListQueryKey(unitId),
+    (old) => {
+      if (old === undefined) {
+        return old;
+      }
+      if (old.length === 0) {
+        return [service];
+      }
+      const idx = old.findIndex((s) => s.id === service.id);
+      if (idx < 0) {
+        return [...old, service];
+      }
+      const next = old.slice();
+      next[idx] = service;
+      return next;
+    }
+  );
+}
+
 // Service-related hooks
 export const useCreateService = () => {
   const queryClient = useQueryClient();
@@ -729,9 +768,16 @@ export const useCreateService = () => {
       ) as Omit<Service, 'id'>;
       return servicesApi.create(filteredData);
     },
-    onSuccess: () => {
+    onSuccess: (created) => {
+      mergeServiceIntoUnitServicesListCache(queryClient, created);
       queryClient.invalidateQueries({ queryKey: ['services'] });
       queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: ['units'] });
+      if (created.unitId) {
+        queryClient.invalidateQueries({
+          queryKey: ['units', created.unitId, 'services-tree']
+        });
+      }
     }
   });
 };
@@ -765,9 +811,16 @@ export const useUpdateService = () => {
       ) as Partial<Omit<Service, 'id'>>;
       return servicesApi.update(id, filteredData);
     },
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      mergeServiceIntoUnitServicesListCache(queryClient, updated);
       queryClient.invalidateQueries({ queryKey: ['services'] });
       queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: ['units'] });
+      if (updated.unitId) {
+        queryClient.invalidateQueries({
+          queryKey: ['units', updated.unitId, 'services-tree']
+        });
+      }
     }
   });
 };
@@ -780,6 +833,7 @@ export const useDeleteService = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: ['units'] });
     }
   });
 };

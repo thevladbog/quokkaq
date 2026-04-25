@@ -5,7 +5,11 @@ import { useParams, useRouter } from 'next/navigation';
 import { socketClient, type UnitETASnapshot } from '@/lib/socket';
 import { toast } from 'sonner';
 import { useTranslations, useLocale } from 'next-intl';
-import { KIOSK_ID_DOCUMENT_OCR_KEY } from '@quokkaq/shared-types';
+import {
+  KIOSK_ID_CUSTOM_DATA_SKIPPED_KEY,
+  KIOSK_ID_DOCUMENT_OCR_FAILED_KEY,
+  KIOSK_ID_DOCUMENT_OCR_KEY
+} from '@quokkaq/shared-types';
 import { ticketsApi, Ticket } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -360,15 +364,27 @@ export default function TicketPage() {
             {tStaff(ticket.status)}
           </Badge>
 
-          {ticket.documentsData &&
-            Object.keys(ticket.documentsData).length > 0 && (
+          {(() => {
+            const dd = ticket.documentsData as
+              | Record<string, unknown>
+              | undefined;
+            if (!dd) {
+              return null;
+            }
+            const visitorDocEntries = Object.entries(dd).filter(
+              ([key]) =>
+                key !== KIOSK_ID_DOCUMENT_OCR_FAILED_KEY &&
+                key !== KIOSK_ID_CUSTOM_DATA_SKIPPED_KEY
+            );
+            if (visitorDocEntries.length === 0) {
+              return null;
+            }
+            return (
               <div className='mb-4 w-full max-w-sm space-y-2 text-left text-sm'>
                 <p className='text-foreground/90 font-medium'>
                   {t('documents_data_title')}
                 </p>
-                {Object.entries(
-                  ticket.documentsData as Record<string, unknown>
-                ).map(([key, val]) => {
+                {visitorDocEntries.map(([key, val]) => {
                   const label =
                     key === KIOSK_ID_DOCUMENT_OCR_KEY
                       ? t('documents_id_ocr')
@@ -396,7 +412,8 @@ export default function TicketPage() {
                   );
                 })}
               </div>
-            )}
+            );
+          })()}
 
           {/* Queue position + ETA (waiting only) */}
           {ticket.status === 'waiting' && (

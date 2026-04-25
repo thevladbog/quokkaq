@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { format, parse, isValid } from 'date-fns';
 import { enUS, ru } from 'date-fns/locale';
 import { CalendarIcon } from 'lucide-react';
 import {
+  Area,
   BarChart,
   Bar,
   XAxis,
@@ -58,6 +59,12 @@ const SF_WAIT_MAX = 60;
 /** When |load trend| is below this (percent), badge stays non-alarming (avoids red for minor jitter). */
 const SF_LOAD_TREND_BADGE_PCT = 5;
 
+/** Arrivals band line/dot colors (distinct from each other; work on light and dark UIs). */
+const SF_ARRIVALS_HIGH_STROKE = 'hsl(32 90% 46%)';
+const SF_ARRIVALS_LOW_STROKE = 'hsl(217 85% 50%)';
+/** Central series: on dark UI `hsl(var(--primary))` is often very dark; stroke stays visible. */
+const SF_EXPECTED_ARRIVALS_STROKE = 'hsl(262 78% 62%)';
+
 /** Parse and clamp numeric forecast params to match input min/max and backend defaults. */
 function clampForecastParam(
   raw: string,
@@ -80,6 +87,62 @@ interface CustomTooltipProps {
   active?: boolean;
   payload?: TooltipPayloadItem[];
   label?: string;
+}
+
+type HourlyArrivalsBandRow = ServicesHourlyStaffingForecast & {
+  label: string;
+  arrivalsHigh: number;
+  arrivalsLow: number;
+};
+
+function ArrivalsBandTooltip({ active, payload }: CustomTooltipProps) {
+  const t = useTranslations('statistics');
+  if (!active || !payload?.length) return null;
+  const row = payload[0].payload as HourlyArrivalsBandRow;
+  return (
+    <div className='bg-background min-w-[200px] space-y-1.5 rounded-lg border p-3 text-sm shadow-lg'>
+      <p className='text-foreground font-semibold'>{row.label}</p>
+      <p className='text-muted-foreground flex items-center gap-2'>
+        <span
+          className='size-2.5 shrink-0 rounded-full'
+          style={{ background: SF_ARRIVALS_HIGH_STROKE }}
+        />
+        <span>
+          {t('sf_arrivals_high')}:{' '}
+          <span className='text-foreground font-medium'>
+            {row.arrivalsHigh.toFixed(1)}
+          </span>
+        </span>
+      </p>
+      <p className='text-muted-foreground flex items-center gap-2'>
+        <span
+          className='size-2.5 shrink-0 rounded-full'
+          style={{ background: SF_ARRIVALS_LOW_STROKE }}
+        />
+        <span>
+          {t('sf_arrivals_low')}:{' '}
+          <span className='text-foreground font-medium'>
+            {row.arrivalsLow.toFixed(1)}
+          </span>
+        </span>
+      </p>
+      <p className='text-muted-foreground flex items-center gap-2'>
+        <span
+          className='size-2.5 shrink-0 rounded-full ring-1'
+          style={{
+            background: SF_EXPECTED_ARRIVALS_STROKE,
+            boxShadow: 'inset 0 0 0 1px hsl(0 0% 0% / 0.1)'
+          }}
+        />
+        <span>
+          {t('sf_expected_arrivals')}:{' '}
+          <span className='text-foreground font-medium'>
+            {(row.expectedArrivals ?? 0).toFixed(1)}
+          </span>
+        </span>
+      </p>
+    </div>
+  );
 }
 
 function ForecastTooltip({ active, payload }: CustomTooltipProps) {
@@ -127,6 +190,10 @@ export function StaffingForecastPanel({
   const t = useTranslations('statistics');
   const appLocale = useLocale();
   const dateLocale = appLocale.toLowerCase().startsWith('ru') ? ru : enUS;
+  const gId = useId().replace(/:/g, '');
+  const gradHighToZeroId = `sfAHighDown-${gId}`;
+  const gradLowToZeroId = `sfALowDown-${gId}`;
+  const gradExpectedToZeroId = `sfAExpDown-${gId}`;
 
   const [localDate, setLocalDate] = useState(targetDate);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -156,12 +223,21 @@ export function StaffingForecastPanel({
   const uncFrac = Math.max(0, (data.arrivalUncertaintyPct ?? 0) / 100);
   const hourlyData = (data.hourlyForecasts ?? []).map((h) => {
     const exp = h.expectedArrivals ?? 0;
+    const high = exp * (1 + uncFrac);
+    const low = Math.max(0, exp * (1 - uncFrac));
     return {
       ...h,
       label: fmtHour(h.hour ?? 0),
-      arrivalsHigh: exp * (1 + uncFrac),
-      arrivalsLow: Math.max(0, exp * (1 - uncFrac))
+      arrivalsHigh: high,
+      arrivalsLow: low
     };
+  });
+
+  const lineDot = (fill: string) => ({
+    r: 3.5,
+    fill,
+    stroke: fill,
+    strokeWidth: 1.5
   });
 
   function applyParams() {
@@ -366,6 +442,63 @@ export function StaffingForecastPanel({
                 data={hourlyData}
                 margin={{ top: 4, right: 8, bottom: 0, left: -10 }}
               >
+                <defs>
+                  {/* Downward fills: under each line to y=0; draw order: high (back) → low → expected (front). */}
+                  <linearGradient
+                    id={gradHighToZeroId}
+                    x1='0'
+                    y1='0'
+                    x2='0'
+                    y2='1'
+                  >
+                    <stop
+                      offset='0%'
+                      stopColor={SF_ARRIVALS_HIGH_STROKE}
+                      stopOpacity={0.32}
+                    />
+                    <stop
+                      offset='100%'
+                      stopColor={SF_ARRIVALS_HIGH_STROKE}
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                  <linearGradient
+                    id={gradLowToZeroId}
+                    x1='0'
+                    y1='0'
+                    x2='0'
+                    y2='1'
+                  >
+                    <stop
+                      offset='0%'
+                      stopColor={SF_ARRIVALS_LOW_STROKE}
+                      stopOpacity={0.4}
+                    />
+                    <stop
+                      offset='100%'
+                      stopColor={SF_ARRIVALS_LOW_STROKE}
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                  <linearGradient
+                    id={gradExpectedToZeroId}
+                    x1='0'
+                    y1='0'
+                    x2='0'
+                    y2='1'
+                  >
+                    <stop
+                      offset='0%'
+                      stopColor={SF_EXPECTED_ARRIVALS_STROKE}
+                      stopOpacity={0.5}
+                    />
+                    <stop
+                      offset='100%'
+                      stopColor={SF_EXPECTED_ARRIVALS_STROKE}
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray='3 3' vertical={false} />
                 <XAxis
                   dataKey='label'
@@ -376,48 +509,63 @@ export function StaffingForecastPanel({
                   height={32}
                 />
                 <YAxis tick={{ fontSize: 10 }} allowDecimals />
-                <Tooltip
-                  formatter={(v, name) => {
-                    let label: string;
-                    if (name === 'expectedArrivals')
-                      label = t('sf_expected_arrivals');
-                    else if (name === 'arrivalsHigh')
-                      label = t('sf_arrivals_high');
-                    else if (name === 'arrivalsLow')
-                      label = t('sf_arrivals_low');
-                    else label = String(name);
-                    return [
-                      typeof v === 'number' ? v.toFixed(1) : String(v ?? ''),
-                      label
-                    ];
-                  }}
-                  labelFormatter={(label) => String(label)}
+                <Tooltip content={<ArrivalsBandTooltip />} />
+                <Area
+                  type='monotone'
+                  dataKey='arrivalsHigh'
+                  name='_areaHigh'
+                  baseValue={0}
+                  stroke='none'
+                  fill={`url(#${gradHighToZeroId})`}
+                  isAnimationActive={false}
+                  activeDot={false}
+                />
+                <Area
+                  type='monotone'
+                  dataKey='arrivalsLow'
+                  name='_areaLow'
+                  baseValue={0}
+                  stroke='none'
+                  fill={`url(#${gradLowToZeroId})`}
+                  isAnimationActive={false}
+                  activeDot={false}
+                />
+                <Area
+                  type='monotone'
+                  dataKey='expectedArrivals'
+                  name='_areaExpected'
+                  baseValue={0}
+                  stroke='none'
+                  fill={`url(#${gradExpectedToZeroId})`}
+                  isAnimationActive={false}
+                  activeDot={false}
                 />
                 <Line
                   type='monotone'
                   dataKey='arrivalsHigh'
                   name='arrivalsHigh'
-                  stroke='hsl(var(--muted-foreground))'
-                  strokeWidth={1}
-                  strokeDasharray='4 3'
-                  dot={false}
+                  stroke={SF_ARRIVALS_HIGH_STROKE}
+                  strokeWidth={2}
+                  dot={lineDot(SF_ARRIVALS_HIGH_STROKE)}
+                  isAnimationActive={false}
                 />
                 <Line
                   type='monotone'
                   dataKey='arrivalsLow'
                   name='arrivalsLow'
-                  stroke='hsl(var(--muted-foreground))'
-                  strokeWidth={1}
-                  strokeDasharray='4 3'
-                  dot={false}
+                  stroke={SF_ARRIVALS_LOW_STROKE}
+                  strokeWidth={2}
+                  dot={lineDot(SF_ARRIVALS_LOW_STROKE)}
+                  isAnimationActive={false}
                 />
                 <Line
                   type='monotone'
                   dataKey='expectedArrivals'
                   name='expectedArrivals'
-                  stroke='hsl(var(--primary))'
-                  strokeWidth={2}
-                  dot={false}
+                  stroke={SF_EXPECTED_ARRIVALS_STROKE}
+                  strokeWidth={2.5}
+                  dot={lineDot(SF_EXPECTED_ARRIVALS_STROKE)}
+                  isAnimationActive={false}
                 />
               </ComposedChart>
             </ResponsiveContainer>

@@ -51,6 +51,8 @@ import {
   getGetUnitsUnitIdMaterialsQueryKey
 } from '@/lib/api/generated/units';
 import {
+  KIOSK_ID_CUSTOM_DATA_SKIPPED_KEY,
+  KIOSK_ID_DOCUMENT_OCR_FAILED_KEY,
   KIOSK_ID_DOCUMENT_OCR_KEY,
   type KioskConfig,
   type KioskConfigForDeviceRuntime,
@@ -192,6 +194,17 @@ export default function UnitKioskPage() {
   /** Service waiting for document OCR success before creating a ticket (identificationMode=document). */
   const [pendingDocumentService, setPendingDocumentService] =
     useState<Service | null>(null);
+  const pendingDocumentServiceRef = useRef<Service | null>(null);
+  /** Two unsuccessful Document-tab scans in a row → issue ticket with failure flag. */
+  const idOcrDocFailStreakRef = useRef(0);
+  useEffect(() => {
+    pendingDocumentServiceRef.current = pendingDocumentService;
+  }, [pendingDocumentService]);
+  useEffect(() => {
+    if (documentOcrOpen) {
+      idOcrDocFailStreakRef.current = 0;
+    }
+  }, [documentOcrOpen]);
   const [isKioskDocumentOcrDisabledOpen, setIsKioskDocumentOcrDisabledOpen] =
     useState(false);
   const [customIdentOpen, setCustomIdentOpen] = useState(false);
@@ -571,6 +584,8 @@ export default function UnitKioskPage() {
     setIsKioskDocumentOcrDisabledOpen(false);
     setDocumentOcrOpen(false);
     setPendingDocumentService(null);
+    setCustomIdentOpen(false);
+    setPendingCustomService(null);
     setIsRedemptionModalOpen(false);
     setIsPinModalOpen(false);
     setMessage('');
@@ -1221,11 +1236,20 @@ export default function UnitKioskPage() {
           kioskIdentifiedUserId: opts.kioskIdentifiedUserId
         });
       } else if (opts && 'documentsData' in opts) {
+        const { documentsData } = opts;
         ticket = await createTicketMutation.mutateAsync({
           unitId: kioskApiUnitId!,
           serviceId: service.id,
-          documentsData: opts.documentsData
+          documentsData
         });
+        setPhoneIdentificationError('');
+        setIsPhoneIdentificationOpen(false);
+        setPendingPhoneService(null);
+        setIsEmployeeIdentificationOpen(false);
+        setPendingEmployeeService(null);
+        setEmployeeIdSubmode('badge');
+        openTicketSuccessFlow(ticket, service);
+        return;
       } else if (opts && 'visitorPhone' in opts) {
         ticket = await createTicketMutation.mutateAsync({
           unitId: kioskApiUnitId!,
@@ -1277,6 +1301,28 @@ export default function UnitKioskPage() {
       }
     }
   };
+
+  const createTicketForServiceRef = useRef(createTicketForService);
+  // Store latest for async identification handlers; ref is not read during render.
+  // eslint-disable-next-line react-hooks/refs -- sync latest closed-over API for event handlers
+  createTicketForServiceRef.current = createTicketForService;
+
+  const onDocumentOcrUnsuccessful = useCallback(() => {
+    const svc = pendingDocumentServiceRef.current;
+    if (!svc) {
+      return;
+    }
+    idOcrDocFailStreakRef.current += 1;
+    if (idOcrDocFailStreakRef.current < 2) {
+      return;
+    }
+    idOcrDocFailStreakRef.current = 0;
+    setDocumentOcrOpen(false);
+    setPendingDocumentService(null);
+    void createTicketForServiceRef.current(svc, {
+      documentsData: { [KIOSK_ID_DOCUMENT_OCR_FAILED_KEY]: true }
+    });
+  }, []);
 
   const handleServiceSelection = async (service: Service) => {
     if (service.isLeaf) {
@@ -2414,6 +2460,7 @@ export default function UnitKioskPage() {
                 setPendingCustomService(null);
               }
             }}
+            unitId={kioskApiUnitId}
             config={
               (
                 pendingCustomService as {
@@ -2428,6 +2475,16 @@ export default function UnitKioskPage() {
               setPendingCustomService(null);
               if (svc) {
                 void createTicketForService(svc, { documentsData: data });
+              }
+            }}
+            onSkip={() => {
+              setCustomIdentOpen(false);
+              const svc = pendingCustomService;
+              setPendingCustomService(null);
+              if (svc) {
+                void createTicketForService(svc, {
+                  documentsData: { [KIOSK_ID_CUSTOM_DATA_SKIPPED_KEY]: true }
+                });
               }
             }}
           />
@@ -2446,6 +2503,7 @@ export default function UnitKioskPage() {
             preferNative={kioskCfg?.idOcrPreferNative !== false}
             wedgeMrz={kioskCfg?.idOcrWedgeMrz !== false}
             wedgeRu={kioskCfg?.idOcrWedgeRuDriverLicense !== false}
+            onUnsuccessfulDocumentScan={onDocumentOcrUnsuccessful}
             onUseText={(text) => {
               const svc = pendingDocumentService;
               if (svc) {

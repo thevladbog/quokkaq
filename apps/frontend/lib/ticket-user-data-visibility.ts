@@ -1,5 +1,10 @@
 import { getServiceIdentificationMode } from '@/lib/kiosk-service-identification';
-import type { Service, Ticket } from '@quokkaq/shared-types';
+import {
+  KIOSK_ID_CUSTOM_DATA_SKIPPED_KEY,
+  KIOSK_ID_DOCUMENT_OCR_FAILED_KEY,
+  type Service,
+  type Ticket
+} from '@quokkaq/shared-types';
 
 export function ticketHasDocumentsData(
   ticket: Pick<Ticket, 'documentsData'>
@@ -52,9 +57,21 @@ export function shouldShowUserDataInQueueList(
   return false;
 }
 
+/** Human labels for staff-facing previews/tooltips (not for public visitor UIs). */
+export type DocumentsDataFlagLabels = {
+  ocrFailed: string;
+  customSkipped: string;
+};
+
+/**
+ * One-line summary for staff queue/hero. Without `flagLabels`, keeps legacy behavior
+ * (first key only). With `flagLabels`, expands known kiosk flags to full phrases and
+ * can combine multiple entries.
+ */
 export function getDocumentsDataPreviewString(
   ticket: Pick<Ticket, 'documentsData'>,
-  maxLen = 120
+  maxLen = 120,
+  flagLabels?: DocumentsDataFlagLabels
 ): string {
   const d = ticket.documentsData;
   if (!d || typeof d !== 'object') {
@@ -65,11 +82,41 @@ export function getDocumentsDataPreviewString(
   if (keys.length === 0) {
     return '';
   }
-  const k = keys[0];
-  const v = e[k];
-  const text =
-    v === null || v === undefined ? '' : typeof v === 'string' ? v : String(v);
-  const line = `${k}: ${text}`;
+
+  if (!flagLabels) {
+    const k = keys[0]!;
+    const v = e[k];
+    const text =
+      v === null || v === undefined
+        ? ''
+        : typeof v === 'string'
+          ? v
+          : String(v);
+    const line = `${k}: ${text}`;
+    if (line.length <= maxLen) {
+      return line;
+    }
+    return `${line.slice(0, maxLen - 1)}…`;
+  }
+
+  const parts: string[] = [];
+  for (const k of keys) {
+    const v = e[k];
+    if (k === KIOSK_ID_DOCUMENT_OCR_FAILED_KEY && v === true) {
+      parts.push(flagLabels.ocrFailed);
+    } else if (k === KIOSK_ID_CUSTOM_DATA_SKIPPED_KEY && v === true) {
+      parts.push(flagLabels.customSkipped);
+    } else {
+      const text =
+        v === null || v === undefined
+          ? ''
+          : typeof v === 'string'
+            ? v
+            : String(v);
+      parts.push(`${k}: ${text}`);
+    }
+  }
+  const line = parts.filter(Boolean).join(' · ');
   if (line.length <= maxLen) {
     return line;
   }

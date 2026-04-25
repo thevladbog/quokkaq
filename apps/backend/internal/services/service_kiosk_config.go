@@ -57,12 +57,15 @@ func validateKioskIdentificationConfigJSON(raw json.RawMessage) error {
 		return nil
 	}
 	var cfg struct {
-		Sensitive     *bool            `json:"sensitive"`
-		RetentionDays *int             `json:"retentionDays"`
-		RetentionAlt  *int             `json:"retention_days"`
-		APIFieldKey   *string          `json:"apiFieldKey"`
-		ShowInQueue   *bool            `json:"showInQueuePreview"`
-		Capture       *json.RawMessage `json:"capture"`
+		Sensitive       *bool            `json:"sensitive"`
+		RetentionDays   *int             `json:"retentionDays"`
+		RetentionAlt    *int             `json:"retention_days"`
+		APIFieldKey     *string          `json:"apiFieldKey"`
+		ShowInQueue     *bool            `json:"showInQueuePreview"`
+		Capture         *json.RawMessage `json:"capture"`
+		Skippable       *bool            `json:"skippable"`
+		UserInstruction *json.RawMessage `json:"userInstruction"`
+		OperatorLabel   *json.RawMessage `json:"operatorLabel"`
 	}
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return fmt.Errorf("kioskIdentificationConfig: %w", err)
@@ -86,5 +89,8 @@ func validateKioskIdentificationConfigJSON(raw json.RawMessage) error {
 	}
 	_ = cfg.Capture
 	_ = cfg.ShowInQueue
+	_ = cfg.Skippable
+	_ = cfg.UserInstruction
+	_ = cfg.OperatorLabel
 	return nil
 }

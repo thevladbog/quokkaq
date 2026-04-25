@@ -127,7 +127,10 @@ export type ServiceModel = {
     | 'badge';
   /** Retention (days, 1–30) for `identificationMode=document` — stored on the service, applies to ticket.documentsData TTL. */
   kioskDocumentSettings?: unknown;
-  /** Custom identification flow (labels, capture kind, sensitive+retention, etc.). */
+  /**
+   * Custom identification flow (labels, `capture`, sensitive+retention, etc.).
+   * `capture` for `identificationMode=custom` may include e.g. `{ kind: "barcode", manualInputMode: "none"|"numeric"|"alphanumeric", numericMaxLength?: number, showOnScreenKeyboard?: boolean }`.
+   */
   kioskIdentificationConfig?: unknown;
   isLeaf?: boolean;
   /** Order within the unit for kiosk and lists; lower = earlier. */
@@ -992,6 +995,18 @@ export type ClientVisitTransferEvent = z.infer<
 
 /** Key for document-OCR line merged into `ticket.documentsData` (CreateTicket from kiosk / document mode). */
 export const KIOSK_ID_DOCUMENT_OCR_KEY = 'idDocumentOcr';
+
+/**
+ * When true, OCR failed after max scan attempts. Shown in staff/operator UIs
+ * (not on public kiosk or visitor ticket page). Value is boolean.
+ */
+export const KIOSK_ID_DOCUMENT_OCR_FAILED_KEY = 'idDocumentOcrFailed';
+
+/**
+ * When true, the visitor used "Skip" on custom identification. Staff-facing only
+ * (not on public kiosk or visitor ticket page). Value is boolean.
+ */
+export const KIOSK_ID_CUSTOM_DATA_SKIPPED_KEY = 'idCustomDataSkipped';
 
 export const TicketModelSchema = z.object({
   id: z.string(),

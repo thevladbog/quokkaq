@@ -221,6 +221,8 @@ var updatableServiceColumns = []string{
 	"calendar_slot_key",
 	"offer_identification",
 	"identification_mode",
+	"kiosk_document_settings",
+	"kiosk_identification_config",
 	"is_leaf",
 	"restricted_service_zone_id",
 	"grid_row",

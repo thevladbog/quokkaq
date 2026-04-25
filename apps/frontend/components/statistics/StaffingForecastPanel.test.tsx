@@ -29,7 +29,8 @@ vi.mock('recharts', () => ({
     <div>{children}</div>
   ),
   Cell: () => null,
-  ReferenceLine: () => null
+  ReferenceLine: () => null,
+  Area: () => null
 }));
 
 import { StaffingForecastPanel } from './StaffingForecastPanel';

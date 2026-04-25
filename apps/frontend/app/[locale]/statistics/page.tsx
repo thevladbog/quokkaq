@@ -113,6 +113,7 @@ import {
 } from '@/lib/guest-survey-blocks';
 import { cn } from '@/lib/utils';
 import { getUnitDisplayName } from '@/lib/unit-display';
+import { getAnomalyKindLabel, getAnomalyMessage } from '@/lib/anomaly-i18n';
 import {
   ChartContainer,
   ChartTooltip,
@@ -325,6 +326,7 @@ export default function StatisticsPage() {
   const appLocale = useLocale();
   const dateLocale = appLocale.toLowerCase().startsWith('ru') ? ru : enUS;
   const t = useTranslations('statistics');
+  const tAnomalies = useTranslations('anomalies');
   const { activeUnitId, assignableUnitIds } = useActiveUnit();
   const { user } = useAuthContext();
   const [{ from, to }, setRange] = useState<{ from: string; to?: string }>(() =>
@@ -2558,10 +2560,19 @@ export default function StatisticsPage() {
                                       }
                                     )
                                   : '—'}
-                                {row.kind ? ` · ${row.kind}` : ''}
+                                {row.kind
+                                  ? ` · ${getAnomalyKindLabel(
+                                      row.kind,
+                                      tAnomalies
+                                    )}`
+                                  : ''}
                               </p>
                               <p className='text-foreground mt-0.5'>
-                                {row.message}
+                                {getAnomalyMessage(
+                                  row.kind,
+                                  row.message,
+                                  tAnomalies
+                                )}
                               </p>
                             </li>
                           )

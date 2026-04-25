@@ -62,3 +62,30 @@ func TestMergeServiceJSONPatch_iconKey(t *testing.T) {
 		t.Fatalf("iconKey: got %#v", merged.IconKey)
 	}
 }
+
+// Regression: same patch used to clobber custom/document with none when
+// offerIdentification:false was applied after identificationMode (random map order).
+func TestMergeServiceJSONPatch_customModeNotClobberedByOfferIdentFalse(t *testing.T) {
+	existing := models.Service{
+		ID:                  "s1",
+		UnitID:              "u1",
+		Name:                "Leaf",
+		IdentificationMode:  models.IdentificationModeCustom,
+		OfferIdentification: false,
+	}
+	merged := existing
+	raw := map[string]json.RawMessage{
+		"identificationMode":        json.RawMessage(`"custom"`),
+		"offerIdentification":       json.RawMessage(`false`),
+		"kioskIdentificationConfig": json.RawMessage(`{"apiFieldKey":"v"}`),
+	}
+	if err := MergeServiceJSONPatch(&merged, raw); err != nil {
+		t.Fatal(err)
+	}
+	if merged.IdentificationMode != models.IdentificationModeCustom {
+		t.Fatalf("identificationMode: got %q", merged.IdentificationMode)
+	}
+	if merged.OfferIdentification {
+		t.Fatalf("OfferIdentification: want false")
+	}
+}

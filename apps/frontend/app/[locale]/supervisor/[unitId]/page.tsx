@@ -26,6 +26,7 @@ import { SlaAlertBanner } from '@/components/supervisor/SlaAlertBanner';
 import { KioskPrinterAlertBanner } from '@/components/supervisor/KioskPrinterAlertBanner';
 import type { ShiftCounterRow } from '@/components/supervisor/SupervisorWorkstationMonitoring';
 import { useSyncActiveUnit } from '@/contexts/ActiveUnitContext';
+import { getAnomalyMessage } from '@/lib/anomaly-i18n';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { useSlaAlerts } from '@/hooks/use-sla-alerts';
 import { useKioskPrinterAlerts } from '@/hooks/use-kiosk-printer-alerts';
@@ -42,6 +43,7 @@ export default function ShiftDashboardPage({
 }) {
   const { unitId } = use(params);
   const t = useTranslations('supervisor');
+  const tAnomalies = useTranslations('anomalies');
   const locale = useLocale();
   const queryClient = useQueryClient();
   useSyncActiveUnit(unitId);
@@ -76,7 +78,7 @@ export default function ShiftDashboardPage({
     };
     const onAnom = (a: UnitAnomalyAlert) => {
       if (a.unitId !== unitId) return;
-      toast.error(a.message);
+      toast.error(getAnomalyMessage(a.kind, a.message, tAnomalies));
     };
     const onKioskSurvey = (d: {
       unitId: string;
@@ -96,7 +98,7 @@ export default function ShiftDashboardPage({
       socketClient.offAnomalyAlert(onAnom);
       socketClient.offKioskSurveyLow(onKioskSurvey);
     };
-  }, [unitId, t]);
+  }, [unitId, t, tAnomalies]);
 
   const [showEODDialog, setShowEODDialog] = useState(false);
   const [forceReleaseDialogOpen, setForceReleaseDialogOpen] = useState(false);
