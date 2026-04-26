@@ -261,6 +261,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 type ReadinessAggregator struct {
@@ -269,6 +271,7 @@ type ReadinessAggregator struct {
 	mu        sync.Mutex
 	last      *AggregatedResult
 	lastAt    time.Time
+	sf        singleflight.Group // dedupes concurrent probes when cache is empty/stale
 }
 
 type AggregatedResult struct {
@@ -280,6 +283,10 @@ func NewReadinessAggregator(checks []Check, cacheTTL time.Duration) *ReadinessAg
 	return &ReadinessAggregator{checks: checks, cacheTTL: cacheTTL}
 }
 
+// Get returns the cached aggregated result if fresh; otherwise it triggers a
+// single probe pass and waits for it to complete. Concurrent callers that find
+// the cache empty/stale do NOT each launch their own probe — they share the
+// in-flight one via golang.org/x/sync/singleflight.
 func (r *ReadinessAggregator) Get(ctx context.Context) AggregatedResult {
 	r.mu.Lock()
 	if r.last != nil && time.Since(r.lastAt) < r.cacheTTL {
@@ -289,55 +296,89 @@ func (r *ReadinessAggregator) Get(ctx context.Context) AggregatedResult {
 	}
 	r.mu.Unlock()
 
-	probeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	results := make(map[string]Result, len(r.checks))
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	for _, c := range r.checks {
-		wg.Add(1)
-		go func(c Check) {
-			defer wg.Done()
-			res := c.Probe(probeCtx)
-			mu.Lock()
-			results[c.Name()] = res
-			mu.Unlock()
-		}(c)
-	}
-	wg.Wait()
-
-	out := AggregatedResult{Status: "ok", Checks: results}
-	for _, res := range results {
-		if res.Status != "ok" {
-			out.Status = "degraded"
-			break
+	v, _, _ := r.sf.Do("probe", func() (any, error) {
+		// Re-check inside the singleflight in case a concurrent caller
+		// already populated the cache while we were waiting.
+		r.mu.Lock()
+		if r.last != nil && time.Since(r.lastAt) < r.cacheTTL {
+			out := *r.last
+			r.mu.Unlock()
+			return out, nil
 		}
-	}
-	r.mu.Lock()
-	r.last, r.lastAt = &out, time.Now()
-	r.mu.Unlock()
-	return out
+		r.mu.Unlock()
+
+		probeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+
+		results := make(map[string]Result, len(r.checks))
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		for _, c := range r.checks {
+			wg.Add(1)
+			go func(c Check) {
+				defer wg.Done()
+				res := c.Probe(probeCtx)
+				mu.Lock()
+				results[c.Name()] = res
+				mu.Unlock()
+			}(c)
+		}
+		wg.Wait()
+
+		out := AggregatedResult{Status: "ok", Checks: results}
+		for _, res := range results {
+			if res.Status != "ok" {
+				out.Status = "degraded"
+				break
+			}
+		}
+		r.mu.Lock()
+		r.last, r.lastAt = &out, time.Now()
+		r.mu.Unlock()
+		return out, nil
+	})
+	return v.(AggregatedResult)
 }
 ```
 
 - [ ] **Step 5.2: Test (concurrent calls during cache window dedupe to one set of probes)**
 
+The test fires 50 concurrent `Get()` calls before any have completed, simulating a load-balancer hammering the readiness endpoint while the cache is cold. The singleflight guard must collapse them to exactly one probe invocation.
+
 ```go
-func TestReadinessAggregator_CachesResult(t *testing.T) {
-	probeCount := 0
+func TestReadinessAggregator_DedupesConcurrentProbes(t *testing.T) {
+	var probeCount int64
+	gate := make(chan struct{})
 	check := stubCheck{name: "x", probe: func() Result {
-		probeCount++
+		atomic.AddInt64(&probeCount, 1)
+		<-gate // hold all callers in the probe until gate is closed
 		return Result{Status: "ok"}
 	}}
 	agg := NewReadinessAggregator([]Check{check}, 5*time.Second)
 
-	for i := 0; i < 3; i++ {
-		_ = agg.Get(context.Background())
+	const N = 50
+	var wg sync.WaitGroup
+	wg.Add(N)
+	for i := 0; i < N; i++ {
+		go func() {
+			defer wg.Done()
+			_ = agg.Get(context.Background())
+		}()
 	}
-	require.Equal(t, 1, probeCount)
+	// Give all goroutines a moment to hit the singleflight before releasing the probe.
+	time.Sleep(20 * time.Millisecond)
+	close(gate)
+	wg.Wait()
+
+	require.Equal(t, int64(1), atomic.LoadInt64(&probeCount), "concurrent callers should share one probe")
+
+	// Subsequent call inside the cache window must NOT re-probe.
+	_ = agg.Get(context.Background())
+	require.Equal(t, int64(1), atomic.LoadInt64(&probeCount), "cached result should not trigger another probe")
 }
 ```
+
+(Add imports `sync/atomic` and `time` if not already present in the test file.)
 
 - [ ] **Step 5.3: Commit**
 

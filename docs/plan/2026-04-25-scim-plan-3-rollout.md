@@ -434,13 +434,25 @@ git commit -am "test(scim-load): nightly k6 against staging with threshold gate"
 ### Task 10 — Playwright base config
 
 **Files:**
-- Create: `apps/frontend/playwright.config.ts` (if not present from Plan 2 ops spec)
+- Create: `apps/frontend/playwright.config.ts` (only if not present)
 - Create: `apps/frontend/e2e/lib/scim-fixtures.ts`
 - Modify: `apps/frontend/package.json` — add `e2e:scim` target
 
-- [ ] **Step 10.1: Decide if Playwright already exists**
+- [ ] **Step 10.1: Verify Playwright presence — branch on result**
 
-Plan 2 / ops spec may have introduced Playwright. If so, just add SCIM-specific fixtures. If not, install and configure.
+Run the presence check before doing anything else in Phase 3.C:
+
+```bash
+test -f apps/frontend/playwright.config.ts && echo present || echo absent
+grep -q '"@playwright/test"' apps/frontend/package.json && echo dep-present || echo dep-absent
+```
+
+Now branch:
+
+- **Path A — both present:** Playwright was shipped earlier (Plan 2 / ops spec / another track). Skip configuration; jump straight to Step 10.2 (SCIM-specific fixtures), and import the existing `playwright.config.ts` rather than creating a new one. Document this choice with a one-line note in the commit message.
+- **Path B — either absent:** allocate this task as the project-wide Playwright bring-up. Run `pnpm --filter frontend add -D @playwright/test && pnpm --filter frontend exec playwright install --with-deps`, then create `apps/frontend/playwright.config.ts` with project-wide defaults (baseURL `http://localhost:3000`, headless, reporters `list,html`, timeout 30s, retries 1 in CI). After config lands, proceed to Step 10.2. Note explicitly in the commit that this task installed Playwright project-wide because it was absent.
+
+Do NOT proceed to Step 10.2 until one path has been chosen and committed. Both paths are valid; the Findings section below tracks which was taken so future tasks know whether to reuse or extend the config.
 
 - [ ] **Step 10.2: Fixtures: pre-create SCIM-enabled tenant, generate token, seed users via backend SCIM API**
 

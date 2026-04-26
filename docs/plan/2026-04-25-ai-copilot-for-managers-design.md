@@ -234,7 +234,7 @@ type Tool struct {
     Name           string                              // "get_unit_summary"
     Description    string                              // shown to LLM
     Schema         json.RawMessage                     // JSON Schema for args
-    RequiredScopes []string                            // RBAC, e.g. ["unit:read", "stats:read"]
+    RequiredScopes []string                            // RBAC: ANY-of semantics — caller passes if it holds at least one of these scopes. Empty = unrestricted. e.g. ["unit:read", "stats:read"]
     Handler        func(ToolCtx, json.RawMessage) (Result, error)
     RateLimit      Limit                               // per-user/per-minute
 }
@@ -289,7 +289,7 @@ type Result struct {
 Each handler runs:
 
 1. JSON-Schema validation of `args`.
-2. RBAC guard: caller must hold one of `RequiredScopes` for `TenantID`. Reject otherwise with structured error the LLM can read.
+2. RBAC guard (any-of): caller must hold **at least one** of `RequiredScopes` for `TenantID`; an empty `RequiredScopes` means unrestricted. Reject otherwise with structured error the LLM can read.
 3. Tenant boundary: every repo call is scoped to `TenantID`; no cross-tenant aggregates.
 4. Underlying repo/service call.
 5. PII mask: `pii.Mask(out, ctx.PIILevel)` (Section 5).
@@ -412,8 +412,15 @@ CREATE TABLE copilot_threads (
 );
 CREATE INDEX ON copilot_threads (tenant_id, user_id, updated_at DESC);
 
+-- Note on tenant isolation: every child table carries `company_id` denormalised
+-- from `copilot_threads`. This is defense-in-depth: even if a query forgets
+-- the join through threads, the company filter still applies. Inserts populate
+-- company_id from the parent thread; a CHECK constraint or migration-time
+-- validation enforces consistency on backfill.
+
 CREATE TABLE copilot_messages (
     id            uuid PRIMARY KEY,
+    company_id    uuid NOT NULL,               -- denormalised from copilot_threads
     thread_id     uuid NOT NULL REFERENCES copilot_threads(id) ON DELETE CASCADE,
     role          text NOT NULL,               -- user|assistant|tool|system
     content       jsonb NOT NULL,              -- markdown text, tool_use blocks, tool_result, etc.
@@ -421,13 +428,14 @@ CREATE TABLE copilot_messages (
     tokens_out    int,
     provider      text,                        -- anthropic|yandex|gigachat
     model         text,
-    cost_usd_x10000 int,                       -- micros
+    cost_usd_micros int,                       -- USD * 1_000_000 (i.e. 3000 = $0.003)
     created_at    timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX ON copilot_messages (thread_id, created_at);
+CREATE INDEX ON copilot_messages (company_id, thread_id, created_at);
 
 CREATE TABLE copilot_tool_calls (
     id              uuid PRIMARY KEY,
+    company_id      uuid NOT NULL,             -- denormalised from copilot_threads
     message_id      uuid NOT NULL REFERENCES copilot_messages(id) ON DELETE CASCADE,
     tool_name       text NOT NULL,
     args_redacted   jsonb,                     -- args after redaction
@@ -437,16 +445,18 @@ CREATE TABLE copilot_tool_calls (
     error_message   text,
     created_at      timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX ON copilot_tool_calls (message_id);
+CREATE INDEX ON copilot_tool_calls (company_id, message_id);
 
 CREATE TABLE copilot_feedback (
     id            uuid PRIMARY KEY,
+    company_id    uuid NOT NULL,               -- denormalised from copilot_threads
     message_id    uuid NOT NULL REFERENCES copilot_messages(id) ON DELETE CASCADE,
     user_id       uuid NOT NULL,
     rating        smallint NOT NULL,           -- -1, 0, +1
     comment       text,
     created_at    timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX ON copilot_feedback (company_id, message_id);
 ```
 
 ### 6.2 Retention
@@ -455,7 +465,7 @@ Default 90 days. Per-tenant configurable up to 365. Background Asynq job purges 
 
 ### 6.3 Tenant isolation
 
-All reads filter by `tenant_id`. Cross-tenant access is impossible at the repository layer; users in multiple tenants see separate thread lists per tenant context.
+Every child row (`copilot_messages`, `copilot_tool_calls`, `copilot_feedback`) carries `company_id` denormalised from `copilot_threads`. Every read filters on `company_id` directly, not via the join through threads — so a query that forgets the thread join still hits the tenant filter. Writes populate `company_id` from the parent thread inside the conversation service; a backfill migration sets `company_id` on existing rows from `copilot_threads.company_id`. Users in multiple tenants see separate thread lists per tenant context.
 
 ---
 
@@ -543,7 +553,7 @@ All under existing JWT auth + tenant resolution middleware. Admin-only endpoints
 | `tool_call_started` | `{call_id, name, args_summary}` |
 | `tool_call_completed` | `{call_id, name, status, duration_ms, result_summary}` |
 | `citation` | `{tool_name, ref}` (may emit multiple per turn) |
-| `message_complete` | `{message_id, tokens_in, tokens_out, cost_usd_x10000}` |
+| `message_complete` | `{message_id, tokens_in, tokens_out, cost_usd_micros}` (cost is USD × 1,000,000 — divide by 1e6 for dollars) |
 | `error` | `{code, message, retryable}` |
 
 Heartbeat: SSE `: keepalive` comment every 15s to keep proxies open.

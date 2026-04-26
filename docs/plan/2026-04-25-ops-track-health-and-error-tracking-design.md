@@ -47,7 +47,7 @@ This unblocks the public status page sibling (Enterprise pack), the Prometheus/G
 
 **Runtime:** Yandex Cloud, same Kubernetes cluster as the backend. Three components:
 
-```
+```text
 GlitchTip stack (in-cluster):
   - glitchtip-web      (Django HTTP frontend)        × 2 replicas
   - glitchtip-worker   (Celery event ingestion)      × 3 replicas
@@ -81,7 +81,7 @@ Two web replicas + three workers handle 100 events/sec burst with headroom. Scal
 
 **Purpose:** answer "is the process alive and able to serve HTTP" — used by the LB / k8s liveness probe to decide restart.
 
-```
+```http
 GET /health/live HTTP/1.1
 →
 HTTP/1.1 200 OK
@@ -107,7 +107,7 @@ Checks executed in parallel with a 2-second budget:
 - **MinIO/S3 head bucket** (HEAD on a non-sensitive bucket)
 - **Asynq broker connectivity** (separate Redis client — same instance OK)
 
-```
+```http
 GET /health/ready HTTP/1.1
 →
 HTTP/1.1 200 OK         ← all deps ok

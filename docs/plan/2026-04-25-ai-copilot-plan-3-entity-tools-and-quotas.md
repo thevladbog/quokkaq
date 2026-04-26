@@ -2419,7 +2419,7 @@ func NewCostDashboardHandler(db *gorm.DB) *CostDashboardHandler {
 
 type KPIs struct {
 	TokensTotal       int64   `json:"tokensTotal"`
-	CostUSDx10000     int64   `json:"costUsdMicros"`
+	CostUSDMicros     int64   `json:"costUsdMicros"` // USD × 1,000,000
 	MessageCount      int64   `json:"messageCount"`
 	AbortRate         float64 `json:"abortRate"`
 	ThumbsUpRate      float64 `json:"thumbsUpRate"`
@@ -2462,13 +2462,13 @@ func (h *CostDashboardHandler) HandleKPIs(w http.ResponseWriter, r *http.Request
 	row := h.db.Raw(`
 SELECT
   COALESCE(SUM(COALESCE(m.tokens_in,0) + COALESCE(m.tokens_out,0)),0) AS tokens_total,
-  COALESCE(SUM(COALESCE(m.cost_usd_x10000,0)),0) AS cost,
+  COALESCE(SUM(COALESCE(m.cost_usd_micros,0)),0) AS cost,
   COUNT(*) FILTER (WHERE m.role IN ('user','assistant')) AS message_count,
   COUNT(DISTINCT t.user_id) AS unique_users
 FROM copilot_messages m
 JOIN copilot_threads t ON t.id = m.thread_id
 WHERE t.company_id = ? AND m.created_at >= ?`, ident.CompanyID, from).Row()
-	_ = row.Scan(&k.TokensTotal, &k.CostUSDx10000, &k.MessageCount, &k.UniqueUsers)
+	_ = row.Scan(&k.TokensTotal, &k.CostUSDMicros, &k.MessageCount, &k.UniqueUsers)
 
 	row = h.db.Raw(`
 SELECT
@@ -2677,7 +2677,7 @@ export function KPIGrid({ kpis }: { kpis: KPIs }) {
   const t = useTranslations('copilot.dashboard');
   const cards = [
     { label: t('kpiTokens'), value: kpis.tokensTotal.toLocaleString() },
-    { label: t('kpiCost'), value: '$' + (kpis.costUsdMicros / 10000).toFixed(2) },
+    { label: t('kpiCost'), value: '$' + (kpis.costUsdMicros / 1_000_000).toFixed(2) },
     { label: t('kpiMessages'), value: kpis.messageCount.toLocaleString() },
     { label: t('kpiUsers'), value: kpis.uniqueUsers.toString() },
     { label: t('kpiThumbsUp'), value: (kpis.thumbsUpRate * 100).toFixed(1) + '%' },

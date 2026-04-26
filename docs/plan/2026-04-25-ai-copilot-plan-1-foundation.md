@@ -346,15 +346,16 @@ import (
 // CopilotMessage roles: "user" | "assistant" | "tool" | "system".
 type CopilotMessage struct {
 	ID            string         `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	ThreadID      string         `gorm:"not null;index:idx_copilot_messages_thread_created,priority:1" json:"threadId"`
+	CompanyID     string         `gorm:"not null;index:idx_copilot_messages_company_thread_created,priority:1" json:"companyId"`
+	ThreadID      string         `gorm:"not null;index:idx_copilot_messages_company_thread_created,priority:2" json:"threadId"`
 	Role          string         `gorm:"not null;size:16" json:"role"`
 	Content       datatypes.JSON `gorm:"type:jsonb;not null" json:"content"`
 	TokensIn      *int           `json:"tokensIn,omitempty"`
 	TokensOut     *int           `json:"tokensOut,omitempty"`
 	Provider      *string        `gorm:"size:32" json:"provider,omitempty"`
 	Model         *string        `gorm:"size:64" json:"model,omitempty"`
-	CostUSDx10000 *int           `gorm:"column:cost_usd_x10000" json:"costUsdMicros,omitempty"`
-	CreatedAt     time.Time      `gorm:"default:now();index:idx_copilot_messages_thread_created,priority:2" json:"createdAt"`
+	CostUSDMicros *int           `gorm:"column:cost_usd_micros" json:"costUsdMicros,omitempty"`
+	CreatedAt     time.Time      `gorm:"default:now();index:idx_copilot_messages_company_thread_created,priority:3" json:"createdAt"`
 
 	Thread CopilotThread `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`
 }
@@ -378,7 +379,8 @@ import (
 // CopilotToolCall.Status: "ok" | "rbac_denied" | "invalid_args" | "error" | "timeout".
 type CopilotToolCall struct {
 	ID            string         `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	MessageID     string         `gorm:"not null;index" json:"messageId"`
+	CompanyID     string         `gorm:"not null;index:idx_copilot_tool_calls_company_message,priority:1" json:"companyId"`
+	MessageID     string         `gorm:"not null;index:idx_copilot_tool_calls_company_message,priority:2" json:"messageId"`
 	ToolName      string         `gorm:"not null;size:64" json:"toolName"`
 	ArgsRedacted  datatypes.JSON `gorm:"type:jsonb" json:"argsRedacted,omitempty"`
 	ResultSummary datatypes.JSON `gorm:"type:jsonb" json:"resultSummary,omitempty"`
@@ -404,7 +406,8 @@ import "time"
 
 type CopilotFeedback struct {
 	ID        string    `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	MessageID string    `gorm:"not null;index" json:"messageId"`
+	CompanyID string    `gorm:"not null;index:idx_copilot_feedback_company_message,priority:1" json:"companyId"`
+	MessageID string    `gorm:"not null;index:idx_copilot_feedback_company_message,priority:2" json:"messageId"`
 	UserID    string    `gorm:"not null" json:"userId"`
 	Rating    int16     `gorm:"not null" json:"rating"` // -1, 0, +1
 	Comment   *string   `gorm:"type:text" json:"comment,omitempty"`
@@ -682,8 +685,8 @@ func TestCopilotMessageRepository_AppendAndList(t *testing.T) {
 	_ = tr.Create(&models.CopilotThread{ID: "t1", CompanyID: "c1", UserID: "u1", Locale: "en"})
 
 	mr := NewCopilotMessageRepositoryWithDB(db)
-	a := &models.CopilotMessage{ID: "m1", ThreadID: "t1", Role: "user", Content: datatypes.JSON([]byte(`{"text":"hi"}`))}
-	b := &models.CopilotMessage{ID: "m2", ThreadID: "t1", Role: "assistant", Content: datatypes.JSON([]byte(`{"text":"hello"}`))}
+	a := &models.CopilotMessage{ID: "m1", CompanyID: "c1", ThreadID: "t1", Role: "user", Content: datatypes.JSON([]byte(`{"text":"hi"}`))}
+	b := &models.CopilotMessage{ID: "m2", CompanyID: "c1", ThreadID: "t1", Role: "assistant", Content: datatypes.JSON([]byte(`{"text":"hello"}`))}
 	if err := mr.Append(a); err != nil {
 		t.Fatal(err)
 	}
@@ -706,9 +709,9 @@ func TestCopilotMessageRepository_RecordToolCall(t *testing.T) {
 	tr := NewCopilotThreadRepositoryWithDB(db)
 	_ = tr.Create(&models.CopilotThread{ID: "t1", CompanyID: "c1", UserID: "u1", Locale: "en"})
 	mr := NewCopilotMessageRepositoryWithDB(db)
-	_ = mr.Append(&models.CopilotMessage{ID: "m1", ThreadID: "t1", Role: "assistant", Content: datatypes.JSON([]byte(`{}`))})
+	_ = mr.Append(&models.CopilotMessage{ID: "m1", CompanyID: "c1", ThreadID: "t1", Role: "assistant", Content: datatypes.JSON([]byte(`{}`))})
 
-	tc := &models.CopilotToolCall{ID: "tc1", MessageID: "m1", ToolName: "list_units", DurationMs: 12, Status: "ok"}
+	tc := &models.CopilotToolCall{ID: "tc1", CompanyID: "c1", MessageID: "m1", ToolName: "list_units", DurationMs: 12, Status: "ok"}
 	if err := mr.RecordToolCall(tc); err != nil {
 		t.Fatal(err)
 	}
@@ -727,9 +730,9 @@ func TestCopilotMessageRepository_RecordFeedback(t *testing.T) {
 	tr := NewCopilotThreadRepositoryWithDB(db)
 	_ = tr.Create(&models.CopilotThread{ID: "t1", CompanyID: "c1", UserID: "u1", Locale: "en"})
 	mr := NewCopilotMessageRepositoryWithDB(db)
-	_ = mr.Append(&models.CopilotMessage{ID: "m1", ThreadID: "t1", Role: "assistant", Content: datatypes.JSON([]byte(`{}`))})
+	_ = mr.Append(&models.CopilotMessage{ID: "m1", CompanyID: "c1", ThreadID: "t1", Role: "assistant", Content: datatypes.JSON([]byte(`{}`))})
 
-	if err := mr.RecordFeedback(&models.CopilotFeedback{MessageID: "m1", UserID: "u1", Rating: 1, Comment: ptrString("good")}); err != nil {
+	if err := mr.RecordFeedback(&models.CopilotFeedback{CompanyID: "c1", MessageID: "m1", UserID: "u1", Rating: 1, Comment: ptrString("good")}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -984,7 +987,7 @@ type AppendMessageInput struct {
 	TokensOut     *int
 	Provider      *string
 	Model         *string
-	CostUSDx10000 *int
+	CostUSDMicros *int
 }
 
 type Service struct {
@@ -1020,6 +1023,7 @@ func (s *Service) AppendMessage(ctx context.Context, in AppendMessageInput) (*mo
 		return nil, ErrThreadNotFound
 	}
 	msg := &models.CopilotMessage{
+		CompanyID:     in.CompanyID, // denormalised; verified via FindByID above
 		ThreadID:      in.ThreadID,
 		Role:          in.Role,
 		Content:       in.Content,
@@ -1027,7 +1031,7 @@ func (s *Service) AppendMessage(ctx context.Context, in AppendMessageInput) (*mo
 		TokensOut:     in.TokensOut,
 		Provider:      in.Provider,
 		Model:         in.Model,
-		CostUSDx10000: in.CostUSDx10000,
+		CostUSDMicros: in.CostUSDMicros,
 	}
 	if err := s.messages.Append(msg); err != nil {
 		return nil, err
@@ -1065,11 +1069,20 @@ func (s *Service) SoftDeleteThread(ctx context.Context, companyID, threadID stri
 	return s.threads.SoftDelete(companyID, threadID)
 }
 
+// RecordToolCall persists a tool call. Caller must set call.CompanyID — the
+// service will not infer it from the message because that would require an
+// extra DB read on the hot path. Chat handler sets it from request identity.
 func (s *Service) RecordToolCall(ctx context.Context, call *models.CopilotToolCall) error {
+	if call.CompanyID == "" {
+		return errors.New("copilot: tool call requires CompanyID")
+	}
 	return s.messages.RecordToolCall(call)
 }
 
 func (s *Service) RecordFeedback(ctx context.Context, fb *models.CopilotFeedback) error {
+	if fb.CompanyID == "" {
+		return errors.New("copilot: feedback requires CompanyID")
+	}
 	return s.messages.RecordFeedback(fb)
 }
 
@@ -1640,9 +1653,9 @@ var pricingTable = map[string]map[string]struct {
     },
 }
 
-// EstimateCostUSDx10000 returns cost in USD micros (1_000_000 = $1).
+// EstimateCostUSDMicros returns cost in USD micros (1_000_000 = $1).
 // Returns 0 for unknown providers/models so callers can show "—" instead of failing.
-func EstimateCostUSDx10000(provider, model string, usage Usage) int {
+func EstimateCostUSDMicros(provider, model string, usage Usage) int {
     p, ok := pricingTable[provider]
     if !ok {
         return 0
@@ -4125,7 +4138,7 @@ func (h *ChatHandler) HandleMessage(w http.ResponseWriter, r *http.Request) {
 			"toolCalls":  toolCallSummariesForPersistence(res.ToolCalls),
 			"stopReason": res.StopReason,
 		})
-		costMicros := gateway.EstimateCostUSDx10000("anthropic", h.defaultModel, res.Usage)
+		costMicros := gateway.EstimateCostUSDMicros("anthropic", h.defaultModel, res.Usage)
 		ti, to := res.Usage.InputTokens, res.Usage.OutputTokens
 		provider := "anthropic"
 		model := h.defaultModel
@@ -4138,7 +4151,7 @@ func (h *ChatHandler) HandleMessage(w http.ResponseWriter, r *http.Request) {
 			TokensOut:     &to,
 			Provider:      &provider,
 			Model:         &model,
-			CostUSDx10000: &costMicros,
+			CostUSDMicros: &costMicros,
 		})
 		if assistantMsg != nil {
 			for _, tc := range res.ToolCalls {
@@ -4146,6 +4159,7 @@ func (h *ChatHandler) HandleMessage(w http.ResponseWriter, r *http.Request) {
 				resultSummary, _ := json.Marshal(json.RawMessage(tc.Output))
 				errMsg := tc.ErrMsg
 				_ = h.convoSvc.RecordToolCall(r.Context(), &models.CopilotToolCall{
+					CompanyID:     ident.CompanyID,
 					MessageID:     assistantMsg.ID,
 					ToolName:      tc.Name,
 					ArgsRedacted:  datatypes.JSON(args),
@@ -4540,6 +4554,7 @@ func (h *FeedbackHandler) HandleFeedback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	fb := &models.CopilotFeedback{
+		CompanyID: ident.CompanyID,
 		MessageID: id,
 		UserID:    ident.UserID,
 		Rating:    int16(body.Rating),

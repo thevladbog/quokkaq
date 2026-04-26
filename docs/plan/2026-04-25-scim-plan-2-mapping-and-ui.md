@@ -750,8 +750,11 @@ package service
 
 import (
 	"context"
+	"sort"
+	"strings"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 
 	"github.com/quokkaq/backend/internal/scim/repository"
 )
@@ -884,11 +887,51 @@ func (s *RecomputeService) RecomputeUserGrants(ctx context.Context, companyID, u
 	return added, removed, nil
 }
 
+// diffSize returns true set-difference counts between current and target
+// assignments. Two assignments are considered the same when their (RoleCode,
+// UnitID, sorted ServiceIDs) tuple matches — that's the unique key for a
+// "same grant" under the Source-scoped replace.
+//
+// Earlier versions returned len(target) and len(current), which inflated the
+// audit-log added/removed counts whenever a recompute was a no-op or a small
+// change (e.g. swapping one ServiceID inflated both metrics). The audit event
+// is what operators read to gauge churn during a bulk recompute, so accurate
+// counts matter.
 func diffSize(current []repository.UserRoleAssignment, target []*repository.UserRoleAssignment) (added, removed int) {
-	// Pragmatic: ReplaceForSource always deletes + inserts, so absolute counts.
-	// More precise diffing is possible but not required for metrics.
-	added = len(target)
-	removed = len(current)
+	key := func(roleCode string, unitID *uuid.UUID, serviceIDs pq.UUIDArray) string {
+		var b strings.Builder
+		b.WriteString(roleCode)
+		b.WriteByte('|')
+		if unitID != nil {
+			b.WriteString(unitID.String())
+		}
+		b.WriteByte('|')
+		// Sort service IDs so order doesn't affect equality.
+		sids := make([]string, len(serviceIDs))
+		for i, id := range serviceIDs {
+			sids[i] = id.String()
+		}
+		sort.Strings(sids)
+		b.WriteString(strings.Join(sids, ","))
+		return b.String()
+	}
+	have := make(map[string]bool, len(current))
+	for i := range current {
+		have[key(current[i].RoleCode, current[i].UnitID, current[i].ServiceIDs)] = true
+	}
+	seen := make(map[string]bool, len(target))
+	for _, a := range target {
+		k := key(a.RoleCode, a.UnitID, a.ServiceIDs)
+		seen[k] = true
+		if !have[k] {
+			added++
+		}
+	}
+	for k := range have {
+		if !seen[k] {
+			removed++
+		}
+	}
 	return
 }
 ```
@@ -1082,7 +1125,7 @@ git commit -m "feat(scim): add bulk recompute job (fan out at 100 users/sec)"
 
 Wire recompute calls into the SCIM endpoints (Plan 1 left `// TODO recompute` markers in `GroupService.AddMembers / RemoveMembers / ReplaceMembers`).
 
-### Task 9 — Inject `EnqueueRecompute` into Plan 1 group service
+### Task 9 — Inject `triggerRecompute` into Plan 1 group service
 
 **Files:**
 - Modify: `apps/backend/internal/scim/service/group_service.go`
@@ -1094,7 +1137,7 @@ Add to `GroupService`:
 type GroupService struct {
 	repo               *repository.GroupRepo
 	userRepo           *repository.UserRepo
-	enqueueRecompute   func(ctx context.Context, companyID, userID uuid.UUID) error
+	triggerRecompute   func(ctx context.Context, companyID, userID uuid.UUID) error
 	enqueueGroupBulk   func(ctx context.Context, companyID, groupID uuid.UUID) error
 }
 
@@ -1111,7 +1154,7 @@ func NewGroupService(
 	if enqueueGroupBulk == nil {
 		enqueueGroupBulk = func(_ context.Context, _, _ uuid.UUID) error { return nil }
 	}
-	return &GroupService{repo: repo, userRepo: userRepo, enqueueRecompute: enqueueUser, enqueueGroupBulk: enqueueGroupBulk}
+	return &GroupService{repo: repo, userRepo: userRepo, triggerRecompute: enqueueUser, enqueueGroupBulk: enqueueGroupBulk}
 }
 ```
 
@@ -1132,7 +1175,7 @@ func (s *GroupService) AddMembers(ctx context.Context, companyID, groupID uuid.U
 	}
 	if len(ids) <= SyncRecomputeThreshold {
 		for _, uid := range ids {
-			if err := s.enqueueRecompute(ctx, companyID, uid); err != nil {
+			if err := s.triggerRecompute(ctx, companyID, uid); err != nil {
 				return err
 			}
 		}
@@ -1143,7 +1186,7 @@ func (s *GroupService) AddMembers(ctx context.Context, companyID, groupID uuid.U
 // (RemoveMembers / ReplaceMembers / Delete — same pattern.)
 ```
 
-Note: `enqueueRecompute` here is named "enqueue" but for ≤10 it should run sync (call the recompute service directly, no Asynq). To keep the interface simple, the Plan 1 wiring in `cmd/api/main.go` uses a single function that decides sync vs async:
+Note: `triggerRecompute` is intentionally **sync-or-async-agnostic**: callers don't decide, the wiring decides. For ≤10 users we call the recompute service directly (synchronous, fast); for bulk we enqueue an Asynq job. The name is neutral so neither path is misleading. The Plan 1 wiring in `cmd/api/main.go` injects a single function that picks based on the threshold:
 
 ```go
 // In cmd/api/main.go:
