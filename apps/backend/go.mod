@@ -25,7 +25,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/lmittmann/tint v1.1.3
 	github.com/mmcdole/gofeed v1.3.0
-	github.com/nyaruka/phonenumbers v1.7.1
+	github.com/nyaruka/phonenumbers v1.7.2
 	github.com/russellhaering/goxmldsig v1.6.0
 	github.com/rvinnie/yookassa-sdk-go v0.1.6
 	github.com/signintech/gopdf v0.36.0
