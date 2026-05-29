@@ -13,6 +13,10 @@ area/marketing:
   - changed-files:
       - any-glob-to-any-file: 'apps/marketing/**'
 
+area/docs:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/docs/**'
+
 area/backend:
   - changed-files:
       - any-glob-to-any-file: 'apps/backend/**'

@@ -1,0 +1,70 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+@import 'fumadocs-openapi/css/preset.css';
+
+@layer base {
+  :root {
+    /* QuokkaQ marketing-style surfaces + Fumadocs token overrides */
+    --color-quokkaq-primary: #ff6b35;
+    --color-fd-primary: #ff6b35;
+    --color-fd-primary-foreground: #fffef9;
+    --color-fd-background: #fefefe;
+    --color-fd-card: #fff8f3;
+    --color-fd-border: #f0e5db;
+    --color-fd-muted-foreground: #4b5563;
+  }
+
+  .dark {
+    --color-fd-primary: #ff6b35;
+    --color-fd-primary-foreground: #0a0908;
+    --color-fd-background: #0a0908;
+    --color-fd-card: #1a1614;
+    --color-fd-foreground: #fafafa;
+    --color-fd-border: #2d2622;
+    --color-fd-muted-foreground: #a8a29e;
+  }
+
+  body {
+    font-family: var(--font-sans, ui-sans-serif), system-ui, sans-serif;
+  }
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0 !important;
+  --removed-body-scroll-bar-size: 0 !important;
+}
+
+/* Clerk-style TOC: curved track, dot, and text — brand orange from `--color-fd-primary` */
+#nd-toc a[data-active='true'],
+header[data-toc-popover] a[data-active='true'] {
+  font-weight: 500;
+}
+
+#nd-toc svg .stroke-fd-primary,
+header[data-toc-popover] svg .stroke-fd-primary {
+  filter: drop-shadow(
+    0 0 4px color-mix(in srgb, var(--color-fd-primary) 28%, transparent)
+  );
+}
+
+/* Moving dot on the path (fumadocs `ThumbTrack` + `offsetPath`) */
+#nd-toc .absolute.size-1.rounded-full.bg-fd-primary,
+header[data-toc-popover] .absolute.size-1.rounded-full.bg-fd-primary {
+  box-shadow:
+    0 0 0 2px var(--color-fd-card),
+    0 0 0 1px color-mix(in srgb, var(--color-fd-primary) 45%, transparent);
+}
+
+/* MDX: <p> wrapped for paragraph comments — restore body rhythm in `.prose` */
+.prose [data-doc-para-wrap] {
+  margin-top: 1.2em;
+}
+
+.prose :is(h1, h2, h3, h4) + [data-doc-para-wrap] {
+  margin-top: 0.75em;
+}

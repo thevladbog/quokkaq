@@ -24,6 +24,11 @@ jobs:
                 color: 'F97316',
                 description: 'Changes under apps/marketing'
               },
+              {
+                name: 'area/docs',
+                color: '238636',
+                description: 'Changes under apps/docs (Fumadocs public docs site)'
+              },
               { name: 'area/backend', color: '1D76DB', description: 'Changes under apps/backend' },
               { name: 'area/kiosk', color: '5319E7', description: 'Changes under apps/kiosk-desktop' },
               { name: 'area/shared', color: 'FBCA04', description: 'Changes under packages/' },

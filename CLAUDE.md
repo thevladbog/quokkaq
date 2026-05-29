@@ -10,6 +10,7 @@ QuokkaQ is a multi-tenant SaaS platform for managing queuing, kiosk check-ins, a
 - `apps/frontend` — Next.js 16 + React 19, main web app (port 3000)
 - `apps/backend` — Go 1.26 REST API with PostgreSQL, Redis, MinIO (port 3001)
 - `apps/marketing` — Next.js 16 public marketing site (port 3010)
+- `apps/docs` — Next.js 16 + Fumadocs public documentation (port 3020; e.g. `docs.*` in production)
 - `apps/kiosk-desktop` — Tauri 2 + Rust desktop kiosk app
 
 **Packages:**
@@ -21,6 +22,14 @@ QuokkaQ is a multi-tenant SaaS platform for managing queuing, kiosk check-ins, a
 ## Development Commands
 
 All tasks go through Nx. Use `pnpm nx <target> <project>` or `pnpm nx run-many`.
+
+### Docs (Fumadocs)
+```bash
+pnpm nx run docs:dev          # Dev server (port 3020)
+pnpm nx run docs:build
+pnpm nx run docs:lint
+pnpm nx run docs:test         # fumadocs-mdx, next typegen, tsc
+```
 
 ### Frontend
 ```bash

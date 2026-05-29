@@ -1,0 +1,7 @@
+{
+  "root": true,
+  "title": "Documentation",
+  "description": "Integrations, HTTP API, digital signage, and embeddable queue widget",
+  "defaultOpen": true,
+  "pages": ["index", "developer-api", "digital-signage"]
+}

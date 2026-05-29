@@ -31,6 +31,7 @@ jobs:
       web: ${{ steps.check.outputs.web }}
       frontend: ${{ steps.check.outputs.frontend }}
       marketing: ${{ steps.check.outputs.marketing }}
+      docs: ${{ steps.check.outputs.docs }}
       backend: ${{ steps.check.outputs.backend }}
       kiosk: ${{ steps.check.outputs.kiosk }}
     steps:
@@ -54,7 +55,7 @@ jobs:
         run: |
           AFFECTED="$(pnpm nx show projects --affected --base=$NX_BASE --head=$NX_HEAD)"
 
-          if echo "$AFFECTED" | grep -qE 'frontend|marketing|shared-types|ui-kit|subscription-pricing'; then
+          if echo "$AFFECTED" | grep -qE 'frontend|marketing|docs|shared-types|ui-kit|subscription-pricing'; then
             echo "web=true" >> $GITHUB_OUTPUT
           else
             echo "web=false" >> $GITHUB_OUTPUT
@@ -70,6 +71,12 @@ jobs:
             echo "marketing=true" >> $GITHUB_OUTPUT
           else
             echo "marketing=false" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$AFFECTED" | grep -qxF 'docs'; then
+            echo "docs=true" >> $GITHUB_OUTPUT
+          else
+            echo "docs=false" >> $GITHUB_OUTPUT
           fi
 
           if echo "$AFFECTED" | grep -q "backend"; then
@@ -168,6 +175,8 @@ jobs:
       NX_EXCLUDE_WEB: '*,!tag:platform:web,!tag:scope:shared,!tag:scope:ui'
       # Marketing `next build` uses NODE_ENV=production; there is no .env.local in CI — getMetadataBaseUrl() needs a canonical origin (see apps/marketing/lib/marketing-site-url.ts).
       NEXT_PUBLIC_MARKETING_SITE_URL: https://quokkaq.com
+      # Docs `next build`: metadataBase in apps/docs/src/app/layout.tsx
+      NEXT_PUBLIC_DOCS_SITE_URL: https://quokkaq.com
     steps:
       - uses: actions/checkout@v6
         with:
@@ -199,6 +208,14 @@ jobs:
       - name: '🔷 Typecheck marketing (tsc --noEmit)'
         if: needs.affected.outputs.marketing == 'true'
         run: pnpm --dir apps/marketing exec tsc --noEmit
+
+      - name: '💅 Prettier (docs)'
+        if: needs.affected.outputs.docs == 'true'
+        run: pnpm nx run docs:format:check
+
+      - name: '🔷 Typecheck docs (tsc --noEmit)'
+        if: needs.affected.outputs.docs == 'true'
+        run: pnpm --dir apps/docs exec tsc --noEmit
 
       - name: '🏗️ Build, test, lint (affected web stack)'
         run: pnpm nx affected -t build,test,lint --base=$NX_BASE --head=$NX_HEAD --outputStyle=static --parallel=3 --exclude="$NX_EXCLUDE_WEB"
