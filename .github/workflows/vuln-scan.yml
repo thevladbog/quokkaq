@@ -20,7 +20,7 @@ jobs:
     name: pnpm audit (high+)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Enable Corepack
         run: corepack enable
@@ -78,7 +78,7 @@ jobs:
     name: govulncheck (Go)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Patched stdlib (e.g. crypto/tls, crypto/x509) is only fixed in Go 1.26.2+;
       # pin explicitly so govulncheck never runs on an older 1.26.x from the runner cache.
