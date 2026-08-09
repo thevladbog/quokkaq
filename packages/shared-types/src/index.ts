@@ -856,6 +856,16 @@ export {
 } from './experience-legacy';
 
 export {
+  validateExperienceForPublish,
+  type ExperienceValidationErrorCode,
+  type ExperienceValidationWarningCode,
+  type ExperienceValidationIssueCode,
+  type ExperienceValidationPath,
+  type ExperienceValidationIssue,
+  type ExperienceValidationReport
+} from './experience-validation';
+
+export {
   KioskIdentificationModeSchema,
   getKioskServiceIdentificationMode,
   type KioskIdentificationMode,
