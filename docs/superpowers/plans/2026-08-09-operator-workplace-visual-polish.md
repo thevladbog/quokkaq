@@ -194,7 +194,7 @@ It owns only:
 
 ~~~go
 r.Get("/{unitId}/services", serviceHandler.GetServicesByUnit)
-r.Get("/{unitId}/services-tree", serviceHandler.GetServicesTreeByUnit)
+r.Get("/{unitId}/services-tree", serviceHandler.GetServicesByUnit)
 ~~~
 
 Keep these three operations in the existing access.kiosk-only group:
@@ -234,6 +234,7 @@ git commit -m "fix(api): allow staff to read unit services"
 
 - Modify: apps/backend/internal/handlers/service_handler.go
 - Create: apps/backend/internal/handlers/service_openapi_contract_test.go
+- Modify: apps/backend/cmd/api/main.go
 - Modify generated: apps/backend/docs/swagger.json
 - Modify generated: apps/backend/docs/swagger.yaml
 - Modify generated: apps/backend/docs/openapi.json
@@ -275,6 +276,8 @@ func (h *ServiceHandler) GetServicesTreeByUnit(w http.ResponseWriter, r *http.Re
 }
 ~~~
 
+Switch only the services-tree route in apps/backend/cmd/api/main.go from GetServicesByUnit to GetServicesTreeByUnit in the same service-read authorization group introduced by Task 2.
+
 - [ ] **Step 2: Add a generated-contract assertion and run RED**
 
 Create apps/backend/internal/handlers/service_openapi_contract_test.go. Load ../../docs/openapi.json and assert both GET paths expose 401 and 403 responses.
@@ -308,6 +311,8 @@ Expected: backend tests and generated clients compile. If the full frontend buil
 
 ~~~bash
 git add apps/backend/internal/handlers/service_handler.go \
+  apps/backend/internal/handlers/service_openapi_contract_test.go \
+  apps/backend/cmd/api/main.go \
   apps/backend/docs/swagger.json \
   apps/backend/docs/swagger.yaml \
   apps/backend/docs/openapi.json \
