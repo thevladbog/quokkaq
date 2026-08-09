@@ -169,9 +169,15 @@ export function StaffQueuePanel({
     <>
       <TooltipProvider>
         <Card className='border-border/70 flex h-full min-h-0 flex-col gap-0 overflow-hidden py-0 shadow-sm'>
-          <CardHeader className='border-border/50 shrink-0 space-y-1.5 border-b py-2'>
-            <div className='flex items-start justify-between gap-2'>
-              <div className='min-w-0 flex-1'>
+          <CardHeader
+            data-testid='staff-queue-header'
+            className='border-border/50 shrink-0 space-y-1.5 border-b px-4 py-3 sm:px-5'
+          >
+            <div
+              data-testid='staff-queue-header-layout'
+              className='flex flex-col gap-3'
+            >
+              <div className='min-w-0'>
                 <CardTitle className='text-sm leading-tight font-semibold'>
                   <h2>{t('queue.title')}</h2>
                 </CardTitle>
@@ -179,7 +185,7 @@ export function StaffQueuePanel({
                   {t('queue.description')}
                 </CardDescription>
               </div>
-              <div className='flex shrink-0 flex-wrap justify-end gap-1'>
+              <div className='flex w-full flex-wrap justify-start gap-1.5'>
                 {scopeLeaves.length > 0 && (
                   <Button
                     type='button'

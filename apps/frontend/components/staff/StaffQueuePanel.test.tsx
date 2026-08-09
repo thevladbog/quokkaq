@@ -182,6 +182,30 @@ describe('StaffQueuePanel', () => {
     expect(screen.getAllByTestId('staff-queue-skeleton')).toHaveLength(5);
   });
 
+  it('keeps queue controls below the title with comfortable panel padding', () => {
+    renderPanel({
+      leafServicesForCreate: [{ id: 'service-a', label: 'Payments' }]
+    });
+
+    const header = screen.getByTestId('staff-queue-header');
+    const layout = screen.getByTestId('staff-queue-header-layout');
+
+    expect(header).toHaveClass('px-4', 'py-3', 'sm:px-5');
+    expect(layout).toHaveClass('flex-col', 'gap-3');
+    expect(
+      within(layout).getByRole('heading', { name: 'Waiting queue' })
+    ).toBeVisible();
+    expect(
+      within(layout).getByRole('button', { name: 'Services' })
+    ).toBeVisible();
+    expect(
+      within(layout).getByRole('button', { name: 'Filters' })
+    ).toBeVisible();
+    expect(
+      within(layout).getByRole('button', { name: 'New ticket' })
+    ).toBeVisible();
+  });
+
   it('renders an alert and retry action when the queue fails', () => {
     const onRetryQueue = vi.fn();
     renderPanel({
