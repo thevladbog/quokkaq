@@ -2046,6 +2046,8 @@
     },
     "visitor_context": {
       "title": "Visitor notes & history",
+      "details_title": "Visitor details",
+      "details_description": "Review notes and recent visits for this ticket.",
       "visitor_on_ticket": "Visitor on this ticket",
       "change_visitor_hint": "While the ticket is called or in service, open Link visitor: search the directory or enter name and phone manually (a new profile is created when needed).",
       "attach_visitor": "Link visitor",
