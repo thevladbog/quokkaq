@@ -201,6 +201,10 @@ func applyTweaks(doc *openapi3.T) error {
 
 	_ = patchStatisticsExportPDFErrorResponses(doc)
 
+	if err := patchTerminalExperienceDeploymentContract(doc); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -907,6 +911,130 @@ func patchUpsertGroupMappingJSON(comp *openapi3.Components) error {
 	})
 	return nil
 }
+
+// patchTerminalExperienceDeploymentContract replaces Swagger 2 carrier DTOs
+// with the strict mode/status-discriminated OpenAPI 3 deployment protocol.
+// swag cannot emit oneOf, literal discriminators, or additionalProperties:
+// false for these variants, so the source DTOs deliberately act only as
+// conversion anchors. Keep this endpoint-specific patch synchronized with the
+// strict JSON decoder in internal/handlers/experience_runtime_handler.go.
+func patchTerminalExperienceDeploymentContract(doc *openapi3.T) error {
+	if doc.Components == nil {
+		return fmt.Errorf("patchTerminalExperienceDeploymentContract: components missing")
+	}
+	comp := doc.Components
+	legacy, err := getSchema(comp, "handlers.LegacyManifest")
+	if err != nil {
+		return err
+	}
+	experience, err := getSchema(comp, "handlers.ExperienceManifest")
+	if err != nil {
+		return err
+	}
+	applied, err := getSchema(comp, "handlers.AppliedExperienceAcknowledgement")
+	if err != nil {
+		return err
+	}
+	rejected, err := getSchema(comp, "handlers.RejectedExperienceAcknowledgement")
+	if err != nil {
+		return err
+	}
+	manifestCarrier, err := getSchema(comp, "handlers.TerminalExperienceManifestResponseDoc")
+	if err != nil {
+		return err
+	}
+	ackCarrier, err := getSchema(comp, "handlers.TerminalExperienceAckRequestDoc")
+	if err != nil {
+		return err
+	}
+
+	if err := patchTerminalExperienceObjectVariant(legacy, []string{"mode"}, map[string][]any{"mode": {"legacy"}}); err != nil {
+		return fmt.Errorf("patch terminal legacy manifest: %w", err)
+	}
+	if err := patchTerminalExperienceObjectVariant(experience, []string{"mode", "templateId", "versionId", "version", "variantId", "definition", "publishedAt"}, map[string][]any{"mode": {"experience"}}); err != nil {
+		return fmt.Errorf("patch terminal experience manifest: %w", err)
+	}
+	if err := patchTerminalExperienceObjectVariant(applied, []string{"versionId", "status"}, map[string][]any{"status": {"applied"}}); err != nil {
+		return fmt.Errorf("patch applied experience acknowledgement: %w", err)
+	}
+	if err := patchTerminalExperienceObjectVariant(rejected, []string{"versionId", "status", "reasonCode"}, map[string][]any{"status": {"rejected"}}); err != nil {
+		return fmt.Errorf("patch rejected experience acknowledgement: %w", err)
+	}
+
+	for _, schema := range []*openapi3.Schema{applied, rejected} {
+		versionID := schema.Properties["versionId"]
+		if versionID == nil || versionID.Value == nil {
+			return fmt.Errorf("acknowledgement versionId property missing")
+		}
+		versionID.Value.Type = &openapi3.Types{"string"}
+		versionID.Value.MinLength = 1
+	}
+	reasonCode := rejected.Properties["reasonCode"]
+	if reasonCode == nil || reasonCode.Value == nil {
+		return fmt.Errorf("rejected acknowledgement reasonCode property missing")
+	}
+	reasonCode.Value.Type = &openapi3.Types{"string"}
+	reasonCode.Value.MinLength = 1
+	reasonCode.Value.MaxLength = uint64Ptr(64)
+	reasonCode.Value.Pattern = `^[a-z0-9]+(?:[._-][a-z0-9]+)*$`
+
+	manifestCarrier.Type = nil
+	manifestCarrier.Properties = nil
+	manifestCarrier.Required = nil
+	manifestCarrier.OneOf = openapi3.SchemaRefs{
+		openapi3.NewSchemaRef("#/components/schemas/handlers.LegacyManifest", nil),
+		openapi3.NewSchemaRef("#/components/schemas/handlers.ExperienceManifest", nil),
+	}
+	manifestCarrier.Discriminator = &openapi3.Discriminator{
+		PropertyName: "mode",
+		Mapping: openapi3.StringMap[openapi3.MappingRef]{
+			"legacy":     {Ref: "#/components/schemas/handlers.LegacyManifest"},
+			"experience": {Ref: "#/components/schemas/handlers.ExperienceManifest"},
+		},
+	}
+
+	ackCarrier.Type = nil
+	ackCarrier.Properties = nil
+	ackCarrier.Required = nil
+	ackCarrier.OneOf = openapi3.SchemaRefs{
+		openapi3.NewSchemaRef("#/components/schemas/handlers.AppliedExperienceAcknowledgement", nil),
+		openapi3.NewSchemaRef("#/components/schemas/handlers.RejectedExperienceAcknowledgement", nil),
+	}
+	ackCarrier.Discriminator = &openapi3.Discriminator{
+		PropertyName: "status",
+		Mapping: openapi3.StringMap[openapi3.MappingRef]{
+			"applied":  {Ref: "#/components/schemas/handlers.AppliedExperienceAcknowledgement"},
+			"rejected": {Ref: "#/components/schemas/handlers.RejectedExperienceAcknowledgement"},
+		},
+	}
+	return nil
+}
+
+func patchTerminalExperienceObjectVariant(schema *openapi3.Schema, required []string, literalEnums map[string][]any) error {
+	if schema.Properties == nil {
+		return fmt.Errorf("properties missing")
+	}
+	falseVal := false
+	schema.Type = &openapi3.Types{"object"}
+	schema.Required = required
+	schema.AdditionalProperties = openapi3.AdditionalProperties{Has: &falseVal}
+	for property, values := range literalEnums {
+		ref := schema.Properties[property]
+		if ref == nil || ref.Value == nil {
+			return fmt.Errorf("%s property missing", property)
+		}
+		ref.Value.Type = &openapi3.Types{"string"}
+		ref.Value.Enum = values
+	}
+	for _, property := range required {
+		if ref := schema.Properties[property]; ref == nil || ref.Value == nil {
+			return fmt.Errorf("required %s property missing", property)
+		}
+	}
+	return nil
+}
+
+func uint64Ptr(value uint64) *uint64 { return &value }
 
 func patchKioskConfigRequest(comp *openapi3.Components) error {
 	s, err := getSchema(comp, "handlers.PatchUnitKioskConfigRequest")

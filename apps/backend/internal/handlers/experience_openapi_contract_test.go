@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 	"reflect"
 	"strings"
@@ -108,13 +109,17 @@ func TestExperienceOpenAPISourceAnnotationsAreGeneratable(t *testing.T) {
 			t.Errorf("%s.publishedBy x-nullable = %v", schemaName, publisher.Extensions["x-nullable"])
 		}
 	}
-	manifestSchema, ok := document.Definitions["services.TerminalExperienceManifest"]
-	if !ok {
-		t.Fatal("missing generated schema services.TerminalExperienceManifest")
+	manifestPath := document.Paths.Paths["/terminal/experience"].Get
+	manifestResponse, ok := manifestPath.Responses.StatusCodeResponses[http.StatusOK]
+	if !ok || manifestResponse.Schema == nil {
+		t.Fatal("terminal manifest source response lacks a schema")
 	}
-	for _, propertyName := range []string{"mode", "templateId", "versionId", "version", "variantId", "definition", "publishedAt"} {
-		if _, ok := manifestSchema.Properties[propertyName]; !ok {
-			t.Errorf("runtime manifest schema missing property %s", propertyName)
+	if manifestResponse.Schema.Ref.String() != "#/definitions/handlers.TerminalExperienceManifestResponseDoc" {
+		t.Fatalf("terminal manifest response ref = %q", manifestResponse.Schema.Ref.String())
+	}
+	for _, schemaName := range []string{"handlers.LegacyManifest", "handlers.ExperienceManifest"} {
+		if _, ok := document.Definitions[schemaName]; !ok {
+			t.Fatalf("missing generated runtime variant schema %s", schemaName)
 		}
 	}
 	ackPath := document.Paths.Paths["/terminal/experience/ack"].Post
@@ -124,20 +129,30 @@ func TestExperienceOpenAPISourceAnnotationsAreGeneratable(t *testing.T) {
 			ackRequestRef = parameter.Schema.Ref.String()
 		}
 	}
-	if ackRequestRef != "#/definitions/handlers.TerminalExperienceAckRequest" {
+	if ackRequestRef != "#/definitions/handlers.TerminalExperienceAckRequestDoc" {
 		t.Fatalf("terminal acknowledgement request ref = %q", ackRequestRef)
 	}
-	ackSchema, ok := document.Definitions["handlers.TerminalExperienceAckRequest"]
-	if !ok {
-		t.Fatal("missing generated acknowledgement request schema")
-	}
-	for _, propertyName := range []string{"versionId", "status", "reasonCode"} {
-		if _, ok := ackSchema.Properties[propertyName]; !ok {
-			t.Errorf("acknowledgement schema missing property %s", propertyName)
+	for _, schemaName := range []string{"handlers.AppliedExperienceAcknowledgement", "handlers.RejectedExperienceAcknowledgement"} {
+		if _, ok := document.Definitions[schemaName]; !ok {
+			t.Fatalf("missing generated acknowledgement variant schema %s", schemaName)
 		}
 	}
-	if _, exists := ackSchema.Properties["terminalId"]; exists {
-		t.Error("acknowledgement schema must not accept terminalId")
+
+	experienceSource, err := os.ReadFile("experience_runtime_handler.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, marker := range []string{
+		"@Success      200 {object} TerminalExperienceManifestResponseDoc",
+		"@Param        body body TerminalExperienceAckRequestDoc true \"Acknowledgement payload\"",
+		"type LegacyManifest struct",
+		"type ExperienceManifest struct",
+		"type AppliedExperienceAcknowledgement struct",
+		"type RejectedExperienceAcknowledgement struct",
+	} {
+		if !strings.Contains(string(experienceSource), marker) {
+			t.Errorf("terminal runtime Swagger source lacks marker %q", marker)
+		}
 	}
 	pageSchema, ok := document.Definitions["models.ExperienceTemplateVersionPage"]
 	if !ok {

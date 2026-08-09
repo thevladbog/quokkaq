@@ -333,13 +333,7 @@ func (s *desktopTerminalService) persistTerminalUpdate(companyID string, termina
 }
 
 func (s *desktopTerminalService) Revoke(id string) error {
-	t, err := s.repo.FindByID(id)
-	if err != nil {
-		return err
-	}
-	now := time.Now()
-	t.RevokedAt = &now
-	return s.repo.Update(t)
+	return s.repo.Revoke(context.Background(), id)
 }
 
 func (s *desktopTerminalService) Bootstrap(pairingCode string) (token, unitID, defaultLocale, appBaseURL string, kioskFullscreen bool, counterID *string, terminalKind string, err error) {
@@ -376,9 +370,10 @@ func (s *desktopTerminalService) Bootstrap(pairingCode string) (token, unitID, d
 		return "", "", "", "", false, nil, "", e
 	}
 
-	now := time.Now()
-	t.LastSeenAt = &now
-	_ = s.repo.Update(t)
+	// Bootstrap authenticated the terminal from the row that was read above,
+	// but revocation can happen immediately afterwards. Touch only last_seen_at
+	// with an active-row predicate instead of saving that stale full row back.
+	_ = s.repo.TouchLastSeen(context.Background(), t.ID)
 
 	base := os.Getenv("APP_BASE_URL")
 	if base == "" {

@@ -687,6 +687,131 @@ func openExperienceRepositoryPostgres(t *testing.T) *gorm.DB {
 	return db
 }
 
+type terminalExperienceRevoker interface {
+	Revoke(context.Context, string) error
+}
+
+func seedPostgresTerminalExperienceAcknowledgement(t *testing.T) (*gorm.DB, *desktopTerminalRepository, *models.ExperienceTemplateVersion) {
+	t.Helper()
+	db := openExperienceRepositoryPostgres(t)
+	ctx := context.Background()
+	definition := repositoryDefinition("terminal-revoke-race", "portrait")
+	for _, seed := range []struct {
+		query string
+		args  []any
+	}{
+		{query: `INSERT INTO companies (id, name) VALUES ('company-a', 'Company A')`},
+		{query: `INSERT INTO users (id, name) VALUES ('publisher', 'Publisher')`},
+		{query: `INSERT INTO units (id, company_id, code, kind, name, timezone) VALUES ('unit-a', 'company-a', 'UNIT-A', 'subdivision', 'Unit A', 'UTC')`},
+		{query: `INSERT INTO screen_layout_templates (id, company_id, name, definition, surface) VALUES ('template-a', 'company-a', 'Template A', ?, 'ticket-station')`, args: []any{definition}},
+		{query: `INSERT INTO desktop_terminals (id, unit_id, kind, default_locale, pairing_code_digest, secret_hash) VALUES ('terminal-a', 'unit-a', 'kiosk', 'en', 'task7-revoke-race-digest', 'task7-revoke-race-hash')`},
+	} {
+		if err := db.Exec(seed.query, seed.args...).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	screenRepo := &screenLayoutTemplateRepository{db: db}
+	published, err := screenRepo.Publish(ctx, "company-a", "template-a", "publisher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	templateID, variantID := "template-a", "portrait"
+	if err := screenRepo.UpdateTerminalWithExperience(ctx, "company-a", &models.DesktopTerminal{
+		ID: "terminal-a", UnitID: "unit-a", Kind: models.DesktopTerminalKindKiosk, DefaultLocale: "en",
+	}, TerminalExperienceAssignment{Specified: true, TemplateID: &templateID, VariantID: &variantID}); err != nil {
+		t.Fatal(err)
+	}
+	return db, &desktopTerminalRepository{db: db}, published
+}
+
+func TestExperienceRuntimeAcknowledgement_PostgresAcknowledgementWinsOverConcurrentRevoke(t *testing.T) {
+	db, terminalRepo, published := seedPostgresTerminalExperienceAcknowledgement(t)
+	revoker, ok := any(terminalRepo).(terminalExperienceRevoker)
+	if !ok {
+		t.Fatal("desktop terminal repository must expose a column-only Revoke operation")
+	}
+
+	revokeInvoked := make(chan struct{})
+	revokeResult := make(chan error, 1)
+	interleavingLogger := &terminalAcknowledgementInterleaveLogger{Interface: gormlogger.Default, afterTerminalRead: func() {
+		go func() {
+			close(revokeInvoked)
+			revokeResult <- revoker.Revoke(context.Background(), "terminal-a")
+		}()
+		<-revokeInvoked
+	}}
+	ackRepo := &desktopTerminalRepository{db: db.Session(&gorm.Session{Logger: interleavingLogger})}
+	if err := ackRepo.AcknowledgeExperience(context.Background(), "terminal-a", published.ID, "applied", nil); err != nil {
+		t.Fatalf("acknowledgement that acquired the row lock first: %v", err)
+	}
+	if err := <-revokeResult; err != nil {
+		t.Fatalf("concurrent revoke after acknowledgement: %v", err)
+	}
+
+	var stored models.DesktopTerminal
+	if err := db.First(&stored, "id = ?", "terminal-a").Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.RevokedAt == nil || stored.ExperienceTemplateID == nil || *stored.ExperienceTemplateID != "template-a" || stored.ExperienceVariantID == nil || *stored.ExperienceVariantID != "portrait" || stored.AppliedTemplateVersionID == nil || *stored.AppliedTemplateVersionID != published.ID || stored.AppliedTemplateAt == nil || stored.ExperienceAckStatus == nil || *stored.ExperienceAckStatus != "applied" || stored.ExperienceAckReasonCode != nil || stored.ExperienceAckAt == nil {
+		t.Fatalf("acknowledgement winner was overwritten by revoke: %#v", stored)
+	}
+}
+
+func TestExperienceRuntimeAcknowledgement_PostgresRevokeWinsAndAcknowledgementDoesNotMutate(t *testing.T) {
+	db, terminalRepo, published := seedPostgresTerminalExperienceAcknowledgement(t)
+	revoker, ok := any(terminalRepo).(terminalExperienceRevoker)
+	if !ok {
+		t.Fatal("desktop terminal repository must expose a column-only Revoke operation")
+	}
+
+	if err := revoker.Revoke(context.Background(), "terminal-a"); err != nil {
+		t.Fatalf("revoke: %v", err)
+	}
+	if err := terminalRepo.AcknowledgeExperience(context.Background(), "terminal-a", published.ID, "applied", nil); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("acknowledgement after winning revoke = %v, want not found", err)
+	}
+
+	var stored models.DesktopTerminal
+	if err := db.First(&stored, "id = ?", "terminal-a").Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.RevokedAt == nil || stored.AppliedTemplateVersionID != nil || stored.AppliedTemplateAt != nil || stored.ExperienceAckStatus != nil || stored.ExperienceAckReasonCode != nil || stored.ExperienceAckAt != nil {
+		t.Fatalf("revoke winner allowed acknowledgement mutation: %#v", stored)
+	}
+}
+
+func TestExperienceRuntimeAcknowledgement_PostgresRevokeAndLastSeenDoNotClobberEachOther(t *testing.T) {
+	db, terminalRepo, _ := seedPostgresTerminalExperienceAcknowledgement(t)
+	if err := terminalRepo.TouchLastSeen(context.Background(), "terminal-a"); err != nil {
+		t.Fatalf("touch active terminal: %v", err)
+	}
+	if err := terminalRepo.Revoke(context.Background(), "terminal-a"); err != nil {
+		t.Fatalf("revoke after activity: %v", err)
+	}
+	var touchedThenRevoked models.DesktopTerminal
+	if err := db.First(&touchedThenRevoked, "id = ?", "terminal-a").Error; err != nil {
+		t.Fatal(err)
+	}
+	if touchedThenRevoked.LastSeenAt == nil || touchedThenRevoked.RevokedAt == nil {
+		t.Fatalf("touch then revoke lost activity or revocation: %#v", touchedThenRevoked)
+	}
+
+	db, terminalRepo, _ = seedPostgresTerminalExperienceAcknowledgement(t)
+	if err := terminalRepo.Revoke(context.Background(), "terminal-a"); err != nil {
+		t.Fatalf("revoke before activity: %v", err)
+	}
+	if err := terminalRepo.TouchLastSeen(context.Background(), "terminal-a"); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("touch after revoke = %v, want not found", err)
+	}
+	var revokedThenTouched models.DesktopTerminal
+	if err := db.First(&revokedThenTouched, "id = ?", "terminal-a").Error; err != nil {
+		t.Fatal(err)
+	}
+	if revokedThenTouched.RevokedAt == nil || revokedThenTouched.LastSeenAt != nil {
+		t.Fatalf("revoke then touch resurrected or changed terminal: %#v", revokedThenTouched)
+	}
+}
+
 func TestExperienceRepository_PostgresLockingRetryAndForeignKeys(t *testing.T) {
 	db := openExperienceRepositoryPostgres(t)
 	repo := &screenLayoutTemplateRepository{db: db}
@@ -845,14 +970,19 @@ func TestExperienceRuntimeAcknowledgement_PostgresPublishBetweenReadAndUpdateCon
 	db := openExperienceRepositoryPostgres(t)
 	ctx := context.Background()
 	definition := repositoryDefinition("published-v1", "portrait")
-	if err := db.Exec(`
-INSERT INTO companies (id, name) VALUES ('company-a', 'Company A');
-INSERT INTO users (id, name) VALUES ('publisher', 'Publisher');
-INSERT INTO units (id, company_id, code, kind, name, timezone) VALUES ('unit-a', 'company-a', 'UNIT-A', 'subdivision', 'Unit A', 'UTC');
-INSERT INTO screen_layout_templates (id, company_id, name, definition, surface) VALUES ('template-a', 'company-a', 'Template A', ?, 'ticket-station');
-INSERT INTO desktop_terminals (id, unit_id, kind, default_locale, pairing_code_digest, secret_hash) VALUES ('terminal-a', 'unit-a', 'kiosk', 'en', 'task7-publish-race-digest', 'task7-publish-race-hash');
-`, definition).Error; err != nil {
-		t.Fatal(err)
+	for _, seed := range []struct {
+		query string
+		args  []any
+	}{
+		{query: `INSERT INTO companies (id, name) VALUES ('company-a', 'Company A')`},
+		{query: `INSERT INTO users (id, name) VALUES ('publisher', 'Publisher')`},
+		{query: `INSERT INTO units (id, company_id, code, kind, name, timezone) VALUES ('unit-a', 'company-a', 'UNIT-A', 'subdivision', 'Unit A', 'UTC')`},
+		{query: `INSERT INTO screen_layout_templates (id, company_id, name, definition, surface) VALUES ('template-a', 'company-a', 'Template A', ?, 'ticket-station')`, args: []any{definition}},
+		{query: `INSERT INTO desktop_terminals (id, unit_id, kind, default_locale, pairing_code_digest, secret_hash) VALUES ('terminal-a', 'unit-a', 'kiosk', 'en', 'task7-publish-race-digest', 'task7-publish-race-hash')`},
+	} {
+		if err := db.Exec(seed.query, seed.args...).Error; err != nil {
+			t.Fatal(err)
+		}
 	}
 	screenRepo := &screenLayoutTemplateRepository{db: db}
 	v1, err := screenRepo.Publish(ctx, "company-a", "template-a", "publisher")
@@ -893,16 +1023,20 @@ func TestExperienceRuntimeAcknowledgement_PostgresReassignmentDuringAcknowledgem
 	db := openExperienceRepositoryPostgres(t)
 	ctx := context.Background()
 	definition := repositoryDefinition("published-a", "portrait")
-	if err := db.Exec(`
-INSERT INTO companies (id, name) VALUES ('company-a', 'Company A');
-INSERT INTO users (id, name) VALUES ('publisher', 'Publisher');
-INSERT INTO units (id, company_id, code, kind, name, timezone) VALUES ('unit-a', 'company-a', 'UNIT-A', 'subdivision', 'Unit A', 'UTC');
-INSERT INTO screen_layout_templates (id, company_id, name, definition, surface) VALUES
-		('template-a', 'company-a', 'Template A', ?, 'ticket-station'),
-		('template-b', 'company-a', 'Template B', ?, 'ticket-station');
-INSERT INTO desktop_terminals (id, unit_id, kind, default_locale, pairing_code_digest, secret_hash) VALUES ('terminal-a', 'unit-a', 'kiosk', 'en', 'task7-reassign-race-digest', 'task7-reassign-race-hash');
-`, definition, repositoryDefinition("published-b", "portrait")).Error; err != nil {
-		t.Fatal(err)
+	for _, seed := range []struct {
+		query string
+		args  []any
+	}{
+		{query: `INSERT INTO companies (id, name) VALUES ('company-a', 'Company A')`},
+		{query: `INSERT INTO users (id, name) VALUES ('publisher', 'Publisher')`},
+		{query: `INSERT INTO units (id, company_id, code, kind, name, timezone) VALUES ('unit-a', 'company-a', 'UNIT-A', 'subdivision', 'Unit A', 'UTC')`},
+		{query: `INSERT INTO screen_layout_templates (id, company_id, name, definition, surface) VALUES ('template-a', 'company-a', 'Template A', ?, 'ticket-station')`, args: []any{definition}},
+		{query: `INSERT INTO screen_layout_templates (id, company_id, name, definition, surface) VALUES ('template-b', 'company-a', 'Template B', ?, 'ticket-station')`, args: []any{repositoryDefinition("published-b", "portrait")}},
+		{query: `INSERT INTO desktop_terminals (id, unit_id, kind, default_locale, pairing_code_digest, secret_hash) VALUES ('terminal-a', 'unit-a', 'kiosk', 'en', 'task7-reassign-race-digest', 'task7-reassign-race-hash')`},
+	} {
+		if err := db.Exec(seed.query, seed.args...).Error; err != nil {
+			t.Fatal(err)
+		}
 	}
 	screenRepo := &screenLayoutTemplateRepository{db: db}
 	v1, err := screenRepo.Publish(ctx, "company-a", "template-a", "publisher")

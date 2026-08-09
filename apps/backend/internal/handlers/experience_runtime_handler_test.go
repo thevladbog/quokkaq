@@ -269,3 +269,89 @@ func TestRegisterTerminalExperienceRoutes_UsesOnlyTerminalJWTAuthentication(t *t
 		t.Fatalf("user status=%d cache=%q terminalIDs=%v body=%s", userRecorder.Code, userRecorder.Header().Get("Cache-Control"), svc.terminalIDs, userRecorder.Body.String())
 	}
 }
+
+func TestRegisterTerminalExperienceRoutes_SetsNoStoreBeforeTerminalAuthentication(t *testing.T) {
+	t.Setenv("JWT_SECRET", "terminal-runtime-cache-route-test")
+	svc := &runtimeManifestService{manifest: &services.TerminalExperienceManifest{Mode: services.TerminalExperienceModeLegacy}}
+	router := chi.NewRouter()
+	router.Get("/unrelated", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	RegisterTerminalExperienceRoutes(router, NewExperienceRuntimeHandler(svc))
+
+	sign := func(t *testing.T, claims jwt.MapClaims) string {
+		t.Helper()
+		token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte("terminal-runtime-cache-route-test"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return "Bearer " + token
+	}
+	terminalAuth := sign(t, jwt.MapClaims{"sub": "terminal-authenticated", "typ": "terminal", "unit_id": "unit-a"})
+	staffAuth := sign(t, jwt.MapClaims{"sub": "staff-user", "typ": "access"})
+
+	tests := []struct {
+		name          string
+		method        string
+		path          string
+		body          string
+		auth          string
+		serviceErr    error
+		serviceAckErr error
+		wantStatus    int
+		wantBody      string
+	}{
+		{name: "missing JWT", method: http.MethodGet, path: "/terminal/experience", wantStatus: http.StatusUnauthorized, wantBody: "Authentication required\n"},
+		{name: "acknowledgement missing JWT", method: http.MethodPost, path: "/terminal/experience/ack", body: `{"versionId":"version-a","status":"applied"}`, wantStatus: http.StatusUnauthorized, wantBody: "Authentication required\n"},
+		{name: "malformed JWT", method: http.MethodGet, path: "/terminal/experience", auth: "Bearer malformed", wantStatus: http.StatusUnauthorized, wantBody: "Invalid or expired token\n"},
+		{name: "acknowledgement malformed JWT", method: http.MethodPost, path: "/terminal/experience/ack", body: `{"versionId":"version-a","status":"applied"}`, auth: "Bearer malformed", wantStatus: http.StatusUnauthorized, wantBody: "Invalid or expired token\n"},
+		{name: "wrong token type", method: http.MethodGet, path: "/terminal/experience", auth: staffAuth, wantStatus: http.StatusForbidden, wantBody: "Forbidden\n"},
+		{name: "acknowledgement wrong token type", method: http.MethodPost, path: "/terminal/experience/ack", body: `{"versionId":"version-a","status":"applied"}`, auth: staffAuth, wantStatus: http.StatusForbidden, wantBody: "Forbidden\n"},
+		{name: "revoked terminal service denial", method: http.MethodGet, path: "/terminal/experience", auth: terminalAuth, serviceErr: gorm.ErrRecordNotFound, wantStatus: http.StatusUnauthorized, wantBody: "Unauthorized\n"},
+		{name: "acknowledgement revoked terminal service denial", method: http.MethodPost, path: "/terminal/experience/ack", auth: terminalAuth, body: `{"versionId":"version-a","status":"applied"}`, serviceAckErr: gorm.ErrRecordNotFound, wantStatus: http.StatusUnauthorized, wantBody: "Unauthorized\n"},
+		{name: "strict acknowledgement validation", method: http.MethodPost, path: "/terminal/experience/ack", auth: terminalAuth, body: `{"versionId":"version-a","status":"applied","unexpected":true}`, wantStatus: http.StatusBadRequest, wantBody: "Invalid acknowledgement payload\n"},
+		{name: "manifest success", method: http.MethodGet, path: "/terminal/experience", auth: terminalAuth, wantStatus: http.StatusOK, wantBody: ""},
+		{name: "acknowledgement success", method: http.MethodPost, path: "/terminal/experience/ack", auth: terminalAuth, body: `{"versionId":"version-a","status":"applied"}`, wantStatus: http.StatusNoContent, wantBody: ""},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			svc.err = testCase.serviceErr
+			svc.ackErr = testCase.serviceAckErr
+			svc.ack = nil
+			svc.terminalIDs = nil
+			req := httptest.NewRequest(testCase.method, testCase.path, strings.NewReader(testCase.body))
+			if testCase.auth != "" {
+				req.Header.Set("Authorization", testCase.auth)
+			}
+			if testCase.body != "" {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			recorder := httptest.NewRecorder()
+
+			router.ServeHTTP(recorder, req)
+
+			if recorder.Code != testCase.wantStatus || recorder.Header().Get("Cache-Control") != "no-store" {
+				t.Fatalf("status=%d cache=%q body=%q", recorder.Code, recorder.Header().Get("Cache-Control"), recorder.Body.String())
+			}
+			if testCase.wantBody != "" && recorder.Body.String() != testCase.wantBody {
+				t.Fatalf("body=%q, want %q", recorder.Body.String(), testCase.wantBody)
+			}
+		})
+	}
+
+	unrelatedRecorder := httptest.NewRecorder()
+	router.ServeHTTP(unrelatedRecorder, httptest.NewRequest(http.MethodGet, "/unrelated", nil))
+	if unrelatedRecorder.Code != http.StatusNoContent || unrelatedRecorder.Header().Get("Cache-Control") != "" {
+		t.Fatalf("unrelated status=%d cache=%q", unrelatedRecorder.Code, unrelatedRecorder.Header().Get("Cache-Control"))
+	}
+	for _, request := range []*http.Request{
+		httptest.NewRequest(http.MethodDelete, "/terminal/experience", nil),
+		httptest.NewRequest(http.MethodGet, "/terminal/experience/ack", nil),
+	} {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusMethodNotAllowed || recorder.Header().Get("Cache-Control") != "" {
+			t.Fatalf("unsupported %s %s status=%d cache=%q", request.Method, request.URL.Path, recorder.Code, recorder.Header().Get("Cache-Control"))
+		}
+	}
+}

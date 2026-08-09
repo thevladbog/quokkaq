@@ -26,6 +26,11 @@ type DesktopTerminalRepository interface {
 	FindActiveByID(ctx context.Context, id string) (*models.DesktopTerminal, error)
 	// AcknowledgeExperience records a result only for the terminal's current published assignment.
 	AcknowledgeExperience(ctx context.Context, terminalID, versionID, status string, reasonCode *string) error
+	// Revoke marks an active terminal revoked without overwriting deployment state.
+	Revoke(ctx context.Context, terminalID string) error
+	// TouchLastSeen records terminal activity without allowing a stale bootstrap
+	// read to restore a concurrently revoked terminal.
+	TouchLastSeen(ctx context.Context, terminalID string) error
 	FindByPairingCodeDigest(digest string) (*models.DesktopTerminal, error)
 	Update(t *models.DesktopTerminal) error
 }
@@ -162,6 +167,46 @@ func (r *desktopTerminalRepository) AcknowledgeExperience(ctx context.Context, t
 		}
 		return nil
 	})
+}
+
+// Revoke changes only the lifecycle columns so a concurrent acknowledgement
+// that committed first cannot be overwritten by a stale whole-row Save.
+func (r *desktopTerminalRepository) Revoke(ctx context.Context, terminalID string) error {
+	now := time.Now().UTC()
+	result := r.db.WithContext(ctx).Model(&models.DesktopTerminal{}).
+		Where("id = ? AND revoked_at IS NULL", strings.TrimSpace(terminalID)).
+		Updates(map[string]any{
+			"revoked_at": now,
+			"updated_at": now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+// TouchLastSeen updates only activity metadata and never writes an in-memory
+// terminal row back to the database. In particular, it cannot clear revoked_at
+// after the terminal was revoked between bootstrap authentication and this
+// best-effort touch.
+func (r *desktopTerminalRepository) TouchLastSeen(ctx context.Context, terminalID string) error {
+	now := time.Now().UTC()
+	result := r.db.WithContext(ctx).Model(&models.DesktopTerminal{}).
+		Where("id = ? AND revoked_at IS NULL", strings.TrimSpace(terminalID)).
+		Updates(map[string]any{
+			"last_seen_at": now,
+			"updated_at":   now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *desktopTerminalRepository) FindByPairingCodeDigest(digest string) (*models.DesktopTerminal, error) {
