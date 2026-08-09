@@ -15,6 +15,7 @@ interface ProtectedSidebarLayoutProps {
   requiredAnyPermission?: string[];
   fallbackComponent?: ReactNode;
   loadingComponent?: ReactNode;
+  contentClassName?: string;
   /** Defaults to AppSidebar (tenant). Use PlatformSidebar for /platform routes. */
   SidebarComponent?: ComponentType<{ className?: string }>;
 }
@@ -27,6 +28,7 @@ const ProtectedSidebarLayout = ({
   requiredAnyPermission,
   fallbackComponent,
   loadingComponent,
+  contentClassName,
   SidebarComponent = AppSidebar
 }: ProtectedSidebarLayoutProps) => {
   return (
@@ -40,7 +42,9 @@ const ProtectedSidebarLayout = ({
     >
       <SidebarProvider>
         <SidebarComponent />
-        <SidebarInsetShell>{children}</SidebarInsetShell>
+        <SidebarInsetShell contentClassName={contentClassName}>
+          {children}
+        </SidebarInsetShell>
         <OperationalSupportFab />
       </SidebarProvider>
     </ProtectedRoute>
