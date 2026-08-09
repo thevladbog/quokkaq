@@ -786,6 +786,31 @@ export {
 
 export { migrateRegionsToCellGrid } from './screen-template-migrate-regions';
 
+export {
+  ExperienceSurfaceSchema,
+  InteractionModeSchema,
+  ViewingDistanceSchema,
+  DeviceProfileSchema,
+  ExperienceGridSchema,
+  ExperienceLayoutVariantSchema,
+  WidgetActionSchema,
+  ExperienceWidgetToneSchema,
+  ExperienceWidgetSchema,
+  ExperiencePlacementSchema,
+  ExperiencePageLayoutSchema,
+  ExperiencePageSchema,
+  ExperienceFlowPagesSchema,
+  ExperienceTemplateSchema,
+  type ExperienceSurface,
+  type DeviceProfile,
+  type ExperienceLayoutVariant,
+  type WidgetAction,
+  type ExperienceWidget,
+  type ExperiencePage,
+  type ExperienceFlowPages,
+  type ExperienceTemplate
+} from './experience-template';
+
 import {
   ScreenTemplateCellGridSchema,
   ScreenTemplateRegionsSchema,
