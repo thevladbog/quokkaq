@@ -15,6 +15,12 @@ export interface StaffServiceScopeSelectorProps {
   leaves: StaffServiceScopeLeaf[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
+  summary?: {
+    kind: 'all' | 'single' | 'multiple';
+    labels: string[];
+    count: number;
+  };
+  waitingCount?: number;
   className?: string;
   /** In a dialog, omit outer card chrome and duplicate headings (title lives in DialogHeader). */
   variant?: 'card' | 'dialog';
@@ -48,6 +54,8 @@ export function StaffServiceScopeSelector({
   leaves,
   selectedIds,
   onChange,
+  summary,
+  waitingCount,
   className,
   variant = 'card'
 }: StaffServiceScopeSelectorProps) {
@@ -68,6 +76,39 @@ export function StaffServiceScopeSelector({
   };
 
   const isDialog = variant === 'dialog';
+
+  if (!isDialog && summary) {
+    const summaryLabel =
+      summary.kind === 'all'
+        ? t('scope.all_services')
+        : summary.kind === 'single'
+          ? t('scope.selected_one', { service: summary.labels[0] ?? '' })
+          : t('scope.selected_many', {
+              service: summary.labels[0] ?? '',
+              count: Math.max(0, summary.count - 1)
+            });
+
+    return (
+      <div
+        className={cn(
+          'border-border/60 bg-muted/15 flex items-center justify-between gap-3 rounded-lg border px-3 py-2 shadow-xs',
+          className
+        )}
+      >
+        <div className='min-w-0'>
+          <p className='text-muted-foreground text-[10px] font-semibold tracking-wide uppercase'>
+            {t('scope.title')}
+          </p>
+          <p className='truncate text-sm font-semibold'>{summaryLabel}</p>
+        </div>
+        {waitingCount !== undefined ? (
+          <p className='text-muted-foreground shrink-0 text-xs tabular-nums'>
+            {t('scope.matching_count', { count: waitingCount })}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div
