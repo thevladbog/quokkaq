@@ -17,6 +17,7 @@ describe('isStaffWorkstationPath', () => {
     ['/staff/unit-1/counter-2', true],
     ['/staff', false],
     ['/staff/support', false],
+    ['/staff/support/example-id', false],
     ['/staff/unit-1', false],
     ['/staff/unit-1/counter-2/details', false]
   ])('returns %s for %s', (path, expected) => {

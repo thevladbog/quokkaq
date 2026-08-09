@@ -24,6 +24,10 @@ interface ConditionalLayoutProps {
 }
 
 export function isStaffWorkstationPath(path: string): boolean {
+  if (path === '/staff/support' || path.startsWith('/staff/support/')) {
+    return false;
+  }
+
   return /^\/staff\/[^/]+\/[^/]+$/.test(path);
 }
 
