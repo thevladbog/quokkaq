@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -8,6 +9,7 @@ import (
 	"strings"
 
 	"quokkaq-go-backend/internal/middleware"
+	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 
@@ -17,34 +19,49 @@ import (
 
 // ScreenLayoutTemplateHandler serves tenant screen layout template CRUD.
 type ScreenLayoutTemplateHandler struct {
-	svc      *services.ScreenLayoutTemplateService
+	svc      screenLayoutTemplateService
 	userRepo repository.UserRepository
 }
 
-func NewScreenLayoutTemplateHandler(svc *services.ScreenLayoutTemplateService, userRepo repository.UserRepository) *ScreenLayoutTemplateHandler {
+type screenLayoutTemplateService interface {
+	List(companyID string) ([]models.ScreenLayoutTemplate, error)
+	Create(companyID, name, surface string, definition json.RawMessage) (*models.ScreenLayoutTemplate, error)
+	Update(companyID, id, name string, definition json.RawMessage, surface *string) (*models.ScreenLayoutTemplate, error)
+	Delete(companyID, id string) error
+	Publish(ctx context.Context, companyID, templateID, publisherID string) (*models.ExperienceTemplateVersion, error)
+	ListVersions(ctx context.Context, companyID, templateID string) ([]models.ExperienceTemplateVersion, error)
+	Restore(ctx context.Context, companyID, templateID, sourceVersionID, publisherID string) (*models.ExperienceTemplateVersion, error)
+}
+
+func NewScreenLayoutTemplateHandler(svc screenLayoutTemplateService, userRepo repository.UserRepository) *ScreenLayoutTemplateHandler {
 	return &ScreenLayoutTemplateHandler{svc: svc, userRepo: userRepo}
 }
 
-func (h *ScreenLayoutTemplateHandler) resolveCompanyID(w http.ResponseWriter, r *http.Request) (string, bool) {
+func (h *ScreenLayoutTemplateHandler) resolveActorAndCompany(w http.ResponseWriter, r *http.Request) (string, string, bool) {
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return "", false
+		return "", "", false
 	}
 	companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
 	if err != nil {
 		if errors.Is(err, repository.ErrCompanyAccessDenied) {
 			http.Error(w, "Forbidden: no access to selected organization", http.StatusForbidden)
-			return "", false
+			return "", "", false
 		}
 		if repository.IsNotFound(err) {
 			http.Error(w, "Not found", http.StatusNotFound)
-			return "", false
+			return "", "", false
 		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return "", false
+		return "", "", false
 	}
-	return companyID, true
+	return userID, companyID, true
+}
+
+func (h *ScreenLayoutTemplateHandler) resolveCompanyID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	_, companyID, ok := h.resolveActorAndCompany(w, r)
+	return companyID, ok
 }
 
 // ListScreenLayoutTemplates godoc
@@ -74,6 +91,7 @@ func (h *ScreenLayoutTemplateHandler) List(w http.ResponseWriter, r *http.Reques
 // CreateScreenLayoutTemplateRequest is the body for POST /companies/me/screen-layout-templates.
 type CreateScreenLayoutTemplateRequest struct {
 	Name       string          `json:"name" example:"Lobby wide"`
+	Surface    string          `json:"surface,omitempty" enums:"ticket-station,queue-display,counter-display,visitor-mobile"`
 	Definition json.RawMessage `json:"definition" swaggertype:"object"`
 }
 
@@ -100,13 +118,17 @@ func (h *ScreenLayoutTemplateHandler) Create(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
-	row, err := h.svc.Create(companyID, req.Name, req.Definition)
+	row, err := h.svc.Create(companyID, req.Name, req.Surface, req.Definition)
 	if err != nil {
 		if errors.Is(err, services.ErrScreenLayoutTemplatePlanDenied) {
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
 		}
 		if errors.Is(err, services.ErrScreenLayoutTemplateInvalidDefinition) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, services.ErrScreenLayoutTemplateInvalidSurface) || errors.Is(err, services.ErrScreenLayoutTemplateSurfaceMismatch) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -126,6 +148,7 @@ func (h *ScreenLayoutTemplateHandler) Create(w http.ResponseWriter, r *http.Requ
 // UpdateScreenLayoutTemplateRequest is the body for PUT /companies/me/screen-layout-templates/{templateId}.
 type UpdateScreenLayoutTemplateRequest struct {
 	Name       string          `json:"name" example:"Lobby wide"`
+	Surface    *string         `json:"surface,omitempty" enums:"ticket-station,queue-display,counter-display,visitor-mobile"`
 	Definition json.RawMessage `json:"definition" swaggertype:"object"`
 }
 
@@ -154,7 +177,7 @@ func (h *ScreenLayoutTemplateHandler) Update(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
-	row, err := h.svc.Update(companyID, id, req.Name, req.Definition)
+	row, err := h.svc.Update(companyID, id, req.Name, req.Definition, req.Surface)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "Not found", http.StatusNotFound)
@@ -168,6 +191,14 @@ func (h *ScreenLayoutTemplateHandler) Update(w http.ResponseWriter, r *http.Requ
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		if errors.Is(err, services.ErrScreenLayoutTemplateInvalidSurface) || errors.Is(err, services.ErrScreenLayoutTemplateSurfaceMismatch) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, services.ErrScreenLayoutTemplateSurfaceImmutable) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		if strings.Contains(err.Error(), "name required") {
 			http.Error(w, "name required", http.StatusBadRequest)
 			return
@@ -178,6 +209,76 @@ func (h *ScreenLayoutTemplateHandler) Update(w http.ResponseWriter, r *http.Requ
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(row)
+}
+
+func respondExperienceVersionError(w http.ResponseWriter, operation string, err error) bool {
+	if err == nil {
+		return false
+	}
+	switch {
+	case errors.Is(err, services.ErrScreenLayoutTemplatePlanDenied):
+		http.Error(w, err.Error(), http.StatusForbidden)
+	case errors.Is(err, services.ErrScreenLayoutTemplateInvalidDefinition):
+		http.Error(w, services.ErrScreenLayoutTemplateInvalidDefinition.Error(), http.StatusBadRequest)
+	case errors.Is(err, services.ErrExperienceVersionConflict):
+		http.Error(w, "publish conflict", http.StatusConflict)
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		http.Error(w, "Not found", http.StatusNotFound)
+	default:
+		slog.Error(operation, "err", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+	return true
+}
+
+// Publish creates an immutable version from the currently locked draft.
+func (h *ScreenLayoutTemplateHandler) Publish(w http.ResponseWriter, r *http.Request) {
+	actorID, companyID, ok := h.resolveActorAndCompany(w, r)
+	if !ok {
+		return
+	}
+	version, err := h.svc.Publish(r.Context(), companyID, chi.URLParam(r, "templateId"), actorID)
+	if respondExperienceVersionError(w, "PublishScreenLayoutTemplate", err) {
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(version)
+}
+
+// ListVersions returns immutable versions newest first for an owned template.
+func (h *ScreenLayoutTemplateHandler) ListVersions(w http.ResponseWriter, r *http.Request) {
+	_, companyID, ok := h.resolveActorAndCompany(w, r)
+	if !ok {
+		return
+	}
+	versions, err := h.svc.ListVersions(r.Context(), companyID, chi.URLParam(r, "templateId"))
+	if respondExperienceVersionError(w, "ListScreenLayoutTemplateVersions", err) {
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(versions)
+}
+
+// Restore copies one owned historical version into a new immutable latest version.
+func (h *ScreenLayoutTemplateHandler) Restore(w http.ResponseWriter, r *http.Request) {
+	actorID, companyID, ok := h.resolveActorAndCompany(w, r)
+	if !ok {
+		return
+	}
+	version, err := h.svc.Restore(
+		r.Context(),
+		companyID,
+		chi.URLParam(r, "templateId"),
+		chi.URLParam(r, "versionId"),
+		actorID,
+	)
+	if respondExperienceVersionError(w, "RestoreScreenLayoutTemplateVersion", err) {
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(version)
 }
 
 // DeleteScreenLayoutTemplate godoc

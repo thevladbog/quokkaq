@@ -41,19 +41,26 @@ const (
 // DesktopTerminal is a paired kiosk device (Tauri) scoped to one unit.
 // When CounterID is set, Kind distinguishes guest survey screen vs ticket board.
 type DesktopTerminal struct {
-	ID                string     `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	UnitID            string     `gorm:"not null;index" json:"unitId"`
-	CounterID         *string    `gorm:"index;column:counter_id" json:"counterId,omitempty"`
-	Kind              string     `gorm:"size:32;not null;default:kiosk;index" json:"kind"`
-	Name              *string    `json:"name,omitempty"`
-	DefaultLocale     string     `gorm:"not null;default:en" json:"defaultLocale"`
-	KioskFullscreen   bool       `gorm:"not null;default:false" json:"kioskFullscreen"`
-	PairingCodeDigest string     `gorm:"uniqueIndex;not null;size:64" json:"-"`
-	SecretHash        string     `gorm:"not null" json:"-"`
-	RevokedAt         *time.Time `json:"revokedAt,omitempty"`
-	LastSeenAt        *time.Time `json:"lastSeenAt,omitempty"`
-	CreatedAt         time.Time  `gorm:"autoCreateTime" json:"createdAt"`
-	UpdatedAt         time.Time  `gorm:"autoUpdateTime" json:"updatedAt"`
+	ID                       string     `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	UnitID                   string     `gorm:"not null;index" json:"unitId"`
+	CounterID                *string    `gorm:"index;column:counter_id" json:"counterId,omitempty"`
+	Kind                     string     `gorm:"size:32;not null;default:kiosk;index" json:"kind"`
+	Name                     *string    `json:"name,omitempty"`
+	DefaultLocale            string     `gorm:"not null;default:en" json:"defaultLocale"`
+	KioskFullscreen          bool       `gorm:"not null;default:false" json:"kioskFullscreen"`
+	ExperienceTemplateID     *string    `gorm:"column:experience_template_id;index" json:"experienceTemplateId,omitempty"`
+	ExperienceVariantID      *string    `gorm:"column:experience_variant_id" json:"experienceVariantId,omitempty"`
+	AppliedTemplateVersionID *string    `gorm:"column:applied_template_version_id;index" json:"appliedTemplateVersionId,omitempty"`
+	AppliedTemplateAt        *time.Time `gorm:"column:applied_template_at" json:"appliedTemplateAt,omitempty"`
+	ExperienceAckStatus      *string    `gorm:"column:experience_ack_status;size:32" json:"experienceAckStatus,omitempty"`
+	ExperienceAckReasonCode  *string    `gorm:"column:experience_ack_reason_code;size:128" json:"experienceAckReasonCode,omitempty"`
+	ExperienceAckAt          *time.Time `gorm:"column:experience_ack_at" json:"experienceAckAt,omitempty"`
+	PairingCodeDigest        string     `gorm:"uniqueIndex;not null;size:64" json:"-"`
+	SecretHash               string     `gorm:"not null" json:"-"`
+	RevokedAt                *time.Time `json:"revokedAt,omitempty"`
+	LastSeenAt               *time.Time `json:"lastSeenAt,omitempty"`
+	CreatedAt                time.Time  `gorm:"autoCreateTime" json:"createdAt"`
+	UpdatedAt                time.Time  `gorm:"autoUpdateTime" json:"updatedAt"`
 
 	Unit    Unit     `gorm:"foreignKey:UnitID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"unit,omitempty"`
 	Counter *Counter `gorm:"foreignKey:CounterID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"counter,omitempty"`

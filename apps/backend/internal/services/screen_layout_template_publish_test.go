@@ -1,0 +1,203 @@
+package services
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"testing"
+
+	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/repository"
+	"quokkaq-go-backend/pkg/database"
+
+	glebarezsqlite "github.com/glebarez/sqlite"
+	"gorm.io/gorm"
+)
+
+func serviceExperienceDefinition(id, variant string) json.RawMessage {
+	return json.RawMessage(`{
+		"schemaVersion":1,
+		"id":"` + id + `",
+		"surface":"ticket-station",
+		"startPageId":"start",
+		"variants":[{"id":"` + variant + `","profile":{"id":"profile","name":"Profile","width":820,"height":1180,"interactionMode":"touch","viewingDistance":"near","safeArea":{"top":0,"right":0,"bottom":0,"left":0}},"grid":{"columns":10,"rows":10}}],
+		"pages":[{"id":"start","name":"Start","widgets":[{"id":"catalog","type":"service-picker","config":{},"actions":[]}],"layouts":{"` + variant + `":{"placements":{"catalog":{"col":1,"row":1,"colSpan":10,"rowSpan":10}}}}}]
+	}`)
+}
+
+func newScreenLayoutTemplateServiceTest(t *testing.T) (*ScreenLayoutTemplateService, repository.ScreenLayoutTemplateRepository, *gorm.DB) {
+	t.Helper()
+	db, err := gorm.Open(glebarezsqlite.Open(":memory:"), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`
+CREATE TABLE companies (
+	id text PRIMARY KEY,
+	name text NOT NULL,
+	subscription_id text,
+	is_saas_operator integer NOT NULL DEFAULT 0
+);
+CREATE TABLE users (id text PRIMARY KEY);
+CREATE TABLE units (id text PRIMARY KEY, company_id text NOT NULL);
+CREATE TABLE screen_layout_templates (
+	id text PRIMARY KEY,
+	company_id text NOT NULL,
+	name text NOT NULL,
+	definition text NOT NULL,
+	surface text NOT NULL DEFAULT 'queue-display',
+	published_version_id text,
+	created_at datetime,
+	updated_at datetime
+);
+CREATE TABLE experience_template_versions (
+	id text PRIMARY KEY,
+	template_id text NOT NULL,
+	version integer NOT NULL,
+	definition text NOT NULL,
+	published_by text NOT NULL,
+	published_at datetime NOT NULL,
+	UNIQUE (template_id, version)
+);
+CREATE TABLE desktop_terminals (
+	id text PRIMARY KEY,
+	unit_id text NOT NULL,
+	counter_id text,
+	kind text NOT NULL,
+	name text,
+	default_locale text NOT NULL,
+	kiosk_fullscreen integer NOT NULL DEFAULT 0,
+	experience_template_id text,
+	experience_variant_id text,
+	applied_template_version_id text,
+	applied_template_at datetime,
+	experience_ack_status text,
+	experience_ack_reason_code text,
+	experience_ack_at datetime,
+	updated_at datetime
+);
+INSERT INTO companies (id, name, is_saas_operator) VALUES ('company-a', 'A', 1);
+INSERT INTO users (id) VALUES ('publisher');
+INSERT INTO units (id, company_id) VALUES ('unit-a', 'company-a');
+INSERT INTO screen_layout_templates (id, company_id, name, definition, surface)
+VALUES ('template-a', 'company-a', 'Template', ?, 'ticket-station');
+INSERT INTO desktop_terminals (id, unit_id, kind, default_locale)
+VALUES ('terminal-a', 'unit-a', 'kiosk', 'en');
+`, serviceExperienceDefinition("draft-a", "portrait")).Error; err != nil {
+		t.Fatal(err)
+	}
+	previousDB := database.DB
+	database.DB = db
+	t.Cleanup(func() { database.DB = previousDB })
+	repo := repository.NewScreenLayoutTemplateRepositoryWithDB(db)
+	return NewScreenLayoutTemplateService(repo), repo, db
+}
+
+func TestScreenLayoutTemplateService_DraftIsolationPublishAndRestore(t *testing.T) {
+	svc, repo, db := newScreenLayoutTemplateServiceTest(t)
+	ctx := context.Background()
+
+	v1, err := svc.Publish(ctx, "company-a", "template-a", "publisher")
+	if err != nil {
+		t.Fatalf("publish v1: %v", err)
+	}
+	templateID, variantID := "template-a", "portrait"
+	desired := &models.DesktopTerminal{ID: "terminal-a", UnitID: "unit-a", Kind: models.DesktopTerminalKindKiosk, DefaultLocale: "en"}
+	if err := repo.UpdateTerminalWithExperience(ctx, "company-a", desired, repository.TerminalExperienceAssignment{
+		Specified: true, TemplateID: &templateID, VariantID: &variantID,
+	}); err != nil {
+		t.Fatalf("assign v1: %v", err)
+	}
+
+	if _, err := svc.Update("company-a", "template-a", "Template", serviceExperienceDefinition("draft-b", "portrait"), nil); err != nil {
+		t.Fatalf("save draft B: %v", err)
+	}
+	resolved, resolvedVariant, err := svc.ResolveTerminalPublishedVersion(ctx, "company-a", "terminal-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.ID != v1.ID || string(resolved.Definition) != string(serviceExperienceDefinition("draft-a", "portrait")) || resolvedVariant != "portrait" {
+		t.Fatalf("draft save changed device resolution: %#v variant=%q", resolved, resolvedVariant)
+	}
+
+	v2, err := svc.Publish(ctx, "company-a", "template-a", "publisher")
+	if err != nil {
+		t.Fatalf("publish v2: %v", err)
+	}
+	resolved, _, err = svc.ResolveTerminalPublishedVersion(ctx, "company-a", "terminal-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.ID != v2.ID || string(resolved.Definition) != string(serviceExperienceDefinition("draft-b", "portrait")) {
+		t.Fatalf("device did not resolve v2: %#v", resolved)
+	}
+
+	v3, err := svc.Restore(ctx, "company-a", "template-a", v1.ID, "publisher")
+	if err != nil {
+		t.Fatalf("restore v1: %v", err)
+	}
+	if v3.Version != 3 || v3.ID == v1.ID || string(v3.Definition) != string(v1.Definition) {
+		t.Fatalf("restore = %#v, want new v3 copied from v1", v3)
+	}
+	resolved, _, err = svc.ResolveTerminalPublishedVersion(ctx, "company-a", "terminal-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.ID != v3.ID {
+		t.Fatalf("device resolved %q after restore, want %q", resolved.ID, v3.ID)
+	}
+
+	var historical []models.ExperienceTemplateVersion
+	if err := db.Where("template_id = ?", "template-a").Order("version ASC").Find(&historical).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(historical) != 3 || string(historical[0].Definition) != string(serviceExperienceDefinition("draft-a", "portrait")) || string(historical[1].Definition) != string(serviceExperienceDefinition("draft-b", "portrait")) {
+		t.Fatalf("historical versions were mutated: %#v", historical)
+	}
+}
+
+func TestScreenLayoutTemplateService_SurfaceDefaultsAndIsImmutable(t *testing.T) {
+	svc, _, _ := newScreenLayoutTemplateServiceTest(t)
+	created, err := svc.Create("company-a", "Legacy display", "", json.RawMessage(`{"legacy":true}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.Surface != "queue-display" || created.PublishedVersionID != nil {
+		t.Fatalf("created = %#v, want queue-display unpublished", created)
+	}
+
+	conflictingSurface := "ticket-station"
+	if _, err := svc.Update("company-a", created.ID, "Renamed", json.RawMessage(`{"legacy":true}`), &conflictingSurface); !errors.Is(err, ErrScreenLayoutTemplateSurfaceImmutable) {
+		t.Fatalf("surface mutation error = %v", err)
+	}
+	if _, err := svc.Update("company-a", created.ID, "Renamed", json.RawMessage(`{"surface":"ticket-station"}`), nil); !errors.Is(err, ErrScreenLayoutTemplateSurfaceMismatch) {
+		t.Fatalf("payload/model surface mismatch error = %v", err)
+	}
+	if _, err := svc.Update("company-a", created.ID, "Renamed", json.RawMessage(`{"surface":" queue-display "}`), nil); !errors.Is(err, ErrScreenLayoutTemplateSurfaceMismatch) {
+		t.Fatalf("non-canonical payload surface error = %v", err)
+	}
+
+	emptySurface := ""
+	if _, err := svc.Update("company-a", created.ID, "Renamed", json.RawMessage(`{"legacy":true}`), &emptySurface); !errors.Is(err, ErrScreenLayoutTemplateInvalidSurface) {
+		t.Fatalf("empty update surface error = %v", err)
+	}
+
+	sameSurface := "queue-display"
+	updated, err := svc.Update("company-a", created.ID, "Renamed", json.RawMessage(`{"surface":"queue-display"}`), &sameSurface)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Surface != "queue-display" {
+		t.Fatalf("updated surface = %q", updated.Surface)
+	}
+}
+
+func TestScreenLayoutTemplateService_PublishMapsValidationAndConflictErrors(t *testing.T) {
+	svc, _, db := newScreenLayoutTemplateServiceTest(t)
+	if err := db.Model(&models.ScreenLayoutTemplate{}).Where("id = ?", "template-a").Update("definition", json.RawMessage(`[]`)).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Publish(context.Background(), "company-a", "template-a", "publisher"); !errors.Is(err, ErrScreenLayoutTemplateInvalidDefinition) {
+		t.Fatalf("invalid publish error = %v", err)
+	}
+}

@@ -2813,6 +2813,173 @@ WHERE code = 'starter' AND (features->>'kiosk_employee_idp') IS NULL;`).Error; e
 		return fmt.Errorf("failed to run v1.8.17_service_behavior migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.8.18_experience_templates", func(db *gorm.DB) error {
+		// The immutable version table must exist before the template's circular
+		// published pointer can reference it. IDs are text to match the existing
+		// GORM-managed primary keys in screen_layout_templates and users.
+		if err := db.Exec(`
+CREATE TABLE IF NOT EXISTS experience_template_versions (
+	id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+	template_id text NOT NULL,
+	version integer NOT NULL,
+	definition jsonb NOT NULL,
+	published_by text NOT NULL,
+	published_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE experience_template_versions
+	ADD COLUMN IF NOT EXISTS template_id text,
+	ADD COLUMN IF NOT EXISTS version integer,
+	ADD COLUMN IF NOT EXISTS definition jsonb,
+	ADD COLUMN IF NOT EXISTS published_by text,
+	ADD COLUMN IF NOT EXISTS published_at timestamptz DEFAULT now();
+ALTER TABLE experience_template_versions
+	ALTER COLUMN template_id SET NOT NULL,
+	ALTER COLUMN version SET NOT NULL,
+	ALTER COLUMN definition SET NOT NULL,
+	ALTER COLUMN published_by SET NOT NULL,
+	ALTER COLUMN published_at SET DEFAULT now(),
+	ALTER COLUMN published_at SET NOT NULL;
+DO $$
+DECLARE
+	index_oid oid;
+BEGIN
+	SELECT to_regclass('uq_experience_template_versions_template_id_id')::oid INTO index_oid;
+	IF index_oid IS NOT NULL AND NOT EXISTS (
+		SELECT 1
+		FROM pg_index candidate
+		WHERE candidate.indexrelid = index_oid
+		  AND candidate.indisunique
+		  AND (
+			SELECT array_agg(attribute.attname::text ORDER BY key.ordinality)
+			FROM unnest(candidate.indkey::smallint[]) WITH ORDINALITY AS key(attnum, ordinality)
+			JOIN pg_attribute attribute
+			  ON attribute.attrelid = candidate.indrelid
+			 AND attribute.attnum = key.attnum
+		  ) = ARRAY['template_id', 'id']::text[]
+	) THEN
+		EXECUTE 'DROP INDEX uq_experience_template_versions_template_id_id';
+	END IF;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_experience_template_versions_template_version
+	ON experience_template_versions (template_id, version);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_experience_template_versions_template_id_id
+	ON experience_template_versions (template_id, id);
+CREATE INDEX IF NOT EXISTS idx_experience_template_versions_published_at
+	ON experience_template_versions (template_id, published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_experience_template_versions_published_by
+	ON experience_template_versions (published_by);
+`).Error; err != nil {
+			return err
+		}
+
+		if err := db.Exec(`
+DO $$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_experience_template_versions_template') THEN
+		ALTER TABLE experience_template_versions
+			ADD CONSTRAINT fk_experience_template_versions_template
+			FOREIGN KEY (template_id) REFERENCES screen_layout_templates(id)
+			ON UPDATE CASCADE ON DELETE CASCADE;
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_experience_template_versions_publisher') THEN
+		ALTER TABLE experience_template_versions
+			ADD CONSTRAINT fk_experience_template_versions_publisher
+			FOREIGN KEY (published_by) REFERENCES users(id)
+			ON UPDATE CASCADE ON DELETE RESTRICT;
+	END IF;
+END $$;
+`).Error; err != nil {
+			return err
+		}
+
+		if err := db.Exec(`
+ALTER TABLE screen_layout_templates
+	ADD COLUMN IF NOT EXISTS surface text,
+	ADD COLUMN IF NOT EXISTS published_version_id text;
+UPDATE screen_layout_templates
+	SET surface = 'queue-display'
+	WHERE surface IS NULL OR btrim(surface) = '';
+ALTER TABLE screen_layout_templates
+	ALTER COLUMN surface SET DEFAULT 'queue-display',
+	ALTER COLUMN surface SET NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_screen_layout_templates_company_surface
+	ON screen_layout_templates (company_id, surface);
+CREATE INDEX IF NOT EXISTS idx_screen_layout_templates_published_version
+	ON screen_layout_templates (published_version_id)
+	WHERE published_version_id IS NOT NULL;
+DO $$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_screen_layout_templates_surface') THEN
+		ALTER TABLE screen_layout_templates
+			ADD CONSTRAINT chk_screen_layout_templates_surface
+			CHECK (surface IN ('ticket-station', 'queue-display', 'counter-display', 'visitor-mobile'));
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_screen_layout_templates_published_version') THEN
+		ALTER TABLE screen_layout_templates
+			ADD CONSTRAINT fk_screen_layout_templates_published_version
+			FOREIGN KEY (id, published_version_id)
+			REFERENCES experience_template_versions(template_id, id)
+			ON UPDATE CASCADE ON DELETE RESTRICT;
+	END IF;
+END $$;
+`).Error; err != nil {
+			return err
+		}
+
+		if err := db.Exec(`
+ALTER TABLE desktop_terminals
+	ADD COLUMN IF NOT EXISTS experience_template_id text,
+	ADD COLUMN IF NOT EXISTS experience_variant_id text,
+	ADD COLUMN IF NOT EXISTS applied_template_version_id text,
+	ADD COLUMN IF NOT EXISTS applied_template_at timestamptz,
+	ADD COLUMN IF NOT EXISTS experience_ack_status text,
+	ADD COLUMN IF NOT EXISTS experience_ack_reason_code text,
+	ADD COLUMN IF NOT EXISTS experience_ack_at timestamptz;
+CREATE INDEX IF NOT EXISTS idx_desktop_terminals_experience_template
+	ON desktop_terminals (experience_template_id)
+	WHERE experience_template_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_desktop_terminals_applied_template_version
+	ON desktop_terminals (applied_template_version_id)
+	WHERE applied_template_version_id IS NOT NULL;
+DO $$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_desktop_terminal_experience_assignment_pair') THEN
+		ALTER TABLE desktop_terminals
+			ADD CONSTRAINT chk_desktop_terminal_experience_assignment_pair
+			CHECK (
+				(experience_template_id IS NULL AND experience_variant_id IS NULL)
+				OR
+				(experience_template_id IS NOT NULL AND experience_variant_id IS NOT NULL)
+			);
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_desktop_terminal_experience_ack_status') THEN
+		ALTER TABLE desktop_terminals
+			ADD CONSTRAINT chk_desktop_terminal_experience_ack_status
+			CHECK (experience_ack_status IS NULL OR experience_ack_status IN ('applied', 'rejected'));
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_desktop_terminal_experience_template') THEN
+		ALTER TABLE desktop_terminals
+			ADD CONSTRAINT fk_desktop_terminal_experience_template
+			FOREIGN KEY (experience_template_id) REFERENCES screen_layout_templates(id)
+			ON UPDATE CASCADE ON DELETE RESTRICT;
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_desktop_terminal_applied_experience_version') THEN
+		ALTER TABLE desktop_terminals
+			ADD CONSTRAINT fk_desktop_terminal_applied_experience_version
+			FOREIGN KEY (experience_template_id, applied_template_version_id)
+			REFERENCES experience_template_versions(template_id, id)
+			ON UPDATE CASCADE ON DELETE RESTRICT;
+	END IF;
+END $$;
+`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.18_experience_templates migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }
