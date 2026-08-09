@@ -1174,13 +1174,6 @@ export const servicesApi = {
   getById: (id: string) =>
     apiRequest<Service>(`/services/${id}`, {}, ServiceModelSchema),
 
-  getByUnitId: (unitId: string) =>
-    apiRequest<Service[]>(
-      `/services/unit/${unitId}`,
-      {},
-      z.array(ServiceModelSchema)
-    ),
-
   create: (serviceData: Omit<Service, 'id'>) =>
     apiRequest<Service>(
       '/services',

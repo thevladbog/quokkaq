@@ -461,7 +461,14 @@ describe('StaffWorkspacePage integration', () => {
     expect(
       screen.getByText('2 tickets match the selected services.')
     ).toBeVisible();
-    expect(screen.getByText('Refreshing queue')).toBeVisible();
+    const queueHeader = screen.getByTestId('staff-queue-header');
+    const refreshingCopy = within(queueHeader).getByText('Refreshing queue');
+    expect(refreshingCopy).toHaveClass('sr-only');
+    expect(within(queueHeader).queryByRole('status')).not.toBeInTheDocument();
+    expect(queueHeader.querySelector('[aria-live]')).not.toBeInTheDocument();
+    expect(
+      within(queueHeader).getByTestId('staff-queue-refresh-indicator')
+    ).toHaveClass('opacity-100');
     expect(screen.getByText('Active')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Call next' })).toHaveAttribute(
       'data-variant',
@@ -550,7 +557,14 @@ describe('StaffWorkspacePage integration', () => {
     state.servicesQuery.isFetching = true;
     renderPage();
 
-    expect(await screen.findByText('Refreshing queue')).toBeVisible();
+    const queueHeader = await screen.findByTestId('staff-queue-header');
+    const refreshingCopy = within(queueHeader).getByText('Refreshing queue');
+    expect(refreshingCopy).toHaveClass('sr-only');
+    expect(within(queueHeader).queryByRole('status')).not.toBeInTheDocument();
+    expect(queueHeader.querySelector('[aria-live]')).not.toBeInTheDocument();
+    expect(
+      within(queueHeader).getByTestId('staff-queue-refresh-indicator')
+    ).toHaveClass('opacity-100');
   });
 
   it('keeps normal all-services behavior for a genuinely loaded empty catalog', async () => {

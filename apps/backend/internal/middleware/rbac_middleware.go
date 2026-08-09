@@ -9,6 +9,7 @@ import (
 	"quokkaq-go-backend/internal/repository"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 // RequireTenantAdmin allows platform_admin, global legacy admin, tenant system_admin role,
@@ -130,9 +131,8 @@ func RequireTerminalUnitMatchOrUnitPermission(userRepo repository.UserRepository
 				http.Error(w, "Unit ID required", http.StatusBadRequest)
 				return
 			}
-			if typ, _ := r.Context().Value(TokenTypeKey).(string); typ == "terminal" {
-				got, ok := r.Context().Value(TerminalUnitIDKey).(string)
-				if !ok || !strings.EqualFold(strings.TrimSpace(got), strings.TrimSpace(unitID)) {
+			if isTerminal, allowed := terminalUnitAuthorization(r, unitID); isTerminal {
+				if !allowed {
 					http.Error(w, "Forbidden", http.StatusForbidden)
 					return
 				}
@@ -142,6 +142,51 @@ func RequireTerminalUnitMatchOrUnitPermission(userRepo repository.UserRepository
 			unitPermMiddleware(next).ServeHTTP(w, r)
 		})
 	}
+}
+
+// RequireTerminalUnitMatchOrUnitAnyPermission allows desktop terminal JWT for the same unit as the URL,
+// otherwise the same checks as RequireUnitAnyPermission (staff users).
+func RequireTerminalUnitMatchOrUnitAnyPermission(userRepo repository.UserRepository, tr repository.TenantRBACRepository, unitRepo repository.UnitRepository, urlUnitParam string, permissions []string) func(http.Handler) http.Handler {
+	unitAnyPermission := RequireUnitAnyPermission(userRepo, tr, unitRepo, urlUnitParam, permissions)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			unitID := unitIDFromRequest(r, urlUnitParam)
+			if unitID == "" {
+				http.Error(w, "Unit ID required", http.StatusBadRequest)
+				return
+			}
+			if isTerminal, allowed := terminalUnitAuthorization(r, unitID); isTerminal {
+				if !allowed {
+					http.Error(w, "Forbidden", http.StatusForbidden)
+					return
+				}
+				next.ServeHTTP(w, r)
+				return
+			}
+			unitAnyPermission(next).ServeHTTP(w, r)
+		})
+	}
+}
+
+func terminalUnitAuthorization(r *http.Request, unitID string) (isTerminal bool, allowed bool) {
+	if typ, _ := r.Context().Value(TokenTypeKey).(string); typ != "terminal" {
+		return false, false
+	}
+
+	terminalUnitID, ok := r.Context().Value(TerminalUnitIDKey).(string)
+	if !ok {
+		return true, false
+	}
+
+	terminalUnitID = strings.TrimSpace(terminalUnitID)
+	unitID = strings.TrimSpace(unitID)
+	terminalUUID, terminalErr := uuid.Parse(terminalUnitID)
+	unitUUID, unitErr := uuid.Parse(unitID)
+	if terminalErr == nil && unitErr == nil {
+		return true, terminalUUID == unitUUID
+	}
+
+	return true, terminalUnitID == unitID
 }
 
 func unitIDFromRequest(r *http.Request, urlUnitParam string) string {

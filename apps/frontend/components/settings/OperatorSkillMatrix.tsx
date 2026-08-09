@@ -12,7 +12,7 @@ import {
   type ModelsOperatorSkill
 } from '@/lib/api/generated/units';
 import { useGetUnitsUnitIdShiftActivityActors } from '@/lib/api/generated/shift';
-import { useGetUnitsUnitIdServices } from '@/lib/api/generated/services';
+import { useGetServicesByUnit } from '@/lib/api/generated/services';
 import {
   Table,
   TableBody,
@@ -68,7 +68,7 @@ export function OperatorSkillMatrix({
   const actorsQuery = useGetUnitsUnitIdShiftActivityActors(unitId, {
     query: { enabled: Boolean(unitId) }
   });
-  const servicesQuery = useGetUnitsUnitIdServices(unitId, {
+  const servicesQuery = useGetServicesByUnit(unitId, {
     query: { enabled: Boolean(unitId) }
   });
 

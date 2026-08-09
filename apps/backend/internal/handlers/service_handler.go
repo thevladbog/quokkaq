@@ -87,22 +87,47 @@ func (h *ServiceHandler) CreateService(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetServicesByUnit godoc
+// @ID           GetServicesByUnit
 // @Summary      Get services by unit
 // @Description  Retrieves all services for a specific unit
 // @Tags         services
 // @Produce      json
+// @Security     BearerAuth
 // @Param        unitId path      string  true  "Unit ID"
 // @Success      200    {array}   models.Service
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/services [get]
 func (h *ServiceHandler) GetServicesByUnit(w http.ResponseWriter, r *http.Request) {
+	h.respondServicesByUnit(w, r)
+}
+
+// GetServicesTreeByUnit godoc
+// @ID           GetServicesTreeByUnit
+// @Summary      Get service tree by unit
+// @Description  Retrieves the service tree for a specific unit
+// @Tags         services
+// @Produce      json
+// @Security     BearerAuth
+// @Param        unitId path      string  true  "Unit ID"
+// @Success      200    {array}   models.Service
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
+// @Failure      500    {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/services-tree [get]
+func (h *ServiceHandler) GetServicesTreeByUnit(w http.ResponseWriter, r *http.Request) {
+	h.respondServicesByUnit(w, r)
+}
+
+func (h *ServiceHandler) respondServicesByUnit(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
-	services, err := h.service.GetServicesByUnit(unitID)
+	unitServices, err := h.service.GetServicesByUnit(unitID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	RespondJSON(w, services)
+	RespondJSON(w, unitServices)
 }
 
 // GetServiceByID godoc

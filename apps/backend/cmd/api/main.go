@@ -594,15 +594,20 @@ func run() error {
 			r.Use(authmiddleware.RequireTerminalUnitMatchOrUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermTicketsRead))
 			r.Get("/{unitId}/tickets", ticketHandler.GetTicketsByUnit)
 		})
-		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
-			r.Use(authmiddleware.RequireTerminalUnitMatchOrUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermAccessKiosk))
-			r.Get("/{unitId}/services", serviceHandler.GetServicesByUnit)
-			r.Get("/{unitId}/services-tree", serviceHandler.GetServicesByUnit)
-			r.Post("/{unitId}/kiosk-printer-telemetry", unitHandler.PostKioskPrinterTelemetry)
-			r.Post("/{unitId}/kiosk-telemetry", kioskHandler.PostKioskTelemetry)
-			r.With(authmiddleware.EmployeeIdpResolveRateLimit).Post("/{unitId}/employee-idp/resolve", employeeIdpHandler.PostPublicEmployeeIdpResolve)
-		})
+		registerUnitAccessRoutes(
+			r,
+			authmiddleware.JWTAuthAndActive(userRepo),
+			authmiddleware.RequireTerminalUnitMatchOrUnitAnyPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", []string{rbac.PermAccessKiosk, rbac.PermAccessStaffPanel}),
+			authmiddleware.RequireTerminalUnitMatchOrUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermAccessKiosk),
+			authmiddleware.EmployeeIdpResolveRateLimit,
+			unitAccessRouteHandlers{
+				getServicesByUnit:            serviceHandler.GetServicesByUnit,
+				getServicesTreeByUnit:        serviceHandler.GetServicesTreeByUnit,
+				postKioskPrinterTelemetry:    unitHandler.PostKioskPrinterTelemetry,
+				postKioskTelemetry:           kioskHandler.PostKioskTelemetry,
+				postPublicEmployeeIDPResolve: employeeIdpHandler.PostPublicEmployeeIdpResolve,
+			},
+		)
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Use(authmiddleware.RequireTerminalUnitMatchOrUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermAccessStaffPanel))

@@ -34,6 +34,9 @@ const messages: Record<string, string> = {
   'queue.no_name': 'No name on file',
   'queue.uncategorized': 'Other',
   'queue.waiting': 'Waiting',
+  'queue.sla_waiting': 'Waiting SLA',
+  'queue.sla_remaining': '{time} remaining',
+  'queue.sla_over_by': '{time} over limit',
   'queue.max_label': 'Max',
   'queue.sla_warning': 'SLA warning',
   'queue.sla_overdue': 'SLA overdue',
@@ -122,13 +125,22 @@ function renderPanel(overrides: Partial<StaffQueuePanelProps> = {}) {
     defaultOptions: { queries: { retry: false } }
   });
 
+  const rendered = render(
+    <QueryClientProvider client={queryClient}>
+      <StaffQueuePanel {...props} />
+    </QueryClientProvider>
+  );
+
   return {
-    ...render(
-      <QueryClientProvider client={queryClient}>
-        <StaffQueuePanel {...props} />
-      </QueryClientProvider>
-    ),
-    props
+    ...rendered,
+    props,
+    rerenderPanel(nextOverrides: Partial<StaffQueuePanelProps>) {
+      rendered.rerender(
+        <QueryClientProvider client={queryClient}>
+          <StaffQueuePanel {...props} {...nextOverrides} />
+        </QueryClientProvider>
+      );
+    }
   };
 }
 
@@ -138,7 +150,7 @@ afterEach(() => {
 });
 
 describe('StaffQueuePanel', () => {
-  it('shows the ticket number, visitor, service, live wait, SLA status and Call action', () => {
+  it('shows a normal snapshot SLA inside the dense timer', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-09T09:00:00.000Z'));
     renderPanel({
@@ -150,26 +162,179 @@ describe('StaffQueuePanel', () => {
             firstName: 'Ada',
             lastName: 'Lovelace'
           },
-          createdAt: new Date(Date.now() - 95_000).toISOString(),
-          maxWaitingTime: 100
+          createdAt: new Date(Date.now() - 878_000).toISOString(),
+          maxWaitingTime: 1_000
+        })
+      ],
+      scopedWaitingCount: 1
+    });
+
+    const row = screen.getByTestId('staff-queue-ticket-7');
+    const timerValue = within(row).getByTestId('staff-queue-timer-value');
+
+    expect(screen.getByText('B007')).toBeVisible();
+    expect(screen.getByText('Ada Lovelace')).toBeVisible();
+    expect(screen.getAllByText('Payments')).not.toHaveLength(0);
+    expect(within(row).getByText('Waiting SLA')).toBeVisible();
+    expect(timerValue).toHaveTextContent('14:38 / 16:40');
+    expect(within(row).getByText('02:02 remaining')).toBeVisible();
+    expect(row).toHaveClass('p-2', 'border-l-2', 'border-l-border');
+    expect(row.style.background).toBe('');
+    expect(timerValue).not.toHaveClass('text-amber-700');
+    expect(timerValue).not.toHaveClass('text-red-700');
+    expect(within(row).getByRole('button', { name: 'Call' })).toHaveClass(
+      'h-9'
+    );
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(screen.queryByText('Max')).not.toBeInTheDocument();
+    expect(screen.queryByText('SLA warning')).not.toBeInTheDocument();
+    expect(screen.queryByText('SLA overdue')).not.toBeInTheDocument();
+  });
+
+  it('turns the compact timer amber at the start of the final ten percent', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-09T09:00:00.000Z'));
+    renderPanel({
+      waitingTickets: [
+        ticket('1', {
+          createdAt: new Date(Date.now() - 900_000).toISOString(),
+          maxWaitingTime: 1_000
         }),
-        ticket('8', {
-          queueNumber: 'B008',
-          createdAt: new Date(Date.now() - 110_000).toISOString(),
-          maxWaitingTime: 100
+        ticket('2', {
+          createdAt: new Date(Date.now() - 1_000_000).toISOString(),
+          maxWaitingTime: 1_000
         })
       ],
       scopedWaitingCount: 2
     });
 
-    expect(screen.getByText('B007')).toBeVisible();
-    expect(screen.getByText('Ada Lovelace')).toBeVisible();
-    expect(screen.getAllByText('Payments')).not.toHaveLength(0);
-    expect(screen.getByText('01:35')).toBeVisible();
-    expect(screen.getByText('SLA warning')).toBeVisible();
-    expect(screen.getByText('SLA overdue')).toBeVisible();
-    expect(screen.getByText('No name on file')).toBeVisible();
-    expect(screen.getAllByRole('button', { name: 'Call' })).toHaveLength(2);
+    const row = screen.getByTestId('staff-queue-ticket-1');
+    const atLimitRow = screen.getByTestId('staff-queue-ticket-2');
+    const timerValue = within(row).getByTestId('staff-queue-timer-value');
+    const delta = within(row).getByText('01:40 remaining');
+
+    expect(timerValue).toHaveTextContent('15:00 / 16:40');
+    expect(timerValue).toHaveClass('text-amber-700', 'dark:text-amber-400');
+    expect(delta).toHaveClass('text-amber-700', 'dark:text-amber-400');
+    expect(row).toHaveClass('border-l-2', 'border-l-amber-500');
+    expect(row).not.toHaveClass('border-l-red-500');
+    expect(
+      within(atLimitRow).getByTestId('staff-queue-timer-value')
+    ).toHaveTextContent('16:40 / 16:40');
+    expect(within(atLimitRow).getByText('00:00 remaining')).toHaveClass(
+      'text-amber-700',
+      'dark:text-amber-400'
+    );
+    expect(atLimitRow).toHaveClass('border-l-2', 'border-l-amber-500');
+    expect(atLimitRow).not.toHaveClass('border-l-red-500');
+  });
+
+  it('turns the compact timer red only after the snapshot SLA is exceeded', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-09T09:00:00.000Z'));
+    renderPanel({
+      waitingTickets: [
+        ticket('1', {
+          createdAt: new Date(Date.now() - 1_001_000).toISOString(),
+          maxWaitingTime: 1_000
+        })
+      ]
+    });
+
+    const row = screen.getByTestId('staff-queue-ticket-1');
+    const timerValue = within(row).getByTestId('staff-queue-timer-value');
+    const delta = within(row).getByText('00:01 over limit');
+
+    expect(timerValue).toHaveTextContent('16:41 / 16:40');
+    expect(timerValue).toHaveClass('text-red-700', 'dark:text-red-400');
+    expect(delta).toHaveClass('text-red-700', 'dark:text-red-400');
+    expect(row).toHaveClass('border-l-2', 'border-l-red-500');
+    expect(row).not.toHaveClass('border-l-amber-500');
+  });
+
+  it.each([undefined, 0, -1])(
+    'keeps a ticket with maxWaitingTime %s as an ordinary waiting row',
+    (maxWaitingTime) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-08-09T09:00:00.000Z'));
+      renderPanel({
+        waitingTickets: [
+          ticket('1', {
+            createdAt: new Date(Date.now() - 65_000).toISOString(),
+            maxWaitingTime
+          })
+        ]
+      });
+
+      const row = screen.getByTestId('staff-queue-ticket-1');
+
+      expect(within(row).getByText('Waiting')).toBeVisible();
+      expect(
+        within(row).getByTestId('staff-queue-timer-value')
+      ).toHaveTextContent('01:05');
+      expect(within(row).queryByText('Waiting SLA')).not.toBeInTheDocument();
+      expect(
+        within(row).queryByText(/remaining|over limit/)
+      ).not.toBeInTheDocument();
+      expect(row).not.toHaveClass('border-l-2');
+      expect(row).not.toHaveClass('border-l-border');
+      expect(row).not.toHaveClass('border-l-amber-500');
+      expect(row).not.toHaveClass('border-l-red-500');
+    }
+  );
+
+  it('does not fall back to the current Service SLA when the ticket has no snapshot', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-09T09:00:00.000Z'));
+    renderPanel({
+      waitingTickets: [
+        ticket('1', {
+          createdAt: new Date(Date.now() - 65_000).toISOString(),
+          maxWaitingTime: undefined
+        })
+      ],
+      services: [
+        {
+          id: 'service-a',
+          unitId: 'unit-1',
+          name: 'Payments',
+          maxWaitingTime: 60
+        }
+      ]
+    });
+
+    const row = screen.getByTestId('staff-queue-ticket-1');
+    expect(within(row).getByText('Waiting')).toBeVisible();
+    expect(
+      within(row).getByTestId('staff-queue-timer-value')
+    ).toHaveTextContent('01:05');
+    expect(within(row).queryByText('Waiting SLA')).not.toBeInTheDocument();
+    expect(
+      within(row).queryByText(/remaining|over limit/)
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps oldest-first order when a later ticket crosses its SLA', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-09T09:00:00.000Z'));
+    renderPanel({
+      waitingTickets: [
+        ticket('2', {
+          createdAt: new Date(Date.now() - 1_001_000).toISOString(),
+          maxWaitingTime: 1_000
+        }),
+        ticket('1', {
+          createdAt: new Date(Date.now() - 1_200_000).toISOString(),
+          maxWaitingTime: 2_000
+        })
+      ],
+      scopedWaitingCount: 2
+    });
+
+    expect(screen.getAllByTestId(/^staff-queue-ticket-/)).toEqual([
+      screen.getByTestId('staff-queue-ticket-1'),
+      screen.getByTestId('staff-queue-ticket-2')
+    ]);
   });
 
   it('keeps the header and renders five skeleton rows while loading', () => {
@@ -180,6 +345,63 @@ describe('StaffQueuePanel', () => {
     ).toBeVisible();
     expect(screen.getByText('Loading queue')).toBeVisible();
     expect(screen.getAllByTestId('staff-queue-skeleton')).toHaveLength(5);
+  });
+
+  it('keeps queue controls below the title with comfortable panel padding', () => {
+    renderPanel({
+      leafServicesForCreate: [{ id: 'service-a', label: 'Payments' }]
+    });
+
+    const header = screen.getByTestId('staff-queue-header');
+    const layout = screen.getByTestId('staff-queue-header-layout');
+
+    expect(header).toHaveClass('px-4', 'py-3', 'sm:px-5');
+    expect(layout).toHaveClass('flex-col', 'gap-3');
+    expect(
+      within(layout).getByRole('heading', { name: 'Waiting queue' })
+    ).toBeVisible();
+    expect(
+      within(layout).getByRole('button', { name: 'Services' })
+    ).toBeVisible();
+    expect(
+      within(layout).getByRole('button', { name: 'Filters' })
+    ).toBeVisible();
+    expect(
+      within(layout).getByRole('button', { name: 'New ticket' })
+    ).toBeVisible();
+  });
+
+  it('keeps a permanent title refresh indicator without changing sorting geometry', () => {
+    const { rerenderPanel } = renderPanel({ queueRefreshing: false });
+    const idleIndicator = screen.getByTestId('staff-queue-refresh-indicator');
+    const idleSorting = screen.getByText('Longest wait first');
+
+    expect(idleIndicator).toHaveClass('size-1.5', 'opacity-0');
+    expect(idleIndicator).not.toHaveClass('motion-safe:animate-pulse');
+    expect(idleSorting).toHaveTextContent('Longest wait first');
+    expect(screen.queryByText('Refreshing queue')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+    rerenderPanel({ queueRefreshing: true });
+
+    const refreshingIndicator = screen.getByTestId(
+      'staff-queue-refresh-indicator'
+    );
+
+    expect(refreshingIndicator).toBe(idleIndicator);
+    expect(refreshingIndicator).toHaveClass(
+      'size-1.5',
+      'opacity-100',
+      'motion-safe:animate-pulse'
+    );
+    expect(screen.getByText('Longest wait first')).toHaveTextContent(
+      idleSorting.textContent ?? ''
+    );
+    expect(screen.getByText('Refreshing queue')).toHaveClass('sr-only');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByText('Refreshing queue')).not.toHaveAttribute(
+      'aria-live'
+    );
   });
 
   it('renders an alert and retry action when the queue fails', () => {

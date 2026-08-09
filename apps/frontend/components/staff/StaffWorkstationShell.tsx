@@ -35,7 +35,7 @@ export function StaffWorkstationShell({
       data-testid='staff-workstation-shell'
       className='flex min-w-0 flex-col gap-3 min-[1366px]:h-full min-[1366px]:min-h-0 min-[1366px]:overflow-hidden'
     >
-      <header className='flex shrink-0 items-center justify-between gap-3'>
+      <header className='flex shrink-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between'>
         <div className='min-w-0'>
           <p className='truncate text-xs'>{unitName}</p>
           <h1 className='truncate text-xl font-bold'>{counterName}</h1>
@@ -43,9 +43,9 @@ export function StaffWorkstationShell({
             {operatorName}
           </p>
         </div>
-        <div className='shrink-0'>{statusControls}</div>
+        <div className='sm:shrink-0'>{statusControls}</div>
       </header>
-      <div className='grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_25rem]'>
+      <div className='grid min-h-0 flex-1 gap-4 min-[1366px]:grid-cols-[minmax(0,1fr)_25rem] min-[1366px]:gap-3'>
         <main className='min-h-0 min-w-0'>{main}</main>
         <aside className='min-h-0 min-w-0'>{queue}</aside>
       </div>

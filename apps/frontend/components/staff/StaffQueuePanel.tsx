@@ -169,17 +169,38 @@ export function StaffQueuePanel({
     <>
       <TooltipProvider>
         <Card className='border-border/70 flex h-full min-h-0 flex-col gap-0 overflow-hidden py-0 shadow-sm'>
-          <CardHeader className='border-border/50 shrink-0 space-y-1.5 border-b py-2'>
-            <div className='flex items-start justify-between gap-2'>
-              <div className='min-w-0 flex-1'>
+          <CardHeader
+            data-testid='staff-queue-header'
+            className='border-border/50 shrink-0 space-y-1.5 border-b px-4 py-3 sm:px-5'
+          >
+            <div
+              data-testid='staff-queue-header-layout'
+              className='flex flex-col gap-3'
+            >
+              <div className='min-w-0'>
                 <CardTitle className='text-sm leading-tight font-semibold'>
-                  <h2>{t('queue.title')}</h2>
+                  <div className='flex items-center gap-1.5'>
+                    <h2>{t('queue.title')}</h2>
+                    <span
+                      data-testid='staff-queue-refresh-indicator'
+                      className={cn(
+                        'bg-primary size-1.5 shrink-0 rounded-full transition-opacity',
+                        queueRefreshing
+                          ? 'opacity-100 motion-safe:animate-pulse'
+                          : 'opacity-0'
+                      )}
+                      aria-hidden='true'
+                    />
+                    <span className='sr-only'>
+                      {queueRefreshing ? t('queue.refreshing') : ''}
+                    </span>
+                  </div>
                 </CardTitle>
                 <CardDescription className='text-[11px] leading-snug'>
                   {t('queue.description')}
                 </CardDescription>
               </div>
-              <div className='flex shrink-0 flex-wrap justify-end gap-1'>
+              <div className='flex w-full flex-wrap justify-start gap-1.5'>
                 {scopeLeaves.length > 0 && (
                   <Button
                     type='button'
@@ -276,14 +297,6 @@ export function StaffQueuePanel({
             <p className='text-muted-foreground text-[10px] leading-tight'>
               {t('queue.sorted_by_wait')}
             </p>
-            {queueRefreshing ? (
-              <p
-                className='text-muted-foreground text-[10px] leading-tight'
-                role='status'
-              >
-                {t('queue.refreshing')}
-              </p>
-            ) : null}
           </CardHeader>
 
           <div className='shrink-0 px-3 pt-2'>
@@ -459,10 +472,18 @@ function StaffQueueTicketRow({
   getServiceForTicket: (id: string | undefined) => Service | undefined;
   canReadUserData: boolean;
 }) {
-  const { background, formatTime, elapsed, isOverdue, isWarning } =
-    useTicketTimer(ticket.createdAt || undefined, ticket.maxWaitingTime);
+  const { formatTime, elapsed, isOverdue, isWarning } = useTicketTimer(
+    ticket.createdAt || undefined,
+    ticket.maxWaitingTime
+  );
   const hasMaxBudget =
     ticket.maxWaitingTime != null && ticket.maxWaitingTime > 0;
+  const maxWaitingTime = hasMaxBudget ? ticket.maxWaitingTime : undefined;
+  const deltaSeconds = maxWaitingTime
+    ? isOverdue
+      ? elapsed - maxWaitingTime
+      : Math.max(0, maxWaitingTime - elapsed)
+    : undefined;
   const preRegistrationDetailsLabel = t('pre_registration.details_title', {
     defaultValue: 'Pre-registration Details'
   });
@@ -497,13 +518,20 @@ function StaffQueueTicketRow({
 
   return (
     <div
+      data-testid={`staff-queue-ticket-${ticket.id}`}
       className={cn(
         'border-border/60 relative flex flex-col gap-1.5 overflow-hidden rounded-md border p-2 text-sm shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2',
-        isOverdue && 'border-l-4 border-l-red-500',
-        !isOverdue && isWarning && 'border-l-4 border-l-amber-500',
+        hasMaxBudget &&
+          !isWarning &&
+          !isOverdue &&
+          'border-l-border border-l-2',
+        hasMaxBudget &&
+          isWarning &&
+          !isOverdue &&
+          'border-l-2 border-l-amber-500',
+        hasMaxBudget && isOverdue && 'border-l-2 border-l-red-500',
         !hasMaxBudget && 'bg-muted/15'
       )}
-      style={background ? { background } : undefined}
     >
       <div className='relative z-10 min-w-0 flex-1 space-y-0.5'>
         <div className='flex flex-wrap items-baseline gap-x-2 gap-y-0'>
@@ -531,9 +559,10 @@ function StaffQueueTicketRow({
       <div className='relative z-10 flex shrink-0 items-center justify-between gap-2 sm:flex-col sm:items-end'>
         <div className='text-right'>
           <div className='text-muted-foreground text-[9px] font-semibold tracking-wide uppercase'>
-            {t('queue.waiting')}
+            {hasMaxBudget ? t('queue.sla_waiting') : t('queue.waiting')}
           </div>
           <div
+            data-testid='staff-queue-timer-value'
             className={cn(
               'font-mono text-lg font-bold tabular-nums',
               isOverdue && 'text-red-700 dark:text-red-400',
@@ -541,28 +570,24 @@ function StaffQueueTicketRow({
             )}
           >
             {formatTime(elapsed)}
+            {maxWaitingTime && (
+              <span className='text-muted-foreground text-[11px] font-medium'>
+                {' '}
+                / {formatTime(maxWaitingTime)}
+              </span>
+            )}
           </div>
-          {hasMaxBudget && (
-            <div className='text-muted-foreground text-[10px]'>
-              {t('queue.max_label')}:{' '}
-              {formatTime(ticket.maxWaitingTime as number)}
-            </div>
-          )}
-          {(isWarning || isOverdue) && (
+          {deltaSeconds != null && (
             <div
               className={cn(
-                'mt-1 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold',
-                isOverdue &&
-                  'border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300',
-                isWarning &&
-                  !isOverdue &&
-                  'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                'text-muted-foreground text-[10px] font-medium tabular-nums',
+                isOverdue && 'text-red-700 dark:text-red-400',
+                !isOverdue && isWarning && 'text-amber-700 dark:text-amber-400'
               )}
             >
-              <span>{t('queue.sla_label')}</span>
-              <span>
-                {isOverdue ? t('queue.sla_overdue') : t('queue.sla_warning')}
-              </span>
+              {t(isOverdue ? 'queue.sla_over_by' : 'queue.sla_remaining', {
+                time: formatTime(deltaSeconds)
+              })}
             </div>
           )}
         </div>

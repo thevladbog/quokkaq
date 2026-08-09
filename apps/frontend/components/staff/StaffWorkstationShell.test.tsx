@@ -38,7 +38,20 @@ describe('StaffWorkstationShell', () => {
     expect(shell.querySelector('aside')).toHaveClass('min-h-0', 'min-w-0');
     expect(shell.querySelector('main')?.parentElement).toHaveClass(
       'min-h-0',
-      'flex-1'
+      'flex-1',
+      'gap-4',
+      'min-[1366px]:gap-3',
+      'min-[1366px]:grid-cols-[minmax(0,1fr)_25rem]'
+    );
+    expect(shell.querySelector('main')?.parentElement).not.toHaveClass(
+      'lg:grid-cols-[minmax(0,1fr)_22rem]',
+      'xl:grid-cols-[minmax(0,1fr)_25rem]'
+    );
+    expect(shell.querySelector('header')).toHaveClass(
+      'flex-col',
+      'items-stretch',
+      'sm:flex-row',
+      'sm:items-center'
     );
 
     expect(screen.getByText('Central office')).toBeInTheDocument();

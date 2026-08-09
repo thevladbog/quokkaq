@@ -3532,26 +3532,36 @@ export const usePutServicesId = <TError = string,
  * Retrieves all services for a specific unit
  * @summary Get services by unit
  */
-export type getUnitsUnitIdServicesResponse200 = {
+export type getServicesByUnitResponse200 = {
   data: ModelsService[]
   status: 200
 }
 
-export type getUnitsUnitIdServicesResponse500 = {
+export type getServicesByUnitResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getServicesByUnitResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getServicesByUnitResponse500 = {
   data: string
   status: 500
 }
 
-export type getUnitsUnitIdServicesResponseSuccess = (getUnitsUnitIdServicesResponse200) & {
+export type getServicesByUnitResponseSuccess = (getServicesByUnitResponse200) & {
   headers: Headers;
 };
-export type getUnitsUnitIdServicesResponseError = (getUnitsUnitIdServicesResponse500) & {
+export type getServicesByUnitResponseError = (getServicesByUnitResponse401 | getServicesByUnitResponse403 | getServicesByUnitResponse500) & {
   headers: Headers;
 };
 
-export type getUnitsUnitIdServicesResponse = (getUnitsUnitIdServicesResponseSuccess | getUnitsUnitIdServicesResponseError)
+export type getServicesByUnitResponse = (getServicesByUnitResponseSuccess | getServicesByUnitResponseError)
 
-export const getGetUnitsUnitIdServicesUrl = (unitId: string,) => {
+export const getGetServicesByUnitUrl = (unitId: string,) => {
 
 
 
@@ -3559,9 +3569,9 @@ export const getGetUnitsUnitIdServicesUrl = (unitId: string,) => {
   return `/units/${unitId}/services`
 }
 
-export const getUnitsUnitIdServices = async (unitId: string, options?: RequestInit): Promise<getUnitsUnitIdServicesResponse> => {
+export const getServicesByUnit = async (unitId: string, options?: RequestInit): Promise<getServicesByUnitResponse> => {
 
-  return orvalMutator<getUnitsUnitIdServicesResponse>(getGetUnitsUnitIdServicesUrl(unitId),
+  return orvalMutator<getServicesByUnitResponse>(getGetServicesByUnitUrl(unitId),
   {
     ...options,
     method: 'GET'
@@ -3574,69 +3584,200 @@ export const getUnitsUnitIdServices = async (unitId: string, options?: RequestIn
 
 
 
-export const getGetUnitsUnitIdServicesQueryKey = (unitId: string,) => {
+export const getGetServicesByUnitQueryKey = (unitId: string,) => {
     return [
     `/units/${unitId}/services`
     ] as const;
     }
 
 
-export const getGetUnitsUnitIdServicesQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdServices>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdServices>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetServicesByUnitQueryOptions = <TData = Awaited<ReturnType<typeof getServicesByUnit>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getServicesByUnit>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdServicesQueryKey(unitId);
+  const queryKey =  queryOptions?.queryKey ?? getGetServicesByUnitQueryKey(unitId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdServices>>> = ({ signal }) => getUnitsUnitIdServices(unitId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getServicesByUnit>>> = ({ signal }) => getServicesByUnit(unitId, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdServices>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getServicesByUnit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetUnitsUnitIdServicesQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdServices>>>
-export type GetUnitsUnitIdServicesQueryError = string
+export type GetServicesByUnitQueryResult = NonNullable<Awaited<ReturnType<typeof getServicesByUnit>>>
+export type GetServicesByUnitQueryError = string
 
 
-export function useGetUnitsUnitIdServices<TData = Awaited<ReturnType<typeof getUnitsUnitIdServices>>, TError = string>(
- unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdServices>>, TError, TData>> & Pick<
+export function useGetServicesByUnit<TData = Awaited<ReturnType<typeof getServicesByUnit>>, TError = string>(
+ unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getServicesByUnit>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdServices>>,
+          Awaited<ReturnType<typeof getServicesByUnit>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdServices>>
+          Awaited<ReturnType<typeof getServicesByUnit>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdServices<TData = Awaited<ReturnType<typeof getUnitsUnitIdServices>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdServices>>, TError, TData>> & Pick<
+export function useGetServicesByUnit<TData = Awaited<ReturnType<typeof getServicesByUnit>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getServicesByUnit>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdServices>>,
+          Awaited<ReturnType<typeof getServicesByUnit>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdServices>>
+          Awaited<ReturnType<typeof getServicesByUnit>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdServices<TData = Awaited<ReturnType<typeof getUnitsUnitIdServices>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdServices>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetServicesByUnit<TData = Awaited<ReturnType<typeof getServicesByUnit>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getServicesByUnit>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get services by unit
  */
 
-export function useGetUnitsUnitIdServices<TData = Awaited<ReturnType<typeof getUnitsUnitIdServices>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdServices>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetServicesByUnit<TData = Awaited<ReturnType<typeof getServicesByUnit>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getServicesByUnit>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetUnitsUnitIdServicesQueryOptions(unitId,options)
+  const queryOptions = getGetServicesByUnitQueryOptions(unitId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Retrieves the service tree for a specific unit
+ * @summary Get service tree by unit
+ */
+export type getServicesTreeByUnitResponse200 = {
+  data: ModelsService[]
+  status: 200
+}
+
+export type getServicesTreeByUnitResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getServicesTreeByUnitResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getServicesTreeByUnitResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getServicesTreeByUnitResponseSuccess = (getServicesTreeByUnitResponse200) & {
+  headers: Headers;
+};
+export type getServicesTreeByUnitResponseError = (getServicesTreeByUnitResponse401 | getServicesTreeByUnitResponse403 | getServicesTreeByUnitResponse500) & {
+  headers: Headers;
+};
+
+export type getServicesTreeByUnitResponse = (getServicesTreeByUnitResponseSuccess | getServicesTreeByUnitResponseError)
+
+export const getGetServicesTreeByUnitUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/services-tree`
+}
+
+export const getServicesTreeByUnit = async (unitId: string, options?: RequestInit): Promise<getServicesTreeByUnitResponse> => {
+
+  return orvalMutator<getServicesTreeByUnitResponse>(getGetServicesTreeByUnitUrl(unitId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetServicesTreeByUnitQueryKey = (unitId: string,) => {
+    return [
+    `/units/${unitId}/services-tree`
+    ] as const;
+    }
+
+
+export const getGetServicesTreeByUnitQueryOptions = <TData = Awaited<ReturnType<typeof getServicesTreeByUnit>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getServicesTreeByUnit>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetServicesTreeByUnitQueryKey(unitId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getServicesTreeByUnit>>> = ({ signal }) => getServicesTreeByUnit(unitId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getServicesTreeByUnit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetServicesTreeByUnitQueryResult = NonNullable<Awaited<ReturnType<typeof getServicesTreeByUnit>>>
+export type GetServicesTreeByUnitQueryError = string
+
+
+export function useGetServicesTreeByUnit<TData = Awaited<ReturnType<typeof getServicesTreeByUnit>>, TError = string>(
+ unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getServicesTreeByUnit>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getServicesTreeByUnit>>,
+          TError,
+          Awaited<ReturnType<typeof getServicesTreeByUnit>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetServicesTreeByUnit<TData = Awaited<ReturnType<typeof getServicesTreeByUnit>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getServicesTreeByUnit>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getServicesTreeByUnit>>,
+          TError,
+          Awaited<ReturnType<typeof getServicesTreeByUnit>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetServicesTreeByUnit<TData = Awaited<ReturnType<typeof getServicesTreeByUnit>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getServicesTreeByUnit>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get service tree by unit
+ */
+
+export function useGetServicesTreeByUnit<TData = Awaited<ReturnType<typeof getServicesTreeByUnit>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getServicesTreeByUnit>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetServicesTreeByUnitQueryOptions(unitId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
