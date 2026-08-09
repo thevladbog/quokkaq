@@ -6,7 +6,7 @@
 
 **Architecture:** Маршрут остаётся координатором query, WebSocket и мутаций. Чистые вычисления очереди, call-next scope и доступных действий выносятся в `lib`; существующие крупные компоненты получают узкие view-props. Desktop shell занимает доступную высоту viewport, а прокрутка остаётся только в очереди и правом Sheet подробностей. Сведения о передаче берутся только из существующего `useClientVisits` с тем же query key, который уже использует история посетителя.
 
-**Tech Stack:** Next.js 16, React 19, TypeScript, Tailwind CSS 4, TanStack Query v5, next-intl, Radix/shadcn UI, Vitest, Testing Library, jest-axe.
+**Tech Stack:** Next.js 16.2+, React 19, TypeScript 6, Tailwind CSS 4, TanStack Query v5, next-intl, Radix/shadcn UI, Vitest, Testing Library, jest-axe.
 
 ## Global Constraints
 
@@ -35,19 +35,20 @@
 Создать фабрику минимального `Ticket` через `TicketModelSchema.parse` и покрыть порядок применения фильтров: сначала зона, затем выбранные услуги, затем временный full-list override.
 
 ```ts
-it('keeps call-next scope while temporarily showing the full zone queue', () => {
+it("keeps call-next scope while temporarily showing the full zone queue", () => {
   const result = deriveStaffQueueView({
-    waitingTickets: [ticket('a', 'service-a', 'zone-1'), ticket('b', 'service-b', 'zone-1')],
-    selectedServiceIds: ['service-a'],
-    allLeafServiceIds: ['service-a', 'service-b'],
+    waitingTickets: [ticket("a", "service-a", "zone-1"), ticket("b", "service-b", "zone-1")],
+    serviceScopeStatus: "ready",
+    selectedServiceIds: ["service-a"],
+    allLeafServiceIds: ["service-a", "service-b"],
     onlyMyZone: true,
-    counterServiceZoneId: 'zone-1',
-    showAllTemporarily: true
+    counterServiceZoneId: "zone-1",
+    showAllTemporarily: true,
   });
 
-  expect(result.scopedWaiting.map((item) => item.id)).toEqual(['a']);
-  expect(result.visibleWaiting.map((item) => item.id)).toEqual(['a', 'b']);
-  expect(result.callNextServiceIds).toEqual(['service-a']);
+  expect(result.scopedWaiting.map((item) => item.id)).toEqual(["a"]);
+  expect(result.visibleWaiting.map((item) => item.id)).toEqual(["a", "b"]);
+  expect(result.callNextServiceIds).toEqual(["service-a"]);
 });
 ```
 
@@ -69,16 +70,15 @@ Expected: FAIL с `Cannot find module './staff-workstation-view'`.
 - [ ] **Step 3: Реализовать чистые функции с явными контрактами**
 
 ```ts
-import type { Ticket } from '@/lib/api';
+import type { Ticket } from "@/lib/api";
 
-export type StaffPrimaryAction =
-  | 'call_next'
-  | 'start_service'
-  | 'complete'
-  | 'resume';
+export type StaffPrimaryAction = "call_next" | "start_service" | "complete" | "resume" | "blocked";
+
+export type StaffServiceScopeStatus = "pending" | "error" | "hydrating" | "ready";
 
 export interface StaffQueueViewInput {
   waitingTickets: readonly Ticket[];
+  serviceScopeStatus: StaffServiceScopeStatus;
   selectedServiceIds: readonly string[];
   allLeafServiceIds: readonly string[];
   onlyMyZone: boolean;
@@ -87,6 +87,7 @@ export interface StaffQueueViewInput {
 }
 
 export interface StaffQueueView {
+  serviceScopeReady: boolean;
   zoneWaiting: Ticket[];
   scopedWaiting: Ticket[];
   visibleWaiting: Ticket[];
@@ -95,18 +96,12 @@ export interface StaffQueueView {
 
 export function deriveStaffQueueView(input: StaffQueueViewInput): StaffQueueView;
 
-export function getStaffPrimaryAction(
-  ticketStatus: string | undefined,
-  workstationOnBreak: boolean
-): StaffPrimaryAction;
+export function getStaffPrimaryAction(ticketStatus: string | undefined, workstationOnBreak: boolean): StaffPrimaryAction;
 
-export function summarizeServiceScope(
-  leaves: readonly { id: string; label: string }[],
-  selectedIds: readonly string[]
-): { kind: 'all' | 'single' | 'multiple'; labels: string[]; count: number };
+export function summarizeServiceScope(leaves: readonly { id: string; label: string }[], selectedIds: readonly string[]): { kind: "all" | "single" | "multiple"; labels: string[]; count: number };
 ```
 
-Правила `getStaffPrimaryAction`: break → `resume`, no ticket → `call_next`, `called` → `start_service`, `in_service` → `complete`. Для неожиданного статуса активного талона возвращать `call_next` только когда талона фактически нет; вызывающий код передаёт статус найденного active ticket.
+Правила `getStaffPrimaryAction`: break → `resume`, no ticket → `call_next`, `called` → `start_service`, `in_service` → `complete`, неожиданный статус активного талона → `blocked`. `call_next` разрешён только когда активного талона фактически нет. Пока `serviceScopeStatus !== 'ready'`, view model возвращает `serviceScopeReady: false`, пустые очереди и не допускает вызов следующего талона.
 
 - [ ] **Step 4: Дописать тесты primary action и summary scope**
 
@@ -165,6 +160,7 @@ Expected: FAIL из-за отсутствующего компонента.
 export interface StaffWorkstationShellProps {
   unitName: string;
   counterName: string;
+  operatorName: string;
   statusControls: ReactNode;
   main: ReactNode;
   queue: ReactNode;
@@ -174,20 +170,18 @@ export interface StaffWorkstationShellProps {
 Структура desktop:
 
 ```tsx
-<section
-  data-testid='staff-workstation-shell'
-  className='flex min-w-0 flex-col gap-3 md:h-full md:min-h-0 md:overflow-hidden'
->
-  <header className='flex shrink-0 items-center justify-between gap-3'>
-    <div className='min-w-0'>
-      <p className='truncate text-xs'>{unitName}</p>
-      <h1 className='truncate text-xl font-bold'>{counterName}</h1>
+<section data-testid="staff-workstation-shell" className="flex min-w-0 flex-col gap-3 min-[1366px]:h-full min-[1366px]:min-h-0 min-[1366px]:overflow-hidden">
+  <header className="flex shrink-0 items-center justify-between gap-3">
+    <div className="min-w-0">
+      <p className="truncate text-xs">{unitName}</p>
+      <h1 className="truncate text-xl font-bold">{counterName}</h1>
+      <p className="text-muted-foreground truncate text-xs">{operatorName}</p>
     </div>
-    <div className='shrink-0'>{statusControls}</div>
+    <div className="shrink-0">{statusControls}</div>
   </header>
-  <div className='grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_25rem]'>
-    <main className='min-h-0 min-w-0'>{main}</main>
-    <aside className='min-h-0 min-w-0'>{queue}</aside>
+  <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_25rem]">
+    <main className="min-h-0 min-w-0">{main}</main>
+    <aside className="min-h-0 min-w-0">{queue}</aside>
   </div>
 </section>
 ```
@@ -209,7 +203,7 @@ const isStaffWorkstationPath = /^\/staff\/[^/]+\/[^/]+$/.test(pathWithoutLocale)
 ```ts
 contentClassName={
   isStaffWorkstationPath
-    ? 'md:h-dvh md:min-h-0 md:overflow-hidden md:p-3'
+    ? 'min-[1366px]:h-dvh min-[1366px]:min-h-0 min-[1366px]:overflow-hidden min-[1366px]:p-3'
     : undefined
 }
 ```
@@ -252,12 +246,12 @@ git commit -m "feat(staff): add fixed workstation shell"
 
 Проверить доступные кнопки и единственный `data-variant="primary-workflow"`:
 
-| Input | Primary | Secondary |
-| --- | --- | --- |
-| no ticket | `callNext` | none in panel |
-| `called` | `startService` | recall, noShow, returnToQueue, transfer |
-| `in_service` | `complete` | transfer, returnToQueue |
-| break | `resume` | release counter lives in header |
+| Input        | Primary        | Secondary                               |
+| ------------ | -------------- | --------------------------------------- |
+| no ticket    | `callNext`     | none in panel                           |
+| `called`     | `startService` | recall, noShow, returnToQueue, transfer |
+| `in_service` | `complete`     | transfer, returnToQueue                 |
+| break        | `resume`       | release counter lives in header         |
 
 Отдельно проверить:
 
@@ -408,7 +402,7 @@ export interface StaffQueuePanelProps {
   onCreateTicket: (input: { serviceId: string; clientId?: string }) => Promise<void>;
   scopeLeaves: { id: string; label: string }[];
   selectedScopeIds: string[];
-  scopeSummary: { kind: 'all' | 'single' | 'multiple'; labels: string[]; count: number };
+  scopeSummary: { kind: "all" | "single" | "multiple"; labels: string[]; count: number };
   onScopeChange: (ids: string[]) => void;
   pickPending: boolean;
   inProgressTicketId: string | null;
@@ -474,25 +468,16 @@ git commit -m "feat(staff): make queue scope permanently visible"
 
 ```ts
 export interface TransferDisplayLine {
-  kind: 'service' | 'counter' | 'zone';
+  kind: "service" | "counter" | "zone";
   from: string;
   to: string;
 }
 
-export function localizedTransferServiceName(
-  event: ClientVisitTransferEvent,
-  side: 'from' | 'to',
-  locale: string
-): string | null;
+export function localizedTransferServiceName(event: ClientVisitTransferEvent, side: "from" | "to", locale: string): string | null;
 
-export function getTransferDisplayLines(
-  event: ClientVisitTransferEvent,
-  locale: string
-): TransferDisplayLine[];
+export function getTransferDisplayLines(event: ClientVisitTransferEvent, locale: string): TransferDisplayLine[];
 
-export function getLatestTransfer(
-  trail: readonly ClientVisitTransferEvent[] | undefined
-): ClientVisitTransferEvent | null;
+export function getLatestTransfer(trail: readonly ClientVisitTransferEvent[] | undefined): ClientVisitTransferEvent | null;
 ```
 
 Проверить RU/EN fallback, сортировку latest по `at`, отсутствие пустых строк и zone-transfer-to-queue без выдуманного destination counter.
@@ -652,7 +637,7 @@ git commit -m "feat(staff): move visitor context into details sheet"
 7. query pending: stable card/queue skeletons;
 8. refetch error with cached data: cached active ticket остаётся, inline Retry видим;
 9. action failure: inline `role="alert"` и toast оба вызываются;
-10. linked active visitor: один `useClientVisits(unitId, clientId, { enabled: true })`, текущий visit находится по `ticket.id`, latest trail передаётся hero;
+10. linked active visitor: route и Sheet используют одинаковый query key `['clientVisits', unitId, clientId]`, поэтому TanStack Query делит один cache/network request между потребителями; текущий visit находится по `ticket.id`, latest trail передаётся hero;
 11. anonymous/no client: client-visits query disabled, transfer summary отсутствует;
 12. visitor details Sheet открывается из hero и закрывается при смене active ticket id.
 
@@ -672,10 +657,10 @@ const {
   error: ticketsError,
   isPending: ticketsPending,
   isFetching: ticketsFetching,
-  refetch
+  refetch,
 } = useTickets(unitId, {
   enabled: Boolean(unitId),
-  refetchInterval: 12_000
+  refetchInterval: 12_000,
 });
 ```
 
@@ -685,36 +670,32 @@ const {
 
 ```ts
 const queueView = useMemo(
-  () => deriveStaffQueueView({
-    waitingTickets,
-    selectedServiceIds: scopeForFilter,
-    allLeafServiceIds: leafServiceIds,
-    onlyMyZone,
-    counterServiceZoneId: myCounter?.serviceZoneId,
-    showAllTemporarily: showAllQueueTickets
-  }),
-  [waitingTickets, scopeForFilter, leafServiceIds, onlyMyZone, myCounter?.serviceZoneId, showAllQueueTickets]
+  () =>
+    deriveStaffQueueView({
+      waitingTickets,
+      serviceScopeStatus,
+      selectedServiceIds: scopeForFilter,
+      allLeafServiceIds: leafServiceIds,
+      onlyMyZone,
+      counterServiceZoneId: myCounter?.serviceZoneId,
+      showAllTemporarily: showAllQueueTickets,
+    }),
+  [waitingTickets, serviceScopeStatus, scopeForFilter, leafServiceIds, onlyMyZone, myCounter?.serviceZoneId, showAllQueueTickets],
 );
 ```
 
-`handleCallNext` использует только `queueView.callNextServiceIds`. `waitingCount` главной кнопки — `queueView.scopedWaiting.length`, никогда не `visibleWaiting.length`.
+`handleCallNext` использует только `queueView.callNextServiceIds` и завершается без мутации, пока `queueView.serviceScopeReady === false`. `waitingCount` главной кнопки — `queueView.scopedWaiting.length`, никогда не `visibleWaiting.length`.
 
 - [ ] **Step 4: Подключить client visits без N+1**
 
 ```ts
-const activeClientId =
-  currentTicket?.client && !currentTicket.client.isAnonymous
-    ? currentTicket.client.id
-    : undefined;
+const activeClientId = currentTicket?.client && !currentTicket.client.isAnonymous ? currentTicket.client.id : undefined;
 
 const { data: activeClientVisits } = useClientVisits(unitId, activeClientId, {
-  enabled: Boolean(activeClientId)
+  enabled: Boolean(activeClientId),
 });
 
-const activeVisitTransferTrail = useMemo(
-  () => activeClientVisits?.items.find((visit) => visit.id === currentTicket?.id)?.transferTrail,
-  [activeClientVisits?.items, currentTicket?.id]
-);
+const activeVisitTransferTrail = useMemo(() => activeClientVisits?.items.find((visit) => visit.id === currentTicket?.id)?.transferTrail, [activeClientVisits?.items, currentTicket?.id]);
 ```
 
 Не копировать query logic в queue rows. `StaffVisitorContextPanel` внутри Sheet продолжает вызывать тот же hook/key; TanStack Query переиспользует cache.
@@ -729,7 +710,7 @@ const activeVisitTransferTrail = useMemo(
 
 `StaffWorkstationShell` получает:
 
-- header: unit, counter, break/status, Release;
+- header: unit, counter, operator, break/status, Release;
 - main: current/idle/break hero + action panel;
 - queue: обновлённый `StaffQueuePanel` с `queueView.visibleWaiting`;
 - sibling overlay: transfer Dialog, pre-registration modal, visitor details Sheet.
@@ -769,7 +750,9 @@ git commit -m "feat(staff): integrate focused operator workplace"
 
 - [ ] **Step 1: Format all touched files**
 
-Run: `pnpm --dir apps/frontend exec prettier --write 'app/[locale]/staff/[unitId]/[counterId]/page.tsx' 'app/[locale]/staff/[unitId]/[counterId]/page.test.tsx' components/staff/StaffWorkstationShell.tsx components/staff/StaffWorkstationShell.test.tsx components/staff/StaffWorkstationActionPanel.tsx components/staff/StaffWorkstationActionPanel.test.tsx components/staff/StaffQueuePanel.tsx components/staff/StaffQueuePanel.test.tsx components/staff/StaffServiceScopeSelector.tsx components/staff/StaffServiceScopeSelector.test.tsx components/staff/StaffCurrentTransferSummary.tsx components/staff/StaffCurrentTransferSummary.test.tsx components/staff/StaffVisitorDetailsSheet.tsx components/staff/StaffVisitorDetailsSheet.test.tsx components/staff/StaffVisitorContextPanel.tsx components/staff/StaffCurrentTicketHero.tsx components/staff/StaffIdleWorkstationHero.tsx components/visitors/VisitTransferTrail.tsx components/ProtectedSidebarLayout.tsx components/ConditionalLayout.tsx components/ConditionalLayout.test.tsx lib/staff-workstation-view.ts lib/staff-workstation-view.test.ts lib/visit-transfer-display.ts lib/visit-transfer-display.test.ts messages/ru.json messages/en.json`
+Run: `pnpm nx run frontend:format:fix`
+
+Run: `pnpm nx run frontend:format:check`
 
 Expected: command exits 0.
 
@@ -781,11 +764,11 @@ Expected: PASS.
 
 - [ ] **Step 3: Run frontend project gates**
 
-Run: `pnpm nx test frontend`
+Run: `pnpm nx run frontend:test`
 
 Expected: PASS.
 
-Run: `pnpm nx lint frontend`
+Run: `pnpm nx run frontend:lint`
 
 Expected: PASS.
 
@@ -808,8 +791,8 @@ For both viewports record:
   viewport: [window.innerWidth, window.innerHeight],
   pageScroll: document.documentElement.scrollHeight - document.documentElement.clientHeight,
   bodyScroll: document.body.scrollHeight - document.body.clientHeight,
-  queueScroll: document.querySelector('[data-testid="staff-queue-scroll"]')?.scrollHeight - document.querySelector('[data-testid="staff-queue-scroll"]')?.clientHeight
-})
+  queueScroll: document.querySelector('[data-testid="staff-queue-scroll"]')?.scrollHeight - document.querySelector('[data-testid="staff-queue-scroll"]')?.clientHeight,
+});
 ```
 
 Expected:

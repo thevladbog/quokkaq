@@ -298,7 +298,7 @@ export function StaffQueuePanel({
           </div>
 
           {showAllTicketsInQueue ? (
-            <Alert className='mx-3 mt-2 w-auto shrink-0 py-2'>
+            <Alert role='status' className='mx-3 mt-2 w-auto shrink-0 py-2'>
               <AlertTriangle aria-hidden />
               <AlertDescription className='text-xs'>
                 {t('queue.temporary_all_warning')}
@@ -328,7 +328,11 @@ export function StaffQueuePanel({
                 <Alert variant='destructive'>
                   <AlertTriangle aria-hidden />
                   <AlertDescription>
-                    <p>{queueError.message}</p>
+                    <p>
+                      {t('queue.load_error', {
+                        message: queueError.message
+                      })}
+                    </p>
                     <Button
                       type='button'
                       size='sm'
@@ -381,7 +385,7 @@ export function StaffQueuePanel({
                 ))
               ) : (
                 <div className='text-muted-foreground py-6 text-center text-sm'>
-                  {scopeLeaves.length > 0
+                  {scopeLeaves.length > 0 && !showAllTicketsInQueue
                     ? t('queue.empty_scoped', {
                         scope:
                           scopeSummary.kind === 'all'
@@ -555,7 +559,7 @@ function StaffQueueTicketRow({
                   'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
               )}
             >
-              <span>SLA</span>
+              <span>{t('queue.sla_label')}</span>
               <span>
                 {isOverdue ? t('queue.sla_overdue') : t('queue.sla_warning')}
               </span>

@@ -1,7 +1,7 @@
 import type { Ticket } from '@/lib/api';
 
 export type StaffPrimaryAction =
-  'call_next' | 'start_service' | 'complete' | 'resume';
+  'call_next' | 'start_service' | 'complete' | 'resume' | 'blocked';
 
 export type StaffServiceScopeStatus =
   'pending' | 'error' | 'hydrating' | 'ready';
@@ -25,7 +25,9 @@ export interface StaffQueueView {
 }
 
 function byCreationTime(left: Ticket, right: Ticket): number {
-  return (left.createdAt ?? '').localeCompare(right.createdAt ?? '');
+  const leftKey = left.createdAt ?? '\uffff';
+  const rightKey = right.createdAt ?? '\uffff';
+  return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
 }
 
 function normalizeServiceZoneId(
@@ -97,7 +99,7 @@ export function getStaffPrimaryAction(
   if (!ticketStatus) return 'call_next';
   if (ticketStatus === 'called') return 'start_service';
   if (ticketStatus === 'in_service') return 'complete';
-  return 'start_service';
+  return 'blocked';
 }
 
 export function summarizeServiceScope(

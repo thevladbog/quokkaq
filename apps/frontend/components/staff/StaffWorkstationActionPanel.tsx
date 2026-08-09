@@ -150,6 +150,11 @@ export function StaffWorkstationActionPanel({
             : t('workstation.resume')}
         </Button>
       )}
+      {primaryAction === 'blocked' && (
+        <p className='text-destructive text-sm' role='status'>
+          {t('actions.unavailable_status')}
+        </p>
+      )}
 
       {primaryAction === 'call_next' && waitingCount === 0 && (
         <p className='text-muted-foreground text-sm' role='status'>
@@ -196,7 +201,9 @@ export function StaffWorkstationActionPanel({
               disabled={conflictingActionPending || noShowPending}
             >
               <Ban className='h-3.5 w-3.5' />
-              {t('actions.noShow')}
+              {noShowPending
+                ? t('actions.processing_action')
+                : t('actions.noShow')}
             </Button>
           )}
           {showReturnToQueue && (
@@ -225,7 +232,9 @@ export function StaffWorkstationActionPanel({
               disabled={conflictingActionPending || transferPending}
             >
               <ArrowRightLeft className='h-3.5 w-3.5' />
-              {t('actions.transfer')}
+              {transferPending
+                ? t('actions.processing_action')
+                : t('actions.transfer')}
             </Button>
           )}
         </div>

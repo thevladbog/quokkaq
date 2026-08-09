@@ -19,6 +19,8 @@ const messages: Record<string, string> = {
   'workstation.resume': 'Resume work',
   'actions.call_next_empty_reason': 'No tickets are waiting.',
   'actions.disabled_on_break_reason': 'Resume work to manage the queue.',
+  'actions.unavailable_status':
+    'This ticket status is not supported. Refresh before continuing.',
   'actions.action_error': 'Action failed: {message}',
   'actions.processing_action': 'Processing action…'
 };
@@ -42,7 +44,7 @@ function ticket(status: string): Ticket {
 function renderPanel(
   overrides: Partial<StaffWorkstationActionPanelProps> = {}
 ) {
-  const props = {
+  const props: StaffWorkstationActionPanelProps = {
     t,
     currentTicket: undefined,
     waitingCount: 1,
@@ -63,7 +65,7 @@ function renderPanel(
     onReturnToQueue: vi.fn(),
     onRecall: vi.fn(),
     ...overrides
-  } as StaffWorkstationActionPanelProps;
+  };
 
   return { ...render(<StaffWorkstationActionPanel {...props} />), props };
 }
@@ -152,6 +154,88 @@ describe('StaffWorkstationActionPanel', () => {
     await user.click(callNext);
     await user.click(callNext);
     expect(onCallNext).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'call next',
+      label: 'Call next',
+      buildOverrides: (handler: () => void) => ({ onCallNext: handler })
+    },
+    {
+      name: 'start service',
+      label: 'Start service',
+      buildOverrides: (handler: () => void) => ({
+        currentTicket: ticket('called'),
+        onConfirmArrival: handler
+      })
+    },
+    {
+      name: 'complete',
+      label: 'Complete',
+      buildOverrides: (handler: () => void) => ({
+        currentTicket: ticket('in_service'),
+        onComplete: handler
+      })
+    },
+    {
+      name: 'resume',
+      label: 'Resume work',
+      buildOverrides: (handler: () => void) => ({
+        workstationOnBreak: true,
+        onResume: handler
+      })
+    }
+  ])(
+    'runs the enabled $name primary action once',
+    async ({ label, buildOverrides }) => {
+      const user = userEvent.setup();
+      const handler = vi.fn();
+      const { container } = renderPanel(buildOverrides(handler));
+
+      await user.click(within(container).getByRole('button', { name: label }));
+
+      expect(handler).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('blocks workflow mutations for an unsupported active ticket status', () => {
+    const { container } = renderPanel({
+      currentTicket: ticket('unexpected_active_status')
+    });
+    const panel = within(container);
+
+    expect(
+      panel.getByText(
+        'This ticket status is not supported. Refresh before continuing.'
+      )
+    ).toBeVisible();
+    expect(
+      container.querySelectorAll('[data-variant="primary-workflow"]')
+    ).toHaveLength(0);
+  });
+
+  it.each([
+    {
+      name: 'no-show',
+      overrides: {
+        currentTicket: ticket('called'),
+        noShowPending: true
+      }
+    },
+    {
+      name: 'transfer',
+      overrides: {
+        currentTicket: ticket('in_service'),
+        transferPending: true
+      }
+    }
+  ])('shows processing feedback while $name is pending', ({ overrides }) => {
+    const { container } = renderPanel(overrides);
+
+    expect(
+      within(container).getByRole('button', { name: 'Processing action…' })
+    ).toBeDisabled();
   });
 
   it('locks every conflicting action while preserving the pending action label', () => {

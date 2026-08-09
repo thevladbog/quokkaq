@@ -10,17 +10,26 @@ vi.mock('@/components/SettingsSidebar', () => ({ default: 'aside' }));
 vi.mock('@/components/ProtectedSidebarLayout', () => ({ default: 'main' }));
 vi.mock('next/image', () => ({ default: 'img' }));
 
-import { isStaffWorkstationPath } from './ConditionalLayout';
+import {
+  isStaffWorkstationPath,
+  STAFF_WORKSTATION_CONTENT_CLASS
+} from './ConditionalLayout';
 
 describe('isStaffWorkstationPath', () => {
   it.each([
-    ['/staff/unit-1/counter-2', true],
-    ['/staff', false],
-    ['/staff/support', false],
-    ['/staff/support/example-id', false],
-    ['/staff/unit-1', false],
-    ['/staff/unit-1/counter-2/details', false]
-  ])('returns %s for %s', (path, expected) => {
+    { path: '/staff/unit-1/counter-2', expected: true },
+    { path: '/staff', expected: false },
+    { path: '/staff/support', expected: false },
+    { path: '/staff/support/example-id', expected: false },
+    { path: '/staff/unit-1', expected: false },
+    { path: '/staff/unit-1/counter-2/details', expected: false }
+  ])('returns $expected for $path', ({ path, expected }) => {
     expect(isStaffWorkstationPath(path)).toBe(expected);
+  });
+
+  it('starts fixed-height workstation behavior at the desktop acceptance width', () => {
+    expect(STAFF_WORKSTATION_CONTENT_CLASS).toBe(
+      'min-[1366px]:h-dvh min-[1366px]:min-h-0 min-[1366px]:overflow-hidden min-[1366px]:p-3'
+    );
   });
 });

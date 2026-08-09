@@ -11,6 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  ApiHttpError,
   ServiceModelSchema,
   TicketModelSchema,
   type Service,
@@ -30,6 +31,7 @@ const state = vi.hoisted(() => ({
     data: [] as Service[] | undefined,
     error: null as Error | null,
     isPending: false,
+    isFetching: false,
     refetch: vi.fn()
   },
   clientVisits: {
@@ -85,7 +87,9 @@ vi.mock('@/src/i18n/navigation', () => ({
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuthContext: () => ({ user: { isPlatformAdmin: true } })
+  useAuthContext: () => ({
+    user: { isPlatformAdmin: true, name: 'Ada Operator' }
+  })
 }));
 
 vi.mock('@/contexts/ActiveUnitContext', () => ({
@@ -163,6 +167,8 @@ const messages: Record<string, string> = {
   'workstation.break_started': 'Break started',
   'workstation.break_ended': 'Break ended',
   'workstation.break_error': 'Could not change break',
+  'workstation.break_needs_no_ticket':
+    'Finish or transfer the active ticket before taking a break.',
   logout: 'Release counter',
   logout_failed: 'Could not release counter',
   'current.title': 'Current ticket',
@@ -199,6 +205,8 @@ const messages: Record<string, string> = {
   'actions.disabled_on_break_reason': 'Resume work to manage the queue.',
   'actions.action_error': 'Action failed: {message}',
   'actions.processing_action': 'Processing action…',
+  'actions.unavailable_status':
+    'This ticket status is not supported. Refresh before continuing.',
   'queue.title': 'Waiting queue',
   'queue.description': 'Tickets waiting to be called',
   'queue.number': 'Number',
@@ -221,10 +229,12 @@ const messages: Record<string, string> = {
   'queue.loading': 'Loading queue',
   'queue.refreshing': 'Refreshing queue',
   'queue.retry': 'Retry queue',
+  'queue.load_error': 'Could not load queue: {message}',
   'queue.no_name': 'No name on file',
   'queue.uncategorized': 'Other',
   'queue.sla_warning': 'SLA warning',
   'queue.sla_overdue': 'SLA overdue',
+  'queue.sla_label': 'SLA',
   'scope.title': 'Service scope',
   'scope.hint': 'Choose services',
   'scope.configure': 'Services',
@@ -361,6 +371,7 @@ beforeEach(() => {
   state.servicesQuery.data = services;
   state.servicesQuery.error = null;
   state.servicesQuery.isPending = false;
+  state.servicesQuery.isFetching = false;
   state.servicesQuery.refetch.mockReset().mockResolvedValue({ data: services });
   state.clientVisits.data = undefined;
   state.clientVisits.isLoading = false;
@@ -444,6 +455,7 @@ describe('StaffWorkspacePage integration', () => {
     const rendered = renderPage();
 
     expect(await screen.findByTestId('staff-workstation-shell')).toBeVisible();
+    expect(screen.getByText('Ada Operator')).toBeVisible();
     expect(screen.getByText('A001')).toBeVisible();
     expect(screen.getByText('B002')).toBeVisible();
     expect(
@@ -534,6 +546,13 @@ describe('StaffWorkspacePage integration', () => {
     );
   });
 
+  it('shows queue refresh feedback while services refresh in the background', async () => {
+    state.servicesQuery.isFetching = true;
+    renderPage();
+
+    expect(await screen.findByText('Refreshing queue')).toBeVisible();
+  });
+
   it('keeps normal all-services behavior for a genuinely loaded empty catalog', async () => {
     const user = userEvent.setup();
     state.servicesQuery.data = [];
@@ -610,7 +629,6 @@ describe('StaffWorkspacePage integration', () => {
       'staff-service-scope:unit-1:counter-1',
       JSON.stringify(['service-a'])
     );
-    localStorage.setItem('staff-queue-show-all:unit-1:counter-1', '1');
     renderPage();
 
     await screen.findByText('A001');
@@ -744,6 +762,43 @@ describe('StaffWorkspacePage integration', () => {
     expect(state.toast.error).toHaveBeenCalledWith('Could not change break', {
       description: '  Start backend detail  '
     });
+  });
+
+  it('uses one active-ticket break message for inline and toast feedback when the API provides a stable code', async () => {
+    const user = userEvent.setup();
+    state.api.startBreak.mockRejectedValueOnce(
+      new ApiHttpError('Conflict', 409, 'counter_break_active_ticket')
+    );
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Take break' }));
+
+    const message =
+      'Finish or transfer the active ticket before taking a break.';
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      `Action failed: ${message}`
+    );
+    expect(state.toast.error).toHaveBeenCalledWith(message, {
+      description: 'Conflict'
+    });
+  });
+
+  it('blocks workflow actions for an unsupported ticket status assigned to this counter', async () => {
+    state.ticketsQuery.data = [
+      ticket('a001', 'unexpected_active_status', {
+        counter: { id: 'counter-1', name: 'Counter 1' }
+      })
+    ];
+    renderPage();
+
+    expect(
+      await screen.findByText(
+        'This ticket status is not supported. Refresh before continuing.'
+      )
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Call next' })
+    ).not.toBeInTheDocument();
   });
 
   it('shows a localized inline fallback while keeping end-break detail in the toast', async () => {

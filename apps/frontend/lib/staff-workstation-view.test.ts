@@ -10,7 +10,7 @@ function ticket(
   id: string,
   serviceId: string,
   serviceZoneId?: string | null,
-  createdAt = '2026-08-09T09:00:00.000Z'
+  createdAt: string | null | undefined = '2026-08-09T09:00:00.000Z'
 ): Ticket {
   return TicketModelSchema.parse({
     id,
@@ -152,6 +152,25 @@ describe('deriveStaffQueueView', () => {
     ]);
   });
 
+  it('sorts tickets without a creation time after timestamped tickets', () => {
+    const result = deriveStaffQueueView({
+      waitingTickets: [
+        ticket('missing', 'service-a', 'zone-1', null),
+        ticket('known', 'service-a', 'zone-1', '2026-08-09T08:00:00.000Z')
+      ],
+      serviceScopeStatus: 'ready',
+      selectedServiceIds: ['service-a'],
+      allLeafServiceIds: ['service-a'],
+      onlyMyZone: false,
+      showAllTemporarily: false
+    });
+
+    expect(result.visibleWaiting.map((item) => item.id)).toEqual([
+      'known',
+      'missing'
+    ]);
+  });
+
   it('shows only scoped rows when the temporary full-list override is off', () => {
     const result = deriveStaffQueueView({
       waitingTickets: [
@@ -227,10 +246,10 @@ describe('getStaffPrimaryAction', () => {
     [undefined, false, 'call_next'],
     ['called', false, 'start_service'],
     ['in_service', false, 'complete'],
-    ['unexpected_active_status', false, 'start_service'],
+    ['unexpected_active_status', false, 'blocked'],
     ['called', true, 'resume']
   ] as const)(
-    'returns %s for status %s and break %s',
+    'returns the right action for status %s and break %s (expects %s)',
     (status, onBreak, action) => {
       expect(getStaffPrimaryAction(status, onBreak)).toBe(action);
     }

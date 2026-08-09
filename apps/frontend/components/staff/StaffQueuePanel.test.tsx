@@ -30,12 +30,14 @@ const messages: Record<string, string> = {
   'queue.loading': 'Loading queue',
   'queue.refreshing': 'Refreshing queue',
   'queue.retry': 'Retry',
+  'queue.load_error': 'Could not load queue: {message}',
   'queue.no_name': 'No name on file',
   'queue.uncategorized': 'Other',
   'queue.waiting': 'Waiting',
   'queue.max_label': 'Max',
   'queue.sla_warning': 'SLA warning',
   'queue.sla_overdue': 'SLA overdue',
+  'queue.sla_label': 'SLA',
   'scope.title': 'Service scope',
   'scope.hint': 'Choose services',
   'scope.configure': 'Services',
@@ -130,10 +132,15 @@ function renderPanel(overrides: Partial<StaffQueuePanelProps> = {}) {
   };
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe('StaffQueuePanel', () => {
   it('shows the ticket number, visitor, service, live wait, SLA status and Call action', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-09T09:00:00.000Z'));
     renderPanel({
       waitingTickets: [
         ticket('7', {
@@ -183,7 +190,9 @@ describe('StaffQueuePanel', () => {
       onRetryQueue
     });
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Network unavailable');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Could not load queue: Network unavailable'
+    );
     expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible();
   });
 
@@ -191,6 +200,19 @@ describe('StaffQueuePanel', () => {
     renderPanel({ waitingTickets: [], scopedWaitingCount: 0 });
 
     expect(screen.getByText('No tickets for Payments.')).toBeVisible();
+  });
+
+  it('uses a generic empty state while the temporary full list is shown', () => {
+    renderPanel({
+      waitingTickets: [],
+      scopedWaitingCount: 0,
+      showAllTicketsInQueue: true
+    });
+
+    expect(screen.getByText('No tickets waiting')).toBeVisible();
+    expect(
+      screen.queryByText('No tickets for Payments.')
+    ).not.toBeInTheDocument();
   });
 
   it('keeps a long queue inside one internal scrolling region', () => {
@@ -220,6 +242,13 @@ describe('StaffQueuePanel', () => {
     ).toBeVisible();
     expect(screen.getAllByText('Payments')).not.toHaveLength(0);
     expect(screen.queryByText('All services')).not.toBeInTheDocument();
+    expect(
+      screen
+        .getByText(
+          'Temporary full list: Call next still follows the selected services.'
+        )
+        .closest('[role="status"]')
+    ).not.toBeNull();
   });
 
   it.each([

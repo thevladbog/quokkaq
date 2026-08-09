@@ -18,6 +18,7 @@ describe('StaffWorkstationShell', () => {
       <StaffWorkstationShell
         unitName='Central office'
         counterName='Counter 12'
+        operatorName='Ada Operator'
         statusControls={<button type='button'>Available</button>}
         main={<div>Main workstation</div>}
         queue={<div>Queue</div>}
@@ -28,7 +29,11 @@ describe('StaffWorkstationShell', () => {
     expect(sidebar.setOpen).toHaveBeenCalledWith(false);
 
     const shell = screen.getByTestId('staff-workstation-shell');
-    expect(shell).toHaveClass('md:h-full', 'md:min-h-0', 'md:overflow-hidden');
+    expect(shell).toHaveClass(
+      'min-[1366px]:h-full',
+      'min-[1366px]:min-h-0',
+      'min-[1366px]:overflow-hidden'
+    );
     expect(shell.querySelector('main')).toHaveClass('min-h-0', 'min-w-0');
     expect(shell.querySelector('aside')).toHaveClass('min-h-0', 'min-w-0');
     expect(shell.querySelector('main')?.parentElement).toHaveClass(
@@ -37,6 +42,7 @@ describe('StaffWorkstationShell', () => {
     );
 
     expect(screen.getByText('Central office')).toBeInTheDocument();
+    expect(screen.getByText('Ada Operator')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Counter 12' })
     ).toBeInTheDocument();
@@ -51,6 +57,7 @@ describe('StaffWorkstationShell', () => {
     const props = {
       unitName: 'Central office',
       counterName: 'Counter 12',
+      operatorName: 'Ada Operator',
       statusControls: <button type='button'>Available</button>,
       main: <div>Main workstation</div>,
       queue: <div>Queue</div>

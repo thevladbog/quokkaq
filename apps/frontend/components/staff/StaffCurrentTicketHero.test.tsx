@@ -24,6 +24,7 @@ const messages: Record<string, string> = {
   'queue.service_time': 'Service time',
   'queue.sla_warning': 'Approaching limit',
   'queue.sla_overdue': 'Limit exceeded',
+  'queue.sla_label': 'SLA',
   'statuses.called': 'Called',
   'statuses.in_service': 'In service',
   'visitor_context.open_details': 'Visitor details'

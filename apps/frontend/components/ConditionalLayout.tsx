@@ -31,6 +31,9 @@ export function isStaffWorkstationPath(path: string): boolean {
   return /^\/staff\/[^/]+\/[^/]+$/.test(path);
 }
 
+export const STAFF_WORKSTATION_CONTENT_CLASS =
+  'min-[1366px]:h-dvh min-[1366px]:min-h-0 min-[1366px]:overflow-hidden min-[1366px]:p-3';
+
 const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
   const pathname = usePathname();
 
@@ -215,9 +218,7 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
             requiredAnyPermission={layoutConfig.requiredAnyPermission}
             SidebarComponent={layoutConfig.SidebarComponent}
             contentClassName={
-              isStaffWorkstation
-                ? 'md:h-dvh md:min-h-0 md:overflow-hidden md:p-3'
-                : undefined
+              isStaffWorkstation ? STAFF_WORKSTATION_CONTENT_CLASS : undefined
             }
             fallbackComponent={
               <div className='flex min-h-screen items-center justify-center p-4'>

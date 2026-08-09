@@ -27,7 +27,13 @@ import {
   getGetUnitByIDQueryKey,
   getGetUnitsUnitIdChildUnitsQueryKey
 } from '@/lib/api/generated/units';
-import { countersApi, unitsApi, Ticket, type Service } from '@/lib/api';
+import {
+  ApiHttpError,
+  countersApi,
+  unitsApi,
+  Ticket,
+  type Service
+} from '@/lib/api';
 import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import { getUnitDisplayName } from '@/lib/unit-display';
 
@@ -35,6 +41,13 @@ import { getUnitDisplayName } from '@/lib/unit-display';
 const EMPTY_TICKET_LIST: Ticket[] = [];
 const EMPTY_SERVICE_LIST: Service[] = [];
 const EMPTY_SERVICE_ID_LIST: string[] = [];
+const NON_ACTIVE_TICKET_STATUSES = new Set([
+  'waiting',
+  'served',
+  'completed',
+  'no_show',
+  'cancelled'
+]);
 import { socketClient } from '@/lib/socket';
 import { logger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
@@ -226,14 +239,14 @@ export default function StaffWorkspacePage({
       refetch();
     },
     onError: (error: Error) => {
-      const msg = (error.message || '').toLowerCase();
       const detail = error.message.trim() ? error.message : undefined;
       const message =
-        msg.includes('active') || msg.includes('ticket')
+        error instanceof ApiHttpError &&
+        error.code === 'counter_break_active_ticket'
           ? t('workstation.break_needs_no_ticket')
           : t('workstation.break_error');
       setActionError(message);
-      toast.error(t('workstation.break_error'), {
+      toast.error(message, {
         description: detail
       });
     }
@@ -260,9 +273,15 @@ export default function StaffWorkspacePage({
     }
   });
 
-  const currentTicket = tickets.find(
-    (ticket) => ticket.status === 'called' || ticket.status === 'in_service'
-  );
+  const currentTicket =
+    tickets.find(
+      (ticket) => ticket.status === 'called' || ticket.status === 'in_service'
+    ) ??
+    tickets.find(
+      (ticket) =>
+        ticket.counter?.id === counterId &&
+        !NON_ACTIVE_TICKET_STATUSES.has(ticket.status)
+    );
   const waitingTickets = tickets.filter(
     (ticket) => ticket.status === 'waiting'
   );
@@ -1016,6 +1035,7 @@ export default function StaffWorkspacePage({
       <StaffWorkstationShell
         unitName={unit ? getUnitDisplayName(unit, locale) : '—'}
         counterName={counterName}
+        operatorName={user?.name?.trim() || '—'}
         statusControls={
           <div className='flex flex-wrap items-center justify-end gap-2'>
             <span

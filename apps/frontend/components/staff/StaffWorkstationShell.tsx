@@ -6,6 +6,7 @@ import { useSidebar } from '@/components/ui/sidebar';
 export interface StaffWorkstationShellProps {
   unitName: string;
   counterName: string;
+  operatorName: string;
   statusControls: ReactNode;
   main: ReactNode;
   queue: ReactNode;
@@ -14,6 +15,7 @@ export interface StaffWorkstationShellProps {
 export function StaffWorkstationShell({
   unitName,
   counterName,
+  operatorName,
   statusControls,
   main,
   queue
@@ -31,12 +33,15 @@ export function StaffWorkstationShell({
   return (
     <section
       data-testid='staff-workstation-shell'
-      className='flex min-w-0 flex-col gap-3 md:h-full md:min-h-0 md:overflow-hidden'
+      className='flex min-w-0 flex-col gap-3 min-[1366px]:h-full min-[1366px]:min-h-0 min-[1366px]:overflow-hidden'
     >
       <header className='flex shrink-0 items-center justify-between gap-3'>
         <div className='min-w-0'>
           <p className='truncate text-xs'>{unitName}</p>
           <h1 className='truncate text-xl font-bold'>{counterName}</h1>
+          <p className='text-muted-foreground truncate text-xs'>
+            {operatorName}
+          </p>
         </div>
         <div className='shrink-0'>{statusControls}</div>
       </header>

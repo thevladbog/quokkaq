@@ -322,7 +322,7 @@ export function StaffCurrentTicketHero({
                         )}
                         role='status'
                       >
-                        <span>SLA</span>
+                        <span>{t('queue.sla_label')}</span>
                         <span>
                           {serviceIsOverdue
                             ? t('queue.sla_overdue')
