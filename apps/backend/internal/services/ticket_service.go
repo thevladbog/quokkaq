@@ -516,7 +516,7 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 				return ErrTicketKioskIdentifiedUserMode
 			}
 		}
-		if HasRequestDocumentsData(documentsData) && kid != nil {
+		if HasRequestDocumentsData(documentsData) && kid != nil && !IsServiceBehaviorFormDocumentsData(service, documentsData) {
 			return ErrDocumentsDataWithKioskIdp
 		}
 

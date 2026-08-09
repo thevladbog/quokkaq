@@ -24,6 +24,13 @@ func svcCustom(kiosk string) *models.Service {
 	}
 }
 
+func svcBehavior(mode, behavior string) *models.Service {
+	return &models.Service{
+		IdentificationMode: mode,
+		Behavior:           json.RawMessage(behavior),
+	}
+}
+
 func TestHasRequestDocumentsData(t *testing.T) {
 	empty := json.RawMessage(" {} ")
 	if !HasRequestDocumentsData(&empty) {
@@ -182,6 +189,110 @@ func TestResolveDocumentsDataForNewTicket(t *testing.T) {
 			svcCustom(`{"sensitive": true}`), &in)
 		if !errors.Is(err, ErrKioskConfigRetentionRequiredWhenSensitive) {
 			t.Fatalf("err %v", err)
+		}
+	})
+}
+
+func TestResolveDocumentsDataForNewTicketBehaviorForm(t *testing.T) {
+	behavior := `{
+  "version": 1,
+  "fields": [
+    {"key": "room", "label": {"en": "Room"}, "type": "text", "required": true},
+    {"key": "floor", "label": {"en": "Floor"}, "type": "number", "required": false},
+    {"key": "arrival", "label": {"en": "Arrival"}, "type": "checkbox", "required": true}
+  ],
+  "dataRetentionDays": 2
+}`
+
+	t.Run("accepts namespaced form with employee identity", func(t *testing.T) {
+		service := svcBehavior(models.IdentificationModeBadge, behavior)
+		in := json.RawMessage(`{"form":{"room":"A-101","floor":4,"arrival":true}}`)
+		if !IsServiceBehaviorFormDocumentsData(service, &in) {
+			t.Fatal("employee ticket path must allow a declared behavior form")
+		}
+		data, exp, err := ResolveDocumentsDataForNewTicket(service, &in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(data), `"form"`) {
+			t.Fatalf("data: %s", data)
+		}
+		if exp == nil {
+			t.Fatal("expected behavior retention expiry")
+		}
+		legacy := json.RawMessage(`{"idDocumentOcr":"MRZ"}`)
+		if IsServiceBehaviorFormDocumentsData(service, &legacy) {
+			t.Fatal("employee ticket path must keep legacy identification payloads rejected")
+		}
+	})
+
+	t.Run("uses behavior retention expiry", func(t *testing.T) {
+		in := json.RawMessage(`{"form":{"room":"A-101","arrival":true}}`)
+		_, exp, err := ResolveDocumentsDataForNewTicket(
+			svcBehavior(models.IdentificationModeNone, behavior),
+			&in,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if exp == nil {
+			t.Fatal("expected expiry")
+		}
+		before := time.Now().UTC().AddDate(0, 0, 1)
+		after := time.Now().UTC().AddDate(0, 0, 3)
+		if exp.Before(before) || exp.After(after) {
+			t.Fatalf("exp ~2d, got %v", exp)
+		}
+	})
+
+	t.Run("preserves stricter document retention", func(t *testing.T) {
+		service := svcBehavior(models.IdentificationModeDocument, behavior)
+		service.KioskDocumentSettings = json.RawMessage(`{"retentionDays":1}`)
+		in := json.RawMessage(`{"form":{"room":"A-101","arrival":true}}`)
+		_, exp, err := ResolveDocumentsDataForNewTicket(service, &in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if exp == nil {
+			t.Fatal("expected expiry")
+		}
+		before := time.Now().UTC().AddDate(0, 0, 0)
+		after := time.Now().UTC().AddDate(0, 0, 2)
+		if exp.Before(before) || exp.After(after) {
+			t.Fatalf("exp ~1d, got %v", exp)
+		}
+	})
+
+	t.Run("rejects undeclared form key", func(t *testing.T) {
+		in := json.RawMessage(`{"form":{"room":"A-101","arrival":true,"secret":"x"}}`)
+		_, _, err := ResolveDocumentsDataForNewTicket(
+			svcBehavior(models.IdentificationModeNone, behavior),
+			&in,
+		)
+		if !errors.Is(err, ErrServiceBehaviorFormInvalid) {
+			t.Fatalf("err = %v, want %v", err, ErrServiceBehaviorFormInvalid)
+		}
+	})
+
+	t.Run("rejects wrong field value type", func(t *testing.T) {
+		in := json.RawMessage(`{"form":{"room":101,"arrival":true}}`)
+		_, _, err := ResolveDocumentsDataForNewTicket(
+			svcBehavior(models.IdentificationModeNone, behavior),
+			&in,
+		)
+		if !errors.Is(err, ErrServiceBehaviorFormInvalid) {
+			t.Fatalf("err = %v, want %v", err, ErrServiceBehaviorFormInvalid)
+		}
+	})
+
+	t.Run("keeps legacy flat document payloads compatible", func(t *testing.T) {
+		in := json.RawMessage(`{"idDocumentOcr":"MRZ"}`)
+		data, exp, err := ResolveDocumentsDataForNewTicket(svcDoc(`{"retentionDays":3}`), &in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(data), "idDocumentOcr") || exp == nil {
+			t.Fatalf("legacy data = %s, expiry = %v", data, exp)
 		}
 	})
 }

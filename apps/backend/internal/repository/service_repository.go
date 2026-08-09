@@ -247,6 +247,7 @@ var updatableServiceColumns = []string{
 	"identification_mode",
 	"kiosk_document_settings",
 	"kiosk_identification_config",
+	"behavior",
 	"is_leaf",
 	"restricted_service_zone_id",
 	"grid_row",

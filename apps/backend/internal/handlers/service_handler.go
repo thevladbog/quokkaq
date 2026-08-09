@@ -74,7 +74,8 @@ func (h *ServiceHandler) CreateService(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "unit not found", http.StatusBadRequest)
 		case errors.Is(err, repository.ErrServiceUnitIDRequired),
 			errors.Is(err, services.ErrKioskConfigRetentionOutOfRange),
-			errors.Is(err, services.ErrKioskConfigRetentionRequiredWhenSensitive):
+			errors.Is(err, services.ErrKioskConfigRetentionRequiredWhenSensitive),
+			errors.Is(err, services.ErrServiceBehaviorInvalid):
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -175,7 +176,8 @@ func (h *ServiceHandler) UpdateService(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, services.ErrKioskConfigRetentionOutOfRange) ||
-			errors.Is(err, services.ErrKioskConfigRetentionRequiredWhenSensitive) {
+			errors.Is(err, services.ErrKioskConfigRetentionRequiredWhenSensitive) ||
+			errors.Is(err, services.ErrServiceBehaviorInvalid) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}

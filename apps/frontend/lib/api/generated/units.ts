@@ -160,6 +160,11 @@ export interface ModelsUnitOperationsPublic {
 }
 
 /**
+ * Behavior is optional portable station flow configuration. It complements, but never replaces, identification mode.
+ */
+export type ModelsServiceBehavior = { [key: string]: unknown };
+
+/**
  * KioskDocumentSettings: JSON, e.g. { "retentionDays": 1–30 } for identificationMode=document.
  */
 export type ModelsServiceKioskDocumentSettings = { [key: string]: unknown };
@@ -171,6 +176,8 @@ export type ModelsServiceKioskIdentificationConfig = { [key: string]: unknown };
 
 export interface ModelsService {
   backgroundColor?: string;
+  /** Behavior is optional portable station flow configuration. It complements, but never replaces, identification mode. */
+  behavior?: ModelsServiceBehavior;
   /** CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).
   When non-empty (after trim), it must be unique per unit — enforced by DB partial unique index and create/update validation. */
   calendarSlotKey?: string;

@@ -210,6 +210,16 @@ func MergeServiceJSONPatch(dst *models.Service, raw map[string]json.RawMessage) 
 				return fmt.Errorf("kioskIdentificationConfig: invalid json")
 			}
 			dst.KioskIdentificationConfig = append(json.RawMessage(nil), b...)
+		case "behavior":
+			b := bytesTrimJSON(v)
+			if len(b) == 0 || string(b) == "null" {
+				dst.Behavior = nil
+				break
+			}
+			if !json.Valid(b) {
+				return fmt.Errorf("behavior: invalid json")
+			}
+			dst.Behavior = append(json.RawMessage(nil), b...)
 		default:
 			// Ignore unknown keys so generated clients can add read-only metadata without breaking updates.
 			continue

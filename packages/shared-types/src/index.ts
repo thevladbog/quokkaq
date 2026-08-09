@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  ServiceBehaviorSchema,
+  type ServiceBehavior
+} from './service-behavior';
 
 export {
   TENANT_SLUG_MIN_LEN,
@@ -132,6 +136,8 @@ export type ServiceModel = {
    * `capture` for `identificationMode=custom` may include e.g. `{ kind: "barcode", manualInputMode: "none"|"numeric"|"alphanumeric", numericMaxLength?: number, showOnScreenKeyboard?: boolean }`.
    */
   kioskIdentificationConfig?: unknown;
+  /** Optional Phase 1 composable station behavior; legacy identification remains separate. */
+  behavior?: ServiceBehavior;
   isLeaf?: boolean;
   /** Order within the unit for kiosk and lists; lower = earlier. */
   sortOrder?: number;
@@ -219,6 +225,7 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
     .optional(),
   kioskDocumentSettings: KioskDocumentSettingsSchema.optional(),
   kioskIdentificationConfig: KioskIdentificationConfigSchema.optional(),
+  behavior: ServiceBehaviorSchema.optional(),
   isLeaf: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
   gridRow: z.number().nullable().optional(),
@@ -804,6 +811,14 @@ export {
   type PageAccessPolicy,
   type ConditionContext
 } from './experience-condition';
+
+export {
+  ServiceBehaviorFieldSchema,
+  ServiceBehaviorInformationSchema,
+  ServiceBehaviorRouteSchema,
+  ServiceBehaviorSchema,
+  type ServiceBehavior
+} from './service-behavior';
 
 export {
   ExperienceSurfaceSchema,

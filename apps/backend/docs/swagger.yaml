@@ -2887,6 +2887,9 @@ components:
             properties:
                 backgroundColor:
                     type: string
+                behavior:
+                    description: Behavior is optional portable station flow configuration. It complements, but never replaces, identification mode.
+                    type: object
                 calendarSlotKey:
                     description: |-
                         CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).

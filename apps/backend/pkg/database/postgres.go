@@ -2806,6 +2806,13 @@ WHERE code = 'starter' AND (features->>'kiosk_employee_idp') IS NULL;`).Error; e
 		return fmt.Errorf("failed to run v1.8.16_tickets_documents_data_and_kiosk_config migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.8.17_service_behavior", func(db *gorm.DB) error {
+		return db.Exec(`ALTER TABLE services ADD COLUMN IF NOT EXISTS behavior jsonb;`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.17_service_behavior migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }
