@@ -144,6 +144,34 @@ func RequireTerminalUnitMatchOrUnitPermission(userRepo repository.UserRepository
 	}
 }
 
+// RequireTerminalUnitMatchOrUnitAnyPermission allows desktop terminal JWT for the same unit as the URL,
+// otherwise the same checks as RequireUnitAnyPermission (staff users).
+func RequireTerminalUnitMatchOrUnitAnyPermission(userRepo repository.UserRepository, tr repository.TenantRBACRepository, unitRepo repository.UnitRepository, urlUnitParam string, permissions []string) func(http.Handler) http.Handler {
+	unitAnyPermission := RequireUnitAnyPermission(userRepo, tr, unitRepo, urlUnitParam, permissions)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			unitID := unitIDFromRequest(r, urlUnitParam)
+			if unitID == "" {
+				http.Error(w, "Unit ID required", http.StatusBadRequest)
+				return
+			}
+			if typ, _ := r.Context().Value(TokenTypeKey).(string); typ == "terminal" {
+				terminalUnitID, ok := r.Context().Value(TerminalUnitIDKey).(string)
+				if !ok || !strings.EqualFold(
+					strings.TrimSpace(terminalUnitID),
+					strings.TrimSpace(unitID),
+				) {
+					http.Error(w, "Forbidden", http.StatusForbidden)
+					return
+				}
+				next.ServeHTTP(w, r)
+				return
+			}
+			unitAnyPermission(next).ServeHTTP(w, r)
+		})
+	}
+}
+
 func unitIDFromRequest(r *http.Request, urlUnitParam string) string {
 	u := strings.TrimSpace(chi.URLParam(r, urlUnitParam))
 	if u != "" {
