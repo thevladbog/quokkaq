@@ -363,6 +363,39 @@ describe('StaffQueuePanel', () => {
     ).toBeVisible();
   });
 
+  it('keeps a permanent title refresh indicator without changing sorting geometry', () => {
+    const { unmount } = renderPanel({ queueRefreshing: false });
+    const idleIndicator = screen.getByTestId('staff-queue-refresh-indicator');
+    const idleSorting = screen.getByText('Longest wait first');
+
+    expect(idleIndicator).toHaveClass('size-1.5', 'opacity-0');
+    expect(idleIndicator).not.toHaveClass('motion-safe:animate-pulse');
+    expect(idleSorting).toHaveTextContent('Longest wait first');
+    expect(screen.queryByText('Refreshing queue')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+    unmount();
+    renderPanel({ queueRefreshing: true });
+
+    const refreshingIndicator = screen.getByTestId(
+      'staff-queue-refresh-indicator'
+    );
+
+    expect(refreshingIndicator).toHaveClass(
+      'size-1.5',
+      'opacity-100',
+      'motion-safe:animate-pulse'
+    );
+    expect(screen.getByText('Longest wait first')).toHaveTextContent(
+      idleSorting.textContent ?? ''
+    );
+    expect(screen.getByText('Refreshing queue')).toHaveClass('sr-only');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByText('Refreshing queue')).not.toHaveAttribute(
+      'aria-live'
+    );
+  });
+
   it('renders an alert and retry action when the queue fails', () => {
     const onRetryQueue = vi.fn();
     renderPanel({

@@ -179,7 +179,22 @@ export function StaffQueuePanel({
             >
               <div className='min-w-0'>
                 <CardTitle className='text-sm leading-tight font-semibold'>
-                  <h2>{t('queue.title')}</h2>
+                  <div className='flex items-center gap-1.5'>
+                    <h2>{t('queue.title')}</h2>
+                    <span
+                      data-testid='staff-queue-refresh-indicator'
+                      className={cn(
+                        'bg-primary size-1.5 shrink-0 rounded-full transition-opacity',
+                        queueRefreshing
+                          ? 'opacity-100 motion-safe:animate-pulse'
+                          : 'opacity-0'
+                      )}
+                      aria-hidden='true'
+                    />
+                    <span className='sr-only'>
+                      {queueRefreshing ? t('queue.refreshing') : ''}
+                    </span>
+                  </div>
                 </CardTitle>
                 <CardDescription className='text-[11px] leading-snug'>
                   {t('queue.description')}
@@ -282,14 +297,6 @@ export function StaffQueuePanel({
             <p className='text-muted-foreground text-[10px] leading-tight'>
               {t('queue.sorted_by_wait')}
             </p>
-            {queueRefreshing ? (
-              <p
-                className='text-muted-foreground text-[10px] leading-tight'
-                role='status'
-              >
-                {t('queue.refreshing')}
-              </p>
-            ) : null}
           </CardHeader>
 
           <div className='shrink-0 px-3 pt-2'>
