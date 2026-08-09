@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"quokkaq-go-backend/internal/experience"
 	"quokkaq-go-backend/internal/models"
@@ -38,15 +39,35 @@ var (
 const (
 	DefaultExperienceVersionPageSize = 20
 	MaxExperienceVersionPageSize     = 100
+
+	TerminalExperienceModeLegacy     = "legacy"
+	TerminalExperienceModeExperience = "experience"
 )
+
+// TerminalExperienceManifest is the bounded runtime projection of the current
+// immutable published template for one terminal.
+type TerminalExperienceManifest struct {
+	Mode        string          `json:"mode"`
+	TemplateID  string          `json:"templateId,omitempty"`
+	VersionID   string          `json:"versionId,omitempty"`
+	Version     int             `json:"version,omitempty"`
+	VariantID   string          `json:"variantId,omitempty"`
+	Definition  json.RawMessage `json:"definition,omitempty" swaggertype:"object"`
+	PublishedAt *time.Time      `json:"publishedAt,omitempty"`
+}
 
 // ScreenLayoutTemplateService manages tenant screen layout templates.
 type ScreenLayoutTemplateService struct {
-	repo repository.ScreenLayoutTemplateRepository
+	repo         repository.ScreenLayoutTemplateRepository
+	terminalRepo repository.DesktopTerminalRepository
 }
 
-func NewScreenLayoutTemplateService(repo repository.ScreenLayoutTemplateRepository) *ScreenLayoutTemplateService {
-	return &ScreenLayoutTemplateService{repo: repo}
+func NewScreenLayoutTemplateService(repo repository.ScreenLayoutTemplateRepository, terminalRepos ...repository.DesktopTerminalRepository) *ScreenLayoutTemplateService {
+	var terminalRepo repository.DesktopTerminalRepository
+	if len(terminalRepos) > 0 {
+		terminalRepo = terminalRepos[0]
+	}
+	return &ScreenLayoutTemplateService{repo: repo, terminalRepo: terminalRepo}
 }
 
 func (s *ScreenLayoutTemplateService) List(companyID string) ([]models.ScreenLayoutTemplate, error) {
@@ -205,6 +226,56 @@ func (s *ScreenLayoutTemplateService) GetPublishedVersion(ctx context.Context, c
 
 func (s *ScreenLayoutTemplateService) ResolveTerminalPublishedVersion(ctx context.Context, companyID, terminalID string) (*models.ExperienceTemplateVersion, string, error) {
 	return s.repo.ResolveTerminalPublishedVersion(ctx, companyID, terminalID)
+}
+
+// ResolveTerminalExperience projects only the terminal's current immutable
+// published version. An entirely absent assignment deliberately stays on the
+// legacy runtime; incomplete or no-longer-deployable assignments fail closed.
+func (s *ScreenLayoutTemplateService) ResolveTerminalExperience(ctx context.Context, terminalID string) (*TerminalExperienceManifest, error) {
+	if s.terminalRepo == nil {
+		return nil, errors.New("terminal repository is not configured")
+	}
+	terminal, err := s.terminalRepo.FindActiveByID(ctx, terminalID)
+	if err != nil {
+		return nil, err
+	}
+	if models.EffectiveTerminalKind(terminal) != models.DesktopTerminalKindKiosk {
+		return nil, ErrExperienceAssignmentIncompatible
+	}
+	if terminal.ExperienceTemplateID == nil && terminal.ExperienceVariantID == nil {
+		return &TerminalExperienceManifest{Mode: TerminalExperienceModeLegacy}, nil
+	}
+	if terminal.ExperienceTemplateID == nil || terminal.ExperienceVariantID == nil {
+		return nil, ErrExperienceAssignmentIncomplete
+	}
+	version, variantID, err := s.repo.ResolveTerminalPublishedVersion(ctx, terminal.Unit.CompanyID, terminal.ID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrExperienceTemplateUnpublished
+	}
+	if err != nil {
+		return nil, err
+	}
+	publishedAt := version.PublishedAt
+	return &TerminalExperienceManifest{
+		Mode:        TerminalExperienceModeExperience,
+		TemplateID:  version.TemplateID,
+		VersionID:   version.ID,
+		Version:     version.Version,
+		VariantID:   variantID,
+		Definition:  version.Definition,
+		PublishedAt: &publishedAt,
+	}, nil
+}
+
+// AcknowledgeTerminalExperience delegates the compare-and-update to the
+// terminal repository, where the terminal and published-template rows are
+// locked together. A rejected acknowledgement intentionally preserves the
+// last successful applied version for operational history.
+func (s *ScreenLayoutTemplateService) AcknowledgeTerminalExperience(ctx context.Context, terminalID, versionID, status string, reasonCode *string) error {
+	if s.terminalRepo == nil {
+		return errors.New("terminal repository is not configured")
+	}
+	return s.terminalRepo.AcknowledgeExperience(ctx, terminalID, versionID, status, reasonCode)
 }
 
 func (s *ScreenLayoutTemplateService) Delete(companyID, id string) error {

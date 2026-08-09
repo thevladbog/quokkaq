@@ -97,6 +97,7 @@ CREATE TABLE desktop_terminals (
 	experience_ack_status text,
 	experience_ack_reason_code text,
 	experience_ack_at datetime,
+	revoked_at datetime,
 	updated_at datetime
 );
 INSERT INTO companies (id, name, is_saas_operator) VALUES ('company-a', 'A', 1);
@@ -176,6 +177,124 @@ func TestScreenLayoutTemplateService_DraftIsolationPublishAndRestore(t *testing.
 	}
 	if len(historical) != 3 || string(historical[0].Definition) != string(serviceExperienceDefinition("draft-a", "portrait")) || string(historical[1].Definition) != string(serviceExperienceDefinition("draft-b", "portrait")) {
 		t.Fatalf("historical versions were mutated: %#v", historical)
+	}
+}
+
+func TestScreenLayoutTemplateService_RuntimeManifestUsesPublishedSnapshotWhileDraftChanges(t *testing.T) {
+	_, repo, _ := newScreenLayoutTemplateServiceTest(t)
+	runtimeService := NewScreenLayoutTemplateService(repo, repository.NewDesktopTerminalRepository())
+	ctx := context.Background()
+
+	v1, err := runtimeService.Publish(ctx, "company-a", "template-a", "publisher")
+	if err != nil {
+		t.Fatalf("publish v1: %v", err)
+	}
+	templateID, variantID := "template-a", "portrait"
+	terminal := &models.DesktopTerminal{ID: "terminal-a", UnitID: "unit-a", Kind: models.DesktopTerminalKindKiosk, DefaultLocale: "en"}
+	if err := repo.UpdateTerminalWithExperience(ctx, "company-a", terminal, repository.TerminalExperienceAssignment{
+		Specified: true, TemplateID: &templateID, VariantID: &variantID,
+	}); err != nil {
+		t.Fatalf("assign v1: %v", err)
+	}
+	if _, err := runtimeService.Update("company-a", "template-a", "Template", serviceExperienceDefinition("draft-removes-portrait", "landscape"), nil); err != nil {
+		t.Fatalf("save later draft: %v", err)
+	}
+
+	manifest, err := runtimeService.ResolveTerminalExperience(ctx, "terminal-a")
+	if err != nil {
+		t.Fatalf("resolve runtime manifest: %v", err)
+	}
+	if manifest.Mode != TerminalExperienceModeExperience || manifest.TemplateID != "template-a" || manifest.VersionID != v1.ID || manifest.Version != v1.Version || manifest.VariantID != "portrait" || string(manifest.Definition) != string(v1.Definition) || manifest.PublishedAt == nil || !manifest.PublishedAt.Equal(v1.PublishedAt) {
+		t.Fatalf("manifest = %#v, want immutable v1 snapshot", manifest)
+	}
+}
+
+func TestScreenLayoutTemplateService_RejectedCurrentVersionPreservesLastAppliedVersion(t *testing.T) {
+	_, repo, db := newScreenLayoutTemplateServiceTest(t)
+	runtimeService := NewScreenLayoutTemplateService(repo, repository.NewDesktopTerminalRepository())
+	ctx := context.Background()
+	v1, err := runtimeService.Publish(ctx, "company-a", "template-a", "publisher")
+	if err != nil {
+		t.Fatalf("publish v1: %v", err)
+	}
+	templateID, variantID := "template-a", "portrait"
+	terminal := &models.DesktopTerminal{ID: "terminal-a", UnitID: "unit-a", Kind: models.DesktopTerminalKindKiosk, DefaultLocale: "en"}
+	if err := repo.UpdateTerminalWithExperience(ctx, "company-a", terminal, repository.TerminalExperienceAssignment{
+		Specified: true, TemplateID: &templateID, VariantID: &variantID,
+	}); err != nil {
+		t.Fatalf("assign: %v", err)
+	}
+	if err := runtimeService.AcknowledgeTerminalExperience(ctx, "terminal-a", v1.ID, "applied", nil); err != nil {
+		t.Fatalf("acknowledge applied v1: %v", err)
+	}
+	if _, err := runtimeService.Update("company-a", "template-a", "Template", serviceExperienceDefinition("draft-v2", "portrait"), nil); err != nil {
+		t.Fatalf("save draft v2: %v", err)
+	}
+	v2, err := runtimeService.Publish(ctx, "company-a", "template-a", "publisher")
+	if err != nil {
+		t.Fatalf("publish v2: %v", err)
+	}
+	reason := "renderer.timeout"
+	if err := runtimeService.AcknowledgeTerminalExperience(ctx, "terminal-a", v2.ID, "rejected", &reason); err != nil {
+		t.Fatalf("acknowledge rejected v2: %v", err)
+	}
+	var stored models.DesktopTerminal
+	if err := db.First(&stored, "id = ?", "terminal-a").Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.AppliedTemplateVersionID == nil || *stored.AppliedTemplateVersionID != v1.ID || stored.AppliedTemplateAt == nil || stored.ExperienceAckStatus == nil || *stored.ExperienceAckStatus != "rejected" || stored.ExperienceAckReasonCode == nil || *stored.ExperienceAckReasonCode != reason || stored.ExperienceAckAt == nil {
+		t.Fatalf("rejected v2 changed acknowledged terminal state to %#v", stored)
+	}
+}
+
+func TestScreenLayoutTemplateService_RuntimeManifestUsesLegacyOnlyForUnassignedTerminal(t *testing.T) {
+	_, repo, _ := newScreenLayoutTemplateServiceTest(t)
+	runtimeService := NewScreenLayoutTemplateService(repo, repository.NewDesktopTerminalRepository())
+
+	manifest, err := runtimeService.ResolveTerminalExperience(context.Background(), "terminal-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Mode != TerminalExperienceModeLegacy || manifest.TemplateID != "" || manifest.VersionID != "" || manifest.Version != 0 || manifest.VariantID != "" || manifest.Definition != nil || manifest.PublishedAt != nil {
+		t.Fatalf("unassigned manifest = %#v, want legacy mode only", manifest)
+	}
+}
+
+func TestScreenLayoutTemplateService_RuntimeManifestFailsClosedWithoutPublishedVersion(t *testing.T) {
+	_, repo, db := newScreenLayoutTemplateServiceTest(t)
+	runtimeService := NewScreenLayoutTemplateService(repo, repository.NewDesktopTerminalRepository())
+	if err := db.Model(&models.DesktopTerminal{}).Where("id = ?", "terminal-a").Updates(map[string]any{
+		"experience_template_id": "template-a",
+		"experience_variant_id":  "portrait",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if manifest, err := runtimeService.ResolveTerminalExperience(context.Background(), "terminal-a"); !errors.Is(err, ErrExperienceTemplateUnpublished) || manifest != nil {
+		t.Fatalf("unpublished manifest=%#v err=%v", manifest, err)
+	}
+}
+
+func TestScreenLayoutTemplateService_RuntimeManifestFailsClosedWhenPublishedVersionRemovesVariant(t *testing.T) {
+	_, repo, _ := newScreenLayoutTemplateServiceTest(t)
+	runtimeService := NewScreenLayoutTemplateService(repo, repository.NewDesktopTerminalRepository())
+	ctx := context.Background()
+	if _, err := runtimeService.Publish(ctx, "company-a", "template-a", "publisher"); err != nil {
+		t.Fatalf("publish v1: %v", err)
+	}
+	templateID, variantID := "template-a", "portrait"
+	if err := repo.UpdateTerminalWithExperience(ctx, "company-a", &models.DesktopTerminal{
+		ID: "terminal-a", UnitID: "unit-a", Kind: models.DesktopTerminalKindKiosk, DefaultLocale: "en",
+	}, repository.TerminalExperienceAssignment{Specified: true, TemplateID: &templateID, VariantID: &variantID}); err != nil {
+		t.Fatalf("assign: %v", err)
+	}
+	if _, err := runtimeService.Update("company-a", "template-a", "Template", serviceExperienceDefinition("draft-removes-portrait", "landscape"), nil); err != nil {
+		t.Fatalf("save draft: %v", err)
+	}
+	if _, err := runtimeService.Publish(ctx, "company-a", "template-a", "publisher"); err != nil {
+		t.Fatalf("publish variant removal: %v", err)
+	}
+	if manifest, err := runtimeService.ResolveTerminalExperience(ctx, "terminal-a"); !errors.Is(err, ErrExperienceVariantNotFound) || manifest != nil {
+		t.Fatalf("published removed variant manifest=%#v err=%v", manifest, err)
 	}
 }
 

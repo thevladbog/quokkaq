@@ -32,6 +32,8 @@ func TestExperienceOpenAPISourceAnnotationsAreGeneratable(t *testing.T) {
 		{path: "/companies/me/screen-layout-templates/{templateId}/versions/{versionId}/restore", method: "post", statuses: []int{201, 400, 401, 403, 404, 409, 500}},
 		{path: "/companies/me/screen-layout-templates/{templateId}", method: "delete", statuses: []int{204, 401, 403, 404, 409, 500}},
 		{path: "/desktop-terminals/{id}", method: "patch", statuses: []int{204, 400, 401, 403, 404, 409, 500}},
+		{path: "/terminal/experience", method: "get", statuses: []int{200, 401, 403, 409, 500}},
+		{path: "/terminal/experience/ack", method: "post", statuses: []int{204, 400, 401, 403, 409, 500}},
 	}
 	for _, testCase := range tests {
 		pathItem, ok := document.Paths.Paths[testCase.path]
@@ -105,6 +107,37 @@ func TestExperienceOpenAPISourceAnnotationsAreGeneratable(t *testing.T) {
 		if nullable, _ := publisher.Extensions["x-nullable"].(bool); !nullable {
 			t.Errorf("%s.publishedBy x-nullable = %v", schemaName, publisher.Extensions["x-nullable"])
 		}
+	}
+	manifestSchema, ok := document.Definitions["services.TerminalExperienceManifest"]
+	if !ok {
+		t.Fatal("missing generated schema services.TerminalExperienceManifest")
+	}
+	for _, propertyName := range []string{"mode", "templateId", "versionId", "version", "variantId", "definition", "publishedAt"} {
+		if _, ok := manifestSchema.Properties[propertyName]; !ok {
+			t.Errorf("runtime manifest schema missing property %s", propertyName)
+		}
+	}
+	ackPath := document.Paths.Paths["/terminal/experience/ack"].Post
+	var ackRequestRef string
+	for _, parameter := range ackPath.Parameters {
+		if parameter.In == "body" && parameter.Schema != nil {
+			ackRequestRef = parameter.Schema.Ref.String()
+		}
+	}
+	if ackRequestRef != "#/definitions/handlers.TerminalExperienceAckRequest" {
+		t.Fatalf("terminal acknowledgement request ref = %q", ackRequestRef)
+	}
+	ackSchema, ok := document.Definitions["handlers.TerminalExperienceAckRequest"]
+	if !ok {
+		t.Fatal("missing generated acknowledgement request schema")
+	}
+	for _, propertyName := range []string{"versionId", "status", "reasonCode"} {
+		if _, ok := ackSchema.Properties[propertyName]; !ok {
+			t.Errorf("acknowledgement schema missing property %s", propertyName)
+		}
+	}
+	if _, exists := ackSchema.Properties["terminalId"]; exists {
+		t.Error("acknowledgement schema must not accept terminalId")
 	}
 	pageSchema, ok := document.Definitions["models.ExperienceTemplateVersionPage"]
 	if !ok {

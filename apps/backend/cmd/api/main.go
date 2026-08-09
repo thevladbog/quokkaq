@@ -427,8 +427,9 @@ func run() error {
 	)
 	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo, tenantRBACRepo, database.DB)
 	companyVisitorSMSHandler := handlers.NewCompanyVisitorSMSHandler(companyRepo, userRepo, deploymentSaaSSettingsService, queueFunnelRepo)
-	screenLayoutTemplateService := services.NewScreenLayoutTemplateService(screenLayoutTemplateRepo)
+	screenLayoutTemplateService := services.NewScreenLayoutTemplateService(screenLayoutTemplateRepo, desktopTerminalRepo)
 	screenLayoutTemplateHandler := handlers.NewScreenLayoutTemplateHandler(screenLayoutTemplateService, userRepo)
+	experienceRuntimeHandler := handlers.NewExperienceRuntimeHandler(screenLayoutTemplateService)
 	onecSettingsHandler := handlers.NewOneCSettingsHandler(companyRepo, onecSettingsRepo)
 	commerceMLExchangeHandler := handlers.NewCommerceMLExchangeHandler(companyRepo, invoiceRepo, onecSettingsRepo, onecSessionStore)
 	platformHandler := handlers.NewPlatformHandler(companyRepo, subscriptionRepo, invoiceRepo, catalogRepo)
@@ -553,6 +554,8 @@ func run() error {
 			r.Get("/accessible-companies", authHandler.ListAccessibleCompanies)
 		})
 	})
+
+	handlers.RegisterTerminalExperienceRoutes(r, experienceRuntimeHandler)
 
 	// Google Calendar OAuth browser callback (must match GOOGLE_CALENDAR_OAUTH_REDIRECT_URL path on API origin, not under /auth).
 	r.With(authmiddleware.SSOCallbackRateLimit).Get("/calendar-integrations/google/oauth/callback", calendarIntegrationHandler.GoogleOAuthCallback)

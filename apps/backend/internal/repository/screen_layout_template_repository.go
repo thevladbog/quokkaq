@@ -286,20 +286,25 @@ func (r *screenLayoutTemplateRepository) GetPublishedVersion(ctx context.Context
 func (r *screenLayoutTemplateRepository) ResolveTerminalPublishedVersion(ctx context.Context, companyID, terminalID string) (*models.ExperienceTemplateVersion, string, error) {
 	type resolvedRow struct {
 		models.ExperienceTemplateVersion
-		VariantID string `gorm:"column:experience_variant_id"`
-		Surface   string `gorm:"column:template_surface"`
+		VariantID    string  `gorm:"column:experience_variant_id"`
+		Surface      string  `gorm:"column:template_surface"`
+		TerminalKind string  `gorm:"column:terminal_kind"`
+		CounterID    *string `gorm:"column:terminal_counter_id"`
 	}
 	var resolved resolvedRow
 	err := r.db.WithContext(ctx).
 		Table("experience_template_versions AS version").
-		Select("version.*, terminal.experience_variant_id, template.surface AS template_surface").
+		Select("version.*, terminal.experience_variant_id, terminal.kind AS terminal_kind, terminal.counter_id AS terminal_counter_id, template.surface AS template_surface").
 		Joins("INNER JOIN screen_layout_templates AS template ON template.id = version.template_id AND template.published_version_id = version.id").
 		Joins("INNER JOIN desktop_terminals AS terminal ON terminal.experience_template_id = template.id").
 		Joins("INNER JOIN units AS unit ON unit.id = terminal.unit_id AND unit.company_id = ?", companyID).
-		Where("terminal.id = ? AND template.company_id = ?", terminalID, companyID).
+		Where("terminal.id = ? AND terminal.revoked_at IS NULL AND template.company_id = ?", terminalID, companyID).
 		First(&resolved).Error
 	if err != nil {
 		return nil, "", err
+	}
+	if resolved.Surface != experience.SurfaceTicketStation || models.EffectiveTerminalKind(&models.DesktopTerminal{Kind: resolved.TerminalKind, CounterID: resolved.CounterID}) != models.DesktopTerminalKindKiosk {
+		return nil, "", ErrExperienceAssignmentIncompatible
 	}
 	if err := experience.ValidateDefinition(resolved.Definition, resolved.Surface); err != nil {
 		return nil, "", ErrExperiencePublishedDefinitionInvalid

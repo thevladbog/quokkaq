@@ -18,7 +18,22 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
+
+type terminalAcknowledgementInterleaveLogger struct {
+	gormlogger.Interface
+	afterTerminalRead func()
+	once              sync.Once
+}
+
+func (l *terminalAcknowledgementInterleaveLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+	sql, rows := fc()
+	l.Interface.Trace(ctx, begin, func() (string, int64) { return sql, rows }, err)
+	if err == nil && strings.Contains(strings.ToLower(sql), "from \"desktop_terminals\"") && strings.Contains(strings.ToLower(sql), "for update") {
+		l.once.Do(l.afterTerminalRead)
+	}
+}
 
 func repositoryDefinition(id, variant string) json.RawMessage {
 	return json.RawMessage(`{
@@ -96,6 +111,7 @@ CREATE TABLE desktop_terminals (
 	experience_ack_status text,
 	experience_ack_reason_code text,
 	experience_ack_at datetime,
+	revoked_at datetime,
 	updated_at datetime,
 	CONSTRAINT chk_desktop_terminal_experience_assignment_pair CHECK ((experience_template_id IS NULL AND experience_variant_id IS NULL) OR (experience_template_id IS NOT NULL AND experience_variant_id IS NOT NULL)),
 	CONSTRAINT fk_desktop_terminal_experience_template FOREIGN KEY (experience_template_id) REFERENCES screen_layout_templates(id) ON DELETE RESTRICT,
@@ -384,6 +400,26 @@ func TestScreenLayoutTemplateRepository_RuntimeResolutionRequiresTemplateCompany
 	}
 }
 
+func TestScreenLayoutTemplateRepository_RuntimeResolutionFailsClosedForIncompatibleTerminalAssignment(t *testing.T) {
+	db := newExperienceRepositorySQLite(t)
+	seedExperienceRepository(t, db)
+	repo := &screenLayoutTemplateRepository{db: db}
+	ctx := context.Background()
+	if _, err := repo.Publish(ctx, "company-a", "template-a", "publisher"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&models.DesktopTerminal{}).Where("id = ?", "terminal-a").Updates(map[string]any{
+		"kind":                   models.DesktopTerminalKindCounterBoard,
+		"experience_template_id": "template-a",
+		"experience_variant_id":  "portrait",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if version, variant, err := repo.ResolveTerminalPublishedVersion(ctx, "company-a", "terminal-a"); !errors.Is(err, ErrExperienceAssignmentIncompatible) || version != nil || variant != "" {
+		t.Fatalf("incompatible terminal assignment resolved version=%#v variant=%q err=%v", version, variant, err)
+	}
+}
+
 func TestExperienceRepository_AssignmentIsAtomicAndPublishedOnly(t *testing.T) {
 	db := newExperienceRepositorySQLite(t)
 	seedExperienceRepository(t, db)
@@ -462,6 +498,162 @@ func TestExperienceRepository_AssignmentIsAtomicAndPublishedOnly(t *testing.T) {
 	}
 	if stored.ExperienceTemplateID != nil || stored.ExperienceVariantID != nil {
 		t.Fatalf("unassign left half/full assignment: %#v", stored)
+	}
+}
+
+func TestDesktopTerminalRepository_AcknowledgesCurrentPublishedExperienceAtomically(t *testing.T) {
+	db := newExperienceRepositorySQLite(t)
+	seedExperienceRepository(t, db)
+	ctx := context.Background()
+	screenRepo := &screenLayoutTemplateRepository{db: db}
+	terminalRepo := &desktopTerminalRepository{db: db}
+
+	published, err := screenRepo.Publish(ctx, "company-a", "template-a", "publisher")
+	if err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	templateID, variantID := "template-a", "portrait"
+	if err := screenRepo.UpdateTerminalWithExperience(ctx, "company-a", &models.DesktopTerminal{
+		ID: "terminal-a", UnitID: "unit-a", Kind: models.DesktopTerminalKindKiosk, DefaultLocale: "en",
+	}, TerminalExperienceAssignment{Specified: true, TemplateID: &templateID, VariantID: &variantID}); err != nil {
+		t.Fatalf("assign: %v", err)
+	}
+
+	reason := "renderer.timeout"
+	if err := terminalRepo.AcknowledgeExperience(ctx, "terminal-a", published.ID, "rejected", &reason); err != nil {
+		t.Fatalf("acknowledge rejected: %v", err)
+	}
+	if err := terminalRepo.AcknowledgeExperience(ctx, "terminal-a", published.ID, "applied", nil); err != nil {
+		t.Fatalf("acknowledge applied: %v", err)
+	}
+	var stored models.DesktopTerminal
+	if err := db.First(&stored, "id = ?", "terminal-a").Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.AppliedTemplateVersionID == nil || *stored.AppliedTemplateVersionID != published.ID || stored.AppliedTemplateAt == nil || stored.ExperienceAckStatus == nil || *stored.ExperienceAckStatus != "applied" || stored.ExperienceAckAt == nil || stored.ExperienceAckReasonCode != nil {
+		t.Fatalf("stored applied acknowledgement = %#v", stored)
+	}
+}
+
+func TestDesktopTerminalRepository_RejectsStaleFutureAndCrossTemplateAcknowledgementsWithoutChanges(t *testing.T) {
+	db := newExperienceRepositorySQLite(t)
+	seedExperienceRepository(t, db)
+	ctx := context.Background()
+	screenRepo := &screenLayoutTemplateRepository{db: db}
+	terminalRepo := &desktopTerminalRepository{db: db}
+	v1, err := screenRepo.Publish(ctx, "company-a", "template-a", "publisher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	templateID, variantID := "template-a", "portrait"
+	if err := screenRepo.UpdateTerminalWithExperience(ctx, "company-a", &models.DesktopTerminal{
+		ID: "terminal-a", UnitID: "unit-a", Kind: models.DesktopTerminalKindKiosk, DefaultLocale: "en",
+	}, TerminalExperienceAssignment{Specified: true, TemplateID: &templateID, VariantID: &variantID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := terminalRepo.AcknowledgeExperience(ctx, "terminal-a", v1.ID, "applied", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&models.ScreenLayoutTemplate{}).Where("id = ?", "template-a").Update("definition", repositoryDefinition("draft-v2", "portrait")).Error; err != nil {
+		t.Fatal(err)
+	}
+	v2, err := screenRepo.Publish(ctx, "company-a", "template-a", "publisher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := screenRepo.Publish(ctx, "company-b", "template-b", "publisher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reason := "renderer.timeout"
+	for _, versionID := range []string{v1.ID, "future-version", other.ID} {
+		if err := terminalRepo.AcknowledgeExperience(ctx, "terminal-a", versionID, "rejected", &reason); !errors.Is(err, ErrExperienceAcknowledgementVersionNotCurrent) {
+			t.Fatalf("acknowledge %q error = %v, want current-version conflict", versionID, err)
+		}
+		var stored models.DesktopTerminal
+		if err := db.First(&stored, "id = ?", "terminal-a").Error; err != nil {
+			t.Fatal(err)
+		}
+		if stored.AppliedTemplateVersionID == nil || *stored.AppliedTemplateVersionID != v1.ID || stored.ExperienceAckStatus == nil || *stored.ExperienceAckStatus != "applied" || stored.ExperienceAckReasonCode != nil {
+			t.Fatalf("failed acknowledgement changed terminal state: %#v", stored)
+		}
+	}
+	if v2.ID == v1.ID {
+		t.Fatal("second publish did not create a distinct current version")
+	}
+}
+
+func TestDesktopTerminalRepository_RejectedCurrentVersionPreservesAppliedHistoryWhenVariantWasRemoved(t *testing.T) {
+	db := newExperienceRepositorySQLite(t)
+	seedExperienceRepository(t, db)
+	ctx := context.Background()
+	screenRepo := &screenLayoutTemplateRepository{db: db}
+	terminalRepo := &desktopTerminalRepository{db: db}
+	v1, err := screenRepo.Publish(ctx, "company-a", "template-a", "publisher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	templateID, variantID := "template-a", "portrait"
+	if err := screenRepo.UpdateTerminalWithExperience(ctx, "company-a", &models.DesktopTerminal{
+		ID: "terminal-a", UnitID: "unit-a", Kind: models.DesktopTerminalKindKiosk, DefaultLocale: "en",
+	}, TerminalExperienceAssignment{Specified: true, TemplateID: &templateID, VariantID: &variantID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := terminalRepo.AcknowledgeExperience(ctx, "terminal-a", v1.ID, "applied", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&models.ScreenLayoutTemplate{}).Where("id = ?", "template-a").Update("definition", repositoryDefinition("draft-v2", "landscape")).Error; err != nil {
+		t.Fatal(err)
+	}
+	v2, err := screenRepo.Publish(ctx, "company-a", "template-a", "publisher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := terminalRepo.AcknowledgeExperience(ctx, "terminal-a", v2.ID, "applied", nil); !errors.Is(err, ErrExperienceAcknowledgementVersionNotCurrent) {
+		t.Fatalf("applied removed-variant acknowledgement error = %v", err)
+	}
+	reason := "variant.unavailable"
+	if err := terminalRepo.AcknowledgeExperience(ctx, "terminal-a", v2.ID, "rejected", &reason); err != nil {
+		t.Fatalf("rejected removed-variant acknowledgement: %v", err)
+	}
+	var stored models.DesktopTerminal
+	if err := db.First(&stored, "id = ?", "terminal-a").Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.AppliedTemplateVersionID == nil || *stored.AppliedTemplateVersionID != v1.ID || stored.AppliedTemplateAt == nil || stored.ExperienceAckStatus == nil || *stored.ExperienceAckStatus != "rejected" || stored.ExperienceAckReasonCode == nil || *stored.ExperienceAckReasonCode != reason || stored.ExperienceAckAt == nil {
+		t.Fatalf("rejected removed-variant acknowledgement state = %#v", stored)
+	}
+}
+
+func TestDesktopTerminalRepository_DoesNotAcknowledgeRevokedTerminal(t *testing.T) {
+	db := newExperienceRepositorySQLite(t)
+	seedExperienceRepository(t, db)
+	ctx := context.Background()
+	screenRepo := &screenLayoutTemplateRepository{db: db}
+	terminalRepo := &desktopTerminalRepository{db: db}
+	published, err := screenRepo.Publish(ctx, "company-a", "template-a", "publisher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	templateID, variantID := "template-a", "portrait"
+	if err := screenRepo.UpdateTerminalWithExperience(ctx, "company-a", &models.DesktopTerminal{
+		ID: "terminal-a", UnitID: "unit-a", Kind: models.DesktopTerminalKindKiosk, DefaultLocale: "en",
+	}, TerminalExperienceAssignment{Specified: true, TemplateID: &templateID, VariantID: &variantID}); err != nil {
+		t.Fatal(err)
+	}
+	revokedAt := time.Now().UTC()
+	if err := db.Model(&models.DesktopTerminal{}).Where("id = ?", "terminal-a").Update("revoked_at", revokedAt).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := terminalRepo.AcknowledgeExperience(ctx, "terminal-a", published.ID, "applied", nil); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("revoked terminal acknowledgement error = %v", err)
+	}
+	var stored models.DesktopTerminal
+	if err := db.First(&stored, "id = ?", "terminal-a").Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.AppliedTemplateVersionID != nil || stored.ExperienceAckStatus != nil || stored.ExperienceAckReasonCode != nil || stored.ExperienceAckAt != nil {
+		t.Fatalf("revoked terminal acknowledgement changed state: %#v", stored)
 	}
 }
 
@@ -646,5 +838,110 @@ CREATE TRIGGER experience_publish_retry_trigger BEFORE INSERT ON experience_temp
 	}
 	if _, err := repo.GetByIDAndCompany("template-retry", "company-a"); !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatalf("unassigned published template still exists: %v", err)
+	}
+}
+
+func TestExperienceRuntimeAcknowledgement_PostgresPublishBetweenReadAndUpdateConflicts(t *testing.T) {
+	db := openExperienceRepositoryPostgres(t)
+	ctx := context.Background()
+	definition := repositoryDefinition("published-v1", "portrait")
+	if err := db.Exec(`
+INSERT INTO companies (id, name) VALUES ('company-a', 'Company A');
+INSERT INTO users (id, name) VALUES ('publisher', 'Publisher');
+INSERT INTO units (id, company_id, code, kind, name, timezone) VALUES ('unit-a', 'company-a', 'UNIT-A', 'subdivision', 'Unit A', 'UTC');
+INSERT INTO screen_layout_templates (id, company_id, name, definition, surface) VALUES ('template-a', 'company-a', 'Template A', ?, 'ticket-station');
+INSERT INTO desktop_terminals (id, unit_id, kind, default_locale, pairing_code_digest, secret_hash) VALUES ('terminal-a', 'unit-a', 'kiosk', 'en', 'task7-publish-race-digest', 'task7-publish-race-hash');
+`, definition).Error; err != nil {
+		t.Fatal(err)
+	}
+	screenRepo := &screenLayoutTemplateRepository{db: db}
+	v1, err := screenRepo.Publish(ctx, "company-a", "template-a", "publisher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	templateID, variantID := "template-a", "portrait"
+	if err := screenRepo.UpdateTerminalWithExperience(ctx, "company-a", &models.DesktopTerminal{
+		ID: "terminal-a", UnitID: "unit-a", Kind: models.DesktopTerminalKindKiosk, DefaultLocale: "en",
+	}, TerminalExperienceAssignment{Specified: true, TemplateID: &templateID, VariantID: &variantID}); err != nil {
+		t.Fatal(err)
+	}
+
+	var publishErr error
+	interleavingLogger := &terminalAcknowledgementInterleaveLogger{Interface: gormlogger.Default, afterTerminalRead: func() {
+		publishErr = db.Model(&models.ScreenLayoutTemplate{}).Where("id = ?", "template-a").Update("definition", repositoryDefinition("published-v2", "portrait")).Error
+		if publishErr == nil {
+			_, publishErr = screenRepo.Publish(ctx, "company-a", "template-a", "publisher")
+		}
+	}}
+	ackRepo := &desktopTerminalRepository{db: db.Session(&gorm.Session{Logger: interleavingLogger})}
+	if err := ackRepo.AcknowledgeExperience(ctx, "terminal-a", v1.ID, "applied", nil); !errors.Is(err, ErrExperienceAcknowledgementVersionNotCurrent) {
+		t.Fatalf("acknowledgement after interleaved publish error = %v", err)
+	}
+	if publishErr != nil {
+		t.Fatalf("interleaved publish: %v", publishErr)
+	}
+	var stored models.DesktopTerminal
+	if err := db.First(&stored, "id = ?", "terminal-a").Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.AppliedTemplateVersionID != nil || stored.ExperienceAckStatus != nil || stored.ExperienceAckAt != nil {
+		t.Fatalf("stale acknowledgement changed state after publish: %#v", stored)
+	}
+}
+
+func TestExperienceRuntimeAcknowledgement_PostgresReassignmentDuringAcknowledgementClearsOldState(t *testing.T) {
+	db := openExperienceRepositoryPostgres(t)
+	ctx := context.Background()
+	definition := repositoryDefinition("published-a", "portrait")
+	if err := db.Exec(`
+INSERT INTO companies (id, name) VALUES ('company-a', 'Company A');
+INSERT INTO users (id, name) VALUES ('publisher', 'Publisher');
+INSERT INTO units (id, company_id, code, kind, name, timezone) VALUES ('unit-a', 'company-a', 'UNIT-A', 'subdivision', 'Unit A', 'UTC');
+INSERT INTO screen_layout_templates (id, company_id, name, definition, surface) VALUES
+		('template-a', 'company-a', 'Template A', ?, 'ticket-station'),
+		('template-b', 'company-a', 'Template B', ?, 'ticket-station');
+INSERT INTO desktop_terminals (id, unit_id, kind, default_locale, pairing_code_digest, secret_hash) VALUES ('terminal-a', 'unit-a', 'kiosk', 'en', 'task7-reassign-race-digest', 'task7-reassign-race-hash');
+`, definition, repositoryDefinition("published-b", "portrait")).Error; err != nil {
+		t.Fatal(err)
+	}
+	screenRepo := &screenLayoutTemplateRepository{db: db}
+	v1, err := screenRepo.Publish(ctx, "company-a", "template-a", "publisher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := screenRepo.Publish(ctx, "company-a", "template-b", "publisher"); err != nil {
+		t.Fatal(err)
+	}
+	templateA, templateB, variantID := "template-a", "template-b", "portrait"
+	if err := screenRepo.UpdateTerminalWithExperience(ctx, "company-a", &models.DesktopTerminal{
+		ID: "terminal-a", UnitID: "unit-a", Kind: models.DesktopTerminalKindKiosk, DefaultLocale: "en",
+	}, TerminalExperienceAssignment{Specified: true, TemplateID: &templateA, VariantID: &variantID}); err != nil {
+		t.Fatal(err)
+	}
+
+	reassignmentStarted := make(chan struct{})
+	reassignmentResult := make(chan error, 1)
+	interleavingLogger := &terminalAcknowledgementInterleaveLogger{Interface: gormlogger.Default, afterTerminalRead: func() {
+		go func() {
+			close(reassignmentStarted)
+			reassignmentResult <- screenRepo.UpdateTerminalWithExperience(ctx, "company-a", &models.DesktopTerminal{
+				ID: "terminal-a", UnitID: "unit-a", Kind: models.DesktopTerminalKindKiosk, DefaultLocale: "en",
+			}, TerminalExperienceAssignment{Specified: true, TemplateID: &templateB, VariantID: &variantID})
+		}()
+		<-reassignmentStarted
+	}}
+	ackRepo := &desktopTerminalRepository{db: db.Session(&gorm.Session{Logger: interleavingLogger})}
+	if err := ackRepo.AcknowledgeExperience(ctx, "terminal-a", v1.ID, "applied", nil); err != nil {
+		t.Fatalf("acknowledge before concurrent reassignment: %v", err)
+	}
+	if err := <-reassignmentResult; err != nil {
+		t.Fatalf("concurrent reassignment: %v", err)
+	}
+	var stored models.DesktopTerminal
+	if err := db.First(&stored, "id = ?", "terminal-a").Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.ExperienceTemplateID == nil || *stored.ExperienceTemplateID != templateB || stored.AppliedTemplateVersionID != nil || stored.AppliedTemplateAt != nil || stored.ExperienceAckStatus != nil || stored.ExperienceAckReasonCode != nil || stored.ExperienceAckAt != nil {
+		t.Fatalf("reassignment did not clear acknowledgement lifecycle: %#v", stored)
 	}
 }
