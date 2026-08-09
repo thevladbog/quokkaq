@@ -829,6 +829,7 @@ export {
   ExperienceLayoutVariantSchema,
   WidgetActionSchema,
   ExperienceWidgetToneSchema,
+  ExperienceThemeSchema,
   ExperienceWidgetSchema,
   ExperiencePlacementSchema,
   ExperiencePageLayoutSchema,
@@ -839,11 +840,18 @@ export {
   type DeviceProfile,
   type ExperienceLayoutVariant,
   type WidgetAction,
+  type ExperienceTheme,
   type ExperienceWidget,
   type ExperiencePage,
   type ExperienceFlowPages,
   type ExperienceTemplate
 } from './experience-template';
+
+export {
+  experienceFromScreenTemplate,
+  experienceFromKioskConfig,
+  normalizeExperienceInput
+} from './experience-legacy';
 
 import {
   ScreenTemplateCellGridSchema,

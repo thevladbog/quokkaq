@@ -66,6 +66,24 @@ export const ExperienceWidgetToneSchema = z.enum([
   'destructive'
 ]);
 
+const ExperienceThemeColorSchema = z.string().regex(/^#[0-9a-f]{6}$/i);
+
+/**
+ * Compatibility theme values are deliberately limited to named surface tokens.
+ * Legacy imports must not turn individual widget or service tiles into builder
+ * styling controls.
+ */
+export const ExperienceThemeSchema = z.object({
+  preset: z.literal('legacy-kiosk'),
+  tokens: z
+    .object({
+      header: ExperienceThemeColorSchema,
+      surface: ExperienceThemeColorSchema,
+      serviceGrid: ExperienceThemeColorSchema
+    })
+    .strict()
+});
+
 export const ExperienceWidgetSchema = z.object({
   id: z.string().min(1),
   type: ScreenWidgetTypeSchema,
@@ -114,7 +132,8 @@ const ExperienceTemplateBaseSchema = z.object({
   startPageId: z.string().min(1),
   variants: z.array(ExperienceLayoutVariantSchema).min(1).max(2),
   pages: z.array(ExperiencePageSchema).min(1),
-  flowPages: ExperienceFlowPagesSchema.optional()
+  flowPages: ExperienceFlowPagesSchema.optional(),
+  theme: ExperienceThemeSchema.optional()
 });
 
 export const ExperienceTemplateSchema =
@@ -321,6 +340,7 @@ export type ExperienceLayoutVariant = z.infer<
 >;
 export type WidgetAction = z.infer<typeof WidgetActionSchema>;
 export type ExperienceWidget = z.infer<typeof ExperienceWidgetSchema>;
+export type ExperienceTheme = z.infer<typeof ExperienceThemeSchema>;
 export type ExperiencePage = z.infer<typeof ExperiencePageSchema>;
 export type ExperienceFlowPages = z.infer<typeof ExperienceFlowPagesSchema>;
 export type ExperienceTemplate = z.infer<typeof ExperienceTemplateSchema>;
