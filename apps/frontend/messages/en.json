@@ -20,6 +20,32 @@
     "login": "Login",
     "pre_registrations": "Appointments"
   },
+  "experience": {
+    "conditions": {
+      "and": "and",
+      "or": "or",
+      "fields": {
+        "identityIsAuthenticated": "Authenticated",
+        "identityIsEmployee": "Employee",
+        "identityGroups": "group",
+        "liveQueueLength": "Queue length",
+        "liveIsOpen": "Open",
+        "liveIsConnected": "Connected",
+        "sessionSelectedServiceId": "Selected service"
+      },
+      "operators": {
+        "isFalse": "Not {field}",
+        "eq": "{field} equals {value}",
+        "ne": "{field} does not equal {value}",
+        "gt": "{field} is greater than {value}",
+        "gte": "{field} is at least {value}",
+        "lt": "{field} is less than {value}",
+        "lte": "{field} is at most {value}",
+        "contains": "{field} contains {value}",
+        "notContains": "{field} does not contain {value}"
+      }
+    }
+  },
   "clients": {
     "backHome": "Back to home",
     "listTitle": "Clients",

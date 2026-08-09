@@ -787,6 +787,25 @@ export {
 export { migrateRegionsToCellGrid } from './screen-template-migrate-regions';
 
 export {
+  ConditionFieldSchema,
+  ConditionOperatorSchema,
+  ConditionRuleSchema,
+  ConditionGroupSchema,
+  ConditionNodeSchema,
+  AccessPolicySchema,
+  PageAccessPolicySchema,
+  ConditionContextSchema,
+  type ConditionField,
+  type ConditionOperator,
+  type ConditionRule,
+  type ConditionGroup,
+  type ConditionNode,
+  type AccessPolicy,
+  type PageAccessPolicy,
+  type ConditionContext
+} from './experience-condition';
+
+export {
   ExperienceSurfaceSchema,
   InteractionModeSchema,
   ViewingDistanceSchema,

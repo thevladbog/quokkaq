@@ -20,6 +20,32 @@
     "login": "Войти",
     "pre_registrations": "Записи на приём"
   },
+  "experience": {
+    "conditions": {
+      "and": "и",
+      "or": "или",
+      "fields": {
+        "identityIsAuthenticated": "Авторизован",
+        "identityIsEmployee": "Сотрудник",
+        "identityGroups": "группа",
+        "liveQueueLength": "Длина очереди",
+        "liveIsOpen": "Открыто",
+        "liveIsConnected": "Подключено",
+        "sessionSelectedServiceId": "Выбранная услуга"
+      },
+      "operators": {
+        "isFalse": "Не {field}",
+        "eq": "{field} равно {value}",
+        "ne": "{field} не равно {value}",
+        "gt": "{field} больше {value}",
+        "gte": "{field} не меньше {value}",
+        "lt": "{field} меньше {value}",
+        "lte": "{field} не больше {value}",
+        "contains": "{field} содержит {value}",
+        "notContains": "{field} не содержит {value}"
+      }
+    }
+  },
   "clients": {
     "backHome": "На главную",
     "listTitle": "Клиенты",

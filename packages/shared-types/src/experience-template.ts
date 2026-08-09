@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  AccessPolicySchema,
+  PageAccessPolicySchema
+} from './experience-condition';
 import { ScreenWidgetTypeSchema } from './screen-template-widgets';
 
 export const ExperienceSurfaceSchema = z.enum([
@@ -67,6 +71,7 @@ export const ExperienceWidgetSchema = z.object({
   type: ScreenWidgetTypeSchema,
   config: z.record(z.string(), z.unknown()),
   tone: ExperienceWidgetToneSchema.optional(),
+  access: AccessPolicySchema.optional(),
   actions: z.array(WidgetActionSchema).default([])
 });
 
@@ -86,6 +91,7 @@ export const ExperiencePageSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   widgets: z.array(ExperienceWidgetSchema),
+  access: PageAccessPolicySchema.optional(),
   layouts: z.record(z.string().min(1), ExperiencePageLayoutSchema)
 });
 
