@@ -119,6 +119,31 @@ describe('ExperienceTemplateSchema', () => {
     ]);
   });
 
+  it('requires every page to define each declared variant layout', () => {
+    const template = validTemplate();
+    template.variants.push({ ...template.variants[0]!, id: 'landscape' });
+
+    expectIssuePath(template, ['pages', 0, 'layouts', 'landscape']);
+  });
+
+  it('requires every page layout to place each shared widget', () => {
+    const template = validTemplate();
+    template.pages[0]!.widgets.push({
+      id: 'details',
+      type: 'rich-info',
+      config: {}
+    });
+
+    expectIssuePath(template, [
+      'pages',
+      0,
+      'layouts',
+      'portrait',
+      'placements',
+      'details'
+    ]);
+  });
+
   it.each([
     {
       name: 'duplicate variant ids',

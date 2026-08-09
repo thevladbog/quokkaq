@@ -206,6 +206,31 @@ export const ExperienceTemplateSchema =
         }
       }
 
+      for (const variant of template.variants) {
+        const layout = page.layouts[variant.id];
+        const layoutPath = ['pages', pageIndex, 'layouts', variant.id];
+        if (!layout) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Page layout must exist for every variant',
+            path: layoutPath
+          });
+          continue;
+        }
+
+        for (const widget of page.widgets) {
+          if (
+            !Object.prototype.hasOwnProperty.call(layout.placements, widget.id)
+          ) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'Page layout must place every widget',
+              path: [...layoutPath, 'placements', widget.id]
+            });
+          }
+        }
+      }
+
       for (const [variantId, layout] of Object.entries(page.layouts)) {
         const variant = template.variants.find(
           (candidate) => candidate.id === variantId
