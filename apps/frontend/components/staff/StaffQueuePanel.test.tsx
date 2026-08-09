@@ -1,4 +1,10 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within
+} from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { axe } from 'jest-axe';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -226,6 +232,25 @@ describe('StaffQueuePanel', () => {
   });
 
   it.each([
+    { name: 'a pending pick', overrides: { pickPending: true } },
+    {
+      name: 'another row being picked',
+      overrides: { inProgressTicketId: 'ticket-in-progress' }
+    }
+  ])('blocks row Call during $name without hiding the row', ({ overrides }) => {
+    const onPickTicket = vi.fn(async () => undefined);
+    const setInProgressTicketId = vi.fn();
+    renderPanel({ ...overrides, onPickTicket, setInProgressTicketId });
+
+    expect(screen.getByText('A001')).toBeVisible();
+    const call = screen.getByRole('button', { name: 'Call' });
+    expect(call).toBeDisabled();
+    fireEvent.click(call);
+    expect(onPickTicket).not.toHaveBeenCalled();
+    expect(setInProgressTicketId).not.toHaveBeenCalled();
+  });
+
+  it.each([
     { name: 'populated', overrides: {} },
     {
       name: 'empty',
@@ -254,5 +279,34 @@ describe('StaffQueuePanel', () => {
     expect(
       within(header as HTMLElement).getByRole('button', { name: 'Filters' })
     ).toBeVisible();
+  });
+
+  it('gives queue header controls and filter switches a 36px floor', () => {
+    const onShowAllTicketsInQueueChange = vi.fn();
+    renderPanel({
+      leafServicesForCreate: [{ id: 'service-a', label: 'Payments' }],
+      onShowAllTicketsInQueueChange
+    });
+
+    for (const label of ['Services', 'Filters', 'New ticket']) {
+      expect(screen.getByRole('button', { name: label })).toHaveClass('h-9');
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    expect(
+      screen.getByRole('switch', { name: 'Show all unit tickets' })
+    ).toHaveClass('h-9');
+    expect(screen.getByRole('switch', { name: 'Only my zone' })).toHaveClass(
+      'h-9'
+    );
+    expect(screen.getByText('Show all unit tickets')).toHaveClass(
+      'min-h-9',
+      'flex-1'
+    );
+    expect(screen.getByText('Only my zone')).toHaveClass('min-h-9', 'flex-1');
+
+    fireEvent.click(screen.getByText('Show all unit tickets'));
+    expect(onShowAllTicketsInQueueChange).toHaveBeenCalledTimes(1);
+    expect(onShowAllTicketsInQueueChange).toHaveBeenCalledWith(true);
   });
 });

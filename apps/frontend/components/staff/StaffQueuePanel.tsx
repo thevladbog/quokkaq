@@ -183,7 +183,7 @@ export function StaffQueuePanel({
                     type='button'
                     variant='outline'
                     size='sm'
-                    className='h-7 gap-1 px-2 text-xs'
+                    className='h-9 gap-1 px-2 text-xs'
                     onClick={() => setScopeOpen(true)}
                   >
                     <ListChecks className='h-3.5 w-3.5' />
@@ -196,7 +196,7 @@ export function StaffQueuePanel({
                       type='button'
                       variant='outline'
                       size='sm'
-                      className='h-7 gap-1 px-2 text-xs'
+                      className='h-9 gap-1 px-2 text-xs'
                     >
                       <SlidersHorizontal className='h-3.5 w-3.5' />
                       {t('queue.filters')}
@@ -204,10 +204,10 @@ export function StaffQueuePanel({
                   </PopoverTrigger>
                   <PopoverContent align='end' className='w-72 space-y-3 p-3'>
                     <div className='space-y-1'>
-                      <div className='flex items-center justify-between gap-3'>
+                      <div className='flex min-h-9 items-center justify-between gap-1'>
                         <Label
                           htmlFor='staff-queue-show-all'
-                          className='cursor-pointer text-xs leading-snug'
+                          className='flex min-h-9 flex-1 cursor-pointer items-center text-xs leading-snug'
                         >
                           {t('queue.list_show_all')}
                         </Label>
@@ -215,6 +215,7 @@ export function StaffQueuePanel({
                           id='staff-queue-show-all'
                           checked={showAllTicketsInQueue}
                           onCheckedChange={onShowAllTicketsInQueueChange}
+                          className='h-9 w-11'
                         />
                       </div>
                       <p className='text-muted-foreground text-[10px] leading-tight'>
@@ -225,10 +226,10 @@ export function StaffQueuePanel({
                     </div>
                     {onOnlyMyZoneChange ? (
                       <div className='border-border/50 space-y-1 border-t pt-3'>
-                        <div className='flex items-center justify-between gap-3'>
+                        <div className='flex min-h-9 items-center justify-between gap-1'>
                           <Label
                             htmlFor='staff-queue-only-my-zone'
-                            className='cursor-pointer text-xs leading-snug'
+                            className='flex min-h-9 flex-1 cursor-pointer items-center text-xs leading-snug'
                           >
                             {t('queue.only_my_zone')}
                           </Label>
@@ -236,6 +237,7 @@ export function StaffQueuePanel({
                             id='staff-queue-only-my-zone'
                             checked={onlyMyZone}
                             onCheckedChange={onOnlyMyZoneChange}
+                            className='h-9 w-11'
                           />
                         </div>
                         <p className='text-muted-foreground text-[10px] leading-tight'>
@@ -252,7 +254,7 @@ export function StaffQueuePanel({
                     type='button'
                     variant='outline'
                     size='sm'
-                    className='h-7 gap-1 px-2 text-xs'
+                    className='h-9 gap-1 px-2 text-xs'
                     disabled={counterOnBreak || createTicketPending}
                     onClick={() => {
                       setCreateTicketModalKey((k) => k + 1);

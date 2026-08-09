@@ -40,7 +40,7 @@ function SelectAllButton({
       type='button'
       size='sm'
       variant='outline'
-      className='h-8 text-xs'
+      className='h-9 text-xs'
       onClick={onSelectAll}
       disabled={disabled}
     >
@@ -59,22 +59,6 @@ export function StaffServiceScopeSelector({
   className,
   variant = 'card'
 }: StaffServiceScopeSelectorProps) {
-  if (!leaves.length) return null;
-
-  const allIds = leaves.map((l) => l.id);
-  const set = new Set(selectedIds);
-  const allSelected =
-    selectedIds.length === allIds.length && allIds.every((id) => set.has(id));
-
-  const toggle = (id: string, nextChecked: boolean) => {
-    if (nextChecked) {
-      if (!set.has(id)) onChange([...selectedIds, id]);
-      return;
-    }
-    if (selectedIds.length <= 1) return;
-    onChange(selectedIds.filter((x) => x !== id));
-  };
-
   const isDialog = variant === 'dialog';
 
   if (!isDialog && summary) {
@@ -109,6 +93,22 @@ export function StaffServiceScopeSelector({
       </div>
     );
   }
+
+  if (!leaves.length) return null;
+
+  const allIds = leaves.map((l) => l.id);
+  const set = new Set(selectedIds);
+  const allSelected =
+    selectedIds.length === allIds.length && allIds.every((id) => set.has(id));
+
+  const toggle = (id: string, nextChecked: boolean) => {
+    if (nextChecked) {
+      if (!set.has(id)) onChange([...selectedIds, id]);
+      return;
+    }
+    if (selectedIds.length <= 1) return;
+    onChange(selectedIds.filter((x) => x !== id));
+  };
 
   return (
     <div
@@ -161,18 +161,18 @@ export function StaffServiceScopeSelector({
           return (
             <li
               key={leaf.id}
-              className='border-border/40 bg-background/60 flex items-start gap-2 rounded-md border px-2 py-1.5'
+              className='border-border/40 bg-background/60 flex min-h-9 items-center gap-1 rounded-md border px-1'
             >
               <Checkbox
                 id={`staff-scope-${leaf.id}`}
                 checked={checked}
                 disabled={disableUncheck}
                 onCheckedChange={(v) => toggle(leaf.id, v === true)}
-                className='mt-0.5'
+                className='size-9 rounded-md'
               />
               <label
                 htmlFor={`staff-scope-${leaf.id}`}
-                className='cursor-pointer text-sm leading-snug select-none'
+                className='flex min-h-9 flex-1 cursor-pointer items-center py-1.5 text-sm leading-snug select-none'
               >
                 {leaf.label}
               </label>
