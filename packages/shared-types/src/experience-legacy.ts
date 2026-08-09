@@ -23,6 +23,7 @@ import {
   getKioskServiceIdentificationMode,
   type KioskIdentificationMode
 } from './kiosk-service-identification';
+import { LegacyAttractCompatibilitySchema } from './experience-runtime';
 
 const KIOSK_VARIANT_ID = 'kiosk-1080x1920';
 const SIGNAGE_PORTRAIT_VARIANT_ID = 'signage-portrait';
@@ -113,25 +114,6 @@ export class ExperienceNormalizationError extends Error {
     this.code = code;
   }
 }
-
-const LegacyAttractCompatibilitySchema = z
-  .object({
-    mode: z.enum(['session_then_attract', 'attract_only', 'off']),
-    sessionIdleBeforeWarningSec: z.number().int().positive().max(3_600),
-    sessionIdleCountdownSec: z.number().int().positive().max(300),
-    showAttractAfterSessionEnd: z.boolean(),
-    attractIdleSec: z.number().int().min(10).max(600),
-    showQueueDepthOnAttract: z.boolean(),
-    signage: z
-      .object({
-        mode: z.enum(['inherit', 'playlist', 'materials']),
-        playlistId: z.string().optional(),
-        materialIds: z.array(z.string()).optional(),
-        slideDurationSec: z.number().int().min(1).max(300).optional()
-      })
-      .strict()
-  })
-  .strict();
 
 const LegacyRouteSlotSchema = z.enum([
   'service-info',

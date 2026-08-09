@@ -5,9 +5,11 @@ import {
 } from './experience-condition';
 import {
   ExperienceTemplateSchema,
+  EXPERIENCE_TEMPLATE_LIMITS,
   type ExperienceTemplate,
   type ExperienceWidget
 } from './experience-template';
+import { LegacyAttractCompatibilitySchema } from './experience-runtime';
 import { KioskIdentificationModeSchema } from './kiosk-service-identification';
 
 export type ExperienceValidationErrorCode =
@@ -52,6 +54,9 @@ export type ExperienceValidationReport = {
   canPublish: boolean;
 };
 
+/** Each severity is capped independently so errors never hide authoring hints. */
+export const EXPERIENCE_VALIDATION_MAX_ISSUES_PER_SEVERITY = 200;
+
 type IssueCollector = {
   add: (
     code: ExperienceValidationIssueCode,
@@ -59,6 +64,7 @@ type IssueCollector = {
     details?: Readonly<Record<string, string | number | boolean>>
   ) => void;
   entries: () => ExperienceValidationIssue[];
+  isFull: () => boolean;
 };
 
 type LegacyRouteSlot =
@@ -96,6 +102,13 @@ const LegacyRoutingMetadataSchema = z
       .array(LegacyRouteSlotSchema)
       .length(LEGACY_ROUTE_SLOTS.length),
     routes: z.array(LegacyServiceRouteSchema)
+  })
+  .strict();
+
+const RuntimeAttractConfigSchema = z
+  .object({
+    source: z.literal('legacy-kiosk-attract'),
+    compatibility: LegacyAttractCompatibilitySchema
   })
   .strict();
 
@@ -213,13 +226,19 @@ function createIssueCollector(): IssueCollector {
         ? { code, path: [...path], details: { ...details } }
         : { code, path: [...path] };
       const key = issueKey(issue);
-      if (!seen.has(key)) {
+      if (
+        !seen.has(key) &&
+        issues.length < EXPERIENCE_VALIDATION_MAX_ISSUES_PER_SEVERITY
+      ) {
         seen.add(key);
         issues.push(issue);
       }
     },
     entries() {
       return [...issues].sort(compareIssues);
+    },
+    isFull() {
+      return issues.length >= EXPERIENCE_VALIDATION_MAX_ISSUES_PER_SEVERITY;
     }
   };
 }
@@ -236,29 +255,40 @@ function reportFromCollectors(
   };
 }
 
-function containsAccessPath(path: readonly (string | number)[]): number {
-  return path.lastIndexOf('access');
-}
-
-function conditionPath(
+function conditionPathFromSchemaPath(
   path: readonly (string | number)[]
-): ExperienceValidationPath {
-  const accessIndex = containsAccessPath(path);
-  if (accessIndex < 0) return [...path];
-  return [...path.slice(0, accessIndex + 1), 'when'];
+): ExperienceValidationPath | undefined {
+  const isPageAccess =
+    path.length >= 3 &&
+    path[0] === 'pages' &&
+    typeof path[1] === 'number' &&
+    path[2] === 'access';
+  const isWidgetAccess =
+    path.length >= 5 &&
+    path[0] === 'pages' &&
+    typeof path[1] === 'number' &&
+    path[2] === 'widgets' &&
+    typeof path[3] === 'number' &&
+    path[4] === 'access';
+  if (!isPageAccess && !isWidgetAccess) return undefined;
+
+  const accessIndex = isPageAccess ? 2 : 4;
+  return path[accessIndex + 1] === 'when'
+    ? [...path.slice(0, accessIndex + 2)]
+    : [...path.slice(0, accessIndex + 1), 'when'];
 }
 
 function mapSchemaIssue(issue: {
   path: readonly PropertyKey[];
   message: string;
-}): ExperienceValidationIssue | undefined {
+}): ExperienceValidationIssue {
   const path = issue.path.filter(
     (segment): segment is string | number =>
       typeof segment === 'string' || typeof segment === 'number'
   );
-  const accessIndex = containsAccessPath(path);
-  if (accessIndex >= 0) {
-    return { code: 'condition.invalid', path: conditionPath(path) };
+  const conditionPath = conditionPathFromSchemaPath(path);
+  if (conditionPath !== undefined) {
+    return { code: 'condition.invalid', path: conditionPath };
   }
   if (issue.message === 'Start page must exist') {
     return { code: 'page.start_missing', path };
@@ -281,7 +311,7 @@ function mapSchemaIssue(issue: {
   if (issue.message === 'Flow page must exist') {
     return { code: 'flow.required_page_missing', path };
   }
-  return undefined;
+  return { code: 'schema.invalid', path };
 }
 
 function widgetSupportsSurface(
@@ -289,7 +319,9 @@ function widgetSupportsSurface(
   type: string,
   actions: unknown
 ): boolean {
-  if (type === 'custom-html') return false;
+  if (type === 'custom-html') {
+    return surface === 'queue-display' || surface === 'counter-display';
+  }
 
   if (surface === 'queue-display' || surface === 'counter-display') {
     if (DISPLAY_BLOCKED_WIDGET_TYPES.has(type)) return false;
@@ -427,6 +459,7 @@ function parseLegacyRouting(
   ) {
     return undefined;
   }
+  if (widget.type !== 'service-picker') return null;
   const parsed = LegacyRoutingMetadataSchema.safeParse(
     widget.config.legacyRouting
   );
@@ -438,8 +471,16 @@ function parseLegacyRouting(
   ) {
     return null;
   }
+  const serviceIds = new Set<string>();
   for (const route of parsed.data.routes) {
-    if (!hasCanonicalLegacyRouteSlots(route.slots)) return null;
+    if (
+      serviceIds.has(route.serviceId) ||
+      !hasCanonicalLegacyRouteSlots(route.slots) ||
+      (route.identificationMode !== 'none' && !route.slots.includes('identity'))
+    ) {
+      return null;
+    }
+    serviceIds.add(route.serviceId);
     const terminalAction = route.terminalActions[0]!;
     if (
       (route.identificationMode === 'qr' &&
@@ -520,6 +561,27 @@ function validateGraph(
     template.pages.map((page) => [page.id, 0])
   );
 
+  function isRuntimeAttractPage(page: ExperienceTemplate['pages'][number]) {
+    if (
+      page.id !== 'attract' ||
+      page.access !== undefined ||
+      page.widgets.length !== 1
+    ) {
+      return false;
+    }
+    const currentWidget = page.widgets[0]!;
+    const attractConfig = RuntimeAttractConfigSchema.safeParse(
+      currentWidget.config
+    );
+    return (
+      currentWidget.id === 'attract-media' &&
+      currentWidget.type === 'media' &&
+      currentWidget.actions.length === 0 &&
+      attractConfig.success &&
+      attractConfig.data.compatibility.mode !== 'off'
+    );
+  }
+
   function addEdge(fromPageId: string, toPageId: string): void {
     const targets = adjacency.get(fromPageId);
     if (!targets || !pagesById.has(toPageId) || targets.has(toPageId)) return;
@@ -554,6 +616,12 @@ function validateGraph(
   }
 
   const reachable = new Set<string>();
+  for (const currentPage of template.pages) {
+    if (isRuntimeAttractPage(currentPage)) {
+      reachable.add(currentPage.id);
+      incoming.set(currentPage.id, 1);
+    }
+  }
   const queue = [template.startPageId];
   while (queue.length > 0) {
     const pageId = queue.shift()!;
@@ -584,56 +652,101 @@ function isInteractiveWidget(widget: ExperienceWidget): boolean {
   return INTERACTIVE_WIDGET_TYPES.has(widget.type) || widget.actions.length > 0;
 }
 
-function scrollRequiringManualPlacementIndex(
+const ServicePickerGridSchema = z
+  .object({
+    rows: z.number().int().min(1).max(48),
+    columns: z.number().int().min(1).max(48)
+  })
+  .strict();
+
+const ServicePickerPresentationSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('auto'), grid: ServicePickerGridSchema }).strict(),
+  z
+    .object({
+      mode: z.literal('manual'),
+      grid: ServicePickerGridSchema,
+      coordinateBase: z.enum(['zero-based', 'one-based']),
+      placements: z.array(
+        z
+          .object({
+            serviceId: z.string().min(1),
+            row: z.number().int(),
+            col: z.number().int(),
+            rowSpan: z.number().int().min(1),
+            colSpan: z.number().int().min(1)
+          })
+          .strict()
+      )
+    })
+    .strict()
+]);
+
+const ServicePickerScrollConfigSchema = z
+  .object({
+    catalog: z
+      .object({
+        navigation: z.enum(['flat', 'categories']),
+        rootCategoryIds: z.array(z.string()).optional(),
+        itemCount: z.number().int().min(0).optional()
+      })
+      .strict()
+      .optional(),
+    presentation: ServicePickerPresentationSchema,
+    pagination: z
+      .object({
+        enabled: z.boolean(),
+        pageSize: z.number().int().min(1).optional(),
+        threshold: z.number().int().min(1).optional()
+      })
+      .strict()
+      .optional()
+  })
+  .passthrough();
+
+function stationScrollRequiredPath(
   widget: ExperienceWidget
-): number | undefined {
-  if (!isPlainOwnRecord(widget.config)) return undefined;
-  const presentation = widget.config.presentation;
-  if (!isPlainOwnRecord(presentation) || presentation.mode !== 'manual') {
-    return undefined;
-  }
-  const pagination = widget.config.pagination;
-  if (isPlainOwnRecord(pagination) && pagination.enabled === true) {
-    return undefined;
-  }
-  const grid = presentation.grid;
-  const gridRows = isPlainOwnRecord(grid) ? grid.rows : undefined;
-  const gridColumns = isPlainOwnRecord(grid) ? grid.columns : undefined;
-  if (
-    !isPlainOwnRecord(grid) ||
-    typeof gridRows !== 'number' ||
-    typeof gridColumns !== 'number' ||
-    !Number.isInteger(gridRows) ||
-    !Number.isInteger(gridColumns) ||
-    gridRows < 1 ||
-    gridColumns < 1 ||
-    !Array.isArray(presentation.placements)
-  ) {
-    return undefined;
+): ExperienceValidationPath | undefined {
+  if (widget.type !== 'service-picker') return undefined;
+  const parsed = ServicePickerScrollConfigSchema.safeParse(widget.config);
+  if (!parsed.success) return undefined;
+
+  const { presentation } = parsed.data;
+  const capacity = presentation.grid.rows * presentation.grid.columns;
+  if (presentation.mode === 'manual') {
+    const coordinateMinimum =
+      presentation.coordinateBase === 'zero-based' ? 0 : 1;
+    const overflowingPlacementIndex = presentation.placements.findIndex(
+      (placement) => {
+        const row = placement.row - coordinateMinimum;
+        const col = placement.col - coordinateMinimum;
+        return (
+          row < 0 ||
+          col < 0 ||
+          row + placement.rowSpan > presentation.grid.rows ||
+          col + placement.colSpan > presentation.grid.columns
+        );
+      }
+    );
+    return overflowingPlacementIndex >= 0
+      ? ['presentation', 'placements', overflowingPlacementIndex]
+      : undefined;
   }
 
-  const overflowingPlacementIndex = presentation.placements.findIndex(
-    (placement) => {
-      if (!isPlainOwnRecord(placement)) return false;
-      const { row, col, rowSpan, colSpan } = placement;
-      return (
-        typeof row === 'number' &&
-        typeof col === 'number' &&
-        typeof rowSpan === 'number' &&
-        typeof colSpan === 'number' &&
-        Number.isInteger(row) &&
-        Number.isInteger(col) &&
-        Number.isInteger(rowSpan) &&
-        Number.isInteger(colSpan) &&
-        row >= 0 &&
-        col >= 0 &&
-        rowSpan >= 1 &&
-        colSpan >= 1 &&
-        (row + rowSpan > gridRows || col + colSpan > gridColumns)
-      );
-    }
-  );
-  return overflowingPlacementIndex >= 0 ? overflowingPlacementIndex : undefined;
+  const pagination = parsed.data.pagination;
+  if (pagination?.enabled === true) {
+    return pagination.pageSize === undefined || pagination.pageSize > capacity
+      ? ['pagination', 'pageSize']
+      : undefined;
+  }
+  const catalog = parsed.data.catalog;
+  if (
+    catalog?.itemCount !== undefined &&
+    catalog.itemCount > capacity &&
+    catalog.navigation !== 'categories'
+  ) {
+    return ['catalog', 'itemCount'];
+  }
+  return undefined;
 }
 
 function validateLayouts(
@@ -706,22 +819,24 @@ function validateLayouts(
         ) {
           warnings.add('display.primary_text_small', typographyPath);
         }
+      }
+    }
 
-        if (template.surface === 'ticket-station') {
-          const placementIndex =
-            scrollRequiringManualPlacementIndex(currentWidget);
-          if (placementIndex !== undefined) {
-            errors.add('station.page_scroll_required', [
-              'pages',
-              pageIndex,
-              'widgets',
-              widgetIndex,
-              'config',
-              'presentation',
-              'placements',
-              placementIndex
-            ]);
-          }
+    if (template.surface === 'ticket-station') {
+      for (const [
+        widgetIndex,
+        currentWidget
+      ] of currentPage.widgets.entries()) {
+        const scrollPath = stationScrollRequiredPath(currentWidget);
+        if (scrollPath !== undefined) {
+          errors.add('station.page_scroll_required', [
+            'pages',
+            pageIndex,
+            'widgets',
+            widgetIndex,
+            'config',
+            ...scrollPath
+          ]);
         }
       }
     }
@@ -761,6 +876,127 @@ function validateParsedTemplate(
   validateLayouts(template, errors, warnings);
 }
 
+function rawAccessExceedsConditionLimit(access: unknown): boolean {
+  if (!isPlainOwnRecord(access) || !isPlainOwnRecord(access.when)) {
+    return false;
+  }
+  let nodes = 0;
+  const pending: unknown[] = [access.when];
+  while (pending.length > 0) {
+    const node = pending.pop();
+    nodes += 1;
+    if (nodes > EXPERIENCE_TEMPLATE_LIMITS.maxConditionNodes) return true;
+    if (
+      !isPlainOwnRecord(node) ||
+      node.kind !== 'group' ||
+      !Array.isArray(node.children)
+    ) {
+      continue;
+    }
+    for (let index = node.children.length - 1; index >= 0; index--) {
+      pending.push(node.children[index]);
+    }
+  }
+  return false;
+}
+
+function addResourceLimitIssue(
+  errors: IssueCollector,
+  path: ExperienceValidationPath,
+  limit: number
+): void {
+  errors.add('schema.invalid', path, { limit });
+}
+
+/**
+ * Bounds are checked before Zod walks unknown input. This keeps pathological
+ * draft payloads from allocating an unbounded number of schema issues.
+ */
+function preflightResourceBounds(
+  input: unknown,
+  errors: IssueCollector
+): boolean {
+  if (!isPlainOwnRecord(input)) return false;
+  let exceeded = false;
+  if (
+    Array.isArray(input.variants) &&
+    input.variants.length > EXPERIENCE_TEMPLATE_LIMITS.maxVariants
+  ) {
+    addResourceLimitIssue(
+      errors,
+      ['variants'],
+      EXPERIENCE_TEMPLATE_LIMITS.maxVariants
+    );
+    exceeded = true;
+  }
+  if (!Array.isArray(input.pages)) return exceeded;
+  if (input.pages.length > EXPERIENCE_TEMPLATE_LIMITS.maxPages) {
+    addResourceLimitIssue(
+      errors,
+      ['pages'],
+      EXPERIENCE_TEMPLATE_LIMITS.maxPages
+    );
+    return true;
+  }
+
+  for (let pageIndex = 0; pageIndex < input.pages.length; pageIndex++) {
+    if (errors.isFull()) return true;
+    const rawPage = input.pages[pageIndex];
+    if (!isPlainOwnRecord(rawPage)) continue;
+    if (
+      Array.isArray(rawPage.widgets) &&
+      rawPage.widgets.length > EXPERIENCE_TEMPLATE_LIMITS.maxWidgetsPerPage
+    ) {
+      addResourceLimitIssue(
+        errors,
+        ['pages', pageIndex, 'widgets'],
+        EXPERIENCE_TEMPLATE_LIMITS.maxWidgetsPerPage
+      );
+      exceeded = true;
+      continue;
+    }
+    if (rawAccessExceedsConditionLimit(rawPage.access)) {
+      addResourceLimitIssue(
+        errors,
+        ['pages', pageIndex, 'access', 'when'],
+        EXPERIENCE_TEMPLATE_LIMITS.maxConditionNodes
+      );
+      exceeded = true;
+    }
+    if (!Array.isArray(rawPage.widgets)) continue;
+    for (
+      let widgetIndex = 0;
+      widgetIndex < rawPage.widgets.length;
+      widgetIndex++
+    ) {
+      if (errors.isFull()) return true;
+      const rawWidget = rawPage.widgets[widgetIndex];
+      if (!isPlainOwnRecord(rawWidget)) continue;
+      if (
+        Array.isArray(rawWidget.actions) &&
+        rawWidget.actions.length >
+          EXPERIENCE_TEMPLATE_LIMITS.maxActionsPerWidget
+      ) {
+        addResourceLimitIssue(
+          errors,
+          ['pages', pageIndex, 'widgets', widgetIndex, 'actions'],
+          EXPERIENCE_TEMPLATE_LIMITS.maxActionsPerWidget
+        );
+        exceeded = true;
+      }
+      if (rawAccessExceedsConditionLimit(rawWidget.access)) {
+        addResourceLimitIssue(
+          errors,
+          ['pages', pageIndex, 'widgets', widgetIndex, 'access', 'when'],
+          EXPERIENCE_TEMPLATE_LIMITS.maxConditionNodes
+        );
+        exceeded = true;
+      }
+    }
+  }
+  return exceeded;
+}
+
 /**
  * Validates a draft definition before it can be published. Runtime-owned stale
  * data and emergency overlays are intentional invariants of the renderer, so
@@ -773,18 +1009,16 @@ export function validateExperienceForPublish(
   const warnings = createIssueCollector();
 
   try {
+    if (preflightResourceBounds(template, errors)) {
+      return reportFromCollectors(errors, warnings);
+    }
     const parsed = ExperienceTemplateSchema.safeParse(template);
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
         const mapped = mapSchemaIssue(issue);
-        if (mapped !== undefined) {
-          errors.add(mapped.code, mapped.path, mapped.details);
-        }
+        errors.add(mapped.code, mapped.path, mapped.details);
       }
       scanRawSurfaceAndConditions(template, errors);
-      if (errors.entries().length === 0) {
-        errors.add('schema.invalid', []);
-      }
       return reportFromCollectors(errors, warnings);
     }
 

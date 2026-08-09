@@ -71,6 +71,35 @@ export type ConditionGroup = {
 
 export type ConditionNode = ConditionRule | ConditionGroup;
 
+/** Maximum condition AST nodes accepted in one page or widget access policy. */
+export const MAX_ACCESS_POLICY_CONDITION_NODES = 100;
+
+/**
+ * Iterative traversal keeps resource checks bounded even when a policy comes
+ * from an untrusted editor payload. Call this only after the node schema has
+ * parsed the AST shape.
+ */
+export function exceedsConditionNodeLimit(
+  node: ConditionNode,
+  limit = MAX_ACCESS_POLICY_CONDITION_NODES
+): boolean {
+  let nodes = 0;
+  const pending: ConditionNode[] = [node];
+
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    nodes += 1;
+    if (nodes > limit) return true;
+    if (current.kind === 'group') {
+      for (let index = current.children.length - 1; index >= 0; index--) {
+        pending.push(current.children[index]!);
+      }
+    }
+  }
+
+  return false;
+}
+
 function isPlainOwnRecord(
   value: unknown,
   requiredKeys: readonly string[]
@@ -173,23 +202,40 @@ export const ConditionNodeSchema: z.ZodType<ConditionNode> = z.lazy(() =>
   z.union([ConditionRuleSchema, ConditionGroupSchema])
 );
 
+function accessPolicyWithConditionLimit<T extends z.ZodType>(schema: T): T {
+  return schema.superRefine((policy, ctx) => {
+    const value = policy as { when: ConditionNode };
+    if (exceedsConditionNodeLimit(value.when)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['when'],
+        message: 'access condition exceeds resource bounds'
+      });
+    }
+  }) as T;
+}
+
 export const AccessPolicySchema = plainOwnRecord(
-  z
-    .object({
-      when: ConditionNodeSchema,
-      whenFalse: z.enum(['hide', 'lock'])
-    })
-    .strict(),
+  accessPolicyWithConditionLimit(
+    z
+      .object({
+        when: ConditionNodeSchema,
+        whenFalse: z.enum(['hide', 'lock'])
+      })
+      .strict()
+  ),
   ['when', 'whenFalse']
 );
 
 export const PageAccessPolicySchema = plainOwnRecord(
-  z
-    .object({
-      when: ConditionNodeSchema,
-      whenFalse: z.literal('hide')
-    })
-    .strict(),
+  accessPolicyWithConditionLimit(
+    z
+      .object({
+        when: ConditionNodeSchema,
+        whenFalse: z.literal('hide')
+      })
+      .strict()
+  ),
   ['when', 'whenFalse']
 );
 

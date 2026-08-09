@@ -799,6 +799,8 @@ export {
   ConditionRuleSchema,
   ConditionGroupSchema,
   ConditionNodeSchema,
+  MAX_ACCESS_POLICY_CONDITION_NODES,
+  exceedsConditionNodeLimit,
   AccessPolicySchema,
   PageAccessPolicySchema,
   ConditionContextSchema,
@@ -836,6 +838,7 @@ export {
   ExperiencePageSchema,
   ExperienceFlowPagesSchema,
   ExperienceTemplateSchema,
+  EXPERIENCE_TEMPLATE_LIMITS,
   type ExperienceSurface,
   type DeviceProfile,
   type ExperienceLayoutVariant,
@@ -856,7 +859,13 @@ export {
 } from './experience-legacy';
 
 export {
+  LegacyAttractCompatibilitySchema,
+  type LegacyAttractCompatibility
+} from './experience-runtime';
+
+export {
   validateExperienceForPublish,
+  EXPERIENCE_VALIDATION_MAX_ISSUES_PER_SEVERITY,
   type ExperienceValidationErrorCode,
   type ExperienceValidationWarningCode,
   type ExperienceValidationIssueCode,

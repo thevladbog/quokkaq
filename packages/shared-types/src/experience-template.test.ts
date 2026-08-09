@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ExperienceTemplateSchema } from './experience-template';
+import {
+  EXPERIENCE_TEMPLATE_LIMITS,
+  ExperiencePageSchema,
+  ExperienceTemplateSchema,
+  ExperienceWidgetSchema
+} from './experience-template';
+import { AccessPolicySchema } from './experience-condition';
 
 function validTemplate() {
   return {
@@ -159,6 +165,108 @@ describe('ExperienceTemplateSchema', () => {
     ]);
   });
 
+  it('keeps a positive drawable safe area for touch and non-touch profiles', () => {
+    const onePixel = validTemplate();
+    onePixel.variants[0]!.profile.width = 320;
+    onePixel.variants[0]!.profile.height = 320;
+    onePixel.variants[0]!.profile.safeArea = {
+      top: 319,
+      right: 319,
+      bottom: 0,
+      left: 0
+    };
+    expect(ExperienceTemplateSchema.safeParse(onePixel).success).toBe(true);
+
+    const zeroWidth = validTemplate();
+    zeroWidth.variants[0]!.profile.width = 320;
+    zeroWidth.variants[0]!.profile.safeArea = {
+      top: 0,
+      right: 320,
+      bottom: 0,
+      left: 0
+    };
+    expectIssuePath(zeroWidth, ['variants', 0, 'profile', 'safeArea']);
+
+    const nonTouch = validTemplate();
+    nonTouch.variants[0]!.profile.height = 320;
+    nonTouch.variants[0]!.profile.interactionMode = 'non-touch';
+    nonTouch.variants[0]!.profile.safeArea = {
+      top: 320,
+      right: 0,
+      bottom: 0,
+      left: 0
+    };
+    expectIssuePath(nonTouch, ['variants', 0, 'profile', 'safeArea']);
+  });
+
+  it('enforces exported editor resource limits at schema boundaries', () => {
+    const template = validTemplate();
+    for (
+      let index = 1;
+      index < EXPERIENCE_TEMPLATE_LIMITS.maxVariants;
+      index++
+    ) {
+      const id = `variant-${index}`;
+      template.variants.push({ ...template.variants[0]!, id });
+      template.pages[0]!.layouts[id] = {
+        placements: { catalog: { col: 1, row: 1, colSpan: 1, rowSpan: 1 } }
+      };
+    }
+    expect(ExperienceTemplateSchema.safeParse(template).success).toBe(true);
+    template.variants.push({ ...template.variants[0]!, id: 'too-many' });
+    expectIssuePath(template, ['variants']);
+
+    const pageBoundaries = validTemplate();
+    const sourcePage = pageBoundaries.pages[0]!;
+    pageBoundaries.pages = Array.from(
+      { length: EXPERIENCE_TEMPLATE_LIMITS.maxPages },
+      (_, index) => ({ ...sourcePage, id: `page-${index}` })
+    );
+    pageBoundaries.startPageId = 'page-0';
+    expect(ExperienceTemplateSchema.safeParse(pageBoundaries).success).toBe(
+      true
+    );
+    pageBoundaries.pages.push({ ...sourcePage, id: 'too-many-pages' });
+    expectIssuePath(pageBoundaries, ['pages']);
+
+    const page = validTemplate().pages[0]!;
+    page.widgets = Array.from(
+      { length: EXPERIENCE_TEMPLATE_LIMITS.maxWidgetsPerPage + 1 },
+      (_, index) => ({ id: `widget-${index}`, type: 'media', config: {} })
+    );
+    expect(ExperiencePageSchema.safeParse(page).success).toBe(false);
+
+    expect(
+      ExperienceWidgetSchema.safeParse({
+        id: 'actions',
+        type: 'media',
+        config: {},
+        actions: Array.from(
+          { length: EXPERIENCE_TEMPLATE_LIMITS.maxActionsPerWidget + 1 },
+          () => ({ type: 'reset-session' })
+        )
+      }).success
+    ).toBe(false);
+
+    const condition = {
+      when: {
+        kind: 'group',
+        combinator: 'and',
+        children: Array.from(
+          { length: EXPERIENCE_TEMPLATE_LIMITS.maxConditionNodes + 1 },
+          (_, index) => ({
+            kind: 'rule',
+            field: 'live.queueLength',
+            operator: 'gt',
+            value: index
+          })
+        )
+      },
+      whenFalse: 'hide'
+    };
+    expect(AccessPolicySchema.safeParse(condition).success).toBe(false);
+  });
+
   it.each([
     {
       name: 'duplicate variant ids',
@@ -192,13 +300,15 @@ describe('ExperienceTemplateSchema', () => {
       path: ['pages', 0, 'widgets', 1, 'id']
     },
     {
-      name: 'a third layout variant',
+      name: 'a ninth layout variant',
       input: () => {
         const template = validTemplate();
-        template.variants.push(
-          { ...template.variants[0]!, id: 'landscape' },
-          { ...template.variants[0]!, id: 'wide' }
-        );
+        for (let index = 1; index <= 8; index++) {
+          template.variants.push({
+            ...template.variants[0]!,
+            id: `variant-${index}`
+          });
+        }
         return template;
       },
       path: ['variants']

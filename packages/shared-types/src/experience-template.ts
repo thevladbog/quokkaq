@@ -1,9 +1,19 @@
 import { z } from 'zod';
 import {
   AccessPolicySchema,
+  MAX_ACCESS_POLICY_CONDITION_NODES,
   PageAccessPolicySchema
 } from './experience-condition';
 import { ScreenWidgetTypeSchema } from './screen-template-widgets';
+
+/** Shared editor resource bounds; validators use the same values for preflight. */
+export const EXPERIENCE_TEMPLATE_LIMITS = {
+  maxPages: 100,
+  maxWidgetsPerPage: 200,
+  maxActionsPerWidget: 20,
+  maxVariants: 8,
+  maxConditionNodes: MAX_ACCESS_POLICY_CONDITION_NODES
+} as const;
 
 export const ExperienceSurfaceSchema = z.enum([
   'ticket-station',
@@ -15,20 +25,33 @@ export const ExperienceSurfaceSchema = z.enum([
 export const InteractionModeSchema = z.enum(['touch', 'non-touch']);
 export const ViewingDistanceSchema = z.enum(['near', 'standing', 'far']);
 
-export const DeviceProfileSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  width: z.number().int().min(320).max(7680),
-  height: z.number().int().min(320).max(7680),
-  interactionMode: InteractionModeSchema,
-  viewingDistance: ViewingDistanceSchema,
-  safeArea: z.object({
-    top: z.number().int().min(0),
-    right: z.number().int().min(0),
-    bottom: z.number().int().min(0),
-    left: z.number().int().min(0)
+export const DeviceProfileSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    width: z.number().int().min(320).max(7680),
+    height: z.number().int().min(320).max(7680),
+    interactionMode: InteractionModeSchema,
+    viewingDistance: ViewingDistanceSchema,
+    safeArea: z.object({
+      top: z.number().int().min(0),
+      right: z.number().int().min(0),
+      bottom: z.number().int().min(0),
+      left: z.number().int().min(0)
+    })
   })
-});
+  .superRefine((profile, ctx) => {
+    if (
+      profile.safeArea.left + profile.safeArea.right >= profile.width ||
+      profile.safeArea.top + profile.safeArea.bottom >= profile.height
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['safeArea'],
+        message: 'Safe area must leave a positive drawable region'
+      });
+    }
+  });
 
 export const ExperienceGridSchema = z.object({
   columns: z.number().int().min(1).max(48),
@@ -92,7 +115,10 @@ export const ExperienceWidgetSchema = z.object({
   config: z.record(z.string(), z.unknown()),
   tone: ExperienceWidgetToneSchema.optional(),
   access: AccessPolicySchema.optional(),
-  actions: z.array(WidgetActionSchema).default([])
+  actions: z
+    .array(WidgetActionSchema)
+    .max(EXPERIENCE_TEMPLATE_LIMITS.maxActionsPerWidget)
+    .default([])
 });
 
 export const ExperiencePlacementSchema = z.object({
@@ -110,7 +136,9 @@ export const ExperiencePageLayoutSchema = z.object({
 export const ExperiencePageSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  widgets: z.array(ExperienceWidgetSchema),
+  widgets: z
+    .array(ExperienceWidgetSchema)
+    .max(EXPERIENCE_TEMPLATE_LIMITS.maxWidgetsPerPage),
   access: PageAccessPolicySchema.optional(),
   layouts: z.record(z.string().min(1), ExperiencePageLayoutSchema)
 });
@@ -132,14 +160,26 @@ const ExperienceTemplateBaseSchema = z.object({
   id: z.string().min(1),
   surface: ExperienceSurfaceSchema,
   startPageId: z.string().min(1),
-  variants: z.array(ExperienceLayoutVariantSchema).min(1).max(2),
-  pages: z.array(ExperiencePageSchema).min(1),
+  variants: z
+    .array(ExperienceLayoutVariantSchema)
+    .min(1)
+    .max(EXPERIENCE_TEMPLATE_LIMITS.maxVariants),
+  pages: z
+    .array(ExperiencePageSchema)
+    .min(1)
+    .max(EXPERIENCE_TEMPLATE_LIMITS.maxPages),
   flowPages: ExperienceFlowPagesSchema.optional(),
   theme: ExperienceThemeSchema.optional()
 });
 
 export const ExperienceTemplateSchema =
   ExperienceTemplateBaseSchema.superRefine((template, ctx) => {
+    let schemaIssueCount = 0;
+    const addIssue = (issue: Parameters<typeof ctx.addIssue>[0]) => {
+      if (schemaIssueCount >= 200) return;
+      schemaIssueCount += 1;
+      ctx.addIssue(issue);
+    };
     const variantIds = new Set<string>();
     for (
       let variantIndex = 0;
@@ -148,7 +188,7 @@ export const ExperienceTemplateSchema =
     ) {
       const variant = template.variants[variantIndex]!;
       if (variantIds.has(variant.id)) {
-        ctx.addIssue({
+        addIssue({
           code: z.ZodIssueCode.custom,
           message: 'Duplicate variant id',
           path: ['variants', variantIndex, 'id']
@@ -161,7 +201,7 @@ export const ExperienceTemplateSchema =
     for (let pageIndex = 0; pageIndex < template.pages.length; pageIndex++) {
       const page = template.pages[pageIndex]!;
       if (pageIds.has(page.id)) {
-        ctx.addIssue({
+        addIssue({
           code: z.ZodIssueCode.custom,
           message: 'Duplicate page id',
           path: ['pages', pageIndex, 'id']
@@ -171,7 +211,7 @@ export const ExperienceTemplateSchema =
     }
 
     if (!pageIds.has(template.startPageId)) {
-      ctx.addIssue({
+      addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Start page must exist',
         path: ['startPageId']
@@ -182,7 +222,7 @@ export const ExperienceTemplateSchema =
       template.flowPages ?? {}
     )) {
       if (pageId && !pageIds.has(pageId)) {
-        ctx.addIssue({
+        addIssue({
           code: z.ZodIssueCode.custom,
           message: 'Flow page must exist',
           path: ['flowPages', flowPageRole]
@@ -201,7 +241,7 @@ export const ExperienceTemplateSchema =
       ) {
         const widget = page.widgets[widgetIndex]!;
         if (widgetIds.has(widget.id)) {
-          ctx.addIssue({
+          addIssue({
             code: z.ZodIssueCode.custom,
             message: 'Duplicate widget id',
             path: ['pages', pageIndex, 'widgets', widgetIndex, 'id']
@@ -216,7 +256,7 @@ export const ExperienceTemplateSchema =
         ) {
           const action = widget.actions[actionIndex]!;
           if (action.type === 'navigate' && !pageIds.has(action.toPageId)) {
-            ctx.addIssue({
+            addIssue({
               code: z.ZodIssueCode.custom,
               message: 'Navigation target page must exist',
               path: [
@@ -242,7 +282,7 @@ export const ExperienceTemplateSchema =
           : undefined;
         const layoutPath = ['pages', pageIndex, 'layouts', variant.id];
         if (!layout) {
-          ctx.addIssue({
+          addIssue({
             code: z.ZodIssueCode.custom,
             message: 'Page layout must exist for every variant',
             path: layoutPath
@@ -258,7 +298,7 @@ export const ExperienceTemplateSchema =
             ? layout.placements[widget.id]
             : undefined;
           if (!placement) {
-            ctx.addIssue({
+            addIssue({
               code: z.ZodIssueCode.custom,
               message: 'Page layout must place every widget',
               path: [...layoutPath, 'placements', widget.id]
@@ -274,7 +314,7 @@ export const ExperienceTemplateSchema =
         const layoutPath = ['pages', pageIndex, 'layouts', variantId];
 
         if (!variant) {
-          ctx.addIssue({
+          addIssue({
             code: z.ZodIssueCode.custom,
             message: 'Layout variant must exist',
             path: layoutPath
@@ -283,10 +323,14 @@ export const ExperienceTemplateSchema =
         }
 
         const occupiedCells = new Set<string>();
-        for (const [widgetId, placement] of Object.entries(layout.placements)) {
+        for (const [widgetId, placement] of Object.entries(
+          layout.placements
+        ).sort(([leftWidgetId], [rightWidgetId]) =>
+          leftWidgetId.localeCompare(rightWidgetId)
+        )) {
           const placementPath = [...layoutPath, 'placements', widgetId];
           if (!widgetIds.has(widgetId)) {
-            ctx.addIssue({
+            addIssue({
               code: z.ZodIssueCode.custom,
               message: 'Placement widget must exist on the page',
               path: placementPath
@@ -297,7 +341,7 @@ export const ExperienceTemplateSchema =
             placement.col + placement.colSpan - 1 > variant.grid.columns ||
             placement.row + placement.rowSpan - 1 > variant.grid.rows
           ) {
-            ctx.addIssue({
+            addIssue({
               code: z.ZodIssueCode.custom,
               message: 'Placement exceeds variant grid',
               path: placementPath
@@ -324,7 +368,7 @@ export const ExperienceTemplateSchema =
             }
           }
           if (overlaps) {
-            ctx.addIssue({
+            addIssue({
               code: z.ZodIssueCode.custom,
               message: 'Placements overlap in variant grid',
               path: placementPath

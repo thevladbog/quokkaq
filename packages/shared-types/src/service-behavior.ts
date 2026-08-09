@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {
   AccessPolicySchema,
+  MAX_ACCESS_POLICY_CONDITION_NODES,
+  exceedsConditionNodeLimit,
   type AccessPolicy,
   type ConditionNode
 } from './experience-condition';
@@ -10,7 +12,6 @@ const maxLocalizedEntries = 8;
 const maxFields = 50;
 const maxSelectOptions = 50;
 const maxConditionDepth = 8;
-const maxConditionNodes = 100;
 const maxConditionGroupChildren = 20;
 
 function isPlainOwnRecord(
@@ -170,12 +171,13 @@ function validateServiceBehaviorAccessBounds(
   access: AccessPolicy,
   ctx: z.RefinementCtx
 ) {
-  let nodes = 0;
-  let invalid = false;
+  let invalid = exceedsConditionNodeLimit(
+    access.when,
+    MAX_ACCESS_POLICY_CONDITION_NODES
+  );
 
   function visit(node: ConditionNode, depth: number) {
-    nodes += 1;
-    if (depth > maxConditionDepth || nodes > maxConditionNodes) {
+    if (depth > maxConditionDepth) {
       invalid = true;
       return;
     }

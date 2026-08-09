@@ -164,7 +164,14 @@ describe('validateExperienceForPublish', () => {
     const report = validateExperienceForPublish({ schemaVersion: 'one' });
 
     expect(report).toEqual({
-      errors: [{ code: 'schema.invalid', path: [] }],
+      errors: [
+        { code: 'schema.invalid', path: ['id'] },
+        { code: 'schema.invalid', path: ['pages'] },
+        { code: 'schema.invalid', path: ['schemaVersion'] },
+        { code: 'schema.invalid', path: ['startPageId'] },
+        { code: 'schema.invalid', path: ['surface'] },
+        { code: 'schema.invalid', path: ['variants'] }
+      ],
       warnings: [],
       canPublish: false
     });
@@ -174,7 +181,7 @@ describe('validateExperienceForPublish', () => {
     const template = { ...stationTemplate(), surface: 'tablet-station' };
 
     expect(validateExperienceForPublish(template)).toEqual({
-      errors: [{ code: 'schema.invalid', path: [] }],
+      errors: [{ code: 'schema.invalid', path: ['surface'] }],
       warnings: [],
       canPublish: false
     });
@@ -714,5 +721,369 @@ describe('validateExperienceForPublish', () => {
       },
       { code: 'page.start_missing', path: ['startPageId'] }
     ]);
+  });
+
+  it('treats only the typed default Task 4 attract page as runtime reachable', () => {
+    const normalized = experienceFromKioskConfig({}, [
+      {
+        id: 'default-service',
+        unitId: 'unit-1',
+        name: 'Default service',
+        isLeaf: true,
+        identificationMode: 'none'
+      }
+    ]);
+
+    expect(normalized.pages.map((currentPage) => currentPage.id)).toContain(
+      'attract'
+    );
+    expect(validateExperienceForPublish(normalized)).toEqual({
+      errors: [],
+      warnings: [{ code: 'theme.legacy_contrast_unknown', path: ['theme'] }],
+      canPublish: true
+    });
+
+    const arbitrary = stationTemplate();
+    arbitrary.pages.push(
+      page('attract', [widget('attract-media', 'media')], arbitrary.variants)
+    );
+
+    expect(validateExperienceForPublish(arbitrary).errors).toContainEqual({
+      code: 'page.unreachable',
+      path: ['pages', 1]
+    });
+    expect(validateExperienceForPublish(arbitrary).warnings).toContainEqual({
+      code: 'page.unreferenced',
+      path: ['pages', 1]
+    });
+  });
+
+  it.each([
+    ['ticket-station', false],
+    ['queue-display', true],
+    ['counter-display', true],
+    ['visitor-mobile', false]
+  ] as const)(
+    'allows sanitized custom-html only on the non-interactive %s surface',
+    (surface, allowed) => {
+      const template = stationTemplate({ surface });
+      template.pages[0]!.widgets[0] = widget('html', 'custom-html', {
+        sanitized: true
+      });
+      for (const currentVariant of template.variants) {
+        delete template.pages[0]!.layouts[currentVariant.id]!.placements
+          .catalog;
+        template.pages[0]!.layouts[currentVariant.id]!.placements.html = {
+          col: 1,
+          row: 1,
+          colSpan: 10,
+          rowSpan: 10
+        };
+      }
+
+      expect(
+        errorCodes(template).includes('widget.unsupported_for_surface')
+      ).toBe(!allowed);
+    }
+  );
+
+  it('does not mistake ids named access for condition errors', () => {
+    const widgetNamedAccess = stationTemplate();
+    widgetNamedAccess.pages[0]!.widgets[0]!.id = 'access';
+    for (const currentVariant of widgetNamedAccess.variants) {
+      const placements =
+        widgetNamedAccess.pages[0]!.layouts[currentVariant.id]!.placements;
+      placements.access = placements.catalog!;
+      delete placements.catalog;
+    }
+    delete widgetNamedAccess.pages[0]!.layouts.landscape!.placements.access;
+
+    expect(
+      validateExperienceForPublish(widgetNamedAccess).errors
+    ).toContainEqual({
+      code: 'variant.unplaced_widget',
+      path: ['pages', 0, 'layouts', 'landscape', 'placements', 'access']
+    });
+
+    const variantNamedAccess = stationTemplate();
+    variantNamedAccess.variants[0]!.id = 'access';
+    variantNamedAccess.pages[0]!.layouts.access =
+      variantNamedAccess.pages[0]!.layouts.portrait!;
+    delete variantNamedAccess.pages[0]!.layouts.portrait;
+    variantNamedAccess.pages[0]!.layouts.access!.placements.catalog!.colSpan = 11;
+
+    expect(
+      validateExperienceForPublish(variantNamedAccess).errors
+    ).toContainEqual({
+      code: 'variant.placement_overflow',
+      path: ['pages', 0, 'layouts', 'access', 'placements', 'catalog']
+    });
+
+    const pageNamedAccess = stationTemplate();
+    pageNamedAccess.pages.push(
+      page('access', [widget('spare', 'media')], pageNamedAccess.variants)
+    );
+    const pageReport = validateExperienceForPublish(pageNamedAccess);
+    expect(pageReport.errors).toContainEqual({
+      code: 'page.unreachable',
+      path: ['pages', 1]
+    });
+    expect(errorCodes(pageNamedAccess)).not.toContain('condition.invalid');
+  });
+
+  it('translates every schema issue independently in a mixed invalid draft', () => {
+    const template = stationTemplate({ startPageId: 'missing-page' });
+    template.pages.push({ ...template.pages[0]! });
+
+    expect(validateExperienceForPublish(template).errors).toEqual([
+      { code: 'schema.invalid', path: ['pages', 1, 'id'] },
+      { code: 'page.start_missing', path: ['startPageId'] }
+    ]);
+  });
+
+  it('requires routing metadata only on service pickers and validates every route', () => {
+    const template = structuredClone(
+      experienceFromKioskConfig({ kioskAttractInactivityMode: 'off' }, [
+        {
+          id: 'service',
+          unitId: 'unit-1',
+          name: 'Service',
+          isLeaf: true,
+          identificationMode: 'none'
+        }
+      ])
+    ) as RawExperience;
+    const services = template.pages.find(
+      (currentPage) => currentPage.id === 'services'
+    )!;
+    const routing = structuredClone(
+      services.widgets[0]!.config.legacyRouting
+    ) as {
+      routes: Array<{
+        serviceId: string;
+        identificationMode: string;
+        slots: string[];
+        terminalActions: Array<{ type: string }>;
+      }>;
+    };
+    const success = template.pages.find(
+      (currentPage) => currentPage.id === 'success'
+    )!;
+    success.widgets[0]!.type = 'media';
+    success.widgets[0]!.config = { legacyRouting: routing };
+
+    expect(validateExperienceForPublish(template).errors).toContainEqual({
+      code: 'schema.invalid',
+      path: ['pages', 1, 'widgets', 0, 'config', 'legacyRouting']
+    });
+
+    services.widgets[0]!.config = { legacyRouting: routing };
+    routing.routes.push({ ...routing.routes[0]! });
+    expect(errorCodes(template)).toContain('schema.invalid');
+
+    const multipleTerminalOutcomes = structuredClone(
+      experienceFromKioskConfig({ kioskAttractInactivityMode: 'off' }, [
+        {
+          id: 'terminal-service',
+          unitId: 'unit-1',
+          name: 'Terminal service',
+          isLeaf: true,
+          identificationMode: 'none'
+        }
+      ])
+    ) as RawExperience;
+    const terminalRouting = multipleTerminalOutcomes.pages[0]!.widgets[0]!
+      .config.legacyRouting as {
+      routes: Array<{ terminalActions: Array<{ type: string }> }>;
+    };
+    terminalRouting.routes[0]!.terminalActions.push({ type: 'submit-ticket' });
+    expect(errorCodes(multipleTerminalOutcomes)).toContain('schema.invalid');
+  });
+
+  it('requires identity and explicit behavior slots for per-service routes', () => {
+    const qr = structuredClone(
+      experienceFromKioskConfig({ kioskAttractInactivityMode: 'off' }, [
+        {
+          id: 'qr-service',
+          unitId: 'unit-1',
+          name: 'QR service',
+          isLeaf: true,
+          identificationMode: 'qr'
+        }
+      ])
+    ) as RawExperience;
+    const qrRouting = qr.pages[0]!.widgets[0]!.config.legacyRouting as {
+      routes: Array<{ slots: string[] }>;
+    };
+    qrRouting.routes[0]!.slots = qrRouting.routes[0]!.slots.filter(
+      (slot) => slot !== 'identity'
+    );
+    expect(errorCodes(qr)).toContain('schema.invalid');
+
+    const behavior = experienceFromKioskConfig(
+      { kioskAttractInactivityMode: 'off' },
+      [
+        {
+          id: 'confirmation-service',
+          unitId: 'unit-1',
+          name: 'Confirmation service',
+          isLeaf: true,
+          identificationMode: 'none',
+          behavior: {
+            version: 1,
+            fields: [],
+            route: { mode: 'page-slot', slot: 'confirmation' }
+          }
+        }
+      ]
+    );
+    expect(validateExperienceForPublish(behavior).canPublish).toBe(true);
+
+    const missingBehaviorSlot = structuredClone(behavior) as RawExperience;
+    delete missingBehaviorSlot.flowPages!.confirmationPageId;
+    expect(errorCodes(missingBehaviorSlot)).toContain(
+      'flow.required_page_missing'
+    );
+
+    const unorderedBehaviorSlot = structuredClone(behavior) as RawExperience;
+    const behaviorRouting = unorderedBehaviorSlot.pages[0]!.widgets[0]!.config
+      .legacyRouting as { routes: Array<{ slots: string[] }> };
+    behaviorRouting.routes[0]!.slots.reverse();
+    expect(errorCodes(unorderedBehaviorSlot)).toContain('schema.invalid');
+  });
+
+  it('applies typed no-scroll rules only to service pickers', () => {
+    const media = stationTemplate();
+    media.pages[0]!.widgets[0]!.type = 'media';
+    media.pages[0]!.widgets[0]!.config = {
+      presentation: {
+        mode: 'manual',
+        grid: { rows: 1, columns: 1 },
+        coordinateBase: 'zero-based',
+        placements: [
+          { serviceId: 'outside', row: 1, col: 0, rowSpan: 1, colSpan: 1 }
+        ]
+      },
+      pagination: { enabled: false }
+    };
+    expect(errorCodes(media)).not.toContain('station.page_scroll_required');
+
+    const paginatedManual = stationTemplate();
+    paginatedManual.pages[0]!.widgets[0]!.config = {
+      presentation: {
+        mode: 'manual',
+        grid: { rows: 8, columns: 8 },
+        coordinateBase: 'zero-based',
+        placements: [
+          { serviceId: 'outside', row: 7, col: 0, rowSpan: 2, colSpan: 1 }
+        ]
+      },
+      pagination: { enabled: true, pageSize: 1 }
+    };
+    expect(errorCodes(paginatedManual)).toContain(
+      'station.page_scroll_required'
+    );
+
+    const oneBasedBoundary = stationTemplate();
+    oneBasedBoundary.pages[0]!.widgets[0]!.config = {
+      presentation: {
+        mode: 'manual',
+        grid: { rows: 8, columns: 8 },
+        coordinateBase: 'one-based',
+        placements: [
+          { serviceId: 'last-cell', row: 8, col: 8, rowSpan: 1, colSpan: 1 }
+        ]
+      },
+      pagination: { enabled: false }
+    };
+    expect(errorCodes(oneBasedBoundary)).not.toContain(
+      'station.page_scroll_required'
+    );
+
+    const automatic = stationTemplate();
+    automatic.pages[0]!.widgets[0]!.config = {
+      catalog: { navigation: 'flat', itemCount: 5 },
+      presentation: { mode: 'auto', grid: { rows: 2, columns: 2 } },
+      pagination: { enabled: false, pageSize: 4 }
+    };
+    expect(errorCodes(automatic)).toContain('station.page_scroll_required');
+    automatic.pages[0]!.widgets[0]!.config.pagination = {
+      enabled: true,
+      pageSize: 4
+    };
+    expect(errorCodes(automatic)).not.toContain('station.page_scroll_required');
+    automatic.pages[0]!.widgets[0]!.config.pagination = {
+      enabled: true,
+      pageSize: 5
+    };
+    expect(errorCodes(automatic)).toContain('station.page_scroll_required');
+    automatic.pages[0]!.widgets[0]!.config.pagination = {
+      enabled: false,
+      pageSize: 4
+    };
+    (
+      automatic.pages[0]!.widgets[0]!.config.catalog as {
+        navigation: string;
+      }
+    ).navigation = 'categories';
+    expect(errorCodes(automatic)).not.toContain('station.page_scroll_required');
+  });
+
+  it('preflights oversized unknown input and caps structural schema issues', () => {
+    const pages: unknown[] = [];
+    pages.length = 101;
+    Object.defineProperty(pages, 0, {
+      get() {
+        throw new Error('must not parse oversized pages');
+      }
+    });
+    expect(() => validateExperienceForPublish({ pages })).not.toThrow();
+    expect(validateExperienceForPublish({ pages }).errors).toEqual([
+      { code: 'schema.invalid', path: ['pages'], details: { limit: 100 } }
+    ]);
+
+    const manyActionErrors = {
+      pages: Array.from({ length: 100 }, (_, pageIndex) => ({
+        widgets: Array.from({ length: 3 }, (_, widgetIndex) => ({
+          actions: Array.from({ length: 21 }, () => ({ type: 'navigate' })),
+          id: `widget-${pageIndex}-${widgetIndex}`
+        }))
+      }))
+    };
+    const report = validateExperienceForPublish(manyActionErrors);
+    expect(report.errors).toHaveLength(200);
+    expect(
+      report.errors.every((issue) => issue.code === 'schema.invalid')
+    ).toBe(true);
+  });
+
+  it('reports overlap participants deterministically regardless of placement insertion order', () => {
+    const first = stationTemplate();
+    first.pages[0]!.widgets.push(widget('another', 'media'));
+    for (const currentVariant of first.variants) {
+      first.pages[0]!.layouts[currentVariant.id]!.placements = {
+        another: { col: 1, row: 1, colSpan: 10, rowSpan: 10 },
+        catalog: { col: 1, row: 1, colSpan: 10, rowSpan: 10 }
+      };
+    }
+    const second = structuredClone(first);
+    for (const currentVariant of second.variants) {
+      const placements =
+        second.pages[0]!.layouts[currentVariant.id]!.placements;
+      second.pages[0]!.layouts[currentVariant.id]!.placements = {
+        catalog: placements.catalog!,
+        another: placements.another!
+      };
+    }
+
+    expect(
+      validateExperienceForPublish(first).errors.filter(
+        (issue) => issue.code === 'variant.placement_overlap'
+      )
+    ).toEqual(
+      validateExperienceForPublish(second).errors.filter(
+        (issue) => issue.code === 'variant.placement_overlap'
+      )
+    );
   });
 });
