@@ -211,12 +211,14 @@ export function StaffQueuePanel({
                         >
                           {t('queue.list_show_all')}
                         </Label>
-                        <Switch
-                          id='staff-queue-show-all'
-                          checked={showAllTicketsInQueue}
-                          onCheckedChange={onShowAllTicketsInQueueChange}
-                          className='h-9 w-11'
-                        />
+                        <span className='flex size-9 items-center justify-center'>
+                          <Switch
+                            id='staff-queue-show-all'
+                            checked={showAllTicketsInQueue}
+                            onCheckedChange={onShowAllTicketsInQueueChange}
+                            className="relative h-5 w-9 before:absolute before:inset-x-0 before:-inset-y-2 before:content-['']"
+                          />
+                        </span>
                       </div>
                       <p className='text-muted-foreground text-[10px] leading-tight'>
                         {showAllTicketsInQueue
@@ -233,12 +235,14 @@ export function StaffQueuePanel({
                           >
                             {t('queue.only_my_zone')}
                           </Label>
-                          <Switch
-                            id='staff-queue-only-my-zone'
-                            checked={onlyMyZone}
-                            onCheckedChange={onOnlyMyZoneChange}
-                            className='h-9 w-11'
-                          />
+                          <span className='flex size-9 items-center justify-center'>
+                            <Switch
+                              id='staff-queue-only-my-zone'
+                              checked={onlyMyZone}
+                              onCheckedChange={onOnlyMyZoneChange}
+                              className="relative h-5 w-9 before:absolute before:inset-x-0 before:-inset-y-2 before:content-['']"
+                            />
+                          </span>
                         </div>
                         <p className='text-muted-foreground text-[10px] leading-tight'>
                           {onlyMyZone

@@ -281,7 +281,7 @@ describe('StaffQueuePanel', () => {
     ).toBeVisible();
   });
 
-  it('gives queue header controls and filter switches a 36px floor', () => {
+  it('keeps native switch geometry inside a 36px hit area', () => {
     const onShowAllTicketsInQueueChange = vi.fn();
     renderPanel({
       leafServicesForCreate: [{ id: 'service-a', label: 'Payments' }],
@@ -293,12 +293,27 @@ describe('StaffQueuePanel', () => {
     }
 
     fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
-    expect(
-      screen.getByRole('switch', { name: 'Show all unit tickets' })
-    ).toHaveClass('h-9');
-    expect(screen.getByRole('switch', { name: 'Only my zone' })).toHaveClass(
-      'h-9'
-    );
+    const showAllSwitch = screen.getByRole('switch', {
+      name: 'Show all unit tickets'
+    });
+    const onlyMyZoneSwitch = screen.getByRole('switch', {
+      name: 'Only my zone'
+    });
+    for (const control of [showAllSwitch, onlyMyZoneSwitch]) {
+      expect(control).toHaveClass(
+        'h-5',
+        'w-9',
+        'relative',
+        'before:-inset-y-2',
+        'before:inset-x-0'
+      );
+      expect(control.parentElement).toHaveClass(
+        'flex',
+        'size-9',
+        'items-center',
+        'justify-center'
+      );
+    }
     expect(screen.getByText('Show all unit tickets')).toHaveClass(
       'min-h-9',
       'flex-1'
@@ -306,6 +321,11 @@ describe('StaffQueuePanel', () => {
     expect(screen.getByText('Only my zone')).toHaveClass('min-h-9', 'flex-1');
 
     fireEvent.click(screen.getByText('Show all unit tickets'));
+    expect(onShowAllTicketsInQueueChange).toHaveBeenCalledTimes(1);
+    expect(onShowAllTicketsInQueueChange).toHaveBeenCalledWith(true);
+
+    onShowAllTicketsInQueueChange.mockClear();
+    fireEvent.click(showAllSwitch);
     expect(onShowAllTicketsInQueueChange).toHaveBeenCalledTimes(1);
     expect(onShowAllTicketsInQueueChange).toHaveBeenCalledWith(true);
   });
