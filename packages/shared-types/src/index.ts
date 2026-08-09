@@ -855,6 +855,13 @@ export {
   type ExperienceNormalizationErrorCode
 } from './experience-legacy';
 
+export {
+  KioskIdentificationModeSchema,
+  getKioskServiceIdentificationMode,
+  type KioskIdentificationMode,
+  type KioskIdentificationService
+} from './kiosk-service-identification';
+
 import {
   ScreenTemplateCellGridSchema,
   ScreenTemplateRegionsSchema,

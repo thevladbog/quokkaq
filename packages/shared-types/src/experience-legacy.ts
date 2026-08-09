@@ -18,6 +18,11 @@ import {
   type ScreenTemplateCellGrid,
   type ScreenTemplateRegions
 } from './screen-template-layout';
+import {
+  KioskIdentificationModeSchema,
+  getKioskServiceIdentificationMode,
+  type KioskIdentificationMode
+} from './kiosk-service-identification';
 
 const KIOSK_VARIANT_ID = 'kiosk-1080x1920';
 const SIGNAGE_PORTRAIT_VARIANT_ID = 'signage-portrait';
@@ -128,12 +133,15 @@ const LegacyAttractCompatibilitySchema = z
   })
   .strict();
 
-type LegacyRouteSlot =
-  | 'service-info'
-  | 'service-form'
-  | 'identity'
-  | 'confirmation'
-  | 'success';
+const LegacyRouteSlotSchema = z.enum([
+  'service-info',
+  'service-form',
+  'identity',
+  'confirmation',
+  'success'
+]);
+
+type LegacyRouteSlot = z.infer<typeof LegacyRouteSlotSchema>;
 
 const CANONICAL_ROUTE_SLOTS: readonly LegacyRouteSlot[] = [
   'service-info',
@@ -142,6 +150,30 @@ const CANONICAL_ROUTE_SLOTS: readonly LegacyRouteSlot[] = [
   'confirmation',
   'success'
 ];
+
+const LegacyTerminalOutcomeSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('submit-ticket') }).strict(),
+  z.object({ type: z.literal('redeem-pre-registration') }).strict()
+]);
+
+const LegacyServiceRouteSchema = z
+  .object({
+    serviceId: z.string().min(1),
+    identificationMode: KioskIdentificationModeSchema,
+    slots: z.array(LegacyRouteSlotSchema).min(1),
+    terminalActions: z.array(LegacyTerminalOutcomeSchema).length(1)
+  })
+  .strict();
+
+const LegacyRoutingMetadataSchema = z
+  .object({
+    source: z.literal('legacy-service-routes'),
+    canonicalSlots: z
+      .array(LegacyRouteSlotSchema)
+      .length(CANONICAL_ROUTE_SLOTS.length),
+    routes: z.array(LegacyServiceRouteSchema)
+  })
+  .strict();
 
 function fail(code: ExperienceNormalizationErrorCode): never {
   throw new ExperienceNormalizationError(code);
@@ -225,6 +257,37 @@ function sanitizeWidgetStyle(
   return Object.keys(sanitized).length > 0 ? sanitized : undefined;
 }
 
+type LegacyScreenKind = 'regions' | 'cellGrid';
+
+function classifyLegacyScreenInput(
+  input: Record<string, unknown>
+): LegacyScreenKind | undefined {
+  const hasRegionsShape = hasOwn(input, 'layout');
+  const hasCellGridShape =
+    hasOwn(input, 'portrait') && hasOwn(input, 'landscape');
+  if (hasOwn(input, 'layoutKind')) {
+    if (input.layoutKind !== 'regions' && input.layoutKind !== 'cellGrid') {
+      return fail('invalid-screen-template');
+    }
+    const hasContradictoryShape =
+      input.layoutKind === 'regions'
+        ? hasOwn(input, 'portrait') || hasOwn(input, 'landscape')
+        : hasOwn(input, 'layout');
+    const hasExpectedShape =
+      input.layoutKind === 'regions' ? hasRegionsShape : hasCellGridShape;
+    if (!hasExpectedShape || hasContradictoryShape) {
+      return fail('invalid-screen-template');
+    }
+    return input.layoutKind;
+  }
+  if (hasRegionsShape && hasCellGridShape) {
+    return fail('ambiguous-legacy-input');
+  }
+  if (hasRegionsShape) return 'regions';
+  if (hasCellGridShape) return 'cellGrid';
+  return undefined;
+}
+
 function parseScreenTemplate(
   input: unknown
 ):
@@ -233,23 +296,15 @@ function parseScreenTemplate(
   if (!isOwnRecord(input)) {
     return fail('invalid-screen-template');
   }
-
-  const regionsDiscriminator =
-    input.layoutKind === 'regions' || hasOwn(input, 'layout');
-  const cellGridDiscriminator =
-    input.layoutKind === 'cellGrid' ||
-    (hasOwn(input, 'portrait') && hasOwn(input, 'landscape'));
-  if (regionsDiscriminator && cellGridDiscriminator) {
-    return fail('ambiguous-legacy-input');
-  }
-  if (!regionsDiscriminator && !cellGridDiscriminator) {
+  const kind = classifyLegacyScreenInput(input);
+  if (!kind) {
     return fail('invalid-screen-template');
   }
 
-  if (regionsDiscriminator) {
+  if (kind === 'regions') {
     const result = ScreenTemplateRegionsSchema.safeParse({
       ...input,
-      layoutKind: 'regions'
+      ...(hasOwn(input, 'layoutKind') ? {} : { layoutKind: 'regions' })
     });
     if (!result.success) {
       return fail('invalid-screen-template');
@@ -259,7 +314,7 @@ function parseScreenTemplate(
 
   const result = ScreenTemplateCellGridSchema.safeParse({
     ...input,
-    layoutKind: 'cellGrid'
+    ...(hasOwn(input, 'layoutKind') ? {} : { layoutKind: 'cellGrid' })
   });
   if (!result.success) {
     return fail('invalid-screen-template');
@@ -625,7 +680,10 @@ function autoGrid(total: number) {
   return { rows: 3, columns: 3 };
 }
 
-function serviceRouteSlots(service: ServiceModel): LegacyRouteSlot[] {
+function serviceRouteSlots(
+  service: ServiceModel,
+  identificationMode: KioskIdentificationMode
+): LegacyRouteSlot[] {
   const slots = new Set<LegacyRouteSlot>();
   if (service.behavior?.information !== undefined) {
     slots.add('service-info');
@@ -633,11 +691,7 @@ function serviceRouteSlots(service: ServiceModel): LegacyRouteSlot[] {
   if (service.behavior?.fields.length) {
     slots.add('service-form');
   }
-  if (
-    (service.identificationMode !== undefined &&
-      service.identificationMode !== 'none') ||
-    service.offerIdentification === true
-  ) {
+  if (identificationMode !== 'none') {
     slots.add('identity');
   }
   if (service.behavior?.route?.mode === 'page-slot') {
@@ -645,6 +699,23 @@ function serviceRouteSlots(service: ServiceModel): LegacyRouteSlot[] {
   }
   slots.add('success');
   return CANONICAL_ROUTE_SLOTS.filter((slot) => slots.has(slot));
+}
+
+function legacyServiceRoute(service: ServiceModel) {
+  const identificationMode = getKioskServiceIdentificationMode(service);
+  return LegacyServiceRouteSchema.parse({
+    serviceId: service.id,
+    identificationMode,
+    slots: serviceRouteSlots(service, identificationMode),
+    terminalActions: [
+      {
+        type:
+          identificationMode === 'qr'
+            ? 'redeem-pre-registration'
+            : 'submit-ticket'
+      }
+    ]
+  });
 }
 
 function isTerminalService(
@@ -790,11 +861,12 @@ export function experienceFromKioskConfig(
   const usesPagination = usesAutoGrid && largestLevel > AUTO_PAGE_THRESHOLD;
   const serviceRoutes = services
     .filter((service) => isTerminalService(service, services))
-    .map((service) => ({
-      serviceId: service.id,
-      slots: serviceRouteSlots(service),
-      terminalActions: [{ type: 'submit-ticket' as const }]
-    }));
+    .map(legacyServiceRoute);
+  const legacyRouting = LegacyRoutingMetadataSchema.parse({
+    source: 'legacy-service-routes',
+    canonicalSlots: [...CANONICAL_ROUTE_SLOTS],
+    routes: serviceRoutes
+  });
   const hasInfo = serviceRoutes.some((route) =>
     route.slots.includes('service-info')
   );
@@ -836,11 +908,7 @@ export function experienceFromKioskConfig(
           pageSize: PAGINATED_PAGE_SIZE,
           threshold: AUTO_PAGE_THRESHOLD
         },
-        legacyRouting: {
-          source: 'legacy-service-routes',
-          canonicalSlots: [...CANONICAL_ROUTE_SLOTS],
-          routes: serviceRoutes
-        }
+        legacyRouting
       },
       selectedServiceActions()
     )
@@ -961,21 +1029,6 @@ export function experienceFromKioskConfig(
   });
 }
 
-function hasScreenRegionsDiscriminator(
-  input: Record<string, unknown>
-): boolean {
-  return input.layoutKind === 'regions' || hasOwn(input, 'layout');
-}
-
-function hasScreenCellGridDiscriminator(
-  input: Record<string, unknown>
-): boolean {
-  return (
-    input.layoutKind === 'cellGrid' ||
-    (hasOwn(input, 'portrait') && hasOwn(input, 'landscape'))
-  );
-}
-
 function kioskConfigFromEnvelope(input: Record<string, unknown>): unknown {
   if (hasOwn(input, 'kiosk')) {
     return input.kiosk;
@@ -1002,9 +1055,9 @@ export function normalizeExperienceInput(input: unknown): ExperienceTemplate {
     return structuredClone(parsed.data);
   }
 
+  const screenKind = classifyLegacyScreenInput(input);
   const sourceKinds = [
-    hasScreenRegionsDiscriminator(input),
-    hasScreenCellGridDiscriminator(input),
+    screenKind !== undefined,
     Array.isArray(input.services)
   ].filter(Boolean).length;
   if (sourceKinds > 1) {

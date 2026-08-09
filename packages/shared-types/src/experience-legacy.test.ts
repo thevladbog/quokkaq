@@ -458,6 +458,43 @@ describe('legacy experience normalization', () => {
     );
   });
 
+  it('rejects invalid or contradictory explicit display layout kinds without breaking bare legacy shapes', () => {
+    const bareRegions = {
+      id: 'bare-regions',
+      layout: {
+        type: 'fullscreen' as const,
+        regions: [{ id: 'main', area: 'main', size: '1fr' }]
+      },
+      widgets: []
+    };
+    const bareCellGrid = {
+      id: 'bare-cell-grid',
+      portrait: { columns: 1, rows: 1, widgets: [] },
+      landscape: { columns: 1, rows: 1, widgets: [] }
+    };
+
+    expectNormalizationError(
+      () =>
+        normalizeExperienceInput({
+          ...bareRegions,
+          layoutKind: 'unexpected-layout-kind'
+        }),
+      'invalid-screen-template'
+    );
+    expectNormalizationError(
+      () =>
+        normalizeExperienceInput({ ...bareRegions, layoutKind: 'cellGrid' }),
+      'invalid-screen-template'
+    );
+    expectNormalizationError(
+      () =>
+        normalizeExperienceInput({ ...bareCellGrid, layoutKind: 'regions' }),
+      'invalid-screen-template'
+    );
+    expect(normalizeExperienceInput(bareRegions).surface).toBe('queue-display');
+    expect(normalizeExperienceInput(bareCellGrid).variants).toHaveLength(2);
+  });
+
   it('rejects incompatible orientation-specific display content rather than selecting a face', () => {
     expectNormalizationError(
       () =>
@@ -789,7 +826,7 @@ describe('legacy kiosk derivation', () => {
     expectParsed(normalized);
   });
 
-  it('derives an exact per-service route with one terminal submission for every legacy flow', () => {
+  it('derives exact per-service modes and one submit outcome for non-QR legacy flows', () => {
     const normalized = experienceFromKioskConfig(kioskConfig(), [
       service('plain'),
       service('information-only', {
@@ -815,6 +852,22 @@ describe('legacy kiosk derivation', () => {
       }),
       service('identity-only', {
         identificationMode: 'phone'
+      }),
+      service('document', {
+        identificationMode: 'document'
+      }),
+      service('custom', {
+        identificationMode: 'custom'
+      }),
+      service('employee-login', {
+        identificationMode: 'login'
+      }),
+      service('employee-badge', {
+        identificationMode: 'badge'
+      }),
+      service('explicit-none-wins', {
+        identificationMode: 'none',
+        offerIdentification: true
       }),
       service('confirmation-only', {
         behavior: {
@@ -873,31 +926,67 @@ describe('legacy kiosk derivation', () => {
         routes: [
           {
             serviceId: 'plain',
+            identificationMode: 'none',
             slots: ['success'],
             terminalActions: [{ type: 'submit-ticket' }]
           },
           {
             serviceId: 'information-only',
+            identificationMode: 'none',
             slots: ['service-info', 'success'],
             terminalActions: [{ type: 'submit-ticket' }]
           },
           {
             serviceId: 'form-only',
+            identificationMode: 'none',
             slots: ['service-form', 'success'],
             terminalActions: [{ type: 'submit-ticket' }]
           },
           {
             serviceId: 'identity-only',
+            identificationMode: 'phone',
             slots: ['identity', 'success'],
             terminalActions: [{ type: 'submit-ticket' }]
           },
           {
+            serviceId: 'document',
+            identificationMode: 'document',
+            slots: ['identity', 'success'],
+            terminalActions: [{ type: 'submit-ticket' }]
+          },
+          {
+            serviceId: 'custom',
+            identificationMode: 'custom',
+            slots: ['identity', 'success'],
+            terminalActions: [{ type: 'submit-ticket' }]
+          },
+          {
+            serviceId: 'employee-login',
+            identificationMode: 'login',
+            slots: ['identity', 'success'],
+            terminalActions: [{ type: 'submit-ticket' }]
+          },
+          {
+            serviceId: 'employee-badge',
+            identificationMode: 'badge',
+            slots: ['identity', 'success'],
+            terminalActions: [{ type: 'submit-ticket' }]
+          },
+          {
+            serviceId: 'explicit-none-wins',
+            identificationMode: 'none',
+            slots: ['success'],
+            terminalActions: [{ type: 'submit-ticket' }]
+          },
+          {
             serviceId: 'confirmation-only',
+            identificationMode: 'none',
             slots: ['confirmation', 'success'],
             terminalActions: [{ type: 'submit-ticket' }]
           },
           {
             serviceId: 'everything',
+            identificationMode: 'phone',
             slots: [
               'service-info',
               'service-form',
@@ -909,6 +998,7 @@ describe('legacy kiosk derivation', () => {
           },
           {
             serviceId: 'explicit-identity',
+            identificationMode: 'none',
             slots: ['identity', 'success'],
             terminalActions: [{ type: 'submit-ticket' }]
           }
@@ -922,6 +1012,61 @@ describe('legacy kiosk derivation', () => {
       identityPageId: 'identity',
       confirmationPageId: 'confirmation',
       successPageId: 'success'
+    });
+    expectParsed(normalized);
+  });
+
+  it('routes QR identification through pre-registration redemption without a submit action', () => {
+    const normalized = experienceFromKioskConfig(kioskConfig(), [
+      service('qr-only', { identificationMode: 'qr' })
+    ]);
+    const picker = pageById(normalized, 'services')?.widgets.find(
+      (widget) => widget.id === 'service-picker'
+    );
+
+    expect(picker?.config).toMatchObject({
+      legacyRouting: {
+        routes: [
+          {
+            serviceId: 'qr-only',
+            identificationMode: 'qr',
+            slots: ['identity', 'success'],
+            terminalActions: [{ type: 'redeem-pre-registration' }]
+          }
+        ]
+      }
+    });
+    expect(JSON.stringify(picker?.config)).not.toContain('submit-ticket');
+    expect(pageById(normalized, 'identity')).toBeDefined();
+    expectParsed(normalized);
+  });
+
+  it('keeps QR redemption and normal ticket outcomes distinct in one catalog', () => {
+    const normalized = experienceFromKioskConfig(kioskConfig(), [
+      service('normal', { identificationMode: 'phone' }),
+      service('redeem', { identificationMode: 'qr' })
+    ]);
+    const picker = pageById(normalized, 'services')?.widgets.find(
+      (widget) => widget.id === 'service-picker'
+    );
+
+    expect(picker?.config).toMatchObject({
+      legacyRouting: {
+        routes: [
+          {
+            serviceId: 'normal',
+            identificationMode: 'phone',
+            slots: ['identity', 'success'],
+            terminalActions: [{ type: 'submit-ticket' }]
+          },
+          {
+            serviceId: 'redeem',
+            identificationMode: 'qr',
+            slots: ['identity', 'success'],
+            terminalActions: [{ type: 'redeem-pre-registration' }]
+          }
+        ]
+      }
     });
     expectParsed(normalized);
   });

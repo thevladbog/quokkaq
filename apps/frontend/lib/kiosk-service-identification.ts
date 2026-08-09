@@ -1,31 +1,13 @@
+import {
+  getKioskServiceIdentificationMode,
+  type KioskIdentificationMode
+} from '@quokkaq/shared-types';
 import type { Service } from '@/lib/api';
 
-export type KioskIdentificationMode =
-  | 'none'
-  | 'phone'
-  | 'qr'
-  | 'document'
-  | 'custom'
-  | 'login'
-  | 'badge';
+export type { KioskIdentificationMode };
 
 export function getServiceIdentificationMode(
   s: Pick<Service, 'identificationMode' | 'offerIdentification'>
 ): KioskIdentificationMode {
-  const m = s.identificationMode;
-  if (
-    m === 'phone' ||
-    m === 'qr' ||
-    m === 'document' ||
-    m === 'custom' ||
-    m === 'login' ||
-    m === 'badge' ||
-    m === 'none'
-  ) {
-    return m;
-  }
-  if (s.offerIdentification) {
-    return 'phone';
-  }
-  return 'none';
+  return getKioskServiceIdentificationMode(s);
 }

@@ -126,7 +126,7 @@ export function normalizeScreenTemplateInput(input: unknown): unknown {
     return input;
   }
   const o = input as Record<string, unknown>;
-  if (o.layoutKind === 'cellGrid' || o.layoutKind === 'regions') {
+  if (Object.prototype.hasOwnProperty.call(o, 'layoutKind')) {
     return input;
   }
   const portrait = o.portrait;

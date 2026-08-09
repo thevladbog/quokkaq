@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { ScreenTemplateSchema, migrateRegionsToCellGrid } from './index';
+import { normalizeScreenTemplateInput } from './screen-template-layout';
 
 describe('ScreenTemplateSchema cell grid', () => {
+  it('does not infer over an explicit unsupported layout kind', () => {
+    const raw = {
+      layoutKind: 'invalid-kind',
+      id: 'invalid-kind',
+      portrait: { columns: 1, rows: 1, widgets: [] },
+      landscape: { columns: 1, rows: 1, widgets: [] }
+    };
+
+    expect(normalizeScreenTemplateInput(raw)).toEqual(raw);
+  });
+
   it('accepts valid portrait and landscape faces', () => {
     const ok = {
       layoutKind: 'cellGrid' as const,
