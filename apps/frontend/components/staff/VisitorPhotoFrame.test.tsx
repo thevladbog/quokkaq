@@ -39,7 +39,7 @@ describe('VisitorPhotoFrame', () => {
     );
 
     const image = container.querySelector('img');
-    expect(image).not.toBeNull();
+    if (!image) throw new Error('Expected visitor photo');
     expect(image).toHaveAttribute('alt', '');
     expect(image).toHaveClass('object-cover');
     expect(image.parentElement).toHaveClass(
