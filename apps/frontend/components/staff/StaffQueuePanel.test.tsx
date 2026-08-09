@@ -125,13 +125,22 @@ function renderPanel(overrides: Partial<StaffQueuePanelProps> = {}) {
     defaultOptions: { queries: { retry: false } }
   });
 
+  const rendered = render(
+    <QueryClientProvider client={queryClient}>
+      <StaffQueuePanel {...props} />
+    </QueryClientProvider>
+  );
+
   return {
-    ...render(
-      <QueryClientProvider client={queryClient}>
-        <StaffQueuePanel {...props} />
-      </QueryClientProvider>
-    ),
-    props
+    ...rendered,
+    props,
+    rerenderPanel(nextOverrides: Partial<StaffQueuePanelProps>) {
+      rendered.rerender(
+        <QueryClientProvider client={queryClient}>
+          <StaffQueuePanel {...props} {...nextOverrides} />
+        </QueryClientProvider>
+      );
+    }
   };
 }
 
@@ -364,7 +373,7 @@ describe('StaffQueuePanel', () => {
   });
 
   it('keeps a permanent title refresh indicator without changing sorting geometry', () => {
-    const { unmount } = renderPanel({ queueRefreshing: false });
+    const { rerenderPanel } = renderPanel({ queueRefreshing: false });
     const idleIndicator = screen.getByTestId('staff-queue-refresh-indicator');
     const idleSorting = screen.getByText('Longest wait first');
 
@@ -374,13 +383,13 @@ describe('StaffQueuePanel', () => {
     expect(screen.queryByText('Refreshing queue')).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
 
-    unmount();
-    renderPanel({ queueRefreshing: true });
+    rerenderPanel({ queueRefreshing: true });
 
     const refreshingIndicator = screen.getByTestId(
       'staff-queue-refresh-indicator'
     );
 
+    expect(refreshingIndicator).toBe(idleIndicator);
     expect(refreshingIndicator).toHaveClass(
       'size-1.5',
       'opacity-100',
