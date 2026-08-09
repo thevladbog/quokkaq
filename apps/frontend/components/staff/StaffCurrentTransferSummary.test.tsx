@@ -15,7 +15,13 @@ const messages: Record<string, string> = {
   'visitor_context.transfer_counter_flow': 'Counters: {from} → {to}',
   'visitor_context.transfer_counter_to_zone_queue':
     'Counters: {from} → zone queue',
-  'visitor_context.transfer_zone_flow': 'Zones: {from} → {to}'
+  'visitor_context.transfer_zone_flow': 'Zones: {from} → {to}',
+  'visitor_context.transfer_service_from': 'Previous service: {value}',
+  'visitor_context.transfer_service_to': 'New service: {value}',
+  'visitor_context.transfer_counter_from': 'From counter: {value}',
+  'visitor_context.transfer_counter_to': 'To counter: {value}',
+  'visitor_context.transfer_zone_from': 'From zone: {value}',
+  'visitor_context.transfer_zone_to': 'To zone: {value}'
 };
 
 function t(key: string, values?: Record<string, string | number | Date>) {
@@ -86,6 +92,46 @@ describe('StaffCurrentTransferSummary', () => {
       'datetime',
       latest.at
     );
+  });
+
+  it.each([
+    {
+      dimension: 'service',
+      event: transfer({ fromServiceNameEn: 'Payments' }),
+      expected: 'Previous service: Payments'
+    },
+    {
+      dimension: 'counter',
+      event: transfer({ toCounterName: 'Counter 8' }),
+      expected: 'To counter: Counter 8'
+    },
+    {
+      dimension: 'zone',
+      event: transfer({ toZoneLabel: 'Zone B' }),
+      expected: 'To zone: Zone B'
+    }
+  ])(
+    'labels an available one-sided $dimension without a placeholder',
+    ({ event, expected }) => {
+      renderSummary({ trail: [event] });
+
+      expect(screen.getByText(expected)).toBeVisible();
+      expect(screen.queryByText(/—/)).not.toBeInTheDocument();
+    }
+  );
+
+  it('keeps the zone-to-queue wording for a one-sided counter transfer', () => {
+    renderSummary({
+      trail: [
+        transfer({
+          transferKind: 'zone',
+          fromCounterName: 'Counter 4'
+        })
+      ]
+    });
+
+    expect(screen.getByText('Counters: Counter 4 → zone queue')).toBeVisible();
+    expect(screen.queryByText(/—/)).not.toBeInTheDocument();
   });
 
   it('opens the full transfer trail from its labelled button', async () => {

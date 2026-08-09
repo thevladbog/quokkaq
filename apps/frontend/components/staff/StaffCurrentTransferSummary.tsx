@@ -20,37 +20,46 @@ export interface StaffCurrentTransferSummaryProps {
   onOpenFullTrail: () => void;
 }
 
-function dash(value: string): string {
-  return value || '—';
-}
-
 function formatLine(
   line: TransferDisplayLine,
   event: ClientVisitTransferEvent,
   t: TFn
 ): string {
+  if (
+    line.kind === 'counter' &&
+    event.transferKind === 'zone' &&
+    line.from &&
+    !line.to
+  ) {
+    return t('visitor_context.transfer_counter_to_zone_queue', {
+      from: line.from
+    });
+  }
+
+  if (!line.from || !line.to) {
+    const side = line.from ? 'from' : 'to';
+    return t(`visitor_context.transfer_${line.kind}_${side}`, {
+      value: line.from || line.to
+    });
+  }
+
   if (line.kind === 'service') {
     return t('visitor_context.transfer_service_flow', {
-      from: dash(line.from),
-      to: dash(line.to)
+      from: line.from,
+      to: line.to
     });
   }
 
   if (line.kind === 'counter') {
-    if (event.transferKind === 'zone' && line.from && !line.to) {
-      return t('visitor_context.transfer_counter_to_zone_queue', {
-        from: line.from
-      });
-    }
     return t('visitor_context.transfer_counter_flow', {
-      from: dash(line.from),
-      to: dash(line.to)
+      from: line.from,
+      to: line.to
     });
   }
 
   return t('visitor_context.transfer_zone_flow', {
-    from: dash(line.from),
-    to: dash(line.to)
+    from: line.from,
+    to: line.to
   });
 }
 

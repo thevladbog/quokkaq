@@ -43,6 +43,26 @@ describe('localizedTransferServiceName', () => {
     ).toBe('Fallback service');
     expect(localizedTransferServiceName(withoutAnyName, 'to', 'en')).toBeNull();
   });
+
+  it('falls back from a missing EN name to generic and then RU', () => {
+    expect(
+      localizedTransferServiceName(
+        transfer({
+          fromServiceName: 'Default service',
+          fromServiceNameRu: 'Услуга на русском'
+        }),
+        'from',
+        'en'
+      )
+    ).toBe('Default service');
+    expect(
+      localizedTransferServiceName(
+        transfer({ fromServiceNameRu: 'Услуга на русском' }),
+        'from',
+        'en'
+      )
+    ).toBe('Услуга на русском');
+  });
 });
 
 describe('getTransferDisplayLines', () => {
