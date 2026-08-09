@@ -11,6 +11,12 @@ const baseProps = {
 afterEach(cleanup);
 
 describe('VisitorPhotoFrame', () => {
+  it('exposes the supplied label as the portrait image name', () => {
+    render(<VisitorPhotoFrame {...baseProps} />);
+
+    expect(screen.getByRole('img', { name: 'Visitor portrait' })).toBeVisible();
+  });
+
   it('shows initials for an identified visitor without a photo', () => {
     render(<VisitorPhotoFrame {...baseProps} />);
 
@@ -18,16 +24,20 @@ describe('VisitorPhotoFrame', () => {
   });
 
   it('shows the User icon for an anonymous visitor', () => {
-    render(<VisitorPhotoFrame {...baseProps} isAnonymous />);
+    const { container } = render(
+      <VisitorPhotoFrame {...baseProps} isAnonymous />
+    );
 
-    expect(document.querySelector('.lucide-user')).toBeVisible();
+    expect(container.querySelector('.lucide-user')).toBeVisible();
     expect(screen.queryByText('?')).not.toBeInTheDocument();
   });
 
   it('shows the Headphones icon while idle', () => {
-    render(<VisitorPhotoFrame {...baseProps} variant='idle' />);
+    const { container } = render(
+      <VisitorPhotoFrame {...baseProps} variant='idle' />
+    );
 
-    expect(document.querySelector('.lucide-headphones')).toBeVisible();
+    expect(container.querySelector('.lucide-headphones')).toBeVisible();
   });
 
   it('keeps a valid photo decorative, cropped, and at the md dimensions', () => {

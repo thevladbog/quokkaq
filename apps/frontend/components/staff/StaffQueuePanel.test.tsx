@@ -180,7 +180,8 @@ describe('StaffQueuePanel', () => {
     expect(within(row).getByText('02:02 remaining')).toBeVisible();
     expect(row).toHaveClass('p-2', 'border-l-2', 'border-l-border');
     expect(row.style.background).toBe('');
-    expect(timerValue).not.toHaveClass('text-amber-700', 'text-red-700');
+    expect(timerValue).not.toHaveClass('text-amber-700');
+    expect(timerValue).not.toHaveClass('text-red-700');
     expect(within(row).getByRole('button', { name: 'Call' })).toHaveClass(
       'h-9'
     );
@@ -275,12 +276,10 @@ describe('StaffQueuePanel', () => {
       expect(
         within(row).queryByText(/remaining|over limit/)
       ).not.toBeInTheDocument();
-      expect(row).not.toHaveClass(
-        'border-l-2',
-        'border-l-border',
-        'border-l-amber-500',
-        'border-l-red-500'
-      );
+      expect(row).not.toHaveClass('border-l-2');
+      expect(row).not.toHaveClass('border-l-border');
+      expect(row).not.toHaveClass('border-l-amber-500');
+      expect(row).not.toHaveClass('border-l-red-500');
     }
   );
 

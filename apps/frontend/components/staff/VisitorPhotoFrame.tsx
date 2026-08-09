@@ -60,6 +60,7 @@ export function VisitorPhotoFrame({
   return (
     <div
       className={cn('flex shrink-0 flex-col gap-1.5', className)}
+      role='img'
       aria-label={ariaLabel}
     >
       <div
