@@ -3,8 +3,12 @@ import type { Ticket } from '@/lib/api';
 export type StaffPrimaryAction =
   'call_next' | 'start_service' | 'complete' | 'resume';
 
+export type StaffServiceScopeStatus =
+  'pending' | 'error' | 'hydrating' | 'ready';
+
 export interface StaffQueueViewInput {
   waitingTickets: readonly Ticket[];
+  serviceScopeStatus: StaffServiceScopeStatus;
   selectedServiceIds: readonly string[];
   allLeafServiceIds: readonly string[];
   onlyMyZone: boolean;
@@ -13,6 +17,7 @@ export interface StaffQueueViewInput {
 }
 
 export interface StaffQueueView {
+  serviceScopeReady: boolean;
   zoneWaiting: Ticket[];
   scopedWaiting: Ticket[];
   visibleWaiting: Ticket[];
@@ -32,12 +37,23 @@ function normalizeServiceZoneId(
 
 export function deriveStaffQueueView({
   waitingTickets,
+  serviceScopeStatus,
   selectedServiceIds,
   allLeafServiceIds,
   onlyMyZone,
   counterServiceZoneId,
   showAllTemporarily
 }: StaffQueueViewInput): StaffQueueView {
+  if (serviceScopeStatus !== 'ready') {
+    return {
+      serviceScopeReady: false,
+      zoneWaiting: [],
+      scopedWaiting: [],
+      visibleWaiting: [],
+      callNextServiceIds: undefined
+    };
+  }
+
   const normalizedCounterServiceZoneId =
     normalizeServiceZoneId(counterServiceZoneId);
   const zoneWaiting = waitingTickets
@@ -65,6 +81,7 @@ export function deriveStaffQueueView({
         );
 
   return {
+    serviceScopeReady: true,
     zoneWaiting,
     scopedWaiting,
     visibleWaiting: showAllTemporarily ? zoneWaiting : scopedWaiting,

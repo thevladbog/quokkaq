@@ -91,6 +91,7 @@ export interface StaffQueuePanelProps {
   };
   onScopeChange: (ids: string[]) => void;
   pickPending: boolean;
+  conflictingActionPending: boolean;
   inProgressTicketId: string | null;
   setInProgressTicketId: (id: string | null) => void;
   currentTicket: Ticket | undefined;
@@ -133,6 +134,7 @@ export function StaffQueuePanel({
   scopeSummary,
   onScopeChange,
   pickPending,
+  conflictingActionPending,
   inProgressTicketId,
   setInProgressTicketId,
   currentTicket,
@@ -366,6 +368,7 @@ export function StaffQueuePanel({
                     }}
                     disabled={
                       counterOnBreak ||
+                      conflictingActionPending ||
                       pickPending ||
                       Boolean(inProgressTicketId) ||
                       !!currentTicket

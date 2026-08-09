@@ -1,5 +1,12 @@
 import { Suspense } from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within
+} from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -20,8 +27,10 @@ const state = vi.hoisted(() => ({
     refetch: vi.fn()
   },
   servicesQuery: {
-    data: [] as Service[],
-    isPending: false
+    data: [] as Service[] | undefined,
+    error: null as Error | null,
+    isPending: false,
+    refetch: vi.fn()
   },
   clientVisits: {
     data: undefined as { items: Ticket[] } | undefined,
@@ -168,6 +177,8 @@ const messages: Record<string, string> = {
   'current.unknown_visitor': 'Unknown visitor',
   'current.no_visitor_profile': 'No visitor profile',
   'current.visitor_portrait_aria': 'Visitor portrait',
+  'current.service': 'Service',
+  'current.called_time': 'Time since call',
   'current.idle_portrait_aria': 'Counter idle state',
   'current.idle_badge': 'Ready',
   'current.idle_title': 'Waiting for the next visitor',
@@ -327,6 +338,16 @@ function renderPage() {
   return { ...render(view), queryClient, createView };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 beforeEach(() => {
   localStorage.clear();
   state.ticketsQuery.data = [
@@ -338,7 +359,9 @@ beforeEach(() => {
   state.ticketsQuery.isFetching = false;
   state.ticketsQuery.refetch.mockReset().mockResolvedValue({ data: [] });
   state.servicesQuery.data = services;
+  state.servicesQuery.error = null;
   state.servicesQuery.isPending = false;
+  state.servicesQuery.refetch.mockReset().mockResolvedValue({ data: services });
   state.clientVisits.data = undefined;
   state.clientVisits.isLoading = false;
   state.clientVisitCalls.length = 0;
@@ -474,6 +497,90 @@ describe('StaffWorkspacePage integration', () => {
     });
   });
 
+  it('fails the queue and call-next closed while the service catalog is loading', async () => {
+    const user = userEvent.setup();
+    state.servicesQuery.data = undefined;
+    state.servicesQuery.isPending = true;
+    renderPage();
+
+    expect(await screen.findByText('Loading queue')).toBeVisible();
+    expect(screen.queryByText('A001')).not.toBeInTheDocument();
+    const callNext = screen.getByRole('button', { name: 'Call next' });
+    expect(callNext).toBeDisabled();
+    await user.click(callNext);
+    expect(state.callNext.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('fails the queue and call-next closed when the service catalog query errors', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(
+      'staff-service-scope:unit-1:counter-1',
+      JSON.stringify(['service-a'])
+    );
+    state.servicesQuery.data = undefined;
+    state.servicesQuery.error = new Error('Services unavailable');
+    renderPage();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Services unavailable'
+    );
+    expect(screen.queryByText('A001')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Call next' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Retry queue' }));
+    expect(state.servicesQuery.refetch).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('staff-service-scope:unit-1:counter-1')).toBe(
+      JSON.stringify(['service-a'])
+    );
+  });
+
+  it('keeps normal all-services behavior for a genuinely loaded empty catalog', async () => {
+    const user = userEvent.setup();
+    state.servicesQuery.data = [];
+    renderPage();
+
+    expect(await screen.findByText('A001')).toBeVisible();
+    expect(screen.getByText('B002')).toBeVisible();
+    const callNext = screen.getByRole('button', { name: 'Call next' });
+    expect(callNext).toBeEnabled();
+
+    await user.click(callNext);
+    expect(state.callNext.mutateAsync).toHaveBeenCalledWith({
+      counterId: 'counter-1',
+      serviceIds: undefined
+    });
+  });
+
+  it('locks call-next, every row call and break controls during a deferred row pick', async () => {
+    const user = userEvent.setup();
+    const pendingPick = deferred<void>();
+    state.pick.mutateAsync.mockReturnValueOnce(pendingPick.promise);
+    renderPage();
+
+    const rowCalls = await screen.findAllByRole('button', { name: 'Call' });
+    await user.click(rowCalls[0]);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Call next' })).toBeDisabled();
+      for (const rowCall of screen.getAllByRole('button', { name: 'Call' })) {
+        expect(rowCall).toBeDisabled();
+      }
+      expect(screen.getByRole('button', { name: 'Take break' })).toBeDisabled();
+      expect(
+        screen.getByRole('button', { name: 'Release counter' })
+      ).toBeDisabled();
+    });
+
+    await act(async () => {
+      pendingPick.resolve();
+      await pendingPick.promise;
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Call next' })).toBeEnabled()
+    );
+  });
+
   it('aligns the unzoned queue count and call-next for an unzoned counter', async () => {
     const user = userEvent.setup();
     state.counterServiceZoneId = null;
@@ -547,6 +654,24 @@ describe('StaffWorkspacePage integration', () => {
     expect(state.noShow.mutateAsync).toHaveBeenCalledWith('a001');
     expect(state.returnToQueue.mutateAsync).toHaveBeenCalledWith('a001');
     expect(screen.getByRole('dialog')).toBeVisible();
+  });
+
+  it('wires localized service and elapsed-since-call context into the active hero', async () => {
+    state.ticketsQuery.data = [
+      ticket('a001', 'called', {
+        calledAt: new Date(Date.now() - 65_000).toISOString()
+      })
+    ];
+    renderPage();
+
+    const currentTitle = await screen.findByText('Current ticket');
+    const currentCard = currentTitle.closest('[data-slot="card"]');
+    expect(currentCard).not.toBeNull();
+    const hero = within(currentCard as HTMLElement);
+    expect(hero.getByText('Service')).toBeVisible();
+    expect(hero.getByText('Payments')).toBeVisible();
+    expect(hero.getByText('Time since call')).toBeVisible();
+    expect(hero.getByText('01:05')).toBeVisible();
   });
 
   it('renders Complete primary with transfer and return secondary actions in service', async () => {

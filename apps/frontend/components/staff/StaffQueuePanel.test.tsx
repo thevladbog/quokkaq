@@ -107,6 +107,7 @@ function renderPanel(overrides: Partial<StaffQueuePanelProps> = {}) {
     },
     onScopeChange: vi.fn(),
     pickPending: false,
+    conflictingActionPending: false,
     inProgressTicketId: null,
     setInProgressTicketId: vi.fn(),
     currentTicket: undefined,
@@ -233,6 +234,10 @@ describe('StaffQueuePanel', () => {
 
   it.each([
     { name: 'a pending pick', overrides: { pickPending: true } },
+    {
+      name: 'another conflicting workstation action',
+      overrides: { conflictingActionPending: true }
+    },
     {
       name: 'another row being picked',
       overrides: { inProgressTicketId: 'ticket-in-progress' }

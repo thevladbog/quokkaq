@@ -96,7 +96,7 @@ export function StaffCurrentTransferSummary({
           type='button'
           variant='ghost'
           size='sm'
-          className='h-7 shrink-0 px-2 text-xs'
+          className='h-9 shrink-0 px-2 text-xs'
           onClick={onOpenFullTrail}
         >
           {t('visitor_context.transfer_show_all')}

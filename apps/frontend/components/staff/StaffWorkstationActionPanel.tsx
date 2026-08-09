@@ -23,6 +23,7 @@ export interface StaffWorkstationActionPanelProps {
   workstationOnBreak?: boolean;
   currentTicket: Ticket | undefined;
   waitingCount: number;
+  conflictingActionPending: boolean;
   actionError?: string | null;
   resumePending?: boolean;
   releasePending?: boolean;
@@ -48,6 +49,7 @@ export function StaffWorkstationActionPanel({
   workstationOnBreak = false,
   currentTicket,
   waitingCount,
+  conflictingActionPending,
   actionError = null,
   resumePending = false,
   releasePending = false,
@@ -78,7 +80,8 @@ export function StaffWorkstationActionPanel({
   const showRecall = Boolean(onRecall) && isCalled;
   const showTransfer = isCalled || isInService;
   const showNoShow = isCalled;
-  const isCallNextDisabled = waitingCount === 0 || callNextPending;
+  const isCallNextDisabled =
+    waitingCount === 0 || conflictingActionPending || callNextPending;
 
   return (
     <div className='border-border/60 bg-muted/20 flex flex-col gap-3 rounded-lg border p-2.5'>
@@ -103,7 +106,7 @@ export function StaffWorkstationActionPanel({
           className='h-11 w-full font-semibold'
           data-variant='primary-workflow'
           onClick={onConfirmArrival}
-          disabled={confirmArrivalPending}
+          disabled={conflictingActionPending || confirmArrivalPending}
           aria-busy={confirmArrivalPending || undefined}
         >
           <CheckCircle2 className='h-4 w-4' />
@@ -118,7 +121,7 @@ export function StaffWorkstationActionPanel({
           className='h-11 w-full font-semibold'
           data-variant='primary-workflow'
           onClick={onComplete}
-          disabled={completePending}
+          disabled={conflictingActionPending || completePending}
           aria-busy={completePending || undefined}
         >
           <CheckCircle2 className='h-4 w-4' />
@@ -133,7 +136,12 @@ export function StaffWorkstationActionPanel({
           className='h-11 w-full font-semibold'
           data-variant='primary-workflow'
           onClick={onResume}
-          disabled={!onResume || resumePending || releasePending}
+          disabled={
+            !onResume ||
+            conflictingActionPending ||
+            resumePending ||
+            releasePending
+          }
           aria-busy={resumePending || undefined}
         >
           <Play className='h-4 w-4' />
@@ -170,7 +178,7 @@ export function StaffWorkstationActionPanel({
               className='h-9 font-medium'
               title={t('actions.recall_hint')}
               onClick={onRecall}
-              disabled={recallPending}
+              disabled={conflictingActionPending || recallPending}
             >
               <PhoneCall className='h-4 w-4' />
               {recallPending
@@ -185,7 +193,7 @@ export function StaffWorkstationActionPanel({
               variant='outline'
               className='text-destructive hover:text-destructive h-9 border-red-200/80 bg-red-50/50 font-medium hover:bg-red-50 dark:border-red-900/50 dark:bg-red-950/25 dark:hover:bg-red-950/40'
               onClick={onNoShow}
-              disabled={noShowPending}
+              disabled={conflictingActionPending || noShowPending}
             >
               <Ban className='h-3.5 w-3.5' />
               {t('actions.noShow')}
@@ -199,7 +207,7 @@ export function StaffWorkstationActionPanel({
               className='h-9 font-medium'
               title={t('actions.returnToQueue_hint')}
               onClick={onReturnToQueue}
-              disabled={returnToQueuePending}
+              disabled={conflictingActionPending || returnToQueuePending}
             >
               <Undo2 className='h-4 w-4' />
               {returnToQueuePending
@@ -214,7 +222,7 @@ export function StaffWorkstationActionPanel({
               variant='outline'
               className='h-9 font-medium'
               onClick={onOpenTransfer}
-              disabled={transferPending}
+              disabled={conflictingActionPending || transferPending}
             >
               <ArrowRightLeft className='h-3.5 w-3.5' />
               {t('actions.transfer')}

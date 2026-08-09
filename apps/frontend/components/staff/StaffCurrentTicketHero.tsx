@@ -30,6 +30,7 @@ type TFn = (
 export interface StaffCurrentTicketHeroProps {
   unitId: string;
   ticket: Ticket;
+  serviceName: string;
   t: TFn;
   onShowDetails: () => void;
   transferTrail?: ClientVisitTransferEvent[];
@@ -52,6 +53,7 @@ function statusBadgeClass(status: string): string {
 export function StaffCurrentTicketHero({
   unitId,
   ticket,
+  serviceName,
   t,
   onShowDetails,
   transferTrail,
@@ -66,6 +68,7 @@ export function StaffCurrentTicketHero({
     setTagsModalSession((s) => s + 1);
     setTagsModalOpen(true);
   };
+  const isCalled = ticket.status === 'called';
   const isInService = ticket.status === 'in_service';
   const client = ticket.client;
 
@@ -83,7 +86,9 @@ export function StaffCurrentTicketHero({
   } = useTicketTimer(
     isInService
       ? ticket.confirmedAt || ticket.calledAt || undefined
-      : undefined,
+      : isCalled
+        ? ticket.calledAt || undefined
+        : undefined,
     isInService ? ticket.maxServiceTime : undefined
   );
 
@@ -216,7 +221,7 @@ export function StaffCurrentTicketHero({
                 type='button'
                 variant='outline'
                 size='sm'
-                className='mt-2 h-8'
+                className='mt-2 h-9'
                 onClick={onOpenVisitorDetails}
               >
                 <Info className='h-3.5 w-3.5' />
@@ -244,6 +249,12 @@ export function StaffCurrentTicketHero({
                 <p className='font-mono text-3xl font-bold tracking-tight tabular-nums sm:text-4xl'>
                   {ticket.queueNumber}
                 </p>
+                <div className='mt-2 max-w-md'>
+                  <div className='text-muted-foreground text-[9px] font-semibold tracking-wide uppercase'>
+                    {t('current.service')}
+                  </div>
+                  <p className='text-sm font-semibold'>{serviceName}</p>
+                </div>
               </div>
               <div className='flex flex-wrap gap-2'>
                 <div className='bg-muted/50 border-border/50 rounded-lg border px-2.5 py-1.5'>
@@ -264,19 +275,23 @@ export function StaffCurrentTicketHero({
                     </div>
                   </div>
                 )}
-                {isInService && (
+                {(isCalled || isInService) && (
                   <div
                     className={cn(
                       'rounded-lg border px-2.5 py-1.5',
-                      serviceIsOverdue
-                        ? 'border-red-500/30 bg-red-50/90 dark:bg-red-950/40'
-                        : serviceIsWarning
-                          ? 'border-yellow-500/30 bg-yellow-50/90 dark:bg-yellow-950/40'
-                          : 'border-emerald-500/30 bg-emerald-50/90 dark:bg-emerald-950/40'
+                      isCalled
+                        ? 'border-amber-500/30 bg-amber-50/90 dark:bg-amber-950/40'
+                        : serviceIsOverdue
+                          ? 'border-red-500/30 bg-red-50/90 dark:bg-red-950/40'
+                          : serviceIsWarning
+                            ? 'border-yellow-500/30 bg-yellow-50/90 dark:bg-yellow-950/40'
+                            : 'border-emerald-500/30 bg-emerald-50/90 dark:bg-emerald-950/40'
                     )}
                   >
                     <div className='text-muted-foreground text-[9px] font-semibold tracking-wide uppercase'>
-                      {t('queue.service_time')}
+                      {isCalled
+                        ? t('current.called_time')
+                        : t('queue.service_time')}
                     </div>
                     <div
                       className='font-mono text-lg font-bold tabular-nums'
@@ -289,6 +304,32 @@ export function StaffCurrentTicketHero({
                     >
                       {formatServiceTime(serviceElapsed)}
                     </div>
+                    {isInService &&
+                      ticket.maxServiceTime != null &&
+                      ticket.maxServiceTime > 0 && (
+                        <div className='text-muted-foreground text-[10px]'>
+                          {t('queue.max_label')}:{' '}
+                          {formatServiceTime(ticket.maxServiceTime)}
+                        </div>
+                      )}
+                    {isInService && (serviceIsWarning || serviceIsOverdue) && (
+                      <div
+                        className={cn(
+                          'mt-1 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold',
+                          serviceIsOverdue
+                            ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300'
+                            : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                        )}
+                        role='status'
+                      >
+                        <span>SLA</span>
+                        <span>
+                          {serviceIsOverdue
+                            ? t('queue.sla_overdue')
+                            : t('queue.sla_warning')}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

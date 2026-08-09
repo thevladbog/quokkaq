@@ -46,6 +46,7 @@ function renderPanel(
     t,
     currentTicket: undefined,
     waitingCount: 1,
+    conflictingActionPending: false,
     callNextPending: false,
     confirmArrivalPending: false,
     completePending: false,
@@ -151,6 +152,25 @@ describe('StaffWorkstationActionPanel', () => {
     await user.click(callNext);
     await user.click(callNext);
     expect(onCallNext).not.toHaveBeenCalled();
+  });
+
+  it('locks every conflicting action while preserving the pending action label', () => {
+    const { container } = renderPanel({
+      currentTicket: ticket('called'),
+      conflictingActionPending: true,
+      recallPending: true
+    });
+    const panel = within(container);
+
+    for (const name of [
+      'Start service',
+      'Processing action…',
+      'No show',
+      'Back to queue',
+      'Transfer'
+    ]) {
+      expect(panel.getByRole('button', { name })).toBeDisabled();
+    }
   });
 
   it('explains why call next is unavailable when the scoped queue is empty', () => {

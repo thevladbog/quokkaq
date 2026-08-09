@@ -34,6 +34,7 @@ import { getUnitDisplayName } from '@/lib/unit-display';
 /** Stable empty refs so React Query “no data yet” does not allocate a new [] every render (avoids effect loops on [data]). */
 const EMPTY_TICKET_LIST: Ticket[] = [];
 const EMPTY_SERVICE_LIST: Service[] = [];
+const EMPTY_SERVICE_ID_LIST: string[] = [];
 import { socketClient } from '@/lib/socket';
 import { logger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
@@ -76,7 +77,8 @@ import { formatWaitDurationSeconds } from '@/components/supervisor/supervisor-qu
 import { useLiveElapsedSecondsSince } from '@/lib/use-live-elapsed-since';
 import {
   deriveStaffQueueView,
-  summarizeServiceScope
+  summarizeServiceScope,
+  type StaffServiceScopeStatus
 } from '@/lib/staff-workstation-view';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -283,8 +285,13 @@ export default function StaffWorkspacePage({
     setVisitorDetailsOpen(false);
   }, [currentTicket?.id]);
 
-  const { data: servicesData, isPending: servicesPending } =
-    useUnitServices(unitId);
+  const {
+    data: servicesData,
+    error: servicesError,
+    isPending: servicesPending,
+    isFetching: servicesFetching,
+    refetch: refetchServices
+  } = useUnitServices(unitId);
   const services = servicesData ?? EMPTY_SERVICE_LIST;
 
   const leafServiceIds = useMemo(
@@ -296,12 +303,18 @@ export default function StaffWorkspacePage({
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[] | null>(
     null
   );
+  const [hydratedScopeStorageKey, setHydratedScopeStorageKey] = useState<
+    string | null
+  >(null);
+  const serviceCatalogReady =
+    !servicesPending && !servicesError && servicesData !== undefined;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!serviceCatalogReady) return;
     if (!leafServiceIds.length) {
-      if (servicesPending) return;
       setSelectedServiceIds([]);
+      setHydratedScopeStorageKey(scopeStorageKey);
       return;
     }
     let next = [...leafServiceIds];
@@ -321,21 +334,29 @@ export default function StaffWorkspacePage({
       /* ignore corrupt storage */
     }
     setSelectedServiceIds(next);
-  }, [unitId, counterId, scopeStorageKey, leafServiceIds, servicesPending]);
+    setHydratedScopeStorageKey(scopeStorageKey);
+  }, [scopeStorageKey, leafServiceIds, serviceCatalogReady]);
+
+  const scopeHydrated =
+    hydratedScopeStorageKey === scopeStorageKey && selectedServiceIds !== null;
 
   useEffect(() => {
     if (selectedServiceIds === null || typeof window === 'undefined') return;
-    if (servicesPending && leafServiceIds.length === 0) return;
+    if (!scopeHydrated) return;
     localStorage.setItem(scopeStorageKey, JSON.stringify(selectedServiceIds));
-  }, [
-    scopeStorageKey,
-    selectedServiceIds,
-    servicesPending,
-    leafServiceIds.length
-  ]);
+  }, [scopeStorageKey, scopeHydrated, selectedServiceIds]);
 
   const scopeForFilter =
-    selectedServiceIds === null ? leafServiceIds : selectedServiceIds;
+    scopeHydrated && selectedServiceIds
+      ? selectedServiceIds
+      : EMPTY_SERVICE_ID_LIST;
+  const serviceScopeStatus: StaffServiceScopeStatus = servicesError
+    ? 'error'
+    : servicesPending || servicesData === undefined
+      ? 'pending'
+      : scopeHydrated
+        ? 'ready'
+        : 'hydrating';
 
   const [showAllQueueTickets, setShowAllQueueTickets] = useState(false);
 
@@ -374,6 +395,7 @@ export default function StaffWorkspacePage({
     () =>
       deriveStaffQueueView({
         waitingTickets,
+        serviceScopeStatus,
         selectedServiceIds: scopeForFilter,
         allLeafServiceIds: leafServiceIds,
         onlyMyZone,
@@ -382,6 +404,7 @@ export default function StaffWorkspacePage({
       }),
     [
       waitingTickets,
+      serviceScopeStatus,
       scopeForFilter,
       leafServiceIds,
       onlyMyZone,
@@ -389,6 +412,20 @@ export default function StaffWorkspacePage({
       showAllQueueTickets
     ]
   );
+
+  const conflictingActionPending =
+    Boolean(inProgressTicketId) ||
+    callNextMutation.isPending ||
+    pickMutation.isPending ||
+    confirmArrivalMutation.isPending ||
+    completeMutation.isPending ||
+    noShowMutation.isPending ||
+    returnToQueueMutation.isPending ||
+    recallMutation.isPending ||
+    transferMutation.isPending ||
+    startBreakMutation.isPending ||
+    endBreakMutation.isPending ||
+    releaseMutation.isPending;
 
   const refetchTicketsRef = useRef(refetch);
   useEffect(() => {
@@ -496,6 +533,7 @@ export default function StaffWorkspacePage({
 
   // Actions
   const handleCallNext = async () => {
+    if (conflictingActionPending || !queueView.serviceScopeReady) return;
     setActionError(null);
     const fallbackMessage = t('messages.failed', {
       action: t('actions.callNext')
@@ -523,7 +561,7 @@ export default function StaffWorkspacePage({
   };
 
   const handleConfirmArrival = async () => {
-    if (!currentTicket) return;
+    if (!currentTicket || conflictingActionPending) return;
     setActionError(null);
     const message = t('messages.failed', {
       action: t('actions.startService')
@@ -543,7 +581,7 @@ export default function StaffWorkspacePage({
   };
 
   const handleComplete = async () => {
-    if (!currentTicket) return;
+    if (!currentTicket || conflictingActionPending) return;
     setActionError(null);
     const message = t('messages.failed', { action: t('current.complete') });
     try {
@@ -561,7 +599,7 @@ export default function StaffWorkspacePage({
   };
 
   const handleNoShow = async () => {
-    if (!currentTicket) return;
+    if (!currentTicket || conflictingActionPending) return;
     setActionError(null);
     const message = t('messages.failed', { action: t('actions.noShow') });
     try {
@@ -579,7 +617,7 @@ export default function StaffWorkspacePage({
   };
 
   const handleReturnToQueue = async () => {
-    if (!currentTicket) return;
+    if (!currentTicket || conflictingActionPending) return;
     setActionError(null);
     const message = t('messages.failed', {
       action: t('actions.returnToQueue')
@@ -604,7 +642,7 @@ export default function StaffWorkspacePage({
   };
 
   const handleRecall = async () => {
-    if (!currentTicket) return;
+    if (!currentTicket || conflictingActionPending) return;
     setActionError(null);
     const message = t('messages.failed', { action: t('actions.recall') });
     try {
@@ -671,6 +709,7 @@ export default function StaffWorkspacePage({
   }, [transferZoneId, transferMode, isTransferOpen]);
 
   const openTransferDialog = () => {
+    if (conflictingActionPending) return;
     setActionError(null);
     if (currentTicket) {
       setTransferCommentDraft(currentTicket.operatorComment ?? '');
@@ -683,7 +722,7 @@ export default function StaffWorkspacePage({
   };
 
   const handleTransfer = async () => {
-    if (!currentTicket) return;
+    if (!currentTicket || conflictingActionPending) return;
     setActionError(null);
     const failureMessage = t('messages.failed', {
       action: t('actions.transfer')
@@ -742,7 +781,7 @@ export default function StaffWorkspacePage({
   };
 
   const transferSubmitDisabled =
-    transferMutation.isPending ||
+    conflictingActionPending ||
     (transferMode === 'counter' && !transferTargetId) ||
     (transferMode === 'zone' &&
       (!transferZoneId ||
@@ -999,11 +1038,7 @@ export default function StaffWorkspacePage({
                 size='sm'
                 className='h-9'
                 onClick={() => startBreakMutation.mutate()}
-                disabled={
-                  startBreakMutation.isPending ||
-                  releaseMutation.isPending ||
-                  Boolean(currentTicket)
-                }
+                disabled={conflictingActionPending || Boolean(currentTicket)}
               >
                 {t('workstation.break')}
               </Button>
@@ -1014,7 +1049,7 @@ export default function StaffWorkspacePage({
               size='sm'
               className='h-9'
               onClick={() => releaseMutation.mutate()}
-              disabled={releaseMutation.isPending}
+              disabled={conflictingActionPending}
             >
               <LogOut className='mr-2 h-3.5 w-3.5' />
               {t('logout')}
@@ -1095,6 +1130,11 @@ export default function StaffWorkspacePage({
                 <StaffCurrentTicketHero
                   unitId={unitId}
                   ticket={currentTicket}
+                  serviceName={
+                    serviceNames[currentTicket.serviceId] ||
+                    currentTicket.serviceId ||
+                    t('queue.uncategorized')
+                  }
                   t={t}
                   onShowDetails={() => openDetails(currentTicket)}
                   transferTrail={activeVisitTransferTrail}
@@ -1117,6 +1157,7 @@ export default function StaffWorkspacePage({
                 workstationOnBreak={workstationOnBreak}
                 currentTicket={currentTicket}
                 waitingCount={queueView.scopedWaiting.length}
+                conflictingActionPending={conflictingActionPending}
                 actionError={actionError}
                 resumePending={endBreakMutation.isPending}
                 releasePending={releaseMutation.isPending}
@@ -1147,10 +1188,20 @@ export default function StaffWorkspacePage({
             counterOnBreak={workstationOnBreak}
             waitingTickets={queueView.visibleWaiting}
             scopedWaitingCount={queueView.scopedWaiting.length}
-            queuePending={ticketsPending}
-            queueRefreshing={ticketsFetching && !ticketsPending}
-            queueError={ticketsError}
-            onRetryQueue={() => void refetch()}
+            queuePending={
+              ticketsPending ||
+              serviceScopeStatus === 'pending' ||
+              serviceScopeStatus === 'hydrating'
+            }
+            queueRefreshing={
+              (ticketsFetching && !ticketsPending) ||
+              (servicesFetching && serviceScopeStatus === 'ready')
+            }
+            queueError={ticketsError ?? servicesError}
+            onRetryQueue={() => {
+              void refetch();
+              void refetchServices();
+            }}
             showAllTicketsInQueue={showAllQueueTickets}
             onShowAllTicketsInQueueChange={setShowAllQueueTickets}
             onlyMyZone={onlyMyZone}
@@ -1166,10 +1217,14 @@ export default function StaffWorkspacePage({
             scopeSummary={scopeSummary}
             onScopeChange={setSelectedServiceIds}
             pickPending={pickMutation.isPending}
+            conflictingActionPending={conflictingActionPending}
             inProgressTicketId={inProgressTicketId}
             setInProgressTicketId={setInProgressTicketId}
             currentTicket={currentTicket}
             onPickTicket={async (ticket) => {
+              if (conflictingActionPending || !queueView.serviceScopeReady) {
+                return;
+              }
               setActionError(null);
               const message = t('messages.failed', {
                 action: t('actions.call')

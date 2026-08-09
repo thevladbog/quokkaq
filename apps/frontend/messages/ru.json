@@ -2126,6 +2126,8 @@
       "transfer": "Передать",
       "noTicket": "Нет талона в обслуживании",
       "status": "Статус",
+      "service": "Услуга",
+      "called_time": "После вызова",
       "visitor_section": "Посетитель",
       "anonymous_visitor": "Без записи",
       "unknown_visitor": "Неизвестный посетитель",

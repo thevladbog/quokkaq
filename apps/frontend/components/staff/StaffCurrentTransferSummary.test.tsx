@@ -147,4 +147,14 @@ describe('StaffCurrentTransferSummary', () => {
     );
     expect(onOpenFullTrail).toHaveBeenCalledOnce();
   });
+
+  it('keeps the full-trail control at the secondary desktop target height', () => {
+    renderSummary({
+      trail: [transfer({ fromServiceNameEn: 'Payments' })]
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Show all transfers' })
+    ).toHaveClass('h-9');
+  });
 });

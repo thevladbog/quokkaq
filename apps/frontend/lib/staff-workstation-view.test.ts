@@ -30,6 +30,7 @@ describe('deriveStaffQueueView', () => {
         ticket('a', 'service-a', 'zone-1'),
         ticket('b', 'service-b', 'zone-1')
       ],
+      serviceScopeStatus: 'ready',
       selectedServiceIds: ['service-a'],
       allLeafServiceIds: ['service-a', 'service-b'],
       onlyMyZone: true,
@@ -45,6 +46,7 @@ describe('deriveStaffQueueView', () => {
   it('omits the call-next service filter when all leaf services are selected', () => {
     const result = deriveStaffQueueView({
       waitingTickets: [ticket('a', 'service-a', 'zone-1')],
+      serviceScopeStatus: 'ready',
       selectedServiceIds: ['service-a', 'service-b'],
       allLeafServiceIds: ['service-a', 'service-b'],
       onlyMyZone: false,
@@ -60,6 +62,7 @@ describe('deriveStaffQueueView', () => {
         ticket('a', 'service-a', 'zone-1'),
         ticket('b', 'service-b', 'zone-1')
       ],
+      serviceScopeStatus: 'ready',
       selectedServiceIds: ['service-a'],
       allLeafServiceIds: ['service-a', 'service-b'],
       onlyMyZone: false,
@@ -76,6 +79,7 @@ describe('deriveStaffQueueView', () => {
         ticket('other-zone', 'service-a', 'zone-2'),
         ticket('my-zone', 'service-b', 'zone-1')
       ],
+      serviceScopeStatus: 'ready',
       selectedServiceIds: ['service-a'],
       allLeafServiceIds: ['service-a', 'service-b'],
       onlyMyZone: true,
@@ -93,6 +97,7 @@ describe('deriveStaffQueueView', () => {
         ticket('unzoned', 'service-a'),
         ticket('zoned', 'service-a', 'zone-1')
       ],
+      serviceScopeStatus: 'ready',
       selectedServiceIds: ['service-a'],
       allLeafServiceIds: ['service-a', 'service-b'],
       onlyMyZone: true,
@@ -109,6 +114,7 @@ describe('deriveStaffQueueView', () => {
   it('keeps the queue unfiltered when there are no leaf services', () => {
     const result = deriveStaffQueueView({
       waitingTickets: [ticket('a', 'service-a', 'zone-1')],
+      serviceScopeStatus: 'ready',
       selectedServiceIds: [],
       allLeafServiceIds: [],
       onlyMyZone: false,
@@ -125,6 +131,7 @@ describe('deriveStaffQueueView', () => {
         ticket('late', 'service-a', 'zone-1', '2026-08-09T10:00:00.000Z'),
         ticket('early', 'service-b', 'zone-1', '2026-08-09T08:00:00.000Z')
       ],
+      serviceScopeStatus: 'ready',
       selectedServiceIds: ['service-a', 'service-b'],
       allLeafServiceIds: ['service-a', 'service-b'],
       onlyMyZone: false,
@@ -151,6 +158,7 @@ describe('deriveStaffQueueView', () => {
         ticket('a', 'service-a', 'zone-1'),
         ticket('b', 'service-b', 'zone-1')
       ],
+      serviceScopeStatus: 'ready',
       selectedServiceIds: ['service-a'],
       allLeafServiceIds: ['service-a', 'service-b'],
       onlyMyZone: true,
@@ -159,6 +167,58 @@ describe('deriveStaffQueueView', () => {
     });
 
     expect(result.visibleWaiting.map((item) => item.id)).toEqual(['a']);
+  });
+
+  it.each(['pending', 'error', 'hydrating'] as const)(
+    'fails closed while the service scope is %s',
+    (serviceScopeStatus) => {
+      const result = deriveStaffQueueView({
+        waitingTickets: [ticket('a', 'service-a', 'zone-1')],
+        serviceScopeStatus,
+        selectedServiceIds: [],
+        allLeafServiceIds: [],
+        onlyMyZone: false,
+        showAllTemporarily: true
+      });
+
+      expect(result.serviceScopeReady).toBe(false);
+      expect(result.zoneWaiting).toEqual([]);
+      expect(result.scopedWaiting).toEqual([]);
+      expect(result.visibleWaiting).toEqual([]);
+    }
+  );
+
+  it('uses a hydrated persisted selection for queue and call-next scope', () => {
+    const result = deriveStaffQueueView({
+      waitingTickets: [
+        ticket('a', 'service-a', 'zone-1'),
+        ticket('b', 'service-b', 'zone-1')
+      ],
+      serviceScopeStatus: 'ready',
+      selectedServiceIds: ['service-b'],
+      allLeafServiceIds: ['service-a', 'service-b'],
+      onlyMyZone: false,
+      showAllTemporarily: false
+    });
+
+    expect(result.serviceScopeReady).toBe(true);
+    expect(result.visibleWaiting.map((item) => item.id)).toEqual(['b']);
+    expect(result.callNextServiceIds).toEqual(['service-b']);
+  });
+
+  it('treats a genuinely loaded empty catalog as ready all-services scope', () => {
+    const result = deriveStaffQueueView({
+      waitingTickets: [ticket('a', 'legacy-service', 'zone-1')],
+      serviceScopeStatus: 'ready',
+      selectedServiceIds: [],
+      allLeafServiceIds: [],
+      onlyMyZone: false,
+      showAllTemporarily: false
+    });
+
+    expect(result.serviceScopeReady).toBe(true);
+    expect(result.visibleWaiting.map((item) => item.id)).toEqual(['a']);
+    expect(result.callNextServiceIds).toBeUndefined();
   });
 });
 

@@ -2126,6 +2126,8 @@
       "transfer": "Transfer",
       "noTicket": "No ticket being served",
       "status": "Status",
+      "service": "Service",
+      "called_time": "Time since call",
       "visitor_section": "Visitor",
       "anonymous_visitor": "Walk-in guest",
       "unknown_visitor": "Unknown visitor",
