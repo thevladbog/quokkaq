@@ -1,0 +1,85 @@
+{
+  "cases": [
+    {
+      "name": "valid station access theme tone and 56px target",
+      "expected": { "canPublish": true, "errorCodes": [] },
+      "definition": { "schemaVersion": 1, "id": "station-valid", "surface": "ticket-station", "startPageId": "services", "variants": [{ "id": "touch", "profile": { "id": "touch-profile", "name": "Touch", "width": 560, "height": 560, "interactionMode": "touch", "viewingDistance": "near", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 10, "rows": 10 } }], "pages": [{ "id": "services", "name": "Services", "widgets": [{ "id": "catalog", "type": "service-picker", "config": {}, "tone": "emphasized", "access": { "when": { "kind": "rule", "field": "live.isOpen", "operator": "is-true" }, "whenFalse": "lock" }, "actions": [] }], "layouts": { "touch": { "placements": { "catalog": { "col": 1, "row": 1, "colSpan": 1, "rowSpan": 1 } } } } }], "flowPages": { "serviceCatalogPageId": "services" }, "theme": { "preset": "legacy-kiosk", "tokens": { "header": "#123456", "surface": "#abcdef", "serviceGrid": "#Aa00fF" } } }
+    },
+    {
+      "name": "invalid boolean access condition extra value",
+      "expected": { "canPublish": false, "errorCodes": ["condition.invalid"] },
+      "definition": { "schemaVersion": 1, "id": "access-invalid", "surface": "ticket-station", "startPageId": "services", "variants": [{ "id": "touch", "profile": { "id": "touch-profile", "name": "Touch", "width": 560, "height": 560, "interactionMode": "touch", "viewingDistance": "near", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 10, "rows": 10 } }], "pages": [{ "id": "services", "name": "Services", "widgets": [{ "id": "catalog", "type": "service-picker", "config": {}, "access": { "when": { "kind": "rule", "field": "live.isOpen", "operator": "is-true", "value": true }, "whenFalse": "hide" }, "actions": [] }], "layouts": { "touch": { "placements": { "catalog": { "col": 1, "row": 1, "colSpan": 1, "rowSpan": 1 } } } } }], "flowPages": { "serviceCatalogPageId": "services" } }
+    },
+    {
+      "name": "invalid 55px touch target",
+      "expected": { "canPublish": false, "errorCodes": ["touch.target_too_small"] },
+      "definition": { "schemaVersion": 1, "id": "touch-55", "surface": "ticket-station", "startPageId": "services", "variants": [{ "id": "touch", "profile": { "id": "touch-profile", "name": "Touch", "width": 550, "height": 550, "interactionMode": "touch", "viewingDistance": "near", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 10, "rows": 10 } }], "pages": [{ "id": "services", "name": "Services", "widgets": [{ "id": "catalog", "type": "service-picker", "config": {}, "actions": [] }], "layouts": { "touch": { "placements": { "catalog": { "col": 1, "row": 1, "colSpan": 1, "rowSpan": 1 } } } } }], "flowPages": { "serviceCatalogPageId": "services" } }
+    },
+    {
+      "name": "invalid missing service catalog flow page",
+      "expected": { "canPublish": false, "errorCodes": ["flow.required_page_missing"] },
+      "definition": { "schemaVersion": 1, "id": "catalog-missing", "surface": "ticket-station", "startPageId": "services", "variants": [{ "id": "desktop", "profile": { "id": "desktop-profile", "name": "Desktop", "width": 1280, "height": 800, "interactionMode": "non-touch", "viewingDistance": "standing", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 10, "rows": 10 } }], "pages": [{ "id": "services", "name": "Services", "widgets": [{ "id": "catalog", "type": "service-picker", "config": {}, "actions": [] }], "layouts": { "desktop": { "placements": { "catalog": { "col": 1, "row": 1, "colSpan": 10, "rowSpan": 10 } } } } }] }
+    },
+    {
+      "name": "invalid automatic service picker scroll",
+      "expected": { "canPublish": false, "errorCodes": ["station.page_scroll_required"] },
+      "definition": { "schemaVersion": 1, "id": "scroll-auto", "surface": "ticket-station", "startPageId": "services", "variants": [{ "id": "desktop", "profile": { "id": "desktop-profile", "name": "Desktop", "width": 1280, "height": 800, "interactionMode": "non-touch", "viewingDistance": "standing", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 10, "rows": 10 } }], "pages": [{ "id": "services", "name": "Services", "widgets": [{ "id": "catalog", "type": "service-picker", "config": { "catalog": { "navigation": "flat", "itemCount": 5 }, "presentation": { "mode": "auto", "grid": { "rows": 2, "columns": 2 } }, "pagination": { "enabled": false, "pageSize": 4 } }, "actions": [] }], "layouts": { "desktop": { "placements": { "catalog": { "col": 1, "row": 1, "colSpan": 10, "rowSpan": 10 } } } } }], "flowPages": { "serviceCatalogPageId": "services" } }
+    },
+    {
+      "name": "invalid display surface service picker",
+      "expected": { "canPublish": false, "errorCodes": ["widget.unsupported_for_surface"] },
+      "definition": { "schemaVersion": 1, "id": "queue-picker", "surface": "queue-display", "startPageId": "queue", "variants": [{ "id": "display", "profile": { "id": "display-profile", "name": "Display", "width": 1920, "height": 1080, "interactionMode": "non-touch", "viewingDistance": "far", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 12, "rows": 12 } }], "pages": [{ "id": "queue", "name": "Queue", "widgets": [{ "id": "catalog", "type": "service-picker", "config": {}, "actions": [] }], "layouts": { "display": { "placements": { "catalog": { "col": 1, "row": 1, "colSpan": 12, "rowSpan": 12 } } } } }], "flowPages": { "serviceCatalogPageId": "queue" } }
+    },
+    {
+      "name": "valid exact runtime attract contract",
+      "expected": { "canPublish": true, "errorCodes": [] },
+      "definition": { "schemaVersion": 1, "id": "attract-valid", "surface": "ticket-station", "startPageId": "main", "variants": [{ "id": "desktop", "profile": { "id": "desktop-profile", "name": "Desktop", "width": 1280, "height": 800, "interactionMode": "non-touch", "viewingDistance": "standing", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 10, "rows": 10 } }], "pages": [{ "id": "main", "name": "Main", "widgets": [{ "id": "main-media", "type": "media", "config": {}, "actions": [] }], "layouts": { "desktop": { "placements": { "main-media": { "col": 1, "row": 1, "colSpan": 10, "rowSpan": 10 } } } } }, { "id": "attract", "name": "Attract", "widgets": [{ "id": "attract-media", "type": "media", "config": { "source": "legacy-kiosk-attract", "compatibility": { "mode": "session_then_attract", "sessionIdleBeforeWarningSec": 60, "sessionIdleCountdownSec": 10, "showAttractAfterSessionEnd": true, "attractIdleSec": 30, "showQueueDepthOnAttract": false, "signage": { "mode": "inherit" } } }, "actions": [] }], "layouts": { "desktop": { "placements": { "attract-media": { "col": 1, "row": 1, "colSpan": 10, "rowSpan": 10 } } } } }] }
+    },
+    {
+      "name": "invalid forged attract contract",
+      "expected": { "canPublish": false, "errorCodes": ["page.unreachable"] },
+      "definition": { "schemaVersion": 1, "id": "attract-forged", "surface": "ticket-station", "startPageId": "main", "variants": [{ "id": "desktop", "profile": { "id": "desktop-profile", "name": "Desktop", "width": 1280, "height": 800, "interactionMode": "non-touch", "viewingDistance": "standing", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 10, "rows": 10 } }], "pages": [{ "id": "main", "name": "Main", "widgets": [{ "id": "main-media", "type": "media", "config": {}, "actions": [] }], "layouts": { "desktop": { "placements": { "main-media": { "col": 1, "row": 1, "colSpan": 10, "rowSpan": 10 } } } } }, { "id": "attract", "name": "Attract", "widgets": [{ "id": "attract-media", "type": "media", "tone": "default", "config": { "source": "legacy-kiosk-attract", "compatibility": { "mode": "session_then_attract", "sessionIdleBeforeWarningSec": 60, "sessionIdleCountdownSec": 10, "showAttractAfterSessionEnd": true, "attractIdleSec": 30, "showQueueDepthOnAttract": false, "signage": { "mode": "inherit" } } }, "actions": [] }], "layouts": { "desktop": { "placements": { "attract-media": { "col": 1, "row": 1, "colSpan": 10, "rowSpan": 10 } } } } }] }
+    },
+    {
+      "name": "invalid strict theme tone and flow fields",
+      "expected": { "canPublish": false, "errorCodes": ["schema.invalid"] },
+      "definition": { "schemaVersion": 1, "id": "strict-invalid", "surface": "queue-display", "startPageId": "queue", "variants": [{ "id": "display", "profile": { "id": "display-profile", "name": "Display", "width": 1920, "height": 1080, "interactionMode": "non-touch", "viewingDistance": "far", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 12, "rows": 12 } }], "pages": [{ "id": "queue", "name": "Queue", "widgets": [{ "id": "clock", "type": "clock", "config": {}, "tone": "loud", "actions": [] }], "layouts": { "display": { "placements": { "clock": { "col": 1, "row": 1, "colSpan": 12, "rowSpan": 12 } } } } }], "flowPages": { "unknownPageId": "queue" }, "theme": { "preset": "legacy-kiosk", "tokens": { "header": "red", "surface": "#ffffff", "serviceGrid": "#000000", "extra": "#123456" } } }
+    },
+    {
+      "name": "valid QR service route",
+      "expected": { "canPublish": true, "errorCodes": [] },
+      "definition": { "schemaVersion": 1, "id": "route-qr-valid", "surface": "ticket-station", "startPageId": "services", "variants": [{ "id": "desktop", "profile": { "id": "desktop-profile", "name": "Desktop", "width": 1280, "height": 800, "interactionMode": "non-touch", "viewingDistance": "standing", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 10, "rows": 10 } }], "pages": [{ "id": "services", "name": "Services", "widgets": [{ "id": "catalog", "type": "service-picker", "config": { "legacyRouting": { "source": "legacy-service-routes", "canonicalSlots": ["service-info", "service-form", "identity", "confirmation", "success"], "routes": [{ "serviceId": "qr-service", "identificationMode": "qr", "slots": ["identity", "success"], "terminalActions": [{ "type": "redeem-pre-registration" }] }] } }, "actions": [] }], "layouts": { "desktop": { "placements": { "catalog": { "col": 1, "row": 1, "colSpan": 10, "rowSpan": 10 } } } } }, { "id": "identity", "name": "Identity", "widgets": [{ "id": "identify", "type": "identify", "config": {}, "actions": [] }], "layouts": { "desktop": { "placements": { "identify": { "col": 1, "row": 1, "colSpan": 10, "rowSpan": 10 } } } } }, { "id": "success", "name": "Success", "widgets": [{ "id": "ticket", "type": "ticket-success", "config": {}, "actions": [] }], "layouts": { "desktop": { "placements": { "ticket": { "col": 1, "row": 1, "colSpan": 10, "rowSpan": 10 } } } } }], "flowPages": { "serviceCatalogPageId": "services", "identityPageId": "identity", "successPageId": "success" } }
+    },
+    {
+      "name": "invalid QR terminal action",
+      "expected": { "canPublish": false, "errorCodes": ["page.unreachable", "schema.invalid"] },
+      "definition": { "schemaVersion": 1, "id": "route-qr-invalid", "surface": "ticket-station", "startPageId": "services", "variants": [{ "id": "desktop", "profile": { "id": "desktop-profile", "name": "Desktop", "width": 1280, "height": 800, "interactionMode": "non-touch", "viewingDistance": "standing", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 10, "rows": 10 } }], "pages": [{ "id": "services", "name": "Services", "widgets": [{ "id": "catalog", "type": "service-picker", "config": { "legacyRouting": { "source": "legacy-service-routes", "canonicalSlots": ["service-info", "service-form", "identity", "confirmation", "success"], "routes": [{ "serviceId": "qr-service", "identificationMode": "qr", "slots": ["identity", "success"], "terminalActions": [{ "type": "submit-ticket" }] }] } }, "actions": [] }], "layouts": { "desktop": { "placements": { "catalog": { "col": 1, "row": 1, "colSpan": 10, "rowSpan": 10 } } } } }, { "id": "identity", "name": "Identity", "widgets": [{ "id": "identify", "type": "identify", "config": {}, "actions": [] }], "layouts": { "desktop": { "placements": { "identify": { "col": 1, "row": 1, "colSpan": 10, "rowSpan": 10 } } } } }, { "id": "success", "name": "Success", "widgets": [{ "id": "ticket", "type": "ticket-success", "config": {}, "actions": [] }], "layouts": { "desktop": { "placements": { "ticket": { "col": 1, "row": 1, "colSpan": 10, "rowSpan": 10 } } } } }], "flowPages": { "serviceCatalogPageId": "services", "identityPageId": "identity", "successPageId": "success" } }
+    },
+    {
+      "name": "invalid visitor print action",
+      "expected": { "canPublish": false, "errorCodes": ["widget.unsupported_for_surface"] },
+      "definition": { "schemaVersion": 1, "id": "visitor-print", "surface": "visitor-mobile", "startPageId": "services", "variants": [{ "id": "mobile", "profile": { "id": "mobile-profile", "name": "Mobile", "width": 390, "height": 844, "interactionMode": "non-touch", "viewingDistance": "near", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 6, "rows": 12 } }], "pages": [{ "id": "services", "name": "Services", "widgets": [{ "id": "catalog", "type": "service-picker", "config": {}, "actions": [{ "type": "print-ticket" }] }], "layouts": { "mobile": { "placements": { "catalog": { "col": 1, "row": 1, "colSpan": 6, "rowSpan": 12 } } } } }], "flowPages": { "serviceCatalogPageId": "services" } }
+    },
+    {
+      "name": "valid eight variant resource boundary",
+      "expected": { "canPublish": true, "errorCodes": [] },
+      "definition": { "schemaVersion": 1, "id": "variants-eight", "surface": "queue-display", "startPageId": "queue", "variants": [
+        { "id": "v1", "profile": { "id": "p1", "name": "P1", "width": 320, "height": 320, "interactionMode": "non-touch", "viewingDistance": "far", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 1, "rows": 1 } },
+        { "id": "v2", "profile": { "id": "p2", "name": "P2", "width": 320, "height": 320, "interactionMode": "non-touch", "viewingDistance": "far", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 1, "rows": 1 } },
+        { "id": "v3", "profile": { "id": "p3", "name": "P3", "width": 320, "height": 320, "interactionMode": "non-touch", "viewingDistance": "far", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 1, "rows": 1 } },
+        { "id": "v4", "profile": { "id": "p4", "name": "P4", "width": 320, "height": 320, "interactionMode": "non-touch", "viewingDistance": "far", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 1, "rows": 1 } },
+        { "id": "v5", "profile": { "id": "p5", "name": "P5", "width": 320, "height": 320, "interactionMode": "non-touch", "viewingDistance": "far", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 1, "rows": 1 } },
+        { "id": "v6", "profile": { "id": "p6", "name": "P6", "width": 320, "height": 320, "interactionMode": "non-touch", "viewingDistance": "far", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 1, "rows": 1 } },
+        { "id": "v7", "profile": { "id": "p7", "name": "P7", "width": 320, "height": 320, "interactionMode": "non-touch", "viewingDistance": "far", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 1, "rows": 1 } },
+        { "id": "v8", "profile": { "id": "p8", "name": "P8", "width": 320, "height": 320, "interactionMode": "non-touch", "viewingDistance": "far", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 1, "rows": 1 } }
+      ], "pages": [{ "id": "queue", "name": "Queue", "widgets": [{ "id": "clock", "type": "clock", "config": {}, "actions": [] }], "layouts": {
+        "v1": { "placements": { "clock": { "col": 1, "row": 1, "colSpan": 1, "rowSpan": 1 } } }, "v2": { "placements": { "clock": { "col": 1, "row": 1, "colSpan": 1, "rowSpan": 1 } } }, "v3": { "placements": { "clock": { "col": 1, "row": 1, "colSpan": 1, "rowSpan": 1 } } }, "v4": { "placements": { "clock": { "col": 1, "row": 1, "colSpan": 1, "rowSpan": 1 } } }, "v5": { "placements": { "clock": { "col": 1, "row": 1, "colSpan": 1, "rowSpan": 1 } } }, "v6": { "placements": { "clock": { "col": 1, "row": 1, "colSpan": 1, "rowSpan": 1 } } }, "v7": { "placements": { "clock": { "col": 1, "row": 1, "colSpan": 1, "rowSpan": 1 } } }, "v8": { "placements": { "clock": { "col": 1, "row": 1, "colSpan": 1, "rowSpan": 1 } } }
+      } }] }
+    },
+    {
+      "name": "invalid nine variant resource boundary",
+      "expected": { "canPublish": false, "errorCodes": ["schema.invalid"] },
+      "definition": { "schemaVersion": 1, "id": "variants-nine", "surface": "queue-display", "startPageId": "queue", "variants": [{}, {}, {}, {}, {}, {}, {}, {}, {}], "pages": [] }
+    }
+  ]
+}

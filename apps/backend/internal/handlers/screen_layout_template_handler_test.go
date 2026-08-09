@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"quokkaq-go-backend/internal/experience"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
@@ -34,8 +35,9 @@ type screenTemplateHandlerService struct {
 	create   func(companyID, name, surface string, definition json.RawMessage) (*models.ScreenLayoutTemplate, error)
 	update   func(companyID, id, name string, definition json.RawMessage, surface *string) (*models.ScreenLayoutTemplate, error)
 	publish  func(ctx context.Context, companyID, id, publisherID string) (*models.ExperienceTemplateVersion, error)
-	versions func(ctx context.Context, companyID, id string) ([]models.ExperienceTemplateVersion, error)
+	versions func(ctx context.Context, companyID, id string, beforeVersion *int, limit int) (*models.ExperienceTemplateVersionPage, error)
 	restore  func(ctx context.Context, companyID, id, versionID, publisherID string) (*models.ExperienceTemplateVersion, error)
+	delete   func(companyID, id string) error
 }
 
 func (s screenTemplateHandlerService) List(string) ([]models.ScreenLayoutTemplate, error) {
@@ -53,18 +55,23 @@ func (s screenTemplateHandlerService) Update(companyID, id, name string, definit
 	}
 	return s.update(companyID, id, name, definition, surface)
 }
-func (s screenTemplateHandlerService) Delete(string, string) error { panic("unexpected Delete") }
+func (s screenTemplateHandlerService) Delete(companyID, id string) error {
+	if s.delete == nil {
+		panic("unexpected Delete")
+	}
+	return s.delete(companyID, id)
+}
 func (s screenTemplateHandlerService) Publish(ctx context.Context, companyID, id, publisherID string) (*models.ExperienceTemplateVersion, error) {
 	if s.publish == nil {
 		panic("unexpected Publish")
 	}
 	return s.publish(ctx, companyID, id, publisherID)
 }
-func (s screenTemplateHandlerService) ListVersions(ctx context.Context, companyID, id string) ([]models.ExperienceTemplateVersion, error) {
+func (s screenTemplateHandlerService) ListVersions(ctx context.Context, companyID, id string, beforeVersion *int, limit int) (*models.ExperienceTemplateVersionPage, error) {
 	if s.versions == nil {
 		panic("unexpected ListVersions")
 	}
-	return s.versions(ctx, companyID, id)
+	return s.versions(ctx, companyID, id, beforeVersion, limit)
 }
 func (s screenTemplateHandlerService) Restore(ctx context.Context, companyID, id, versionID, publisherID string) (*models.ExperienceTemplateVersion, error) {
 	if s.restore == nil {
@@ -130,9 +137,10 @@ func TestScreenLayoutTemplateHandler_PublishEndpointStatusContract(t *testing.T)
 
 	handler := newScreenTemplateHandlerForTest(screenTemplateHandlerService{
 		publish: func(context.Context, string, string, string) (*models.ExperienceTemplateVersion, error) {
+			publisher := "actor"
 			return &models.ExperienceTemplateVersion{
 				ID: "version-1", TemplateID: "template-a", Version: 1,
-				Definition: json.RawMessage(`{"safe":true}`), PublishedBy: "actor", PublishedAt: publishedAt,
+				Definition: json.RawMessage(`{"safe":true}`), PublishedBy: &publisher, PublishedAt: publishedAt,
 			}, nil
 		},
 	})
@@ -151,13 +159,17 @@ func TestScreenLayoutTemplateHandler_PublishEndpointStatusContract(t *testing.T)
 }
 
 func TestScreenLayoutTemplateHandler_ListAndRestoreAreTenantScoped(t *testing.T) {
-	version := models.ExperienceTemplateVersion{ID: "version-1", TemplateID: "template-a", Version: 1, Definition: json.RawMessage(`{}`), PublishedBy: "actor", PublishedAt: time.Now()}
+	publisher := "actor"
+	version := models.ExperienceTemplateVersion{ID: "version-1", TemplateID: "template-a", Version: 1, Definition: json.RawMessage(`{}`), PublishedBy: &publisher, PublishedAt: time.Now()}
 	handler := newScreenTemplateHandlerForTest(screenTemplateHandlerService{
-		versions: func(_ context.Context, companyID, id string) ([]models.ExperienceTemplateVersion, error) {
+		versions: func(_ context.Context, companyID, id string, beforeVersion *int, limit int) (*models.ExperienceTemplateVersionPage, error) {
 			if companyID != "company-a" || id != "template-a" {
 				t.Fatalf("versions scope = %q %q", companyID, id)
 			}
-			return []models.ExperienceTemplateVersion{version}, nil
+			if beforeVersion != nil || limit != 20 {
+				t.Fatalf("pagination = before %v limit %d", beforeVersion, limit)
+			}
+			return &models.ExperienceTemplateVersionPage{Items: []models.ExperienceTemplateVersionMetadata{{ID: version.ID, TemplateID: version.TemplateID, Version: version.Version, PublishedBy: version.PublishedBy, PublishedAt: version.PublishedAt}}}, nil
 		},
 		restore: func(_ context.Context, companyID, id, versionID, publisherID string) (*models.ExperienceTemplateVersion, error) {
 			if companyID != "company-a" || id != "template-a" || versionID != "version-1" || publisherID != "actor" {
@@ -171,14 +183,37 @@ func TestScreenLayoutTemplateHandler_ListAndRestoreAreTenantScoped(t *testing.T)
 	})
 
 	listRecorder := httptest.NewRecorder()
-	handler.ListVersions(listRecorder, screenTemplateRequest(http.MethodGet, "/", "actor", nil, map[string]string{"templateId": "template-a"}))
+	handler.ListVersions(listRecorder, screenTemplateRequest(http.MethodGet, "/?limit=20", "actor", nil, map[string]string{"templateId": "template-a"}))
 	if listRecorder.Code != http.StatusOK || !strings.Contains(listRecorder.Body.String(), "version-1") {
 		t.Fatalf("list response = %d %q", listRecorder.Code, listRecorder.Body.String())
+	}
+	if strings.Contains(listRecorder.Body.String(), "definition") {
+		t.Fatalf("list leaked immutable definition: %q", listRecorder.Body.String())
 	}
 	restoreRecorder := httptest.NewRecorder()
 	handler.Restore(restoreRecorder, screenTemplateRequest(http.MethodPost, "/", "actor", nil, map[string]string{"templateId": "template-a", "versionId": "version-1"}))
 	if restoreRecorder.Code != http.StatusCreated || !strings.Contains(restoreRecorder.Body.String(), "version-2") {
 		t.Fatalf("restore response = %d %q", restoreRecorder.Code, restoreRecorder.Body.String())
+	}
+}
+
+func TestScreenLayoutTemplateHandler_ListVersionsValidatesPagination(t *testing.T) {
+	called := false
+	handler := newScreenTemplateHandlerForTest(screenTemplateHandlerService{
+		versions: func(context.Context, string, string, *int, int) (*models.ExperienceTemplateVersionPage, error) {
+			called = true
+			return nil, nil
+		},
+	})
+	for _, target := range []string{"/?limit=0", "/?limit=101", "/?limit=wat", "/?beforeVersion=0", "/?beforeVersion=-1", "/?beforeVersion=wat"} {
+		t.Run(target, func(t *testing.T) {
+			called = false
+			recorder := httptest.NewRecorder()
+			handler.ListVersions(recorder, screenTemplateRequest(http.MethodGet, target, "actor", nil, map[string]string{"templateId": "template-a"}))
+			if recorder.Code != http.StatusBadRequest || called {
+				t.Fatalf("response = %d called=%v body=%q, want 400 and no service call", recorder.Code, called, recorder.Body.String())
+			}
+		})
 	}
 }
 
@@ -207,6 +242,122 @@ func TestScreenLayoutTemplateHandler_CreateAndUpdateCarrySurfaceContract(t *test
 	if updateRecorder.Code != http.StatusConflict || updateSurface == nil || *updateSurface != "ticket-station" {
 		t.Fatalf("update = %d surface=%v body=%q", updateRecorder.Code, updateSurface, updateRecorder.Body.String())
 	}
+}
+
+func TestScreenLayoutTemplateHandler_BoundsCreateAndUpdateBodies(t *testing.T) {
+	called := false
+	handler := newScreenTemplateHandlerForTest(screenTemplateHandlerService{
+		create: func(string, string, string, json.RawMessage) (*models.ScreenLayoutTemplate, error) {
+			called = true
+			return nil, nil
+		},
+		update: func(string, string, string, json.RawMessage, *string) (*models.ScreenLayoutTemplate, error) {
+			called = true
+			return nil, nil
+		},
+	})
+
+	oversizedBody := append([]byte(`{"name":"Oversized","definition":{},"padding":"`), bytes.Repeat([]byte("x"), experience.MaxDefinitionBytes+(32<<10))...)
+	oversizedBody = append(oversizedBody, []byte(`"}`)...)
+	for _, method := range []string{http.MethodPost, http.MethodPut} {
+		t.Run(method+" oversized", func(t *testing.T) {
+			called = false
+			recorder := httptest.NewRecorder()
+			params := map[string]string{}
+			if method == http.MethodPut {
+				params["templateId"] = "template-a"
+			}
+			request := screenTemplateRequest(method, "/", "actor", oversizedBody, params)
+			if method == http.MethodPost {
+				handler.Create(recorder, request)
+			} else {
+				handler.Update(recorder, request)
+			}
+			if recorder.Code != http.StatusRequestEntityTooLarge {
+				t.Fatalf("status = %d body=%q, want 413", recorder.Code, recorder.Body.String())
+			}
+			if called {
+				t.Fatal("service called for oversized body")
+			}
+		})
+	}
+
+	called = false
+	recorder := httptest.NewRecorder()
+	handler.Create(recorder, screenTemplateRequest(http.MethodPost, "/", "actor", []byte(`{"name":`), nil))
+	if recorder.Code != http.StatusBadRequest || called {
+		t.Fatalf("malformed response = %d called=%v body=%q, want 400 and no call", recorder.Code, called, recorder.Body.String())
+	}
+}
+
+func TestScreenLayoutTemplateHandler_MapsDecodedOversizedDefinitionTo413(t *testing.T) {
+	handler := newScreenTemplateHandlerForTest(screenTemplateHandlerService{
+		create: func(string, string, string, json.RawMessage) (*models.ScreenLayoutTemplate, error) {
+			return nil, services.ErrScreenLayoutTemplateDefinitionTooLarge
+		},
+	})
+	recorder := httptest.NewRecorder()
+	handler.Create(recorder, screenTemplateRequest(http.MethodPost, "/", "actor", []byte(`{"name":"Oversized","definition":{}}`), nil))
+	if recorder.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d body=%q, want 413", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestScreenLayoutTemplateHandler_DeleteAssignedReturnsStable409(t *testing.T) {
+	handler := newScreenTemplateHandlerForTest(screenTemplateHandlerService{
+		delete: func(companyID, id string) error {
+			if companyID != "company-a" || id != "template-a" {
+				t.Fatalf("delete scope = %q %q", companyID, id)
+			}
+			return services.ErrExperienceTemplateAssigned
+		},
+	})
+	recorder := httptest.NewRecorder()
+	handler.Delete(recorder, screenTemplateRequest(http.MethodDelete, "/", "actor", nil, map[string]string{"templateId": "template-a"}))
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("status = %d body=%q, want 409", recorder.Code, recorder.Body.String())
+	}
+	var response map[string]string
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response["code"] != "experience_template_assigned" || response["message"] != "experience template is assigned to a terminal" {
+		t.Fatalf("response = %#v", response)
+	}
+}
+
+func TestScreenLayoutTemplateHandler_DeleteUnassignedAndCrossTenantAreDeterministic(t *testing.T) {
+	t.Run("unassigned", func(t *testing.T) {
+		handler := newScreenTemplateHandlerForTest(screenTemplateHandlerService{
+			delete: func(companyID, id string) error {
+				if companyID != "company-a" || id != "template-a" {
+					t.Fatalf("delete scope = %q %q", companyID, id)
+				}
+				return nil
+			},
+		})
+		recorder := httptest.NewRecorder()
+		handler.Delete(recorder, screenTemplateRequest(http.MethodDelete, "/", "actor", nil, map[string]string{"templateId": "template-a"}))
+		if recorder.Code != http.StatusNoContent || recorder.Body.Len() != 0 {
+			t.Fatalf("response = %d %q, want empty 204", recorder.Code, recorder.Body.String())
+		}
+	})
+
+	t.Run("cross tenant hidden", func(t *testing.T) {
+		handler := newScreenTemplateHandlerForTest(screenTemplateHandlerService{
+			delete: func(companyID, id string) error {
+				if companyID != "company-a" || id != "template-b" {
+					t.Fatalf("delete scope = %q %q", companyID, id)
+				}
+				return gorm.ErrRecordNotFound
+			},
+		})
+		recorder := httptest.NewRecorder()
+		handler.Delete(recorder, screenTemplateRequest(http.MethodDelete, "/", "actor", nil, map[string]string{"templateId": "template-b"}))
+		if recorder.Code != http.StatusNotFound || strings.Contains(recorder.Body.String(), "template-b") || strings.Contains(recorder.Body.String(), "company") {
+			t.Fatalf("response = %d %q, want tenant-safe 404", recorder.Code, recorder.Body.String())
+		}
+	})
 }
 
 var _ repository.UserRepository = screenTemplateHandlerUserRepo{}

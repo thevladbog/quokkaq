@@ -6,13 +6,16 @@ import (
 	"errors"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/pkg/database"
 
 	glebarezsqlite "github.com/glebarez/sqlite"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -32,7 +35,8 @@ func repositoryDefinition(id, variant string) json.RawMessage {
 			"id":"start","name":"Start",
 			"widgets":[{"id":"catalog","type":"service-picker","config":{},"actions":[]}],
 			"layouts":{"` + variant + `":{"placements":{"catalog":{"col":1,"row":1,"colSpan":10,"rowSpan":10}}}}
-		}]
+		}],
+		"flowPages":{"serviceCatalogPageId":"start"}
 	}`)
 }
 
@@ -70,12 +74,12 @@ CREATE TABLE experience_template_versions (
 	template_id text NOT NULL,
 	version integer NOT NULL,
 	definition text NOT NULL,
-	published_by text NOT NULL,
+	published_by text,
 	published_at datetime NOT NULL,
 	CONSTRAINT uq_experience_template_versions_template_version UNIQUE (template_id, version),
 	CONSTRAINT uq_experience_template_versions_template_id_id UNIQUE (template_id, id),
 	CONSTRAINT fk_experience_template_versions_template FOREIGN KEY (template_id) REFERENCES screen_layout_templates(id) ON DELETE CASCADE,
-	CONSTRAINT fk_experience_template_versions_publisher FOREIGN KEY (published_by) REFERENCES users(id)
+	CONSTRAINT fk_experience_template_versions_publisher FOREIGN KEY (published_by) REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE TABLE desktop_terminals (
 	id text PRIMARY KEY,
@@ -94,7 +98,7 @@ CREATE TABLE desktop_terminals (
 	experience_ack_at datetime,
 	updated_at datetime,
 	CONSTRAINT chk_desktop_terminal_experience_assignment_pair CHECK ((experience_template_id IS NULL AND experience_variant_id IS NULL) OR (experience_template_id IS NOT NULL AND experience_variant_id IS NOT NULL)),
-	CONSTRAINT fk_desktop_terminal_experience_template FOREIGN KEY (experience_template_id) REFERENCES screen_layout_templates(id) ON DELETE SET NULL,
+	CONSTRAINT fk_desktop_terminal_experience_template FOREIGN KEY (experience_template_id) REFERENCES screen_layout_templates(id) ON DELETE RESTRICT,
 	CONSTRAINT fk_desktop_terminal_applied_experience_version FOREIGN KEY (experience_template_id, applied_template_version_id) REFERENCES experience_template_versions(template_id, id)
 );
 `).Error; err != nil {
@@ -165,15 +169,19 @@ func TestScreenLayoutTemplateRepository_PublishRestoreAreAtomicAndImmutable(t *t
 		t.Fatal("restore moved pointer to historical row instead of creating a new version")
 	}
 
-	versions, err := repo.ListVersions(ctx, "company-a", "template-a")
+	versions, err := repo.ListVersions(ctx, "company-a", "template-a", nil, 20)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(versions) != 3 || versions[0].Version != 3 || versions[1].Version != 2 || versions[2].Version != 1 {
+	if len(versions.Items) != 3 || versions.Items[0].Version != 3 || versions.Items[1].Version != 2 || versions.Items[2].Version != 1 || versions.HasMore || versions.NextBeforeVersion != nil {
 		t.Fatalf("versions = %#v", versions)
 	}
-	if string(versions[2].Definition) != string(repositoryDefinition("draft-a", "portrait")) || string(versions[1].Definition) != string(repositoryDefinition("draft-b", "portrait")) {
-		t.Fatalf("historical definitions mutated: %#v", versions)
+	var historical []models.ExperienceTemplateVersion
+	if err := db.Where("template_id = ?", "template-a").Order("version ASC").Find(&historical).Error; err != nil {
+		t.Fatal(err)
+	}
+	if string(historical[0].Definition) != string(repositoryDefinition("draft-a", "portrait")) || string(historical[1].Definition) != string(repositoryDefinition("draft-b", "portrait")) {
+		t.Fatalf("historical definitions mutated: %#v", historical)
 	}
 
 	row, err = repo.GetByIDAndCompany("template-a", "company-a")
@@ -219,8 +227,139 @@ func TestScreenLayoutTemplateRepository_TenantScopesVersionOperations(t *testing
 	if _, err := repo.Restore(ctx, "company-b", "template-a", v1.ID, "publisher"); !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatalf("cross-tenant restore error = %v, want record not found", err)
 	}
-	if versions, err := repo.ListVersions(ctx, "company-b", "template-a"); !errors.Is(err, gorm.ErrRecordNotFound) || versions != nil {
+	if versions, err := repo.ListVersions(ctx, "company-b", "template-a", nil, 20); !errors.Is(err, gorm.ErrRecordNotFound) || versions != nil {
 		t.Fatalf("cross-tenant versions = %#v, %v", versions, err)
+	}
+}
+
+func TestScreenLayoutTemplateRepository_PublisherDeletionPreservesVersion(t *testing.T) {
+	db := newExperienceRepositorySQLite(t)
+	seedExperienceRepository(t, db)
+	repo := &screenLayoutTemplateRepository{db: db}
+	version, err := repo.Publish(context.Background(), "company-a", "template-a", "publisher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version.PublishedBy == nil || *version.PublishedBy != "publisher" {
+		t.Fatalf("publisher = %v", version.PublishedBy)
+	}
+	if err := db.Exec(`DELETE FROM users WHERE id = 'publisher'`).Error; err != nil {
+		t.Fatal(err)
+	}
+	var stored models.ExperienceTemplateVersion
+	if err := db.First(&stored, "id = ?", version.ID).Error; err != nil {
+		t.Fatalf("version was not preserved: %v", err)
+	}
+	if stored.PublishedBy != nil {
+		t.Fatalf("deleted publisher remained on version: %v", stored.PublishedBy)
+	}
+
+	systemVersion, err := repo.Publish(context.Background(), "company-a", "template-a", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if systemVersion.PublishedBy != nil {
+		t.Fatalf("system publish publisher = %v, want nil", systemVersion.PublishedBy)
+	}
+}
+
+func TestScreenLayoutTemplateRepository_DeleteRejectsAssignedTemplate(t *testing.T) {
+	db := newExperienceRepositorySQLite(t)
+	seedExperienceRepository(t, db)
+	repo := &screenLayoutTemplateRepository{db: db}
+	if err := db.Model(&models.DesktopTerminal{}).Where("id = ?", "terminal-a").Updates(map[string]any{
+		"experience_template_id": "template-a",
+		"experience_variant_id":  "portrait",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repo.Delete("template-a", "company-a"); !errors.Is(err, ErrExperienceTemplateAssigned) {
+		t.Fatalf("assigned delete error = %v, want ErrExperienceTemplateAssigned", err)
+	}
+	if _, err := repo.GetByIDAndCompany("template-a", "company-a"); err != nil {
+		t.Fatalf("assigned template was deleted: %v", err)
+	}
+	if err := repo.Delete("template-unpublished", "company-a"); err != nil {
+		t.Fatalf("unassigned delete: %v", err)
+	}
+	if _, err := repo.GetByIDAndCompany("template-unpublished", "company-a"); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("unassigned template still exists: %v", err)
+	}
+	if err := repo.Delete("template-b", "company-a"); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("cross-tenant delete error = %v", err)
+	}
+	if _, err := repo.GetByIDAndCompany("template-b", "company-b"); err != nil {
+		t.Fatalf("cross-tenant template was deleted: %v", err)
+	}
+}
+
+func TestExperienceAssignmentForeignKeyViolationMapping(t *testing.T) {
+	if !isExperienceAssignmentForeignKeyViolation(&pgconn.PgError{Code: "23503", ConstraintName: "fk_desktop_terminal_experience_template"}) {
+		t.Fatal("assignment FK violation was not recognized")
+	}
+	if isExperienceAssignmentForeignKeyViolation(&pgconn.PgError{Code: "23503", ConstraintName: "some_other_fk"}) {
+		t.Fatal("unrelated FK violation was mapped to template assigned")
+	}
+}
+
+func TestScreenLayoutTemplateRepository_ListVersionsIsMetadataOnlyAndCursorPaginated(t *testing.T) {
+	db := newExperienceRepositorySQLite(t)
+	seedExperienceRepository(t, db)
+	repo := &screenLayoutTemplateRepository{db: db}
+	ctx := context.Background()
+	for version := 1; version <= 25; version++ {
+		publisher := "publisher"
+		row := models.ExperienceTemplateVersion{
+			ID: "version-" + string(rune(0x1000+version)), TemplateID: "template-a", Version: version,
+			Definition: repositoryDefinition("historical", "portrait"), PublishedBy: &publisher, PublishedAt: time.Unix(int64(version), 0).UTC(),
+		}
+		if err := db.Create(&row).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var versionQueries []string
+	if err := db.Callback().Row().After("gorm:row").Register("test:capture-version-select", func(tx *gorm.DB) {
+		sql := tx.Statement.SQL.String()
+		if strings.Contains(sql, "experience_template_versions") {
+			versionQueries = append(versionQueries, sql)
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := repo.ListVersions(ctx, "company-a", "template-a", nil, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.Items) != 10 || first.Items[0].Version != 25 || first.Items[9].Version != 16 || !first.HasMore || first.NextBeforeVersion == nil || *first.NextBeforeVersion != 16 {
+		t.Fatalf("first page = %#v", first)
+	}
+	before := *first.NextBeforeVersion
+	second, err := repo.ListVersions(ctx, "company-a", "template-a", &before, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second.Items) != 10 || second.Items[0].Version != 15 || second.Items[9].Version != 6 || !second.HasMore || second.NextBeforeVersion == nil || *second.NextBeforeVersion != 6 {
+		t.Fatalf("second page = %#v", second)
+	}
+	before = *second.NextBeforeVersion
+	last, err := repo.ListVersions(ctx, "company-a", "template-a", &before, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(last.Items) != 5 || last.Items[0].Version != 5 || last.Items[4].Version != 1 || last.HasMore || last.NextBeforeVersion != nil {
+		t.Fatalf("last page = %#v", last)
+	}
+	if len(versionQueries) == 0 {
+		t.Fatal("version history query was not captured")
+	}
+	for _, query := range versionQueries {
+		projection, _, found := strings.Cut(query, " FROM ")
+		if !found || strings.Contains(strings.ToLower(projection), "definition") || strings.Contains(projection, "*") {
+			t.Fatalf("version history selected a definition-bearing projection: %s", query)
+		}
 	}
 }
 
@@ -329,10 +468,15 @@ func TestExperienceRepository_AssignmentIsAtomicAndPublishedOnly(t *testing.T) {
 func openExperienceRepositoryPostgres(t *testing.T) *gorm.DB {
 	t.Helper()
 	dsn := os.Getenv("EXPERIENCE_REPOSITORY_POSTGRES_URL")
-	if dsn == "" {
-		t.Skip("set EXPERIENCE_REPOSITORY_POSTGRES_URL to a dedicated PostgreSQL 16+ database")
+	allowReset := os.Getenv("EXPERIENCE_REPOSITORY_POSTGRES_ALLOW_RESET") == "1"
+	if dsn == "" && os.Getenv("TASK6_POSTGRES_ALLOW_RESET") == "1" {
+		dsn = os.Getenv("TASK6_POSTGRES_URL")
+		allowReset = dsn != ""
 	}
-	if os.Getenv("EXPERIENCE_REPOSITORY_POSTGRES_ALLOW_RESET") != "1" {
+	if dsn == "" {
+		t.Skip("set EXPERIENCE_REPOSITORY_POSTGRES_URL or TASK6_POSTGRES_URL with TASK6_POSTGRES_ALLOW_RESET=1")
+	}
+	if !allowReset {
 		t.Skip("set EXPERIENCE_REPOSITORY_POSTGRES_ALLOW_RESET=1 for the dedicated database")
 	}
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
@@ -342,54 +486,11 @@ func openExperienceRepositoryPostgres(t *testing.T) *gorm.DB {
 	if err := db.Exec(`DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;`).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Exec(`
-CREATE TABLE users (id text PRIMARY KEY);
-CREATE TABLE units (id text PRIMARY KEY, company_id text NOT NULL);
-CREATE TABLE screen_layout_templates (
-	id text PRIMARY KEY,
-	company_id text NOT NULL,
-	name text NOT NULL,
-	definition jsonb NOT NULL,
-	surface text NOT NULL DEFAULT 'queue-display',
-	published_version_id text,
-	created_at timestamptz DEFAULT now(),
-	updated_at timestamptz DEFAULT now()
-);
-CREATE TABLE experience_template_versions (
-	id text PRIMARY KEY,
-	template_id text NOT NULL,
-	version integer NOT NULL,
-	definition jsonb NOT NULL,
-	published_by text NOT NULL,
-	published_at timestamptz NOT NULL DEFAULT now(),
-	CONSTRAINT uq_experience_template_versions_template_version UNIQUE (template_id, version),
-	CONSTRAINT uq_experience_template_versions_template_id_id UNIQUE (template_id, id),
-	CONSTRAINT fk_experience_template_versions_template FOREIGN KEY (template_id) REFERENCES screen_layout_templates(id) ON DELETE CASCADE,
-	CONSTRAINT fk_experience_template_versions_publisher FOREIGN KEY (published_by) REFERENCES users(id) ON DELETE RESTRICT
-);
-ALTER TABLE screen_layout_templates ADD CONSTRAINT fk_screen_layout_templates_published_version FOREIGN KEY (id, published_version_id) REFERENCES experience_template_versions(template_id, id);
-CREATE TABLE desktop_terminals (
-	id text PRIMARY KEY,
-	unit_id text NOT NULL REFERENCES units(id),
-	counter_id text,
-	kind text NOT NULL,
-	name text,
-	default_locale text NOT NULL,
-	kiosk_fullscreen boolean NOT NULL DEFAULT false,
-	experience_template_id text,
-	experience_variant_id text,
-	applied_template_version_id text,
-	applied_template_at timestamptz,
-	experience_ack_status text,
-	experience_ack_reason_code text,
-	experience_ack_at timestamptz,
-	updated_at timestamptz DEFAULT now(),
-	CONSTRAINT chk_desktop_terminal_experience_assignment_pair CHECK ((experience_template_id IS NULL AND experience_variant_id IS NULL) OR (experience_template_id IS NOT NULL AND experience_variant_id IS NOT NULL)),
-	CONSTRAINT fk_desktop_terminal_experience_template FOREIGN KEY (experience_template_id) REFERENCES screen_layout_templates(id) ON DELETE SET NULL,
-	CONSTRAINT fk_desktop_terminal_applied_experience_version FOREIGN KEY (experience_template_id, applied_template_version_id) REFERENCES experience_template_versions(template_id, id)
-);
-`).Error; err != nil {
-		t.Fatal(err)
+	previousDB := database.DB
+	database.DB = db
+	t.Cleanup(func() { database.DB = previousDB })
+	if err := database.RunVersionedMigrations(database.AllMigratableModels()...); err != nil {
+		t.Fatalf("apply real migrations: %v", err)
 	}
 	return db
 }
@@ -399,10 +500,13 @@ func TestExperienceRepository_PostgresLockingRetryAndForeignKeys(t *testing.T) {
 	repo := &screenLayoutTemplateRepository{db: db}
 	ctx := context.Background()
 	definition := repositoryDefinition("concurrent", "portrait")
-	if err := db.Exec(`INSERT INTO users (id) VALUES ('publisher')`).Error; err != nil {
+	if err := db.Exec(`INSERT INTO companies (id, name) VALUES ('company-a', 'Company A')`).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Exec(`INSERT INTO units (id, company_id) VALUES ('unit-a', 'company-a')`).Error; err != nil {
+	if err := db.Exec(`INSERT INTO users (id, name) VALUES ('publisher', 'Publisher')`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`INSERT INTO units (id, company_id, code, kind, name, timezone) VALUES ('unit-a', 'company-a', 'UNIT-A', 'subdivision', 'Unit A', 'UTC')`).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Exec(`
@@ -413,7 +517,7 @@ INSERT INTO screen_layout_templates (id, company_id, name, definition, surface) 
 `, definition, definition, definition).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Exec(`INSERT INTO desktop_terminals (id, unit_id, kind, default_locale) VALUES ('terminal-a', 'unit-a', 'kiosk', 'en')`).Error; err != nil {
+	if err := db.Exec(`INSERT INTO desktop_terminals (id, unit_id, kind, default_locale, pairing_code_digest, secret_hash) VALUES ('terminal-a', 'unit-a', 'kiosk', 'en', 'task6-terminal-digest', 'task6-secret-hash')`).Error; err != nil {
 		t.Fatal(err)
 	}
 
@@ -496,5 +600,51 @@ CREATE TRIGGER experience_publish_retry_trigger BEFORE INSERT ON experience_temp
 	}
 	if publishedAt.IsZero() {
 		t.Fatal("published version has zero published_at")
+	}
+
+	if err := db.Model(&models.DesktopTerminal{}).Where("id = ?", "terminal-a").Updates(map[string]any{
+		"experience_template_id": "template-other",
+		"experience_variant_id":  "portrait",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Delete("template-other", "company-a"); !errors.Is(err, ErrExperienceTemplateAssigned) {
+		t.Fatalf("assigned template delete error = %v", err)
+	}
+	var rawDeleteErr error
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		rawDeleteErr = tx.Exec(`DELETE FROM screen_layout_templates WHERE id = 'template-other'`).Error
+		return errors.New("rollback raw delete probe")
+	}); err == nil {
+		t.Fatal("raw delete probe did not roll back")
+	}
+	if !isExperienceAssignmentForeignKeyViolation(rawDeleteErr) {
+		t.Fatalf("assignment FK error was not mapped: %v", rawDeleteErr)
+	}
+	if err := db.Model(&models.DesktopTerminal{}).Where("id = ?", "terminal-a").Updates(map[string]any{
+		"experience_template_id": nil,
+		"experience_variant_id":  nil,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Delete("template-other", "company-a"); err != nil {
+		t.Fatalf("unassigned template delete: %v", err)
+	}
+
+	if err := db.Exec(`DELETE FROM users WHERE id = 'publisher'`).Error; err != nil {
+		t.Fatalf("delete publisher: %v", err)
+	}
+	var preserved models.ExperienceTemplateVersion
+	if err := db.First(&preserved, "id = ?", retried.ID).Error; err != nil {
+		t.Fatalf("publisher delete removed version: %v", err)
+	}
+	if preserved.PublishedBy != nil {
+		t.Fatalf("publisher delete left published_by = %v", preserved.PublishedBy)
+	}
+	if err := repo.Delete("template-retry", "company-a"); err != nil {
+		t.Fatalf("unassigned published template delete: %v", err)
+	}
+	if _, err := repo.GetByIDAndCompany("template-retry", "company-a"); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("unassigned published template still exists: %v", err)
 	}
 }

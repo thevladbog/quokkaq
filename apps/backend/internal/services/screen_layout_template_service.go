@@ -18,10 +18,11 @@ var (
 	// ErrScreenLayoutTemplatePlanDenied is returned when the subscription plan disables custom screen layouts.
 	ErrScreenLayoutTemplatePlanDenied = errors.New("custom screen layouts are not enabled for this plan")
 	// ErrScreenLayoutTemplateInvalidDefinition is returned when definition JSON is empty or not an object.
-	ErrScreenLayoutTemplateInvalidDefinition = errors.New("invalid template definition")
-	ErrScreenLayoutTemplateInvalidSurface    = errors.New("invalid template surface")
-	ErrScreenLayoutTemplateSurfaceImmutable  = errors.New("template surface is immutable")
-	ErrScreenLayoutTemplateSurfaceMismatch   = errors.New("definition surface does not match template surface")
+	ErrScreenLayoutTemplateInvalidDefinition  = errors.New("invalid template definition")
+	ErrScreenLayoutTemplateDefinitionTooLarge = errors.New("template definition too large")
+	ErrScreenLayoutTemplateInvalidSurface     = errors.New("invalid template surface")
+	ErrScreenLayoutTemplateSurfaceImmutable   = errors.New("template surface is immutable")
+	ErrScreenLayoutTemplateSurfaceMismatch    = errors.New("definition surface does not match template surface")
 
 	ErrExperienceVersionConflict            = repository.ErrExperienceVersionConflict
 	ErrExperienceAssignmentIncomplete       = repository.ErrExperienceAssignmentIncomplete
@@ -30,6 +31,13 @@ var (
 	ErrExperienceVariantNotFound            = repository.ErrExperienceVariantNotFound
 	ErrExperiencePublishedDefinitionInvalid = repository.ErrExperiencePublishedDefinitionInvalid
 	ErrExperienceTemplateNotFound           = errors.New("experience template not found")
+	ErrExperienceVersionPaginationInvalid   = repository.ErrExperienceVersionPaginationInvalid
+	ErrExperienceTemplateAssigned           = repository.ErrExperienceTemplateAssigned
+)
+
+const (
+	DefaultExperienceVersionPageSize = 20
+	MaxExperienceVersionPageSize     = 100
 )
 
 // ScreenLayoutTemplateService manages tenant screen layout templates.
@@ -58,6 +66,9 @@ func parseExperienceSurface(surface string, allowCreateDefault bool) (string, er
 }
 
 func validateDraftObject(definition json.RawMessage) error {
+	if len(definition) > experience.MaxDefinitionBytes {
+		return ErrScreenLayoutTemplateDefinitionTooLarge
+	}
 	if len(definition) == 0 || !json.Valid(definition) {
 		return ErrScreenLayoutTemplateInvalidDefinition
 	}
@@ -118,13 +129,16 @@ func (s *ScreenLayoutTemplateService) Update(companyID, id, name string, definit
 	if err := requireCustomScreenLayoutsPlan(companyID); err != nil {
 		return nil, err
 	}
-	existing, err := s.repo.GetByIDAndCompany(id, companyID)
-	if err != nil {
-		return nil, err
-	}
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, errors.New("name required")
+	}
+	if err := validateDraftObject(definition); err != nil {
+		return nil, err
+	}
+	existing, err := s.repo.GetByIDAndCompany(id, companyID)
+	if err != nil {
+		return nil, err
 	}
 	if surface != nil {
 		normalized, surfaceErr := parseExperienceSurface(*surface, false)
@@ -134,9 +148,6 @@ func (s *ScreenLayoutTemplateService) Update(companyID, id, name string, definit
 		if normalized != existing.Surface {
 			return nil, ErrScreenLayoutTemplateSurfaceImmutable
 		}
-	}
-	if err := validateDraftObject(definition); err != nil {
-		return nil, err
 	}
 	if err := validateDeclaredSurface(definition, existing.Surface); err != nil {
 		return nil, err
@@ -169,8 +180,14 @@ func (s *ScreenLayoutTemplateService) Publish(ctx context.Context, companyID, te
 	return version, mapExperiencePublishError(err)
 }
 
-func (s *ScreenLayoutTemplateService) ListVersions(ctx context.Context, companyID, templateID string) ([]models.ExperienceTemplateVersion, error) {
-	return s.repo.ListVersions(ctx, companyID, templateID)
+func (s *ScreenLayoutTemplateService) ListVersions(ctx context.Context, companyID, templateID string, beforeVersion *int, limit int) (*models.ExperienceTemplateVersionPage, error) {
+	if limit == 0 {
+		limit = DefaultExperienceVersionPageSize
+	}
+	if limit < 1 || limit > MaxExperienceVersionPageSize || (beforeVersion != nil && *beforeVersion < 1) {
+		return nil, ErrExperienceVersionPaginationInvalid
+	}
+	return s.repo.ListVersions(ctx, companyID, templateID, beforeVersion, limit)
 }
 
 // Restore copies an owned immutable historical definition into a new latest version.

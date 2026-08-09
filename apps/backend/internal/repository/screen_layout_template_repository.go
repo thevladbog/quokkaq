@@ -23,6 +23,8 @@ var (
 	ErrExperienceTemplateUnpublished        = errors.New("experience template has no published version")
 	ErrExperienceVariantNotFound            = errors.New("experience variant does not exist in the published definition")
 	ErrExperiencePublishedDefinitionInvalid = errors.New("published experience definition is invalid")
+	ErrExperienceVersionPaginationInvalid   = errors.New("invalid experience version pagination")
+	ErrExperienceTemplateAssigned           = errors.New("experience template is assigned to a terminal")
 )
 
 // TerminalExperienceAssignment preserves omitted-vs-explicit assignment semantics.
@@ -41,7 +43,7 @@ type ScreenLayoutTemplateRepository interface {
 	Update(row *models.ScreenLayoutTemplate) error
 	Delete(id, companyID string) error
 	Publish(ctx context.Context, companyID, templateID, publisherID string) (*models.ExperienceTemplateVersion, error)
-	ListVersions(ctx context.Context, companyID, templateID string) ([]models.ExperienceTemplateVersion, error)
+	ListVersions(ctx context.Context, companyID, templateID string, beforeVersion *int, limit int) (*models.ExperienceTemplateVersionPage, error)
 	Restore(ctx context.Context, companyID, templateID, sourceVersionID, publisherID string) (*models.ExperienceTemplateVersion, error)
 	GetPublishedVersion(ctx context.Context, companyID, templateID string) (*models.ExperienceTemplateVersion, error)
 	ResolveTerminalPublishedVersion(ctx context.Context, companyID, terminalID string) (*models.ExperienceTemplateVersion, string, error)
@@ -104,14 +106,43 @@ func (r *screenLayoutTemplateRepository) Update(row *models.ScreenLayoutTemplate
 }
 
 func (r *screenLayoutTemplateRepository) Delete(id, companyID string) error {
-	res := r.db.Where("id = ? AND company_id = ?", id, companyID).Delete(&models.ScreenLayoutTemplate{})
-	if res.Error != nil {
-		return res.Error
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		var template models.ScreenLayoutTemplate
+		if err := tx.Select("id").Where("id = ? AND company_id = ?", id, companyID).First(&template).Error; err != nil {
+			return err
+		}
+		var assigned int64
+		if err := tx.Model(&models.DesktopTerminal{}).Where("experience_template_id = ?", template.ID).Count(&assigned).Error; err != nil {
+			return err
+		}
+		if assigned > 0 {
+			return ErrExperienceTemplateAssigned
+		}
+		result := tx.Where("id = ? AND company_id = ?", template.ID, companyID).Delete(&models.ScreenLayoutTemplate{})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return gorm.ErrRecordNotFound
+		}
+		return nil
+	})
+	if isExperienceAssignmentForeignKeyViolation(err) {
+		return ErrExperienceTemplateAssigned
 	}
-	if res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
+	return err
+}
+
+func isExperienceAssignmentForeignKeyViolation(err error) bool {
+	if err == nil {
+		return false
 	}
-	return nil
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23503" && pgErr.ConstraintName == "fk_desktop_terminal_experience_template"
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "foreign key constraint failed") && strings.Contains(message, "desktop")
 }
 
 func isUniqueViolation(err error) bool {
@@ -164,12 +195,17 @@ func (r *screenLayoutTemplateRepository) createPublishedVersion(ctx context.Cont
 				Scan(&maxVersion).Error; err != nil {
 				return err
 			}
+			var publisher *string
+			if strings.TrimSpace(publisherID) != "" {
+				publisherValue := publisherID
+				publisher = &publisherValue
+			}
 			created = models.ExperienceTemplateVersion{
 				ID:          uuid.NewString(),
 				TemplateID:  template.ID,
 				Version:     maxVersion + 1,
 				Definition:  append([]byte(nil), definition...),
-				PublishedBy: publisherID,
+				PublishedBy: publisher,
 				PublishedAt: time.Now().UTC(),
 			}
 			if err := tx.Create(&created).Error; err != nil {
@@ -202,16 +238,35 @@ func (r *screenLayoutTemplateRepository) createPublishedVersion(ctx context.Cont
 	return nil, ErrExperienceVersionConflict
 }
 
-func (r *screenLayoutTemplateRepository) ListVersions(ctx context.Context, companyID, templateID string) ([]models.ExperienceTemplateVersion, error) {
+func (r *screenLayoutTemplateRepository) ListVersions(ctx context.Context, companyID, templateID string, beforeVersion *int, limit int) (*models.ExperienceTemplateVersionPage, error) {
+	if limit < 1 || limit > 100 || (beforeVersion != nil && *beforeVersion < 1) {
+		return nil, ErrExperienceVersionPaginationInvalid
+	}
 	var template models.ScreenLayoutTemplate
 	if err := r.db.WithContext(ctx).Select("id").Where("id = ? AND company_id = ?", templateID, companyID).First(&template).Error; err != nil {
 		return nil, err
 	}
-	var versions []models.ExperienceTemplateVersion
-	if err := r.db.WithContext(ctx).Where("template_id = ?", template.ID).Order("version DESC").Find(&versions).Error; err != nil {
+	versions := make([]models.ExperienceTemplateVersionMetadata, 0, limit+1)
+	query := r.db.WithContext(ctx).
+		Table("experience_template_versions").
+		Select("id", "template_id", "version", "published_by", "published_at").
+		Where("template_id = ?", template.ID)
+	if beforeVersion != nil {
+		query = query.Where("version < ?", *beforeVersion)
+	}
+	if err := query.Order("version DESC").Limit(limit + 1).Scan(&versions).Error; err != nil {
 		return nil, err
 	}
-	return versions, nil
+	hasMore := len(versions) > limit
+	if hasMore {
+		versions = versions[:limit]
+	}
+	page := &models.ExperienceTemplateVersionPage{Items: versions, HasMore: hasMore}
+	if hasMore && len(versions) > 0 {
+		next := versions[len(versions)-1].Version
+		page.NextBeforeVersion = &next
+	}
+	return page, nil
 }
 
 func (r *screenLayoutTemplateRepository) GetPublishedVersion(ctx context.Context, companyID, templateID string) (*models.ExperienceTemplateVersion, error) {

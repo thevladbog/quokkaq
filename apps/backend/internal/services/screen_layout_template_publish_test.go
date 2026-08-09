@@ -1,11 +1,13 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"testing"
 
+	"quokkaq-go-backend/internal/experience"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/pkg/database"
@@ -14,6 +16,26 @@ import (
 	"gorm.io/gorm"
 )
 
+type countingScreenLayoutTemplateRepository struct {
+	repository.ScreenLayoutTemplateRepository
+	calls int
+}
+
+func (r *countingScreenLayoutTemplateRepository) GetByIDAndCompany(id, companyID string) (*models.ScreenLayoutTemplate, error) {
+	r.calls++
+	return r.ScreenLayoutTemplateRepository.GetByIDAndCompany(id, companyID)
+}
+
+func (r *countingScreenLayoutTemplateRepository) Create(row *models.ScreenLayoutTemplate) error {
+	r.calls++
+	return r.ScreenLayoutTemplateRepository.Create(row)
+}
+
+func (r *countingScreenLayoutTemplateRepository) Update(row *models.ScreenLayoutTemplate) error {
+	r.calls++
+	return r.ScreenLayoutTemplateRepository.Update(row)
+}
+
 func serviceExperienceDefinition(id, variant string) json.RawMessage {
 	return json.RawMessage(`{
 		"schemaVersion":1,
@@ -21,7 +43,8 @@ func serviceExperienceDefinition(id, variant string) json.RawMessage {
 		"surface":"ticket-station",
 		"startPageId":"start",
 		"variants":[{"id":"` + variant + `","profile":{"id":"profile","name":"Profile","width":820,"height":1180,"interactionMode":"touch","viewingDistance":"near","safeArea":{"top":0,"right":0,"bottom":0,"left":0}},"grid":{"columns":10,"rows":10}}],
-		"pages":[{"id":"start","name":"Start","widgets":[{"id":"catalog","type":"service-picker","config":{},"actions":[]}],"layouts":{"` + variant + `":{"placements":{"catalog":{"col":1,"row":1,"colSpan":10,"rowSpan":10}}}}}]
+		"pages":[{"id":"start","name":"Start","widgets":[{"id":"catalog","type":"service-picker","config":{},"actions":[]}],"layouts":{"` + variant + `":{"placements":{"catalog":{"col":1,"row":1,"colSpan":10,"rowSpan":10}}}}}],
+		"flowPages":{"serviceCatalogPageId":"start"}
 	}`)
 }
 
@@ -55,7 +78,7 @@ CREATE TABLE experience_template_versions (
 	template_id text NOT NULL,
 	version integer NOT NULL,
 	definition text NOT NULL,
-	published_by text NOT NULL,
+	published_by text,
 	published_at datetime NOT NULL,
 	UNIQUE (template_id, version)
 );
@@ -199,5 +222,54 @@ func TestScreenLayoutTemplateService_PublishMapsValidationAndConflictErrors(t *t
 	}
 	if _, err := svc.Publish(context.Background(), "company-a", "template-a", "publisher"); !errors.Is(err, ErrScreenLayoutTemplateInvalidDefinition) {
 		t.Fatalf("invalid publish error = %v", err)
+	}
+}
+
+func TestScreenLayoutTemplateService_RejectsOversizedDraftBeforeRepositoryCall(t *testing.T) {
+	_, repositoryUnderTest, db := newScreenLayoutTemplateServiceTest(t)
+	spy := &countingScreenLayoutTemplateRepository{ScreenLayoutTemplateRepository: repositoryUnderTest}
+	svc := NewScreenLayoutTemplateService(spy)
+	oversized := json.RawMessage(append(append([]byte(`{"padding":"`), bytes.Repeat([]byte("x"), experience.MaxDefinitionBytes)...), []byte(`"}`)...))
+
+	if _, err := svc.Create("company-a", "Oversized", "queue-display", oversized); !errors.Is(err, ErrScreenLayoutTemplateDefinitionTooLarge) {
+		t.Fatalf("Create error = %v, want ErrScreenLayoutTemplateDefinitionTooLarge", err)
+	}
+	if spy.calls != 0 {
+		t.Fatalf("Create repository calls = %d, want 0", spy.calls)
+	}
+
+	if _, err := svc.Update("company-a", "template-a", "Oversized", oversized, nil); !errors.Is(err, ErrScreenLayoutTemplateDefinitionTooLarge) {
+		t.Fatalf("Update error = %v, want ErrScreenLayoutTemplateDefinitionTooLarge", err)
+	}
+	if spy.calls != 0 {
+		t.Fatalf("Update repository calls = %d, want 0", spy.calls)
+	}
+
+	var stored string
+	if err := db.Model(&models.ScreenLayoutTemplate{}).Select("definition").Where("id = ?", "template-a").Scan(&stored).Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored == string(oversized) {
+		t.Fatal("oversized definition was stored")
+	}
+}
+
+func TestScreenLayoutTemplateService_DeleteMapsAssignedTemplate(t *testing.T) {
+	svc, _, db := newScreenLayoutTemplateServiceTest(t)
+	if err := db.Model(&models.DesktopTerminal{}).Where("id = ?", "terminal-a").Updates(map[string]any{
+		"experience_template_id": "template-a",
+		"experience_variant_id":  "portrait",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Delete("company-a", "template-a"); !errors.Is(err, ErrExperienceTemplateAssigned) {
+		t.Fatalf("Delete error = %v, want ErrExperienceTemplateAssigned", err)
+	}
+	var count int64
+	if err := db.Model(&models.ScreenLayoutTemplate{}).Where("id = ?", "template-a").Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("assigned template count = %d, want 1", count)
 	}
 }

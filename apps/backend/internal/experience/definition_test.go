@@ -3,6 +3,7 @@ package experience
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -54,6 +55,7 @@ func validDefinition(t *testing.T, surface string) map[string]any {
 				},
 			},
 		},
+		"flowPages": map[string]any{"serviceCatalogPageId": "start"},
 	}
 }
 
@@ -117,9 +119,20 @@ func TestExperienceDefinitionValidator_RejectsEnvelopeViolations(t *testing.T) {
 		{name: "unknown surface", mutate: func(v map[string]any) { v["surface"] = "tablet" }, code: CodeSchemaInvalid},
 		{name: "surface mismatch", surface: SurfaceQueueDisplay, code: CodeSchemaInvalid},
 		{name: "zero variants", mutate: func(v map[string]any) { v["variants"] = []any{} }, code: CodeSchemaInvalid},
-		{name: "more than two variants", mutate: func(v map[string]any) {
+		{name: "more than eight variants", mutate: func(v map[string]any) {
 			variants := v["variants"].([]any)
-			v["variants"] = append(variants, variants[0], variants[0])
+			for len(variants) <= 8 {
+				clone := map[string]any{
+					"id": "variant-" + string(rune('a'+len(variants))),
+					"profile": map[string]any{
+						"id": "profile-" + string(rune('a'+len(variants))), "name": "Profile", "width": 820, "height": 1180,
+						"interactionMode": "touch", "viewingDistance": "near", "safeArea": map[string]any{"top": 0, "right": 0, "bottom": 0, "left": 0},
+					},
+					"grid": map[string]any{"columns": 10, "rows": 10},
+				}
+				variants = append(variants, clone)
+			}
+			v["variants"] = variants
 		}, code: CodeSchemaInvalid},
 		{name: "empty pages", mutate: func(v map[string]any) { v["pages"] = []any{} }, code: CodeSchemaInvalid},
 		{name: "missing start page", mutate: func(v map[string]any) { v["startPageId"] = "missing" }, code: CodePageStartMissing},
@@ -142,6 +155,289 @@ func TestExperienceDefinitionValidator_RejectsEnvelopeViolations(t *testing.T) {
 			requireValidationCode(t, validationCodes(t, raw, surface), tt.code)
 		})
 	}
+}
+
+func TestExperienceDefinitionValidator_ValidatesCanonicalSchemaFields(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(map[string]any)
+		code   string
+	}{
+		{
+			name: "missing required profile safe area",
+			mutate: func(v map[string]any) {
+				profile := v["variants"].([]any)[0].(map[string]any)["profile"].(map[string]any)
+				delete(profile, "safeArea")
+			},
+			code: CodeSchemaInvalid,
+		},
+		{
+			name: "invalid widget tone",
+			mutate: func(v map[string]any) {
+				v["pages"].([]any)[0].(map[string]any)["widgets"].([]any)[0].(map[string]any)["tone"] = "loud"
+			},
+			code: CodeSchemaInvalid,
+		},
+		{
+			name: "invalid typography scale",
+			mutate: func(v map[string]any) {
+				v["pages"].([]any)[0].(map[string]any)["layouts"].(map[string]any)["portrait"].(map[string]any)["typographyScale"] = 2.01
+			},
+			code: CodeSchemaInvalid,
+		},
+		{
+			name: "strict theme tokens",
+			mutate: func(v map[string]any) {
+				v["theme"] = map[string]any{
+					"preset": "legacy-kiosk",
+					"tokens": map[string]any{"header": "#ffffff", "surface": "#000000", "serviceGrid": "#123456", "unknown": "#abcdef"},
+				}
+			},
+			code: CodeSchemaInvalid,
+		},
+		{
+			name: "strict flow page fields",
+			mutate: func(v map[string]any) {
+				v["flowPages"].(map[string]any)["unknownPageId"] = "start"
+			},
+			code: CodeSchemaInvalid,
+		},
+		{
+			name: "positive drawable safe area",
+			mutate: func(v map[string]any) {
+				profile := v["variants"].([]any)[0].(map[string]any)["profile"].(map[string]any)
+				profile["safeArea"] = map[string]any{"top": 590, "right": 410, "bottom": 590, "left": 410}
+			},
+			code: CodeSchemaInvalid,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			definition := validDefinition(t, SurfaceTicketStation)
+			tt.mutate(definition)
+			requireValidationCode(t, validationCodes(t, marshalDefinition(t, definition), SurfaceTicketStation), tt.code)
+		})
+	}
+}
+
+func TestExperienceDefinitionValidator_ValidatesCanonicalAccessConditions(t *testing.T) {
+	validRules := []map[string]any{
+		{"kind": "rule", "field": "identity.isAuthenticated", "operator": "is-false"},
+		{"kind": "rule", "field": "identity.groups", "operator": "contains", "value": "staff"},
+		{"kind": "rule", "field": "live.queueLength", "operator": "gte", "value": 4.5},
+		{"kind": "rule", "field": "session.selectedServiceId", "operator": "eq", "value": "service-1"},
+	}
+	for index, rule := range validRules {
+		definition := validDefinition(t, SurfaceTicketStation)
+		widget := definition["pages"].([]any)[0].(map[string]any)["widgets"].([]any)[0].(map[string]any)
+		widget["access"] = map[string]any{"when": rule, "whenFalse": "lock"}
+		if err := ValidateDefinition(marshalDefinition(t, definition), SurfaceTicketStation); err != nil {
+			t.Fatalf("valid access rule %d rejected: %v", index, err)
+		}
+	}
+
+	tests := []struct {
+		name   string
+		access any
+		page   bool
+	}{
+		{name: "boolean rule has value", access: map[string]any{"when": map[string]any{"kind": "rule", "field": "live.isOpen", "operator": "is-true", "value": true}, "whenFalse": "hide"}},
+		{name: "groups rule missing value", access: map[string]any{"when": map[string]any{"kind": "rule", "field": "identity.groups", "operator": "contains"}, "whenFalse": "hide"}},
+		{name: "queue rule string value", access: map[string]any{"when": map[string]any{"kind": "rule", "field": "live.queueLength", "operator": "gt", "value": "4"}, "whenFalse": "hide"}},
+		{name: "selected service empty value", access: map[string]any{"when": map[string]any{"kind": "rule", "field": "session.selectedServiceId", "operator": "eq", "value": ""}, "whenFalse": "hide"}},
+		{name: "group empty children", access: map[string]any{"when": map[string]any{"kind": "group", "combinator": "and", "children": []any{}}, "whenFalse": "hide"}},
+		{name: "unknown condition field", access: map[string]any{"when": map[string]any{"kind": "rule", "field": "visitor.phone", "operator": "eq", "value": "secret"}, "whenFalse": "hide"}},
+		{name: "strict access unknown field", access: map[string]any{"when": map[string]any{"kind": "rule", "field": "live.isOpen", "operator": "is-true"}, "whenFalse": "hide", "unknown": true}},
+		{name: "page cannot lock", access: map[string]any{"when": map[string]any{"kind": "rule", "field": "live.isOpen", "operator": "is-true"}, "whenFalse": "lock"}, page: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			definition := validDefinition(t, SurfaceTicketStation)
+			page := definition["pages"].([]any)[0].(map[string]any)
+			if tt.page {
+				page["access"] = tt.access
+			} else {
+				page["widgets"].([]any)[0].(map[string]any)["access"] = tt.access
+			}
+			requireValidationCode(t, validationCodes(t, marshalDefinition(t, definition), SurfaceTicketStation), "condition.invalid")
+		})
+	}
+}
+
+func TestExperienceDefinitionValidator_ConditionNodeBoundary(t *testing.T) {
+	condition := func(nodes int) any {
+		var current any = map[string]any{"kind": "rule", "field": "live.isOpen", "operator": "is-true"}
+		for index := 1; index < nodes; index++ {
+			current = map[string]any{"kind": "group", "combinator": "and", "children": []any{current}}
+		}
+		return current
+	}
+
+	definition := validDefinition(t, SurfaceTicketStation)
+	widget := definition["pages"].([]any)[0].(map[string]any)["widgets"].([]any)[0].(map[string]any)
+	widget["access"] = map[string]any{"when": condition(100), "whenFalse": "hide"}
+	if err := ValidateDefinition(marshalDefinition(t, definition), SurfaceTicketStation); err != nil {
+		t.Fatalf("100 condition nodes rejected: %v", err)
+	}
+	widget["access"] = map[string]any{"when": condition(101), "whenFalse": "hide"}
+	requireValidationCode(t, validationCodes(t, marshalDefinition(t, definition), SurfaceTicketStation), CodeSchemaInvalid)
+}
+
+func TestExperienceDefinitionValidator_RequiresCanonicalFlowRoles(t *testing.T) {
+	tests := []struct {
+		name       string
+		widgetType string
+		config     map[string]any
+		flowRole   string
+	}{
+		{name: "service picker", widgetType: "service-picker", config: map[string]any{}, flowRole: "serviceCatalogPageId"},
+		{name: "ticket form", widgetType: "ticket-form", config: map[string]any{}, flowRole: "serviceFormPageId"},
+		{name: "appointment ticket form", widgetType: "ticket-form", config: map[string]any{"mode": "appointment-checkin"}, flowRole: "appointmentPageId"},
+		{name: "identify", widgetType: "identify", config: map[string]any{}, flowRole: "identityPageId"},
+		{name: "ticket success", widgetType: "ticket-success", config: map[string]any{}, flowRole: "successPageId"},
+		{name: "rich info slot", widgetType: "rich-info", config: map[string]any{"slot": "confirmation"}, flowRole: "confirmationPageId"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			definition := validDefinition(t, SurfaceTicketStation)
+			widget := definition["pages"].([]any)[0].(map[string]any)["widgets"].([]any)[0].(map[string]any)
+			widget["type"] = tt.widgetType
+			widget["config"] = tt.config
+			delete(definition["flowPages"].(map[string]any), tt.flowRole)
+			requireValidationCode(t, validationCodes(t, marshalDefinition(t, definition), SurfaceTicketStation), CodeFlowRequiredPageMissing)
+		})
+	}
+}
+
+func TestExperienceDefinitionValidator_EnforcesTouchTargetsAndStationNoScroll(t *testing.T) {
+	definition := validDefinition(t, SurfaceTicketStation)
+	variant := definition["variants"].([]any)[0].(map[string]any)
+	profile := variant["profile"].(map[string]any)
+	profile["width"] = 550
+	profile["height"] = 550
+	placement := definition["pages"].([]any)[0].(map[string]any)["layouts"].(map[string]any)["portrait"].(map[string]any)["placements"].(map[string]any)["catalog"].(map[string]any)
+	placement["colSpan"] = 1
+	placement["rowSpan"] = 1
+	requireValidationCode(t, validationCodes(t, marshalDefinition(t, definition), SurfaceTicketStation), "touch.target_too_small")
+
+	profile["width"] = 560
+	profile["height"] = 560
+	if err := ValidateDefinition(marshalDefinition(t, definition), SurfaceTicketStation); err != nil {
+		t.Fatalf("56px touch target rejected: %v", err)
+	}
+
+	widget := definition["pages"].([]any)[0].(map[string]any)["widgets"].([]any)[0].(map[string]any)
+	widget["config"] = map[string]any{
+		"catalog":      map[string]any{"navigation": "flat", "itemCount": 5},
+		"presentation": map[string]any{"mode": "auto", "grid": map[string]any{"rows": 2, "columns": 2}},
+		"pagination":   map[string]any{"enabled": false},
+	}
+	requireValidationCode(t, validationCodes(t, marshalDefinition(t, definition), SurfaceTicketStation), "station.page_scroll_required")
+
+	widget["config"] = map[string]any{
+		"presentation": map[string]any{
+			"mode": "manual", "grid": map[string]any{"rows": 2, "columns": 2}, "coordinateBase": "one-based",
+			"placements": []any{map[string]any{"serviceId": "outside", "row": 2, "col": 2, "rowSpan": 2, "colSpan": 1}},
+		},
+	}
+	requireValidationCode(t, validationCodes(t, marshalDefinition(t, definition), SurfaceTicketStation), "station.page_scroll_required")
+}
+
+func TestExperienceDefinitionValidator_ResourceBoundaries(t *testing.T) {
+	t.Run("actions", func(t *testing.T) {
+		definition := validDefinition(t, SurfaceTicketStation)
+		widget := definition["pages"].([]any)[0].(map[string]any)["widgets"].([]any)[0].(map[string]any)
+		widget["actions"] = make([]any, 21)
+		requireValidationCode(t, validationCodes(t, marshalDefinition(t, definition), SurfaceTicketStation), CodeSchemaInvalid)
+	})
+
+	t.Run("pages", func(t *testing.T) {
+		definition := validDefinition(t, SurfaceTicketStation)
+		definition["pages"] = make([]any, 101)
+		requireValidationCode(t, validationCodes(t, marshalDefinition(t, definition), SurfaceTicketStation), CodeSchemaInvalid)
+	})
+
+	t.Run("widgets", func(t *testing.T) {
+		definition := validDefinition(t, SurfaceTicketStation)
+		definition["pages"].([]any)[0].(map[string]any)["widgets"] = make([]any, 201)
+		requireValidationCode(t, validationCodes(t, marshalDefinition(t, definition), SurfaceTicketStation), CodeSchemaInvalid)
+	})
+
+	t.Run("placements", func(t *testing.T) {
+		definition := validDefinition(t, SurfaceTicketStation)
+		placements := make(map[string]any, 201)
+		for index := 0; index < 201; index++ {
+			placements["widget-"+string(rune(0x1000+index))] = map[string]any{"col": 1, "row": 1, "colSpan": 1, "rowSpan": 1}
+		}
+		definition["pages"].([]any)[0].(map[string]any)["layouts"].(map[string]any)["portrait"].(map[string]any)["placements"] = placements
+		requireValidationCode(t, validationCodes(t, marshalDefinition(t, definition), SurfaceTicketStation), CodeSchemaInvalid)
+	})
+}
+
+func TestExperienceDefinitionValidator_AcceptsExactResourceBoundaries(t *testing.T) {
+	t.Run("twenty actions", func(t *testing.T) {
+		definition := validDefinition(t, SurfaceTicketStation)
+		widget := definition["pages"].([]any)[0].(map[string]any)["widgets"].([]any)[0].(map[string]any)
+		actions := make([]any, 20)
+		for index := range actions {
+			actions[index] = map[string]any{"type": "reset-session"}
+		}
+		widget["actions"] = actions
+		if err := ValidateDefinition(marshalDefinition(t, definition), SurfaceTicketStation); err != nil {
+			t.Fatalf("20 actions rejected: %v", err)
+		}
+	})
+
+	t.Run("one hundred pages", func(t *testing.T) {
+		definition := validDefinition(t, SurfaceQueueDisplay)
+		definition["surface"] = SurfaceQueueDisplay
+		delete(definition, "flowPages")
+		variant := definition["variants"].([]any)[0].(map[string]any)
+		variant["profile"].(map[string]any)["interactionMode"] = "non-touch"
+		pages := make([]any, 100)
+		for index := range pages {
+			pageID := "page-" + strconv.Itoa(index)
+			widgetID := "media-" + strconv.Itoa(index)
+			actions := []any{}
+			if index+1 < len(pages) {
+				actions = []any{map[string]any{"type": "navigate", "toPageId": "page-" + strconv.Itoa(index+1)}}
+			}
+			pages[index] = map[string]any{
+				"id": pageID, "name": pageID,
+				"widgets": []any{map[string]any{"id": widgetID, "type": "media", "config": map[string]any{}, "actions": actions}},
+				"layouts": map[string]any{"portrait": map[string]any{"placements": map[string]any{widgetID: map[string]any{"col": 1, "row": 1, "colSpan": 10, "rowSpan": 10}}}},
+			}
+		}
+		definition["startPageId"] = "page-0"
+		definition["pages"] = pages
+		if err := ValidateDefinition(marshalDefinition(t, definition), SurfaceQueueDisplay); err != nil {
+			t.Fatalf("100 pages rejected: %v", err)
+		}
+	})
+
+	t.Run("two hundred widgets and placements", func(t *testing.T) {
+		definition := validDefinition(t, SurfaceQueueDisplay)
+		definition["surface"] = SurfaceQueueDisplay
+		delete(definition, "flowPages")
+		variant := definition["variants"].([]any)[0].(map[string]any)
+		variant["profile"].(map[string]any)["interactionMode"] = "non-touch"
+		variant["grid"] = map[string]any{"columns": 48, "rows": 48}
+		page := definition["pages"].([]any)[0].(map[string]any)
+		widgets := make([]any, 200)
+		placements := make(map[string]any, 200)
+		for index := range widgets {
+			widgetID := "media-" + strconv.Itoa(index)
+			widgets[index] = map[string]any{"id": widgetID, "type": "media", "config": map[string]any{}, "actions": []any{}}
+			placements[widgetID] = map[string]any{"col": index%48 + 1, "row": index/48 + 1, "colSpan": 1, "rowSpan": 1}
+		}
+		page["widgets"] = widgets
+		page["layouts"] = map[string]any{"portrait": map[string]any{"placements": placements}}
+		if err := ValidateDefinition(marshalDefinition(t, definition), SurfaceQueueDisplay); err != nil {
+			t.Fatalf("200 widgets/placements rejected: %v", err)
+		}
+	})
 }
 
 func TestExperienceDefinitionValidator_RejectsDuplicateIDs(t *testing.T) {

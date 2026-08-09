@@ -2823,7 +2823,7 @@ CREATE TABLE IF NOT EXISTS experience_template_versions (
 	template_id text NOT NULL,
 	version integer NOT NULL,
 	definition jsonb NOT NULL,
-	published_by text NOT NULL,
+	published_by text,
 	published_at timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE experience_template_versions
@@ -2836,7 +2836,7 @@ ALTER TABLE experience_template_versions
 	ALTER COLUMN template_id SET NOT NULL,
 	ALTER COLUMN version SET NOT NULL,
 	ALTER COLUMN definition SET NOT NULL,
-	ALTER COLUMN published_by SET NOT NULL,
+	ALTER COLUMN published_by DROP NOT NULL,
 	ALTER COLUMN published_at SET DEFAULT now(),
 	ALTER COLUMN published_at SET NOT NULL;
 DO $$
@@ -2864,7 +2864,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_experience_template_versions_template_versi
 	ON experience_template_versions (template_id, version);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_experience_template_versions_template_id_id
 	ON experience_template_versions (template_id, id);
-CREATE INDEX IF NOT EXISTS idx_experience_template_versions_published_at
+DROP INDEX IF EXISTS idx_experience_template_versions_published_at;
+CREATE INDEX idx_experience_template_versions_published_at
 	ON experience_template_versions (template_id, published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_experience_template_versions_published_by
 	ON experience_template_versions (published_by);
@@ -2881,12 +2882,12 @@ BEGIN
 			FOREIGN KEY (template_id) REFERENCES screen_layout_templates(id)
 			ON UPDATE CASCADE ON DELETE CASCADE;
 	END IF;
-	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_experience_template_versions_publisher') THEN
-		ALTER TABLE experience_template_versions
-			ADD CONSTRAINT fk_experience_template_versions_publisher
-			FOREIGN KEY (published_by) REFERENCES users(id)
-			ON UPDATE CASCADE ON DELETE RESTRICT;
-	END IF;
+	ALTER TABLE experience_template_versions
+		DROP CONSTRAINT IF EXISTS fk_experience_template_versions_publisher;
+	ALTER TABLE experience_template_versions
+		ADD CONSTRAINT fk_experience_template_versions_publisher
+		FOREIGN KEY (published_by) REFERENCES users(id)
+		ON UPDATE CASCADE ON DELETE SET NULL;
 END $$;
 `).Error; err != nil {
 			return err
@@ -2957,12 +2958,12 @@ BEGIN
 			ADD CONSTRAINT chk_desktop_terminal_experience_ack_status
 			CHECK (experience_ack_status IS NULL OR experience_ack_status IN ('applied', 'rejected'));
 	END IF;
-	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_desktop_terminal_experience_template') THEN
-		ALTER TABLE desktop_terminals
-			ADD CONSTRAINT fk_desktop_terminal_experience_template
-			FOREIGN KEY (experience_template_id) REFERENCES screen_layout_templates(id)
-			ON UPDATE CASCADE ON DELETE RESTRICT;
-	END IF;
+	ALTER TABLE desktop_terminals
+		DROP CONSTRAINT IF EXISTS fk_desktop_terminal_experience_template;
+	ALTER TABLE desktop_terminals
+		ADD CONSTRAINT fk_desktop_terminal_experience_template
+		FOREIGN KEY (experience_template_id) REFERENCES screen_layout_templates(id)
+		ON UPDATE CASCADE ON DELETE RESTRICT;
 	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_desktop_terminal_applied_experience_version') THEN
 		ALTER TABLE desktop_terminals
 			ADD CONSTRAINT fk_desktop_terminal_applied_experience_version
