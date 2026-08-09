@@ -148,6 +148,7 @@ describe('getStaffPrimaryAction', () => {
     [undefined, false, 'call_next'],
     ['called', false, 'start_service'],
     ['in_service', false, 'complete'],
+    ['unexpected_active_status', false, 'start_service'],
     ['called', true, 'resume']
   ] as const)(
     'returns %s for status %s and break %s',
