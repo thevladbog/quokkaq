@@ -2027,6 +2027,7 @@
     "workstation": {
       "break": "Break",
       "resume": "Resume work",
+      "status_active": "Active",
       "break_started": "Break started",
       "break_ended": "Break ended",
       "break_error": "Could not update break",
@@ -2134,6 +2135,10 @@
       "idle_badge": "Ready",
       "idle_title": "Waiting for the next visitor",
       "idle_subtitle": "Call the next ticket from the queue when you are ready to serve.",
+      "loading": "Loading current ticket…",
+      "load_error": "Could not refresh tickets: {message}",
+      "retry": "Retry",
+      "scope_empty_hint": "Tickets matching the selected services: {count}.",
       "idle_hint": "The visitor card and photo will appear here after you call someone.",
       "operator_comment": "Operator notes",
       "break_title": "You are on a break",

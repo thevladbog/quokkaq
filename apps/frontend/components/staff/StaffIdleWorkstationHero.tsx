@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 
 export interface StaffIdleWorkstationHeroProps {
   waitingCount: number;
+  scopeSummary: string;
   t: TFn;
   className?: string;
 }
@@ -13,6 +14,7 @@ export interface StaffIdleWorkstationHeroProps {
 /** Compact idle strip: portrait + status + queue count in one band (operator density). */
 export function StaffIdleWorkstationHero({
   waitingCount,
+  scopeSummary,
   t,
   className
 }: StaffIdleWorkstationHeroProps) {
@@ -46,6 +48,9 @@ export function StaffIdleWorkstationHero({
         </div>
         <p className='text-muted-foreground mt-0.5 text-[11px] leading-snug sm:text-xs'>
           {t('current.idle_subtitle')}
+        </p>
+        <p className='text-foreground/80 mt-1 text-[11px] leading-snug font-medium sm:text-xs'>
+          {scopeSummary}
         </p>
       </div>
 
