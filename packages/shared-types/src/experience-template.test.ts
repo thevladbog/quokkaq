@@ -267,6 +267,29 @@ describe('ExperienceTemplateSchema', () => {
     expect(AccessPolicySchema.safeParse(condition).success).toBe(false);
   });
 
+  it('rejects oversized placement records without reading values beyond the limit', () => {
+    let beyondLimitRead = false;
+    const template = validTemplate();
+    const placements: Record<string, unknown> = {};
+    for (let index = 0; index <= 200; index++) {
+      Object.defineProperty(placements, `widget-${index}`, {
+        enumerable: true,
+        get() {
+          if (index === 200) beyondLimitRead = true;
+          return { col: 1, row: 1, colSpan: 1, rowSpan: 1 };
+        }
+      });
+    }
+    template.pages[0]!.layouts.portrait.placements = placements as {
+      catalog: { col: number; row: number; colSpan: number; rowSpan: number };
+    };
+
+    const result = ExperienceTemplateSchema.safeParse(template);
+
+    expect(result.success).toBe(false);
+    expect(beyondLimitRead).toBe(false);
+  });
+
   it.each([
     {
       name: 'duplicate variant ids',

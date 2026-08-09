@@ -128,8 +128,36 @@ export const ExperiencePlacementSchema = z.object({
   rowSpan: z.number().int().min(1)
 });
 
+function hasMoreThanOwnKeys(value: unknown, limit: number): boolean {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return false;
+
+    let count = 0;
+    for (const key in value) {
+      if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+      count += 1;
+      if (count > limit) return true;
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+const BoundedExperiencePlacementsSchema = z.preprocess(
+  (value) =>
+    hasMoreThanOwnKeys(value, EXPERIENCE_TEMPLATE_LIMITS.maxWidgetsPerPage)
+      ? undefined
+      : value,
+  z.record(z.string().min(1), ExperiencePlacementSchema)
+);
+
 export const ExperiencePageLayoutSchema = z.object({
-  placements: z.record(z.string().min(1), ExperiencePlacementSchema),
+  placements: BoundedExperiencePlacementsSchema,
   typographyScale: z.number().min(0.75).max(2).optional()
 });
 
@@ -175,8 +203,9 @@ const ExperienceTemplateBaseSchema = z.object({
 export const ExperienceTemplateSchema =
   ExperienceTemplateBaseSchema.superRefine((template, ctx) => {
     let schemaIssueCount = 0;
+    const issueCapReached = () => schemaIssueCount >= 200;
     const addIssue = (issue: Parameters<typeof ctx.addIssue>[0]) => {
-      if (schemaIssueCount >= 200) return;
+      if (issueCapReached()) return;
       schemaIssueCount += 1;
       ctx.addIssue(issue);
     };
@@ -186,6 +215,7 @@ export const ExperienceTemplateSchema =
       variantIndex < template.variants.length;
       variantIndex++
     ) {
+      if (issueCapReached()) return;
       const variant = template.variants[variantIndex]!;
       if (variantIds.has(variant.id)) {
         addIssue({
@@ -199,6 +229,7 @@ export const ExperienceTemplateSchema =
 
     const pageIds = new Set<string>();
     for (let pageIndex = 0; pageIndex < template.pages.length; pageIndex++) {
+      if (issueCapReached()) return;
       const page = template.pages[pageIndex]!;
       if (pageIds.has(page.id)) {
         addIssue({
@@ -221,6 +252,7 @@ export const ExperienceTemplateSchema =
     for (const [flowPageRole, pageId] of Object.entries(
       template.flowPages ?? {}
     )) {
+      if (issueCapReached()) return;
       if (pageId && !pageIds.has(pageId)) {
         addIssue({
           code: z.ZodIssueCode.custom,
@@ -231,6 +263,7 @@ export const ExperienceTemplateSchema =
     }
 
     for (let pageIndex = 0; pageIndex < template.pages.length; pageIndex++) {
+      if (issueCapReached()) return;
       const page = template.pages[pageIndex]!;
       const widgetIds = new Set<string>();
 
@@ -239,6 +272,7 @@ export const ExperienceTemplateSchema =
         widgetIndex < page.widgets.length;
         widgetIndex++
       ) {
+        if (issueCapReached()) return;
         const widget = page.widgets[widgetIndex]!;
         if (widgetIds.has(widget.id)) {
           addIssue({
@@ -254,6 +288,7 @@ export const ExperienceTemplateSchema =
           actionIndex < widget.actions.length;
           actionIndex++
         ) {
+          if (issueCapReached()) return;
           const action = widget.actions[actionIndex]!;
           if (action.type === 'navigate' && !pageIds.has(action.toPageId)) {
             addIssue({
@@ -274,6 +309,7 @@ export const ExperienceTemplateSchema =
       }
 
       for (const variant of template.variants) {
+        if (issueCapReached()) return;
         const layout = Object.prototype.hasOwnProperty.call(
           page.layouts,
           variant.id
@@ -291,6 +327,7 @@ export const ExperienceTemplateSchema =
         }
 
         for (const widget of page.widgets) {
+          if (issueCapReached()) return;
           const placement = Object.prototype.hasOwnProperty.call(
             layout.placements,
             widget.id
@@ -308,6 +345,7 @@ export const ExperienceTemplateSchema =
       }
 
       for (const [variantId, layout] of Object.entries(page.layouts)) {
+        if (issueCapReached()) return;
         const variant = template.variants.find(
           (candidate) => candidate.id === variantId
         );
@@ -328,6 +366,7 @@ export const ExperienceTemplateSchema =
         ).sort(([leftWidgetId], [rightWidgetId]) =>
           leftWidgetId.localeCompare(rightWidgetId)
         )) {
+          if (issueCapReached()) return;
           const placementPath = [...layoutPath, 'placements', widgetId];
           if (!widgetIds.has(widgetId)) {
             addIssue({

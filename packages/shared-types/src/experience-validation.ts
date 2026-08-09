@@ -245,13 +245,14 @@ function createIssueCollector(): IssueCollector {
 
 function reportFromCollectors(
   errors: IssueCollector,
-  warnings: IssueCollector
+  warnings: IssueCollector,
+  hasBlockingPreflight = false
 ): ExperienceValidationReport {
   const errorEntries = errors.entries();
   return {
     errors: errorEntries,
     warnings: warnings.entries(),
-    canPublish: errorEntries.length === 0
+    canPublish: !hasBlockingPreflight && errorEntries.length === 0
   };
 }
 
@@ -563,7 +564,9 @@ function validateGraph(
 
   function isRuntimeAttractPage(page: ExperienceTemplate['pages'][number]) {
     if (
+      template.surface !== 'ticket-station' ||
       page.id !== 'attract' ||
+      page.name !== 'Attract' ||
       page.access !== undefined ||
       page.widgets.length !== 1
     ) {
@@ -576,6 +579,8 @@ function validateGraph(
     return (
       currentWidget.id === 'attract-media' &&
       currentWidget.type === 'media' &&
+      currentWidget.tone === undefined &&
+      currentWidget.access === undefined &&
       currentWidget.actions.length === 0 &&
       attractConfig.success &&
       attractConfig.data.compatibility.mode !== 'off'
@@ -755,7 +760,9 @@ function validateLayouts(
   warnings: IssueCollector
 ): void {
   for (const [pageIndex, currentPage] of template.pages.entries()) {
+    if (errors.isFull()) return;
     for (const currentVariant of template.variants) {
+      if (errors.isFull()) return;
       const layout = currentPage.layouts[currentVariant.id]!;
       const typographyPath: ExperienceValidationPath = [
         'pages',
@@ -784,6 +791,7 @@ function validateLayouts(
         widgetIndex,
         currentWidget
       ] of currentPage.widgets.entries()) {
+        if (errors.isFull()) return;
         const placement = layout.placements[currentWidget.id]!;
         const placementPath: ExperienceValidationPath = [
           'pages',
@@ -827,6 +835,7 @@ function validateLayouts(
         widgetIndex,
         currentWidget
       ] of currentPage.widgets.entries()) {
+        if (errors.isFull()) return;
         const scrollPath = stationScrollRequiredPath(currentWidget);
         if (scrollPath !== undefined) {
           errors.add('station.page_scroll_required', [
@@ -853,7 +862,9 @@ function validateParsedTemplate(
   warnings: IssueCollector
 ): void {
   for (const [pageIndex, currentPage] of template.pages.entries()) {
+    if (errors.isFull()) return;
     for (const [widgetIndex, currentWidget] of currentPage.widgets.entries()) {
+      if (errors.isFull()) return;
       if (
         !widgetSupportsSurface(
           template.surface,
@@ -871,8 +882,11 @@ function validateParsedTemplate(
     }
   }
 
+  if (errors.isFull()) return;
   const flowValidation = validateFlowPages(template, errors);
+  if (errors.isFull()) return;
   validateGraph(template, flowValidation, errors, warnings);
+  if (errors.isFull()) return;
   validateLayouts(template, errors, warnings);
 }
 
@@ -881,23 +895,45 @@ function rawAccessExceedsConditionLimit(access: unknown): boolean {
     return false;
   }
   let nodes = 0;
-  const pending: unknown[] = [access.when];
-  while (pending.length > 0) {
-    const node = pending.pop();
+  let node: unknown = access.when;
+  const parents: Array<{ children: unknown[]; nextIndex: number }> = [];
+  while (node !== undefined) {
     nodes += 1;
     if (nodes > EXPERIENCE_TEMPLATE_LIMITS.maxConditionNodes) return true;
     if (
-      !isPlainOwnRecord(node) ||
-      node.kind !== 'group' ||
-      !Array.isArray(node.children)
+      isPlainOwnRecord(node) &&
+      node.kind === 'group' &&
+      Array.isArray(node.children)
     ) {
-      continue;
+      parents.push({ children: node.children, nextIndex: 0 });
     }
-    for (let index = node.children.length - 1; index >= 0; index--) {
-      pending.push(node.children[index]);
+
+    node = undefined;
+    while (parents.length > 0 && node === undefined) {
+      const parent = parents[parents.length - 1]!;
+      if (parent.nextIndex < parent.children.length) {
+        node = parent.children[parent.nextIndex++];
+      } else {
+        parents.pop();
+      }
     }
   }
   return false;
+}
+
+function rawPlacementsExceedLimit(placements: unknown): boolean {
+  if (!isPlainOwnRecord(placements)) return false;
+  try {
+    let count = 0;
+    for (const key in placements) {
+      if (!hasOwn(placements, key)) continue;
+      count += 1;
+      if (count > EXPERIENCE_TEMPLATE_LIMITS.maxWidgetsPerPage) return true;
+    }
+    return false;
+  } catch {
+    return true;
+  }
 }
 
 function addResourceLimitIssue(
@@ -961,7 +997,21 @@ function preflightResourceBounds(
         ['pages', pageIndex, 'access', 'when'],
         EXPERIENCE_TEMPLATE_LIMITS.maxConditionNodes
       );
-      exceeded = true;
+      return true;
+    }
+    if (isPlainOwnRecord(rawPage.layouts)) {
+      for (const variantId in rawPage.layouts) {
+        if (!hasOwn(rawPage.layouts, variantId)) continue;
+        const rawLayout = rawPage.layouts[variantId];
+        if (!isPlainOwnRecord(rawLayout)) continue;
+        if (!rawPlacementsExceedLimit(rawLayout.placements)) continue;
+        addResourceLimitIssue(
+          errors,
+          ['pages', pageIndex, 'layouts', variantId, 'placements'],
+          EXPERIENCE_TEMPLATE_LIMITS.maxWidgetsPerPage
+        );
+        return true;
+      }
     }
     if (!Array.isArray(rawPage.widgets)) continue;
     for (
@@ -990,7 +1040,7 @@ function preflightResourceBounds(
           ['pages', pageIndex, 'widgets', widgetIndex, 'access', 'when'],
           EXPERIENCE_TEMPLATE_LIMITS.maxConditionNodes
         );
-        exceeded = true;
+        return true;
       }
     }
   }
@@ -1010,7 +1060,7 @@ export function validateExperienceForPublish(
 
   try {
     if (preflightResourceBounds(template, errors)) {
-      return reportFromCollectors(errors, warnings);
+      return reportFromCollectors(errors, warnings, true);
     }
     const parsed = ExperienceTemplateSchema.safeParse(template);
     if (!parsed.success) {

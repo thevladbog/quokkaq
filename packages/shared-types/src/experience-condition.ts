@@ -84,15 +84,23 @@ export function exceedsConditionNodeLimit(
   limit = MAX_ACCESS_POLICY_CONDITION_NODES
 ): boolean {
   let nodes = 0;
-  const pending: ConditionNode[] = [node];
+  let current: ConditionNode | undefined = node;
+  const parents: Array<{ children: ConditionNode[]; nextIndex: number }> = [];
 
-  while (pending.length > 0) {
-    const current = pending.pop()!;
+  while (current !== undefined) {
     nodes += 1;
     if (nodes > limit) return true;
     if (current.kind === 'group') {
-      for (let index = current.children.length - 1; index >= 0; index--) {
-        pending.push(current.children[index]!);
+      parents.push({ children: current.children, nextIndex: 0 });
+    }
+
+    current = undefined;
+    while (parents.length > 0 && current === undefined) {
+      const parent = parents[parents.length - 1]!;
+      if (parent.nextIndex < parent.children.length) {
+        current = parent.children[parent.nextIndex++]!;
+      } else {
+        parents.pop();
       }
     }
   }

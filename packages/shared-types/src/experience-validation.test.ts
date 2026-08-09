@@ -758,6 +758,65 @@ describe('validateExperienceForPublish', () => {
     });
   });
 
+  it.each(['queue-display', 'counter-display', 'visitor-mobile'] as const)(
+    'does not exempt a forged Task 4 attract page on %s',
+    (surface) => {
+      const forged = structuredClone(
+        experienceFromKioskConfig({}, [
+          {
+            id: 'default-service',
+            unitId: 'unit-1',
+            name: 'Default service',
+            isLeaf: true,
+            identificationMode: 'none'
+          }
+        ])
+      ) as RawExperience;
+      forged.surface = surface;
+      const attractIndex = forged.pages.findIndex(
+        (currentPage) => currentPage.id === 'attract'
+      );
+
+      const report = validateExperienceForPublish(forged);
+
+      expect(report.errors).toContainEqual({
+        code: 'page.unreachable',
+        path: ['pages', attractIndex]
+      });
+      expect(report.canPublish).toBe(false);
+    }
+  );
+
+  it('does not exempt a typed station attract page with a widget access policy', () => {
+    const ambiguous = structuredClone(
+      experienceFromKioskConfig({}, [
+        {
+          id: 'default-service',
+          unitId: 'unit-1',
+          name: 'Default service',
+          isLeaf: true,
+          identificationMode: 'none'
+        }
+      ])
+    ) as RawExperience;
+    const attractIndex = ambiguous.pages.findIndex(
+      (currentPage) => currentPage.id === 'attract'
+    );
+    ambiguous.pages[attractIndex]!.widgets[0]!.access = {
+      when: {
+        kind: 'rule',
+        field: 'live.isOpen',
+        operator: 'is-true'
+      },
+      whenFalse: 'hide'
+    };
+
+    expect(validateExperienceForPublish(ambiguous).errors).toContainEqual({
+      code: 'page.unreachable',
+      path: ['pages', attractIndex]
+    });
+  });
+
   it.each([
     ['ticket-station', false],
     ['queue-display', true],
@@ -1055,6 +1114,108 @@ describe('validateExperienceForPublish', () => {
     expect(
       report.errors.every((issue) => issue.code === 'schema.invalid')
     ).toBe(true);
+  });
+
+  it('stops condition preflight before reading a child beyond the node limit', () => {
+    let beyondLimitRead = false;
+    const children = new Proxy(
+      Array.from({ length: 102 }, (_, index) => ({
+        kind: 'rule',
+        field: 'live.queueLength',
+        operator: 'gt',
+        value: index
+      })),
+      {
+        get(target, property, receiver) {
+          if (property === '100' || property === '101') {
+            beyondLimitRead = true;
+          }
+          return Reflect.get(target, property, receiver);
+        }
+      }
+    );
+    const report = validateExperienceForPublish({
+      pages: [
+        {
+          access: {
+            when: { kind: 'group', combinator: 'and', children },
+            whenFalse: 'hide'
+          },
+          widgets: []
+        }
+      ]
+    });
+
+    expect(beyondLimitRead).toBe(false);
+    expect(report).toEqual({
+      errors: [
+        {
+          code: 'schema.invalid',
+          path: ['pages', 0, 'access', 'when'],
+          details: { limit: 100 }
+        }
+      ],
+      warnings: [],
+      canPublish: false
+    });
+  });
+
+  it('caps a huge plain condition array before canonical schema parsing', () => {
+    const report = validateExperienceForPublish({
+      pages: [
+        {
+          access: {
+            when: {
+              kind: 'group',
+              combinator: 'or',
+              children: Array.from({ length: 10_000 }, (_, index) => ({
+                kind: 'rule',
+                field: 'live.queueLength',
+                operator: 'gt',
+                value: index
+              }))
+            },
+            whenFalse: 'hide'
+          },
+          widgets: []
+        }
+      ]
+    });
+
+    expect(report.errors).toEqual([
+      {
+        code: 'schema.invalid',
+        path: ['pages', 0, 'access', 'when'],
+        details: { limit: 100 }
+      }
+    ]);
+    expect(report.canPublish).toBe(false);
+  });
+
+  it('preflights oversized placement records without reading their values', () => {
+    let beyondLimitRead = false;
+    const oversizedPlacements: Record<string, RawPlacement> = {};
+    for (let index = 0; index <= 200; index++) {
+      Object.defineProperty(oversizedPlacements, `widget-${index}`, {
+        enumerable: true,
+        get() {
+          if (index === 200) beyondLimitRead = true;
+          return { col: 1, row: 1, colSpan: 1, rowSpan: 1 };
+        }
+      });
+    }
+    const template = stationTemplate();
+    template.pages[0]!.layouts.portrait!.placements = oversizedPlacements;
+
+    const report = validateExperienceForPublish(template);
+
+    expect(beyondLimitRead).toBe(false);
+    expect(report.errors).toContainEqual({
+      code: 'schema.invalid',
+      path: ['pages', 0, 'layouts', 'portrait', 'placements'],
+      details: { limit: 200 }
+    });
+    expect(report.canPublish).toBe(false);
   });
 
   it('reports overlap participants deterministically regardless of placement insertion order', () => {
