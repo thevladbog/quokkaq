@@ -159,7 +159,7 @@ func respondTerminalExperienceError(w http.ResponseWriter, r *http.Request, err 
 // @ID           GetTerminalExperienceManifest
 // @Summary      Get the terminal experience manifest
 // @Description  Returns legacy mode when no experience is assigned, otherwise the terminal's current immutable published experience. The terminal identity always comes from the terminal JWT subject.
-// @Tags         DesktopTerminal
+// @Tags         TerminalExperience
 // @Produce      json
 // @Success      200 {object} TerminalExperienceManifestResponseDoc
 // @Failure      401 {string} string "Unauthorized"
@@ -273,7 +273,7 @@ func terminalExperienceAcknowledgementFromPayload(request terminalExperienceAckP
 // @ID           AcknowledgeTerminalExperienceManifest
 // @Summary      Acknowledge the terminal experience manifest
 // @Description  Records whether the authenticated terminal applied or rejected its currently published assigned version. Rejected deployments require a bounded machine-readable reasonCode and preserve the last successfully applied version; applied deployments forbid one.
-// @Tags         DesktopTerminal
+// @Tags         TerminalExperience
 // @Accept       json
 // @Produce      json
 // @Param        body body TerminalExperienceAckRequestDoc true "Acknowledgement payload"

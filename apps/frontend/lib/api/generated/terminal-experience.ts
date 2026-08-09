@@ -24,7 +24,7 @@ import type {
   UseQueryResult
 } from '@tanstack/react-query';
 
-import { orvalMutator } from '../../orval-mutator';
+import { terminalOrvalMutator } from '../../terminal-orval-mutator';
 export interface HandlersAccessibleCompanyItem {
   id?: string;
   inn?: string;
@@ -3491,315 +3491,59 @@ export interface ServicesUtilizationResponse {
   points?: ServicesUtilizationPoint[];
 }
 
-export type ListSupportReportCommentsParams = {
-/**
- * staff or applicant
- */
-audience?: string;
-};
-
-export type ListSupportReportShareCandidatesParams = {
-/**
- * Search by name or email
- */
-q?: string;
-};
-
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 
 /**
- * Returns the current user's reports; tenant admins see all reports. Refreshes external ticket status when older than a short interval.
- * @summary List support reports visible to the user
+ * Returns legacy mode when no experience is assigned, otherwise the terminal's current immutable published experience. The terminal identity always comes from the terminal JWT subject.
+ * @summary Get the terminal experience manifest
  */
-export type listSupportReportsResponse200 = {
-  data: ModelsSupportReport[]
+export type getTerminalExperienceManifestResponse200 = {
+  data: HandlersTerminalExperienceManifestResponseDoc
   status: 200
 }
 
-export type listSupportReportsResponse401 = {
+export type getTerminalExperienceManifestResponse401 = {
   data: string
   status: 401
 }
 
-export type listSupportReportsResponse500 = {
-  data: string
-  status: 500
-}
-
-export type listSupportReportsResponseSuccess = (listSupportReportsResponse200) & {
-  headers: Headers;
-};
-export type listSupportReportsResponseError = (listSupportReportsResponse401 | listSupportReportsResponse500) & {
-  headers: Headers;
-};
-
-export type listSupportReportsResponse = (listSupportReportsResponseSuccess | listSupportReportsResponseError)
-
-export const getListSupportReportsUrl = () => {
-
-
-
-
-  return `/support/reports`
-}
-
-export const listSupportReports = async ( options?: RequestInit): Promise<listSupportReportsResponse> => {
-
-  return orvalMutator<listSupportReportsResponse>(getListSupportReportsUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getListSupportReportsQueryKey = () => {
-    return [
-    `/support/reports`
-    ] as const;
-    }
-
-
-export const getListSupportReportsQueryOptions = <TData = Awaited<ReturnType<typeof listSupportReports>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReports>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListSupportReportsQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSupportReports>>> = ({ signal }) => listSupportReports({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSupportReports>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type ListSupportReportsQueryResult = NonNullable<Awaited<ReturnType<typeof listSupportReports>>>
-export type ListSupportReportsQueryError = string
-
-
-export function useListSupportReports<TData = Awaited<ReturnType<typeof listSupportReports>>, TError = string>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReports>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listSupportReports>>,
-          TError,
-          Awaited<ReturnType<typeof listSupportReports>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListSupportReports<TData = Awaited<ReturnType<typeof listSupportReports>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReports>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listSupportReports>>,
-          TError,
-          Awaited<ReturnType<typeof listSupportReports>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListSupportReports<TData = Awaited<ReturnType<typeof listSupportReports>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReports>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List support reports visible to the user
- */
-
-export function useListSupportReports<TData = Awaited<ReturnType<typeof listSupportReports>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReports>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getListSupportReportsQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-/**
- * Creates a ticket in the configured backend (Plane or Yandex Tracker per SUPPORT_REPORT_PLATFORM) and stores a row in QuokkaQ.
- * @summary Create a support report (external ticket)
- */
-export type createSupportReportResponse201 = {
-  data: ModelsSupportReport
-  status: 201
-}
-
-export type createSupportReportResponse400 = {
-  data: string
-  status: 400
-}
-
-export type createSupportReportResponse401 = {
-  data: string
-  status: 401
-}
-
-export type createSupportReportResponse413 = {
-  data: string
-  status: 413
-}
-
-export type createSupportReportResponse500 = {
-  data: string
-  status: 500
-}
-
-export type createSupportReportResponse502 = {
-  data: string
-  status: 502
-}
-
-export type createSupportReportResponse503 = {
-  data: string
-  status: 503
-}
-
-export type createSupportReportResponseSuccess = (createSupportReportResponse201) & {
-  headers: Headers;
-};
-export type createSupportReportResponseError = (createSupportReportResponse400 | createSupportReportResponse401 | createSupportReportResponse413 | createSupportReportResponse500 | createSupportReportResponse502 | createSupportReportResponse503) & {
-  headers: Headers;
-};
-
-export type createSupportReportResponse = (createSupportReportResponseSuccess | createSupportReportResponseError)
-
-export const getCreateSupportReportUrl = () => {
-
-
-
-
-  return `/support/reports`
-}
-
-export const createSupportReport = async (handlersCreateSupportReportRequest: HandlersCreateSupportReportRequest, options?: RequestInit): Promise<createSupportReportResponse> => {
-
-  return orvalMutator<createSupportReportResponse>(getCreateSupportReportUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      handlersCreateSupportReportRequest,)
-  }
-);}
-
-
-
-
-export const getCreateSupportReportMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSupportReport>>, TError,{data: HandlersCreateSupportReportRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof createSupportReport>>, TError,{data: HandlersCreateSupportReportRequest}, TContext> => {
-
-const mutationKey = ['createSupportReport'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSupportReport>>, {data: HandlersCreateSupportReportRequest}> = (props) => {
-          const {data} = props ?? {};
-
-          return  createSupportReport(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type CreateSupportReportMutationResult = NonNullable<Awaited<ReturnType<typeof createSupportReport>>>
-    export type CreateSupportReportMutationBody = HandlersCreateSupportReportRequest
-    export type CreateSupportReportMutationError = string
-
-    /**
- * @summary Create a support report (external ticket)
- */
-export const useCreateSupportReport = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSupportReport>>, TError,{data: HandlersCreateSupportReportRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof createSupportReport>>,
-        TError,
-        {data: HandlersCreateSupportReportRequest},
-        TContext
-      > => {
-      return useMutation(getCreateSupportReportMutationOptions(options), queryClient);
-    }
-
-/**
- * Returns a report if the current user is the author, a tenant admin, or has been granted a share. Refreshes external status when the row's backend client is enabled.
- * @summary Get one support report by id
- */
-export type getSupportReportByIDResponse200 = {
-  data: ModelsSupportReport
-  status: 200
-}
-
-export type getSupportReportByIDResponse401 = {
-  data: string
-  status: 401
-}
-
-export type getSupportReportByIDResponse403 = {
+export type getTerminalExperienceManifestResponse403 = {
   data: string
   status: 403
 }
 
-export type getSupportReportByIDResponse404 = {
+export type getTerminalExperienceManifestResponse409 = {
   data: string
-  status: 404
+  status: 409
 }
 
-export type getSupportReportByIDResponse500 = {
+export type getTerminalExperienceManifestResponse500 = {
   data: string
   status: 500
 }
 
-export type getSupportReportByIDResponseSuccess = (getSupportReportByIDResponse200) & {
+export type getTerminalExperienceManifestResponseSuccess = (getTerminalExperienceManifestResponse200) & {
   headers: Headers;
 };
-export type getSupportReportByIDResponseError = (getSupportReportByIDResponse401 | getSupportReportByIDResponse403 | getSupportReportByIDResponse404 | getSupportReportByIDResponse500) & {
+export type getTerminalExperienceManifestResponseError = (getTerminalExperienceManifestResponse401 | getTerminalExperienceManifestResponse403 | getTerminalExperienceManifestResponse409 | getTerminalExperienceManifestResponse500) & {
   headers: Headers;
 };
 
-export type getSupportReportByIDResponse = (getSupportReportByIDResponseSuccess | getSupportReportByIDResponseError)
+export type getTerminalExperienceManifestResponse = (getTerminalExperienceManifestResponseSuccess | getTerminalExperienceManifestResponseError)
 
-export const getGetSupportReportByIDUrl = (id: string,) => {
-
-
+export const getGetTerminalExperienceManifestUrl = () => {
 
 
-  return `/support/reports/${id}`
+
+
+  return `/terminal/experience`
 }
 
-export const getSupportReportByID = async (id: string, options?: RequestInit): Promise<getSupportReportByIDResponse> => {
+export const getTerminalExperienceManifest = async ( options?: RequestInit): Promise<getTerminalExperienceManifestResponse> => {
 
-  return orvalMutator<getSupportReportByIDResponse>(getGetSupportReportByIDUrl(id),
+  return terminalOrvalMutator<getTerminalExperienceManifestResponse>(getGetTerminalExperienceManifestUrl(),
   {
     ...options,
     method: 'GET'
@@ -3812,69 +3556,69 @@ export const getSupportReportByID = async (id: string, options?: RequestInit): P
 
 
 
-export const getGetSupportReportByIDQueryKey = (id: string,) => {
+export const getGetTerminalExperienceManifestQueryKey = () => {
     return [
-    `/support/reports/${id}`
+    `/terminal/experience`
     ] as const;
     }
 
 
-export const getGetSupportReportByIDQueryOptions = <TData = Awaited<ReturnType<typeof getSupportReportByID>>, TError = string>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSupportReportByID>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetTerminalExperienceManifestQueryOptions = <TData = Awaited<ReturnType<typeof getTerminalExperienceManifest>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTerminalExperienceManifest>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetSupportReportByIDQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getGetTerminalExperienceManifestQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSupportReportByID>>> = ({ signal }) => getSupportReportByID(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTerminalExperienceManifest>>> = ({ signal }) => getTerminalExperienceManifest({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSupportReportByID>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTerminalExperienceManifest>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetSupportReportByIDQueryResult = NonNullable<Awaited<ReturnType<typeof getSupportReportByID>>>
-export type GetSupportReportByIDQueryError = string
+export type GetTerminalExperienceManifestQueryResult = NonNullable<Awaited<ReturnType<typeof getTerminalExperienceManifest>>>
+export type GetTerminalExperienceManifestQueryError = string
 
 
-export function useGetSupportReportByID<TData = Awaited<ReturnType<typeof getSupportReportByID>>, TError = string>(
- id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSupportReportByID>>, TError, TData>> & Pick<
+export function useGetTerminalExperienceManifest<TData = Awaited<ReturnType<typeof getTerminalExperienceManifest>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTerminalExperienceManifest>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getSupportReportByID>>,
+          Awaited<ReturnType<typeof getTerminalExperienceManifest>>,
           TError,
-          Awaited<ReturnType<typeof getSupportReportByID>>
+          Awaited<ReturnType<typeof getTerminalExperienceManifest>>
         > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
+      >, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetSupportReportByID<TData = Awaited<ReturnType<typeof getSupportReportByID>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSupportReportByID>>, TError, TData>> & Pick<
+export function useGetTerminalExperienceManifest<TData = Awaited<ReturnType<typeof getTerminalExperienceManifest>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTerminalExperienceManifest>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getSupportReportByID>>,
+          Awaited<ReturnType<typeof getTerminalExperienceManifest>>,
           TError,
-          Awaited<ReturnType<typeof getSupportReportByID>>
+          Awaited<ReturnType<typeof getTerminalExperienceManifest>>
         > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
+      >, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetSupportReportByID<TData = Awaited<ReturnType<typeof getSupportReportByID>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSupportReportByID>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetTerminalExperienceManifest<TData = Awaited<ReturnType<typeof getTerminalExperienceManifest>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTerminalExperienceManifest>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get one support report by id
+ * @summary Get the terminal experience manifest
  */
 
-export function useGetSupportReportByID<TData = Awaited<ReturnType<typeof getSupportReportByID>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSupportReportByID>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetTerminalExperienceManifest<TData = Awaited<ReturnType<typeof getTerminalExperienceManifest>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTerminalExperienceManifest>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetSupportReportByIDQueryOptions(id,options)
+  const queryOptions = getGetTerminalExperienceManifestQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -3888,787 +3632,76 @@ export function useGetSupportReportByID<TData = Awaited<ReturnType<typeof getSup
 
 
 /**
- * Yandex Tracker only. audience=staff (default) for full timeline; audience=applicant for public/email only (report author only).
- * @summary List comments on the external support ticket
+ * Records whether the authenticated terminal applied or rejected its currently published assigned version. Rejected deployments require a bounded machine-readable reasonCode and preserve the last successfully applied version; applied deployments forbid one.
+ * @summary Acknowledge the terminal experience manifest
  */
-export type listSupportReportCommentsResponse200 = {
-  data: ServicesSupportReportCommentItem[]
-  status: 200
-}
-
-export type listSupportReportCommentsResponse400 = {
-  data: string
-  status: 400
-}
-
-export type listSupportReportCommentsResponse401 = {
-  data: string
-  status: 401
-}
-
-export type listSupportReportCommentsResponse403 = {
-  data: string
-  status: 403
-}
-
-export type listSupportReportCommentsResponse404 = {
-  data: string
-  status: 404
-}
-
-export type listSupportReportCommentsResponse501 = {
-  data: string
-  status: 501
-}
-
-export type listSupportReportCommentsResponse502 = {
-  data: string
-  status: 502
-}
-
-export type listSupportReportCommentsResponse503 = {
-  data: string
-  status: 503
-}
-
-export type listSupportReportCommentsResponseSuccess = (listSupportReportCommentsResponse200) & {
-  headers: Headers;
-};
-export type listSupportReportCommentsResponseError = (listSupportReportCommentsResponse400 | listSupportReportCommentsResponse401 | listSupportReportCommentsResponse403 | listSupportReportCommentsResponse404 | listSupportReportCommentsResponse501 | listSupportReportCommentsResponse502 | listSupportReportCommentsResponse503) & {
-  headers: Headers;
-};
-
-export type listSupportReportCommentsResponse = (listSupportReportCommentsResponseSuccess | listSupportReportCommentsResponseError)
-
-export const getListSupportReportCommentsUrl = (id: string,
-    params?: ListSupportReportCommentsParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/support/reports/${id}/comments?${stringifiedParams}` : `/support/reports/${id}/comments`
-}
-
-export const listSupportReportComments = async (id: string,
-    params?: ListSupportReportCommentsParams, options?: RequestInit): Promise<listSupportReportCommentsResponse> => {
-
-  return orvalMutator<listSupportReportCommentsResponse>(getListSupportReportCommentsUrl(id,params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getListSupportReportCommentsQueryKey = (id: string,
-    params?: ListSupportReportCommentsParams,) => {
-    return [
-    `/support/reports/${id}/comments`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getListSupportReportCommentsQueryOptions = <TData = Awaited<ReturnType<typeof listSupportReportComments>>, TError = string>(id: string,
-    params?: ListSupportReportCommentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportComments>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListSupportReportCommentsQueryKey(id,params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSupportReportComments>>> = ({ signal }) => listSupportReportComments(id,params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSupportReportComments>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type ListSupportReportCommentsQueryResult = NonNullable<Awaited<ReturnType<typeof listSupportReportComments>>>
-export type ListSupportReportCommentsQueryError = string
-
-
-export function useListSupportReportComments<TData = Awaited<ReturnType<typeof listSupportReportComments>>, TError = string>(
- id: string,
-    params: undefined |  ListSupportReportCommentsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportComments>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listSupportReportComments>>,
-          TError,
-          Awaited<ReturnType<typeof listSupportReportComments>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListSupportReportComments<TData = Awaited<ReturnType<typeof listSupportReportComments>>, TError = string>(
- id: string,
-    params?: ListSupportReportCommentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportComments>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listSupportReportComments>>,
-          TError,
-          Awaited<ReturnType<typeof listSupportReportComments>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListSupportReportComments<TData = Awaited<ReturnType<typeof listSupportReportComments>>, TError = string>(
- id: string,
-    params?: ListSupportReportCommentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportComments>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List comments on the external support ticket
- */
-
-export function useListSupportReportComments<TData = Awaited<ReturnType<typeof listSupportReportComments>>, TError = string>(
- id: string,
-    params?: ListSupportReportCommentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportComments>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getListSupportReportCommentsQueryOptions(id,params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-/**
- * Yandex Tracker only. Comment text is sent to Tracker as-is; public visibility for the requester is determined in Tracker.
- * @summary Add a comment on the external support ticket
- */
-export type postSupportReportCommentResponse204 = {
+export type acknowledgeTerminalExperienceManifestResponse204 = {
   data: void
   status: 204
 }
 
-export type postSupportReportCommentResponse400 = {
+export type acknowledgeTerminalExperienceManifestResponse400 = {
   data: string
   status: 400
 }
 
-export type postSupportReportCommentResponse401 = {
+export type acknowledgeTerminalExperienceManifestResponse401 = {
   data: string
   status: 401
 }
 
-export type postSupportReportCommentResponse403 = {
+export type acknowledgeTerminalExperienceManifestResponse403 = {
   data: string
   status: 403
 }
 
-export type postSupportReportCommentResponse404 = {
+export type acknowledgeTerminalExperienceManifestResponse409 = {
   data: string
-  status: 404
+  status: 409
 }
 
-export type postSupportReportCommentResponse413 = {
-  data: string
-  status: 413
-}
-
-export type postSupportReportCommentResponse501 = {
-  data: string
-  status: 501
-}
-
-export type postSupportReportCommentResponse502 = {
-  data: string
-  status: 502
-}
-
-export type postSupportReportCommentResponse503 = {
-  data: string
-  status: 503
-}
-
-export type postSupportReportCommentResponseSuccess = (postSupportReportCommentResponse204) & {
-  headers: Headers;
-};
-export type postSupportReportCommentResponseError = (postSupportReportCommentResponse400 | postSupportReportCommentResponse401 | postSupportReportCommentResponse403 | postSupportReportCommentResponse404 | postSupportReportCommentResponse413 | postSupportReportCommentResponse501 | postSupportReportCommentResponse502 | postSupportReportCommentResponse503) & {
-  headers: Headers;
-};
-
-export type postSupportReportCommentResponse = (postSupportReportCommentResponseSuccess | postSupportReportCommentResponseError)
-
-export const getPostSupportReportCommentUrl = (id: string,) => {
-
-
-
-
-  return `/support/reports/${id}/comments`
-}
-
-export const postSupportReportComment = async (id: string,
-    handlersPostSupportReportCommentRequest: HandlersPostSupportReportCommentRequest, options?: RequestInit): Promise<postSupportReportCommentResponse> => {
-
-  return orvalMutator<postSupportReportCommentResponse>(getPostSupportReportCommentUrl(id),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      handlersPostSupportReportCommentRequest,)
-  }
-);}
-
-
-
-
-export const getPostSupportReportCommentMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSupportReportComment>>, TError,{id: string;data: HandlersPostSupportReportCommentRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postSupportReportComment>>, TError,{id: string;data: HandlersPostSupportReportCommentRequest}, TContext> => {
-
-const mutationKey = ['postSupportReportComment'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postSupportReportComment>>, {id: string;data: HandlersPostSupportReportCommentRequest}> = (props) => {
-          const {id,data} = props ?? {};
-
-          return  postSupportReportComment(id,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PostSupportReportCommentMutationResult = NonNullable<Awaited<ReturnType<typeof postSupportReportComment>>>
-    export type PostSupportReportCommentMutationBody = HandlersPostSupportReportCommentRequest
-    export type PostSupportReportCommentMutationError = string
-
-    /**
- * @summary Add a comment on the external support ticket
- */
-export const usePostSupportReportComment = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSupportReportComment>>, TError,{id: string;data: HandlersPostSupportReportCommentRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postSupportReportComment>>,
-        TError,
-        {id: string;data: HandlersPostSupportReportCommentRequest},
-        TContext
-      > => {
-      return useMutation(getPostSupportReportCommentMutationOptions(options), queryClient);
-    }
-
-/**
- * Author or tenant admin: posts a cancel comment on the external ticket when the backend client is enabled, then stores markedIrrelevantAt on the report. Idempotent if already marked.
- * @summary Mark support report as not relevant
- */
-export type markSupportReportIrrelevantResponse200 = {
-  data: ModelsSupportReport
-  status: 200
-}
-
-export type markSupportReportIrrelevantResponse401 = {
-  data: string
-  status: 401
-}
-
-export type markSupportReportIrrelevantResponse403 = {
-  data: string
-  status: 403
-}
-
-export type markSupportReportIrrelevantResponse404 = {
-  data: string
-  status: 404
-}
-
-export type markSupportReportIrrelevantResponse500 = {
+export type acknowledgeTerminalExperienceManifestResponse500 = {
   data: string
   status: 500
 }
 
-export type markSupportReportIrrelevantResponse502 = {
-  data: string
-  status: 502
-}
-
-export type markSupportReportIrrelevantResponse503 = {
-  data: string
-  status: 503
-}
-
-export type markSupportReportIrrelevantResponseSuccess = (markSupportReportIrrelevantResponse200) & {
+export type acknowledgeTerminalExperienceManifestResponseSuccess = (acknowledgeTerminalExperienceManifestResponse204) & {
   headers: Headers;
 };
-export type markSupportReportIrrelevantResponseError = (markSupportReportIrrelevantResponse401 | markSupportReportIrrelevantResponse403 | markSupportReportIrrelevantResponse404 | markSupportReportIrrelevantResponse500 | markSupportReportIrrelevantResponse502 | markSupportReportIrrelevantResponse503) & {
+export type acknowledgeTerminalExperienceManifestResponseError = (acknowledgeTerminalExperienceManifestResponse400 | acknowledgeTerminalExperienceManifestResponse401 | acknowledgeTerminalExperienceManifestResponse403 | acknowledgeTerminalExperienceManifestResponse409 | acknowledgeTerminalExperienceManifestResponse500) & {
   headers: Headers;
 };
 
-export type markSupportReportIrrelevantResponse = (markSupportReportIrrelevantResponseSuccess | markSupportReportIrrelevantResponseError)
+export type acknowledgeTerminalExperienceManifestResponse = (acknowledgeTerminalExperienceManifestResponseSuccess | acknowledgeTerminalExperienceManifestResponseError)
 
-export const getMarkSupportReportIrrelevantUrl = (id: string,) => {
-
-
+export const getAcknowledgeTerminalExperienceManifestUrl = () => {
 
 
-  return `/support/reports/${id}/mark-irrelevant`
+
+
+  return `/terminal/experience/ack`
 }
 
-export const markSupportReportIrrelevant = async (id: string, options?: RequestInit): Promise<markSupportReportIrrelevantResponse> => {
+export const acknowledgeTerminalExperienceManifest = async (handlersTerminalExperienceAckRequestDoc: HandlersTerminalExperienceAckRequestDoc, options?: RequestInit): Promise<acknowledgeTerminalExperienceManifestResponse> => {
 
-  return orvalMutator<markSupportReportIrrelevantResponse>(getMarkSupportReportIrrelevantUrl(id),
-  {
-    ...options,
-    method: 'POST'
-
-
-  }
-);}
-
-
-
-
-export const getMarkSupportReportIrrelevantMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markSupportReportIrrelevant>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof markSupportReportIrrelevant>>, TError,{id: string}, TContext> => {
-
-const mutationKey = ['markSupportReportIrrelevant'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markSupportReportIrrelevant>>, {id: string}> = (props) => {
-          const {id} = props ?? {};
-
-          return  markSupportReportIrrelevant(id,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type MarkSupportReportIrrelevantMutationResult = NonNullable<Awaited<ReturnType<typeof markSupportReportIrrelevant>>>
-
-    export type MarkSupportReportIrrelevantMutationError = string
-
-    /**
- * @summary Mark support report as not relevant
- */
-export const useMarkSupportReportIrrelevant = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markSupportReportIrrelevant>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof markSupportReportIrrelevant>>,
-        TError,
-        {id: string},
-        TContext
-      > => {
-      return useMutation(getMarkSupportReportIrrelevantMutationOptions(options), queryClient);
-    }
-
-/**
- * Author or tenant admin only. Yandex Tracker reports only. Same company as the report author; roles admin/staff/supervisor/operator. Query q must be at least 2 characters.
- * @summary Search users who may receive a share for this report
- */
-export type listSupportReportShareCandidatesResponse200 = {
-  data: RepositorySupportReportShareCandidate[]
-  status: 200
-}
-
-export type listSupportReportShareCandidatesResponse400 = {
-  data: string
-  status: 400
-}
-
-export type listSupportReportShareCandidatesResponse401 = {
-  data: string
-  status: 401
-}
-
-export type listSupportReportShareCandidatesResponse403 = {
-  data: string
-  status: 403
-}
-
-export type listSupportReportShareCandidatesResponse404 = {
-  data: string
-  status: 404
-}
-
-export type listSupportReportShareCandidatesResponse501 = {
-  data: string
-  status: 501
-}
-
-export type listSupportReportShareCandidatesResponseSuccess = (listSupportReportShareCandidatesResponse200) & {
-  headers: Headers;
-};
-export type listSupportReportShareCandidatesResponseError = (listSupportReportShareCandidatesResponse400 | listSupportReportShareCandidatesResponse401 | listSupportReportShareCandidatesResponse403 | listSupportReportShareCandidatesResponse404 | listSupportReportShareCandidatesResponse501) & {
-  headers: Headers;
-};
-
-export type listSupportReportShareCandidatesResponse = (listSupportReportShareCandidatesResponseSuccess | listSupportReportShareCandidatesResponseError)
-
-export const getListSupportReportShareCandidatesUrl = (id: string,
-    params?: ListSupportReportShareCandidatesParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/support/reports/${id}/share-candidates?${stringifiedParams}` : `/support/reports/${id}/share-candidates`
-}
-
-export const listSupportReportShareCandidates = async (id: string,
-    params?: ListSupportReportShareCandidatesParams, options?: RequestInit): Promise<listSupportReportShareCandidatesResponse> => {
-
-  return orvalMutator<listSupportReportShareCandidatesResponse>(getListSupportReportShareCandidatesUrl(id,params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getListSupportReportShareCandidatesQueryKey = (id: string,
-    params?: ListSupportReportShareCandidatesParams,) => {
-    return [
-    `/support/reports/${id}/share-candidates`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getListSupportReportShareCandidatesQueryOptions = <TData = Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError = string>(id: string,
-    params?: ListSupportReportShareCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListSupportReportShareCandidatesQueryKey(id,params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSupportReportShareCandidates>>> = ({ signal }) => listSupportReportShareCandidates(id,params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type ListSupportReportShareCandidatesQueryResult = NonNullable<Awaited<ReturnType<typeof listSupportReportShareCandidates>>>
-export type ListSupportReportShareCandidatesQueryError = string
-
-
-export function useListSupportReportShareCandidates<TData = Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError = string>(
- id: string,
-    params: undefined |  ListSupportReportShareCandidatesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listSupportReportShareCandidates>>,
-          TError,
-          Awaited<ReturnType<typeof listSupportReportShareCandidates>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListSupportReportShareCandidates<TData = Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError = string>(
- id: string,
-    params?: ListSupportReportShareCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listSupportReportShareCandidates>>,
-          TError,
-          Awaited<ReturnType<typeof listSupportReportShareCandidates>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListSupportReportShareCandidates<TData = Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError = string>(
- id: string,
-    params?: ListSupportReportShareCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Search users who may receive a share for this report
- */
-
-export function useListSupportReportShareCandidates<TData = Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError = string>(
- id: string,
-    params?: ListSupportReportShareCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getListSupportReportShareCandidatesQueryOptions(id,params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-/**
- * Author or tenant admin only. Yandex Tracker reports only.
- * @summary List users this report is shared with
- */
-export type listSupportReportSharesResponse200 = {
-  data: ServicesSupportReportShareListItem[]
-  status: 200
-}
-
-export type listSupportReportSharesResponse401 = {
-  data: string
-  status: 401
-}
-
-export type listSupportReportSharesResponse403 = {
-  data: string
-  status: 403
-}
-
-export type listSupportReportSharesResponse404 = {
-  data: string
-  status: 404
-}
-
-export type listSupportReportSharesResponse501 = {
-  data: string
-  status: 501
-}
-
-export type listSupportReportSharesResponseSuccess = (listSupportReportSharesResponse200) & {
-  headers: Headers;
-};
-export type listSupportReportSharesResponseError = (listSupportReportSharesResponse401 | listSupportReportSharesResponse403 | listSupportReportSharesResponse404 | listSupportReportSharesResponse501) & {
-  headers: Headers;
-};
-
-export type listSupportReportSharesResponse = (listSupportReportSharesResponseSuccess | listSupportReportSharesResponseError)
-
-export const getListSupportReportSharesUrl = (id: string,) => {
-
-
-
-
-  return `/support/reports/${id}/shares`
-}
-
-export const listSupportReportShares = async (id: string, options?: RequestInit): Promise<listSupportReportSharesResponse> => {
-
-  return orvalMutator<listSupportReportSharesResponse>(getListSupportReportSharesUrl(id),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getListSupportReportSharesQueryKey = (id: string,) => {
-    return [
-    `/support/reports/${id}/shares`
-    ] as const;
-    }
-
-
-export const getListSupportReportSharesQueryOptions = <TData = Awaited<ReturnType<typeof listSupportReportShares>>, TError = string>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShares>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListSupportReportSharesQueryKey(id);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSupportReportShares>>> = ({ signal }) => listSupportReportShares(id, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShares>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type ListSupportReportSharesQueryResult = NonNullable<Awaited<ReturnType<typeof listSupportReportShares>>>
-export type ListSupportReportSharesQueryError = string
-
-
-export function useListSupportReportShares<TData = Awaited<ReturnType<typeof listSupportReportShares>>, TError = string>(
- id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShares>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listSupportReportShares>>,
-          TError,
-          Awaited<ReturnType<typeof listSupportReportShares>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListSupportReportShares<TData = Awaited<ReturnType<typeof listSupportReportShares>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShares>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listSupportReportShares>>,
-          TError,
-          Awaited<ReturnType<typeof listSupportReportShares>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListSupportReportShares<TData = Awaited<ReturnType<typeof listSupportReportShares>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShares>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List users this report is shared with
- */
-
-export function useListSupportReportShares<TData = Awaited<ReturnType<typeof listSupportReportShares>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShares>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getListSupportReportSharesQueryOptions(id,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-/**
- * Author or tenant admin only. Target must be in the author's company and have support roles. Syncs Yandex Tracker apiAccessToTheTicket.
- * @summary Share a support report with another user
- */
-export type addSupportReportShareResponse200 = {
-  data: ServicesSupportReportShareListItem[]
-  status: 200
-}
-
-export type addSupportReportShareResponse400 = {
-  data: string
-  status: 400
-}
-
-export type addSupportReportShareResponse401 = {
-  data: string
-  status: 401
-}
-
-export type addSupportReportShareResponse403 = {
-  data: string
-  status: 403
-}
-
-export type addSupportReportShareResponse404 = {
-  data: string
-  status: 404
-}
-
-export type addSupportReportShareResponse501 = {
-  data: string
-  status: 501
-}
-
-export type addSupportReportShareResponse502 = {
-  data: string
-  status: 502
-}
-
-export type addSupportReportShareResponse503 = {
-  data: string
-  status: 503
-}
-
-export type addSupportReportShareResponseSuccess = (addSupportReportShareResponse200) & {
-  headers: Headers;
-};
-export type addSupportReportShareResponseError = (addSupportReportShareResponse400 | addSupportReportShareResponse401 | addSupportReportShareResponse403 | addSupportReportShareResponse404 | addSupportReportShareResponse501 | addSupportReportShareResponse502 | addSupportReportShareResponse503) & {
-  headers: Headers;
-};
-
-export type addSupportReportShareResponse = (addSupportReportShareResponseSuccess | addSupportReportShareResponseError)
-
-export const getAddSupportReportShareUrl = (id: string,) => {
-
-
-
-
-  return `/support/reports/${id}/shares`
-}
-
-export const addSupportReportShare = async (id: string,
-    handlersAddSupportReportShareRequest: HandlersAddSupportReportShareRequest, options?: RequestInit): Promise<addSupportReportShareResponse> => {
-
-  return orvalMutator<addSupportReportShareResponse>(getAddSupportReportShareUrl(id),
+  return terminalOrvalMutator<acknowledgeTerminalExperienceManifestResponse>(getAcknowledgeTerminalExperienceManifestUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      handlersAddSupportReportShareRequest,)
+      handlersTerminalExperienceAckRequestDoc,)
   }
 );}
 
 
 
 
-export const getAddSupportReportShareMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addSupportReportShare>>, TError,{id: string;data: HandlersAddSupportReportShareRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof addSupportReportShare>>, TError,{id: string;data: HandlersAddSupportReportShareRequest}, TContext> => {
+export const getAcknowledgeTerminalExperienceManifestMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acknowledgeTerminalExperienceManifest>>, TError,{data: HandlersTerminalExperienceAckRequestDoc}, TContext>, request?: SecondParameter<typeof terminalOrvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof acknowledgeTerminalExperienceManifest>>, TError,{data: HandlersTerminalExperienceAckRequestDoc}, TContext> => {
 
-const mutationKey = ['addSupportReportShare'];
+const mutationKey = ['acknowledgeTerminalExperienceManifest'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -4678,10 +3711,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addSupportReportShare>>, {id: string;data: HandlersAddSupportReportShareRequest}> = (props) => {
-          const {id,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof acknowledgeTerminalExperienceManifest>>, {data: HandlersTerminalExperienceAckRequestDoc}> = (props) => {
+          const {data} = props ?? {};
 
-          return  addSupportReportShare(id,data,requestOptions)
+          return  acknowledgeTerminalExperienceManifest(data,requestOptions)
         }
 
 
@@ -4691,137 +3724,20 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type AddSupportReportShareMutationResult = NonNullable<Awaited<ReturnType<typeof addSupportReportShare>>>
-    export type AddSupportReportShareMutationBody = HandlersAddSupportReportShareRequest
-    export type AddSupportReportShareMutationError = string
+    export type AcknowledgeTerminalExperienceManifestMutationResult = NonNullable<Awaited<ReturnType<typeof acknowledgeTerminalExperienceManifest>>>
+    export type AcknowledgeTerminalExperienceManifestMutationBody = HandlersTerminalExperienceAckRequestDoc
+    export type AcknowledgeTerminalExperienceManifestMutationError = string
 
     /**
- * @summary Share a support report with another user
+ * @summary Acknowledge the terminal experience manifest
  */
-export const useAddSupportReportShare = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addSupportReportShare>>, TError,{id: string;data: HandlersAddSupportReportShareRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useAcknowledgeTerminalExperienceManifest = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acknowledgeTerminalExperienceManifest>>, TError,{data: HandlersTerminalExperienceAckRequestDoc}, TContext>, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof addSupportReportShare>>,
+        Awaited<ReturnType<typeof acknowledgeTerminalExperienceManifest>>,
         TError,
-        {id: string;data: HandlersAddSupportReportShareRequest},
+        {data: HandlersTerminalExperienceAckRequestDoc},
         TContext
       > => {
-      return useMutation(getAddSupportReportShareMutationOptions(options), queryClient);
-    }
-
-/**
- * Author or tenant admin only. Syncs Yandex Tracker apiAccessToTheTicket.
- * @summary Revoke a support report share
- */
-export type removeSupportReportShareResponse200 = {
-  data: ServicesSupportReportShareListItem[]
-  status: 200
-}
-
-export type removeSupportReportShareResponse401 = {
-  data: string
-  status: 401
-}
-
-export type removeSupportReportShareResponse403 = {
-  data: string
-  status: 403
-}
-
-export type removeSupportReportShareResponse404 = {
-  data: string
-  status: 404
-}
-
-export type removeSupportReportShareResponse501 = {
-  data: string
-  status: 501
-}
-
-export type removeSupportReportShareResponse502 = {
-  data: string
-  status: 502
-}
-
-export type removeSupportReportShareResponse503 = {
-  data: string
-  status: 503
-}
-
-export type removeSupportReportShareResponseSuccess = (removeSupportReportShareResponse200) & {
-  headers: Headers;
-};
-export type removeSupportReportShareResponseError = (removeSupportReportShareResponse401 | removeSupportReportShareResponse403 | removeSupportReportShareResponse404 | removeSupportReportShareResponse501 | removeSupportReportShareResponse502 | removeSupportReportShareResponse503) & {
-  headers: Headers;
-};
-
-export type removeSupportReportShareResponse = (removeSupportReportShareResponseSuccess | removeSupportReportShareResponseError)
-
-export const getRemoveSupportReportShareUrl = (id: string,
-    sharedWithUserId: string,) => {
-
-
-
-
-  return `/support/reports/${id}/shares/${sharedWithUserId}`
-}
-
-export const removeSupportReportShare = async (id: string,
-    sharedWithUserId: string, options?: RequestInit): Promise<removeSupportReportShareResponse> => {
-
-  return orvalMutator<removeSupportReportShareResponse>(getRemoveSupportReportShareUrl(id,sharedWithUserId),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-
-
-
-export const getRemoveSupportReportShareMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeSupportReportShare>>, TError,{id: string;sharedWithUserId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof removeSupportReportShare>>, TError,{id: string;sharedWithUserId: string}, TContext> => {
-
-const mutationKey = ['removeSupportReportShare'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeSupportReportShare>>, {id: string;sharedWithUserId: string}> = (props) => {
-          const {id,sharedWithUserId} = props ?? {};
-
-          return  removeSupportReportShare(id,sharedWithUserId,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type RemoveSupportReportShareMutationResult = NonNullable<Awaited<ReturnType<typeof removeSupportReportShare>>>
-
-    export type RemoveSupportReportShareMutationError = string
-
-    /**
- * @summary Revoke a support report share
- */
-export const useRemoveSupportReportShare = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeSupportReportShare>>, TError,{id: string;sharedWithUserId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof removeSupportReportShare>>,
-        TError,
-        {id: string;sharedWithUserId: string},
-        TContext
-      > => {
-      return useMutation(getRemoveSupportReportShareMutationOptions(options), queryClient);
+      return useMutation(getAcknowledgeTerminalExperienceManifestMutationOptions(options), queryClient);
     }

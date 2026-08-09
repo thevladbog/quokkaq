@@ -45,6 +45,19 @@ export interface HandlersAnnouncementRequest {
   text?: string;
 }
 
+export type HandlersAppliedExperienceAcknowledgementStatus = typeof HandlersAppliedExperienceAcknowledgementStatus[keyof typeof HandlersAppliedExperienceAcknowledgementStatus];
+
+
+export const HandlersAppliedExperienceAcknowledgementStatus = {
+  applied: 'applied',
+} as const;
+
+export interface HandlersAppliedExperienceAcknowledgement {
+  status: HandlersAppliedExperienceAcknowledgementStatus;
+  /** @minLength 1 */
+  versionId: string;
+}
+
 export interface HandlersAssignUnitRequest {
   permissions?: string[];
   unitId?: string;
@@ -615,25 +628,43 @@ export interface HandlersCreateDesktopTerminalRequest {
   unitId?: string;
 }
 
-export interface HandlersDesktopTerminalJSON {
-  counterId?: string;
+export interface HandlersDesktopTerminalResponseDoc {
+  /** @nullable */
+  appliedTemplateAt?: string | null;
+  /** @nullable */
+  appliedTemplateVersionId?: string | null;
+  /** @nullable */
+  counterId?: string | null;
   counterName?: string;
   createdAt?: string;
   defaultLocale?: string;
+  /** @nullable */
+  experienceAckAt?: string | null;
+  /** @nullable */
+  experienceAckReasonCode?: string | null;
+  /** @nullable */
+  experienceAckStatus?: string | null;
+  /** @nullable */
+  experienceTemplateId?: string | null;
+  /** @nullable */
+  experienceVariantId?: string | null;
   id?: string;
   kind?: string;
   kioskFullscreen?: boolean;
-  lastSeenAt?: string;
-  name?: string;
-  revokedAt?: string;
+  /** @nullable */
+  lastSeenAt?: string | null;
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  revokedAt?: string | null;
   unitId?: string;
   unitName?: string;
   updatedAt?: string;
 }
 
-export interface HandlersCreateDesktopTerminalResponse {
+export interface HandlersCreateDesktopTerminalResponseDoc {
   pairingCode?: string;
-  terminal?: HandlersDesktopTerminalJSON;
+  terminal?: HandlersDesktopTerminalResponseDoc;
 }
 
 export type HandlersCreateFeedRequestConfig = { [key: string]: unknown };
@@ -687,9 +718,20 @@ export interface HandlersCreateScheduleRequest {
 
 export type HandlersCreateScreenLayoutTemplateRequestDefinition = { [key: string]: unknown };
 
+export type HandlersCreateScreenLayoutTemplateRequestSurface = typeof HandlersCreateScreenLayoutTemplateRequestSurface[keyof typeof HandlersCreateScreenLayoutTemplateRequestSurface];
+
+
+export const HandlersCreateScreenLayoutTemplateRequestSurface = {
+  'ticket-station': 'ticket-station',
+  'queue-display': 'queue-display',
+  'counter-display': 'counter-display',
+  'visitor-mobile': 'visitor-mobile',
+} as const;
+
 export interface HandlersCreateScreenLayoutTemplateRequest {
   definition?: HandlersCreateScreenLayoutTemplateRequestDefinition;
   name?: string;
+  surface?: HandlersCreateScreenLayoutTemplateRequestSurface;
 }
 
 export interface HandlersTenantRoleUnitJSON {
@@ -761,6 +803,25 @@ export interface HandlersDaDataFindPartyByInnRequest {
 export interface HandlersDaDataPassthroughRequest { [key: string]: unknown }
 
 export interface HandlersDaDataUpstreamResponse { [key: string]: unknown }
+
+export type HandlersExperienceManifestDefinition = { [key: string]: unknown };
+
+export type HandlersExperienceManifestMode = typeof HandlersExperienceManifestMode[keyof typeof HandlersExperienceManifestMode];
+
+
+export const HandlersExperienceManifestMode = {
+  experience: 'experience',
+} as const;
+
+export interface HandlersExperienceManifest {
+  definition: HandlersExperienceManifestDefinition;
+  mode: HandlersExperienceManifestMode;
+  publishedAt: string;
+  templateId: string;
+  variantId: string;
+  version: number;
+  versionId: string;
+}
 
 export interface HandlersFeaturesFlags {
   dadata?: boolean;
@@ -869,6 +930,17 @@ export interface HandlersKioskVisitorSurveyRequest {
   emoji?: string;
   score?: number;
   ticketId?: string;
+}
+
+export type HandlersLegacyManifestMode = typeof HandlersLegacyManifestMode[keyof typeof HandlersLegacyManifestMode];
+
+
+export const HandlersLegacyManifestMode = {
+  legacy: 'legacy',
+} as const;
+
+export interface HandlersLegacyManifest {
+  mode: HandlersLegacyManifestMode;
 }
 
 export interface HandlersLoginLinkResponse {
@@ -1232,6 +1304,25 @@ export interface HandlersRegisterUserRequest {
   token: string;
 }
 
+export type HandlersRejectedExperienceAcknowledgementStatus = typeof HandlersRejectedExperienceAcknowledgementStatus[keyof typeof HandlersRejectedExperienceAcknowledgementStatus];
+
+
+export const HandlersRejectedExperienceAcknowledgementStatus = {
+  rejected: 'rejected',
+} as const;
+
+export interface HandlersRejectedExperienceAcknowledgement {
+  /**
+     * @minLength 1
+     * @maxLength 64
+     * @pattern ^[a-z0-9]+(?:[._-][a-z0-9]+)*$
+     */
+  reasonCode: string;
+  status: HandlersRejectedExperienceAcknowledgementStatus;
+  /** @minLength 1 */
+  versionId: string;
+}
+
 export interface HandlersRemoveUnitRequest {
   unitId?: string;
 }
@@ -1410,6 +1501,10 @@ export interface HandlersTerminalBootstrapResponse {
   unitId?: string;
 }
 
+export type HandlersTerminalExperienceAckRequestDoc = HandlersAppliedExperienceAcknowledgement | HandlersRejectedExperienceAcknowledgement;
+
+export type HandlersTerminalExperienceManifestResponseDoc = HandlersLegacyManifest | HandlersExperienceManifest;
+
 export interface HandlersTestSMSIntegrationRequest {
   /** Phone number in E.164 format to send the test SMS to. */
   phone?: string;
@@ -1512,11 +1607,26 @@ export interface HandlersUpdateCounterRequest {
   serviceZoneId?: string;
 }
 
-export interface HandlersUpdateDesktopTerminalRequest {
-  contextUnitId?: string;
-  counterId?: string;
+export type HandlersUpdateDesktopTerminalRequestDocKind = typeof HandlersUpdateDesktopTerminalRequestDocKind[keyof typeof HandlersUpdateDesktopTerminalRequestDocKind];
+
+
+export const HandlersUpdateDesktopTerminalRequestDocKind = {
+  kiosk: 'kiosk',
+  counter_guest_survey: 'counter_guest_survey',
+  counter_board: 'counter_board',
+} as const;
+
+export interface HandlersUpdateDesktopTerminalRequestDoc {
+  /** @nullable */
+  contextUnitId?: string | null;
+  /** @nullable */
+  counterId?: string | null;
   defaultLocale?: string;
-  kind?: string;
+  /** @nullable */
+  experienceTemplateId?: string | null;
+  /** @nullable */
+  experienceVariantId?: string | null;
+  kind?: HandlersUpdateDesktopTerminalRequestDocKind;
   kioskFullscreen?: boolean;
   name?: string;
   unitId?: string;
@@ -1531,9 +1641,20 @@ export interface HandlersUpdatePlaylistRequest {
 
 export type HandlersUpdateScreenLayoutTemplateRequestDefinition = { [key: string]: unknown };
 
+export type HandlersUpdateScreenLayoutTemplateRequestSurface = typeof HandlersUpdateScreenLayoutTemplateRequestSurface[keyof typeof HandlersUpdateScreenLayoutTemplateRequestSurface];
+
+
+export const HandlersUpdateScreenLayoutTemplateRequestSurface = {
+  'ticket-station': 'ticket-station',
+  'queue-display': 'queue-display',
+  'counter-display': 'counter-display',
+  'visitor-mobile': 'visitor-mobile',
+} as const;
+
 export interface HandlersUpdateScreenLayoutTemplateRequest {
   definition?: HandlersUpdateScreenLayoutTemplateRequestDefinition;
   name?: string;
+  surface?: HandlersUpdateScreenLayoutTemplateRequestSurface;
 }
 
 export interface HandlersUpdateStatusRequest {
@@ -2354,6 +2475,34 @@ export interface ModelsDayScheduleWithBookings {
   updatedAt?: string;
 }
 
+export type ModelsExperienceTemplateVersionDefinition = { [key: string]: unknown };
+
+export interface ModelsExperienceTemplateVersion {
+  definition?: ModelsExperienceTemplateVersionDefinition;
+  id?: string;
+  publishedAt?: string;
+  /** @nullable */
+  publishedBy?: string | null;
+  templateId?: string;
+  version?: number;
+}
+
+export interface ModelsExperienceTemplateVersionMetadata {
+  id?: string;
+  publishedAt?: string;
+  /** @nullable */
+  publishedBy?: string | null;
+  templateId?: string;
+  version?: number;
+}
+
+export interface ModelsExperienceTemplateVersionPage {
+  hasMore?: boolean;
+  items?: ModelsExperienceTemplateVersionMetadata[];
+  /** @nullable */
+  nextBeforeVersion: number | null;
+}
+
 export type ModelsExternalFeedCachedData = { [key: string]: unknown };
 
 export type ModelsExternalFeedConfig = { [key: string]: unknown };
@@ -2595,6 +2744,8 @@ export interface ModelsScreenLayoutTemplate {
   definition?: ModelsScreenLayoutTemplateDefinition;
   id?: string;
   name?: string;
+  publishedVersionId?: string;
+  surface?: string;
   updatedAt?: string;
 }
 

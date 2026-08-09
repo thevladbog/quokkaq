@@ -54,6 +54,19 @@ export interface HandlersAnnouncementRequest {
   text?: string;
 }
 
+export type HandlersAppliedExperienceAcknowledgementStatus = typeof HandlersAppliedExperienceAcknowledgementStatus[keyof typeof HandlersAppliedExperienceAcknowledgementStatus];
+
+
+export const HandlersAppliedExperienceAcknowledgementStatus = {
+  applied: 'applied',
+} as const;
+
+export interface HandlersAppliedExperienceAcknowledgement {
+  status: HandlersAppliedExperienceAcknowledgementStatus;
+  /** @minLength 1 */
+  versionId: string;
+}
+
 export interface HandlersAssignUnitRequest {
   permissions?: string[];
   unitId?: string;
@@ -624,25 +637,43 @@ export interface HandlersCreateDesktopTerminalRequest {
   unitId?: string;
 }
 
-export interface HandlersDesktopTerminalJSON {
-  counterId?: string;
+export interface HandlersDesktopTerminalResponseDoc {
+  /** @nullable */
+  appliedTemplateAt?: string | null;
+  /** @nullable */
+  appliedTemplateVersionId?: string | null;
+  /** @nullable */
+  counterId?: string | null;
   counterName?: string;
   createdAt?: string;
   defaultLocale?: string;
+  /** @nullable */
+  experienceAckAt?: string | null;
+  /** @nullable */
+  experienceAckReasonCode?: string | null;
+  /** @nullable */
+  experienceAckStatus?: string | null;
+  /** @nullable */
+  experienceTemplateId?: string | null;
+  /** @nullable */
+  experienceVariantId?: string | null;
   id?: string;
   kind?: string;
   kioskFullscreen?: boolean;
-  lastSeenAt?: string;
-  name?: string;
-  revokedAt?: string;
+  /** @nullable */
+  lastSeenAt?: string | null;
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  revokedAt?: string | null;
   unitId?: string;
   unitName?: string;
   updatedAt?: string;
 }
 
-export interface HandlersCreateDesktopTerminalResponse {
+export interface HandlersCreateDesktopTerminalResponseDoc {
   pairingCode?: string;
-  terminal?: HandlersDesktopTerminalJSON;
+  terminal?: HandlersDesktopTerminalResponseDoc;
 }
 
 export type HandlersCreateFeedRequestConfig = { [key: string]: unknown };
@@ -696,9 +727,20 @@ export interface HandlersCreateScheduleRequest {
 
 export type HandlersCreateScreenLayoutTemplateRequestDefinition = { [key: string]: unknown };
 
+export type HandlersCreateScreenLayoutTemplateRequestSurface = typeof HandlersCreateScreenLayoutTemplateRequestSurface[keyof typeof HandlersCreateScreenLayoutTemplateRequestSurface];
+
+
+export const HandlersCreateScreenLayoutTemplateRequestSurface = {
+  'ticket-station': 'ticket-station',
+  'queue-display': 'queue-display',
+  'counter-display': 'counter-display',
+  'visitor-mobile': 'visitor-mobile',
+} as const;
+
 export interface HandlersCreateScreenLayoutTemplateRequest {
   definition?: HandlersCreateScreenLayoutTemplateRequestDefinition;
   name?: string;
+  surface?: HandlersCreateScreenLayoutTemplateRequestSurface;
 }
 
 export interface HandlersTenantRoleUnitJSON {
@@ -770,6 +812,25 @@ export interface HandlersDaDataFindPartyByInnRequest {
 export interface HandlersDaDataPassthroughRequest { [key: string]: unknown }
 
 export interface HandlersDaDataUpstreamResponse { [key: string]: unknown }
+
+export type HandlersExperienceManifestDefinition = { [key: string]: unknown };
+
+export type HandlersExperienceManifestMode = typeof HandlersExperienceManifestMode[keyof typeof HandlersExperienceManifestMode];
+
+
+export const HandlersExperienceManifestMode = {
+  experience: 'experience',
+} as const;
+
+export interface HandlersExperienceManifest {
+  definition: HandlersExperienceManifestDefinition;
+  mode: HandlersExperienceManifestMode;
+  publishedAt: string;
+  templateId: string;
+  variantId: string;
+  version: number;
+  versionId: string;
+}
 
 export interface HandlersFeaturesFlags {
   dadata?: boolean;
@@ -878,6 +939,17 @@ export interface HandlersKioskVisitorSurveyRequest {
   emoji?: string;
   score?: number;
   ticketId?: string;
+}
+
+export type HandlersLegacyManifestMode = typeof HandlersLegacyManifestMode[keyof typeof HandlersLegacyManifestMode];
+
+
+export const HandlersLegacyManifestMode = {
+  legacy: 'legacy',
+} as const;
+
+export interface HandlersLegacyManifest {
+  mode: HandlersLegacyManifestMode;
 }
 
 export interface HandlersLoginLinkResponse {
@@ -1241,6 +1313,25 @@ export interface HandlersRegisterUserRequest {
   token: string;
 }
 
+export type HandlersRejectedExperienceAcknowledgementStatus = typeof HandlersRejectedExperienceAcknowledgementStatus[keyof typeof HandlersRejectedExperienceAcknowledgementStatus];
+
+
+export const HandlersRejectedExperienceAcknowledgementStatus = {
+  rejected: 'rejected',
+} as const;
+
+export interface HandlersRejectedExperienceAcknowledgement {
+  /**
+     * @minLength 1
+     * @maxLength 64
+     * @pattern ^[a-z0-9]+(?:[._-][a-z0-9]+)*$
+     */
+  reasonCode: string;
+  status: HandlersRejectedExperienceAcknowledgementStatus;
+  /** @minLength 1 */
+  versionId: string;
+}
+
 export interface HandlersRemoveUnitRequest {
   unitId?: string;
 }
@@ -1419,6 +1510,10 @@ export interface HandlersTerminalBootstrapResponse {
   unitId?: string;
 }
 
+export type HandlersTerminalExperienceAckRequestDoc = HandlersAppliedExperienceAcknowledgement | HandlersRejectedExperienceAcknowledgement;
+
+export type HandlersTerminalExperienceManifestResponseDoc = HandlersLegacyManifest | HandlersExperienceManifest;
+
 export interface HandlersTestSMSIntegrationRequest {
   /** Phone number in E.164 format to send the test SMS to. */
   phone?: string;
@@ -1521,11 +1616,26 @@ export interface HandlersUpdateCounterRequest {
   serviceZoneId?: string;
 }
 
-export interface HandlersUpdateDesktopTerminalRequest {
-  contextUnitId?: string;
-  counterId?: string;
+export type HandlersUpdateDesktopTerminalRequestDocKind = typeof HandlersUpdateDesktopTerminalRequestDocKind[keyof typeof HandlersUpdateDesktopTerminalRequestDocKind];
+
+
+export const HandlersUpdateDesktopTerminalRequestDocKind = {
+  kiosk: 'kiosk',
+  counter_guest_survey: 'counter_guest_survey',
+  counter_board: 'counter_board',
+} as const;
+
+export interface HandlersUpdateDesktopTerminalRequestDoc {
+  /** @nullable */
+  contextUnitId?: string | null;
+  /** @nullable */
+  counterId?: string | null;
   defaultLocale?: string;
-  kind?: string;
+  /** @nullable */
+  experienceTemplateId?: string | null;
+  /** @nullable */
+  experienceVariantId?: string | null;
+  kind?: HandlersUpdateDesktopTerminalRequestDocKind;
   kioskFullscreen?: boolean;
   name?: string;
   unitId?: string;
@@ -1540,9 +1650,20 @@ export interface HandlersUpdatePlaylistRequest {
 
 export type HandlersUpdateScreenLayoutTemplateRequestDefinition = { [key: string]: unknown };
 
+export type HandlersUpdateScreenLayoutTemplateRequestSurface = typeof HandlersUpdateScreenLayoutTemplateRequestSurface[keyof typeof HandlersUpdateScreenLayoutTemplateRequestSurface];
+
+
+export const HandlersUpdateScreenLayoutTemplateRequestSurface = {
+  'ticket-station': 'ticket-station',
+  'queue-display': 'queue-display',
+  'counter-display': 'counter-display',
+  'visitor-mobile': 'visitor-mobile',
+} as const;
+
 export interface HandlersUpdateScreenLayoutTemplateRequest {
   definition?: HandlersUpdateScreenLayoutTemplateRequestDefinition;
   name?: string;
+  surface?: HandlersUpdateScreenLayoutTemplateRequestSurface;
 }
 
 export interface HandlersUpdateStatusRequest {
@@ -2363,6 +2484,34 @@ export interface ModelsDayScheduleWithBookings {
   updatedAt?: string;
 }
 
+export type ModelsExperienceTemplateVersionDefinition = { [key: string]: unknown };
+
+export interface ModelsExperienceTemplateVersion {
+  definition?: ModelsExperienceTemplateVersionDefinition;
+  id?: string;
+  publishedAt?: string;
+  /** @nullable */
+  publishedBy?: string | null;
+  templateId?: string;
+  version?: number;
+}
+
+export interface ModelsExperienceTemplateVersionMetadata {
+  id?: string;
+  publishedAt?: string;
+  /** @nullable */
+  publishedBy?: string | null;
+  templateId?: string;
+  version?: number;
+}
+
+export interface ModelsExperienceTemplateVersionPage {
+  hasMore?: boolean;
+  items?: ModelsExperienceTemplateVersionMetadata[];
+  /** @nullable */
+  nextBeforeVersion: number | null;
+}
+
 export type ModelsExternalFeedCachedData = { [key: string]: unknown };
 
 export type ModelsExternalFeedConfig = { [key: string]: unknown };
@@ -2604,6 +2753,8 @@ export interface ModelsScreenLayoutTemplate {
   definition?: ModelsScreenLayoutTemplateDefinition;
   id?: string;
   name?: string;
+  publishedVersionId?: string;
+  surface?: string;
   updatedAt?: string;
 }
 
@@ -3450,7 +3601,7 @@ export const useBootstrapDesktopTerminal = <TError = string,
  * @summary List desktop terminals
  */
 export type listDesktopTerminalsResponse200 = {
-  data: HandlersDesktopTerminalJSON[]
+  data: HandlersDesktopTerminalResponseDoc[]
   status: 200
 }
 
@@ -3586,7 +3737,7 @@ export function useListDesktopTerminals<TData = Awaited<ReturnType<typeof listDe
  * @summary Create desktop terminal
  */
 export type createDesktopTerminalResponse201 = {
-  data: HandlersCreateDesktopTerminalResponse
+  data: HandlersCreateDesktopTerminalResponseDoc
   status: 201
 }
 
@@ -3697,7 +3848,7 @@ export const useCreateDesktopTerminal = <TError = string,
  * @summary Get desktop terminal by ID
  */
 export type getDesktopTerminalByIDResponse200 = {
-  data: HandlersDesktopTerminalJSON
+  data: HandlersDesktopTerminalResponseDoc
   status: 200
 }
 
@@ -3834,7 +3985,7 @@ export function useGetDesktopTerminalByID<TData = Awaited<ReturnType<typeof getD
 
 
 /**
- * Patches name, locale, kiosk fullscreen, and optionally counter binding. Body may include `kind` (kiosk | counter_guest_survey | counter_board) with `counterId`/`contextUnitId` when changing bindings; metadata-only updates omit counter fields.
+ * Patches terminal metadata and optionally assigns an experience. Omit both experience fields to preserve; provide both strings to assign; provide both null to unassign. Acknowledgement fields are server-controlled.
  * @summary Update desktop terminal
  */
 export type updateDesktopTerminalResponse204 = {
@@ -3862,6 +4013,11 @@ export type updateDesktopTerminalResponse404 = {
   status: 404
 }
 
+export type updateDesktopTerminalResponse409 = {
+  data: string
+  status: 409
+}
+
 export type updateDesktopTerminalResponse500 = {
   data: string
   status: 500
@@ -3870,7 +4026,7 @@ export type updateDesktopTerminalResponse500 = {
 export type updateDesktopTerminalResponseSuccess = (updateDesktopTerminalResponse204) & {
   headers: Headers;
 };
-export type updateDesktopTerminalResponseError = (updateDesktopTerminalResponse400 | updateDesktopTerminalResponse401 | updateDesktopTerminalResponse403 | updateDesktopTerminalResponse404 | updateDesktopTerminalResponse500) & {
+export type updateDesktopTerminalResponseError = (updateDesktopTerminalResponse400 | updateDesktopTerminalResponse401 | updateDesktopTerminalResponse403 | updateDesktopTerminalResponse404 | updateDesktopTerminalResponse409 | updateDesktopTerminalResponse500) & {
   headers: Headers;
 };
 
@@ -3885,7 +4041,7 @@ export const getUpdateDesktopTerminalUrl = (id: string,) => {
 }
 
 export const updateDesktopTerminal = async (id: string,
-    handlersUpdateDesktopTerminalRequest: HandlersUpdateDesktopTerminalRequest, options?: RequestInit): Promise<updateDesktopTerminalResponse> => {
+    handlersUpdateDesktopTerminalRequestDoc: HandlersUpdateDesktopTerminalRequestDoc, options?: RequestInit): Promise<updateDesktopTerminalResponse> => {
 
   return orvalMutator<updateDesktopTerminalResponse>(getUpdateDesktopTerminalUrl(id),
   {
@@ -3893,7 +4049,7 @@ export const updateDesktopTerminal = async (id: string,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      handlersUpdateDesktopTerminalRequest,)
+      handlersUpdateDesktopTerminalRequestDoc,)
   }
 );}
 
@@ -3901,8 +4057,8 @@ export const updateDesktopTerminal = async (id: string,
 
 
 export const getUpdateDesktopTerminalMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDesktopTerminal>>, TError,{id: string;data: HandlersUpdateDesktopTerminalRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateDesktopTerminal>>, TError,{id: string;data: HandlersUpdateDesktopTerminalRequest}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDesktopTerminal>>, TError,{id: string;data: HandlersUpdateDesktopTerminalRequestDoc}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDesktopTerminal>>, TError,{id: string;data: HandlersUpdateDesktopTerminalRequestDoc}, TContext> => {
 
 const mutationKey = ['updateDesktopTerminal'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -3914,7 +4070,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDesktopTerminal>>, {id: string;data: HandlersUpdateDesktopTerminalRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDesktopTerminal>>, {id: string;data: HandlersUpdateDesktopTerminalRequestDoc}> = (props) => {
           const {id,data} = props ?? {};
 
           return  updateDesktopTerminal(id,data,requestOptions)
@@ -3928,18 +4084,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type UpdateDesktopTerminalMutationResult = NonNullable<Awaited<ReturnType<typeof updateDesktopTerminal>>>
-    export type UpdateDesktopTerminalMutationBody = HandlersUpdateDesktopTerminalRequest
+    export type UpdateDesktopTerminalMutationBody = HandlersUpdateDesktopTerminalRequestDoc
     export type UpdateDesktopTerminalMutationError = string
 
     /**
  * @summary Update desktop terminal
  */
 export const useUpdateDesktopTerminal = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDesktopTerminal>>, TError,{id: string;data: HandlersUpdateDesktopTerminalRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDesktopTerminal>>, TError,{id: string;data: HandlersUpdateDesktopTerminalRequestDoc}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof updateDesktopTerminal>>,
         TError,
-        {id: string;data: HandlersUpdateDesktopTerminalRequest},
+        {id: string;data: HandlersUpdateDesktopTerminalRequestDoc},
         TContext
       > => {
       return useMutation(getUpdateDesktopTerminalMutationOptions(options), queryClient);

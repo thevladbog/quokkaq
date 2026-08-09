@@ -38,6 +38,20 @@ components:
                 text:
                     type: string
             type: object
+        handlers.AppliedExperienceAcknowledgement:
+            additionalProperties: false
+            properties:
+                status:
+                    enum:
+                        - applied
+                    type: string
+                versionId:
+                    minLength: 1
+                    type: string
+            required:
+                - versionId
+                - status
+            type: object
         handlers.AssignUnitRequest:
             properties:
                 permissions:
@@ -193,12 +207,12 @@ components:
                 unitId:
                     type: string
             type: object
-        handlers.CreateDesktopTerminalResponse:
+        handlers.CreateDesktopTerminalResponseDoc:
             properties:
                 pairingCode:
                     type: string
                 terminal:
-                    $ref: '#/components/schemas/handlers.DesktopTerminalJSON'
+                    $ref: '#/components/schemas/handlers.DesktopTerminalResponseDoc'
             type: object
         handlers.CreateFeedRequest:
             properties:
@@ -267,6 +281,13 @@ components:
                     type: object
                 name:
                     example: Lobby wide
+                    type: string
+                surface:
+                    enum:
+                        - ticket-station
+                        - queue-display
+                        - counter-display
+                        - visitor-mobile
                     type: string
             type: object
         handlers.CreateTenantRoleJSON:
@@ -363,15 +384,37 @@ components:
         handlers.DaDataUpstreamResponse:
             additionalProperties: true
             type: object
-        handlers.DesktopTerminalJSON:
+        handlers.DesktopTerminalResponseDoc:
             properties:
+                appliedTemplateAt:
+                    nullable: true
+                    type: string
+                appliedTemplateVersionId:
+                    nullable: true
+                    type: string
                 counterId:
+                    nullable: true
                     type: string
                 counterName:
                     type: string
                 createdAt:
                     type: string
                 defaultLocale:
+                    type: string
+                experienceAckAt:
+                    nullable: true
+                    type: string
+                experienceAckReasonCode:
+                    nullable: true
+                    type: string
+                experienceAckStatus:
+                    nullable: true
+                    type: string
+                experienceTemplateId:
+                    nullable: true
+                    type: string
+                experienceVariantId:
+                    nullable: true
                     type: string
                 id:
                     type: string
@@ -380,10 +423,13 @@ components:
                 kioskFullscreen:
                     type: boolean
                 lastSeenAt:
+                    nullable: true
                     type: string
                 name:
+                    nullable: true
                     type: string
                 revokedAt:
+                    nullable: true
                     type: string
                 unitId:
                     type: string
@@ -391,6 +437,34 @@ components:
                     type: string
                 updatedAt:
                     type: string
+            type: object
+        handlers.ExperienceManifest:
+            additionalProperties: false
+            properties:
+                definition:
+                    type: object
+                mode:
+                    enum:
+                        - experience
+                    type: string
+                publishedAt:
+                    type: string
+                templateId:
+                    type: string
+                variantId:
+                    type: string
+                version:
+                    type: integer
+                versionId:
+                    type: string
+            required:
+                - mode
+                - templateId
+                - versionId
+                - version
+                - variantId
+                - definition
+                - publishedAt
             type: object
         handlers.FeaturesFlags:
             properties:
@@ -563,6 +637,16 @@ components:
                     type: integer
                 ticketId:
                     type: string
+            type: object
+        handlers.LegacyManifest:
+            additionalProperties: false
+            properties:
+                mode:
+                    enum:
+                        - legacy
+                    type: string
+            required:
+                - mode
             type: object
         handlers.LoginLinkResponse:
             properties:
@@ -1103,6 +1187,27 @@ components:
                 - password
                 - token
             type: object
+        handlers.RejectedExperienceAcknowledgement:
+            additionalProperties: false
+            properties:
+                reasonCode:
+                    example: renderer.timeout
+                    maxLength: 64
+                    minLength: 1
+                    pattern: ^[a-z0-9]+(?:[._-][a-z0-9]+)*$
+                    type: string
+                status:
+                    enum:
+                        - rejected
+                    type: string
+                versionId:
+                    minLength: 1
+                    type: string
+            required:
+                - versionId
+                - status
+                - reasonCode
+            type: object
         handlers.RemoveUnitRequest:
             properties:
                 unitId:
@@ -1381,6 +1486,24 @@ components:
                 unitId:
                     type: string
             type: object
+        handlers.TerminalExperienceAckRequestDoc:
+            discriminator:
+                mapping:
+                    applied: '#/components/schemas/handlers.AppliedExperienceAcknowledgement'
+                    rejected: '#/components/schemas/handlers.RejectedExperienceAcknowledgement'
+                propertyName: status
+            oneOf:
+                - $ref: '#/components/schemas/handlers.AppliedExperienceAcknowledgement'
+                - $ref: '#/components/schemas/handlers.RejectedExperienceAcknowledgement'
+        handlers.TerminalExperienceManifestResponseDoc:
+            discriminator:
+                mapping:
+                    experience: '#/components/schemas/handlers.ExperienceManifest'
+                    legacy: '#/components/schemas/handlers.LegacyManifest'
+                propertyName: mode
+            oneOf:
+                - $ref: '#/components/schemas/handlers.LegacyManifest'
+                - $ref: '#/components/schemas/handlers.ExperienceManifest'
         handlers.TestSMSIntegrationRequest:
             properties:
                 phone:
@@ -1535,15 +1658,27 @@ components:
                 serviceZoneId:
                     type: string
             type: object
-        handlers.UpdateDesktopTerminalRequest:
+        handlers.UpdateDesktopTerminalRequestDoc:
             properties:
                 contextUnitId:
+                    nullable: true
                     type: string
                 counterId:
+                    nullable: true
                     type: string
                 defaultLocale:
                     type: string
+                experienceTemplateId:
+                    nullable: true
+                    type: string
+                experienceVariantId:
+                    nullable: true
+                    type: string
                 kind:
+                    enum:
+                        - kiosk
+                        - counter_guest_survey
+                        - counter_board
                     type: string
                 kioskFullscreen:
                     type: boolean
@@ -1571,6 +1706,13 @@ components:
                     type: object
                 name:
                     example: Lobby wide
+                    type: string
+                surface:
+                    enum:
+                        - ticket-station
+                        - queue-display
+                        - counter-display
+                        - visitor-mobile
                     type: string
             type: object
         handlers.UpdateStatusRequest:
@@ -2502,6 +2644,50 @@ components:
                 updatedAt:
                     type: string
             type: object
+        models.ExperienceTemplateVersion:
+            properties:
+                definition:
+                    type: object
+                id:
+                    type: string
+                publishedAt:
+                    type: string
+                publishedBy:
+                    nullable: true
+                    type: string
+                templateId:
+                    type: string
+                version:
+                    type: integer
+            type: object
+        models.ExperienceTemplateVersionMetadata:
+            properties:
+                id:
+                    type: string
+                publishedAt:
+                    type: string
+                publishedBy:
+                    nullable: true
+                    type: string
+                templateId:
+                    type: string
+                version:
+                    type: integer
+            type: object
+        models.ExperienceTemplateVersionPage:
+            properties:
+                hasMore:
+                    type: boolean
+                items:
+                    items:
+                        $ref: '#/components/schemas/models.ExperienceTemplateVersionMetadata'
+                    type: array
+                nextBeforeVersion:
+                    nullable: true
+                    type: integer
+            required:
+                - nextBeforeVersion
+            type: object
         models.ExternalFeed:
             properties:
                 cachedData:
@@ -3042,6 +3228,10 @@ components:
                 id:
                     type: string
                 name:
+                    type: string
+                publishedVersionId:
+                    type: string
+                surface:
                     type: string
                 updatedAt:
                     type: string
@@ -6997,12 +7187,24 @@ paths:
                             schema:
                                 type: string
                     description: Bad request
+                "401":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Unauthorized
                 "403":
                     content:
                         application/json:
                             schema:
                                 type: string
                     description: Forbidden
+                "413":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Request body too large
                 "500":
                     content:
                         application/json:
@@ -7027,6 +7229,12 @@ paths:
             responses:
                 "204":
                     description: No Content
+                "401":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Unauthorized
                 "403":
                     content:
                         application/json:
@@ -7039,6 +7247,12 @@ paths:
                             schema:
                                 type: string
                     description: Not found
+                "409":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Template is assigned to a terminal
                 "500":
                     content:
                         application/json:
@@ -7080,6 +7294,162 @@ paths:
                             schema:
                                 type: string
                     description: Bad request
+                "401":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Unauthorized
+                "403":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Forbidden
+                "404":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Not found
+                "409":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Surface conflict
+                "413":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Request body too large
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Internal error
+            security:
+                - BearerAuth: []
+            summary: Update a screen layout template
+            tags:
+                - companies
+    /companies/me/screen-layout-templates/{templateId}/publish:
+        post:
+            description: Validates the tenant-owned mutable draft and atomically creates a new immutable published version.
+            operationId: PublishScreenLayoutTemplate
+            parameters:
+                - description: Template ID
+                  in: path
+                  name: templateId
+                  required: true
+                  schema:
+                    type: string
+                - description: Tenant company UUID when the user belongs to multiple organizations
+                  in: header
+                  name: X-Company-Id
+                  schema:
+                    type: string
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/models.ExperienceTemplateVersion'
+                    description: Created
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Draft is not publishable
+                "401":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Unauthorized
+                "403":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Forbidden
+                "404":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Not found
+                "409":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Version conflict
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Internal error
+            security:
+                - BearerAuth: []
+            summary: Publish the current experience template draft
+            tags:
+                - companies
+    /companies/me/screen-layout-templates/{templateId}/versions:
+        get:
+            description: Returns metadata only in descending version order; immutable definitions are excluded from history pages.
+            operationId: ListScreenLayoutTemplateVersions
+            parameters:
+                - description: Template ID
+                  in: path
+                  name: templateId
+                  required: true
+                  schema:
+                    type: string
+                - description: Page size (default 20, maximum 100)
+                  in: query
+                  name: limit
+                  schema:
+                    type: integer
+                - description: Return versions lower than this version number
+                  in: query
+                  name: beforeVersion
+                  schema:
+                    type: integer
+                - description: Tenant company UUID when the user belongs to multiple organizations
+                  in: header
+                  name: X-Company-Id
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/models.ExperienceTemplateVersionPage'
+                    description: OK
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Invalid pagination
+                "401":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Unauthorized
+                "403":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Forbidden
                 "404":
                     content:
                         application/json:
@@ -7094,7 +7464,77 @@ paths:
                     description: Internal error
             security:
                 - BearerAuth: []
-            summary: Update a screen layout template
+            summary: List published experience template versions
+            tags:
+                - companies
+    /companies/me/screen-layout-templates/{templateId}/versions/{versionId}/restore:
+        post:
+            description: Copies one tenant-owned historical definition into a new immutable latest version and advances the published pointer.
+            operationId: RestoreScreenLayoutTemplateVersion
+            parameters:
+                - description: Template ID
+                  in: path
+                  name: templateId
+                  required: true
+                  schema:
+                    type: string
+                - description: Historical version ID
+                  in: path
+                  name: versionId
+                  required: true
+                  schema:
+                    type: string
+                - description: Tenant company UUID when the user belongs to multiple organizations
+                  in: header
+                  name: X-Company-Id
+                  schema:
+                    type: string
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/models.ExperienceTemplateVersion'
+                    description: Created
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Historical definition is not publishable
+                "401":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Unauthorized
+                "403":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Forbidden
+                "404":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Not found
+                "409":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Version conflict
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Internal error
+            security:
+                - BearerAuth: []
+            summary: Restore an experience template version
             tags:
                 - companies
     /companies/me/slug:
@@ -8477,7 +8917,7 @@ paths:
                         application/json:
                             schema:
                                 items:
-                                    $ref: '#/components/schemas/handlers.DesktopTerminalJSON'
+                                    $ref: '#/components/schemas/handlers.DesktopTerminalResponseDoc'
                                 type: array
                     description: OK
                 "400":
@@ -8531,7 +8971,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/handlers.CreateDesktopTerminalResponse'
+                                $ref: '#/components/schemas/handlers.CreateDesktopTerminalResponseDoc'
                     description: Created
                 "400":
                     content:
@@ -8589,7 +9029,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/handlers.DesktopTerminalJSON'
+                                $ref: '#/components/schemas/handlers.DesktopTerminalResponseDoc'
                     description: OK
                 "400":
                     content:
@@ -8627,7 +9067,7 @@ paths:
             tags:
                 - DesktopTerminal
         patch:
-            description: Patches name, locale, kiosk fullscreen, and optionally counter binding. Body may include `kind` (kiosk | counter_guest_survey | counter_board) with `counterId`/`contextUnitId` when changing bindings; metadata-only updates omit counter fields.
+            description: Patches terminal metadata and optionally assigns an experience. Omit both experience fields to preserve; provide both strings to assign; provide both null to unassign. Acknowledgement fields are server-controlled.
             operationId: updateDesktopTerminal
             parameters:
                 - description: Terminal ID
@@ -8645,7 +9085,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/handlers.UpdateDesktopTerminalRequest'
+                            $ref: '#/components/schemas/handlers.UpdateDesktopTerminalRequestDoc'
                 description: Update payload
                 required: true
                 x-originalParamName: body
@@ -8676,6 +9116,12 @@ paths:
                             schema:
                                 type: string
                     description: Not found
+                "409":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Published template conflict
                 "500":
                     content:
                         application/json:
@@ -12294,6 +12740,96 @@ paths:
             summary: Update a template
             tags:
                 - templates
+    /terminal/experience:
+        get:
+            description: Returns legacy mode when no experience is assigned, otherwise the terminal's current immutable published experience. The terminal identity always comes from the terminal JWT subject.
+            operationId: GetTerminalExperienceManifest
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.TerminalExperienceManifestResponseDoc'
+                    description: OK
+                "401":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Unauthorized
+                "403":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Forbidden
+                "409":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Current assignment is unavailable
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Internal server error
+            security:
+                - BearerAuth: []
+            summary: Get the terminal experience manifest
+            tags:
+                - TerminalExperience
+    /terminal/experience/ack:
+        post:
+            description: Records whether the authenticated terminal applied or rejected its currently published assigned version. Rejected deployments require a bounded machine-readable reasonCode and preserve the last successfully applied version; applied deployments forbid one.
+            operationId: AcknowledgeTerminalExperienceManifest
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/handlers.TerminalExperienceAckRequestDoc'
+                description: Acknowledgement payload
+                required: true
+                x-originalParamName: body
+            responses:
+                "204":
+                    description: No Content
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Invalid acknowledgement payload
+                "401":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Unauthorized
+                "403":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Forbidden
+                "409":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Version is not currently assigned and published
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Internal server error
+            security:
+                - BearerAuth: []
+            summary: Acknowledge the terminal experience manifest
+            tags:
+                - TerminalExperience
     /tickets/{id}:
         get:
             description: Retrieves a ticket by its ID. For waiting tickets, also returns queuePosition and estimatedWaitSeconds.

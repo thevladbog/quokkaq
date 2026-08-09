@@ -172,6 +172,27 @@ export default defineConfig({
       target: './lib/api/generated/desktop-terminal.ts'
     }
   },
+  /** Terminal-JWT deployment protocol; intentionally separate from staff cookie auth. */
+  quokkaqTerminalExperience: {
+    input: {
+      target: '../backend/docs/openapi.json',
+      filters: {
+        mode: 'include',
+        tags: ['TerminalExperience']
+      }
+    },
+    output: {
+      ...reactQueryOutput,
+      target: './lib/api/generated/terminal-experience.ts',
+      override: {
+        ...reactQueryOutput.override,
+        mutator: {
+          path: './lib/terminal-orval-mutator.ts',
+          name: 'terminalOrvalMutator'
+        }
+      }
+    }
+  },
   quokkaqServices: {
     input: {
       target: '../backend/docs/openapi.json',
