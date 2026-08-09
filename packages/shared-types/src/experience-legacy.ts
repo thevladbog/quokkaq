@@ -1,17 +1,22 @@
 import { z } from 'zod';
-import type { KioskConfig, ServiceModel } from './index';
+import {
+  KioskConfigSchema,
+  ServiceModelSchema,
+  type KioskConfig,
+  type ServiceModel
+} from './index';
 import {
   ExperienceTemplateSchema,
   type ExperiencePage,
   type ExperienceTemplate,
   type ExperienceWidget
 } from './experience-template';
-import { migrateRegionsToCellGrid } from './screen-template-migrate-regions';
 import {
   ScreenTemplateCellGridSchema,
   ScreenTemplateRegionsSchema,
-  normalizeScreenTemplateInput,
-  type ScreenTemplateCellGrid
+  type ScreenCellGridFace,
+  type ScreenTemplateCellGrid,
+  type ScreenTemplateRegions
 } from './screen-template-layout';
 
 const KIOSK_VARIANT_ID = 'kiosk-1080x1920';
@@ -19,6 +24,10 @@ const SIGNAGE_PORTRAIT_VARIANT_ID = 'signage-portrait';
 const SIGNAGE_LANDSCAPE_VARIANT_ID = 'signage-landscape';
 const AUTO_PAGE_THRESHOLD = 12;
 const PAGINATED_PAGE_SIZE = 9;
+const MANUAL_GRID_ROWS = 8;
+const MANUAL_GRID_COLUMNS = 8;
+const SIGNAGE_COLUMNS = 12;
+const SIGNAGE_ROWS = 24;
 
 const KIOSK_PROFILE = {
   id: KIOSK_VARIANT_ID,
@@ -27,6 +36,26 @@ const KIOSK_PROFILE = {
   height: 1920,
   interactionMode: 'touch' as const,
   viewingDistance: 'standing' as const,
+  safeArea: { top: 0, right: 0, bottom: 0, left: 0 }
+};
+
+const SIGNAGE_PORTRAIT_PROFILE = {
+  id: 'signage-1080x1920',
+  name: 'Signage 1080×1920',
+  width: 1080,
+  height: 1920,
+  interactionMode: 'non-touch' as const,
+  viewingDistance: 'far' as const,
+  safeArea: { top: 0, right: 0, bottom: 0, left: 0 }
+};
+
+const SIGNAGE_LANDSCAPE_PROFILE = {
+  id: 'signage-1920x1080',
+  name: 'Signage 1920×1080',
+  width: 1920,
+  height: 1080,
+  interactionMode: 'non-touch' as const,
+  viewingDistance: 'far' as const,
   safeArea: { top: 0, right: 0, bottom: 0, left: 0 }
 };
 
@@ -55,12 +84,68 @@ const KIOSK_THEME_SURFACES = {
 
 const DEFAULT_KIOSK_THEME = KIOSK_THEME_SURFACES['warm-light'];
 
-const ScreenTemplateUnionSchema = z.union([
-  ScreenTemplateRegionsSchema,
-  ScreenTemplateCellGridSchema
+const NormalizationErrorCodeSchema = z.enum([
+  'unsupported-schema-version',
+  'ambiguous-legacy-input',
+  'invalid-versioned-experience',
+  'invalid-screen-template',
+  'incompatible-orientation-content',
+  'invalid-kiosk-input',
+  'unsupported-experience-input'
 ]);
 
-type LegacyKioskConfig = KioskConfig & Record<string, unknown>;
+export type ExperienceNormalizationErrorCode = z.infer<
+  typeof NormalizationErrorCodeSchema
+>;
+
+/** Stable normalization failure that deliberately contains no source values. */
+export class ExperienceNormalizationError extends Error {
+  readonly code: ExperienceNormalizationErrorCode;
+
+  constructor(code: ExperienceNormalizationErrorCode) {
+    super(`Experience normalization failed: ${code}`);
+    this.name = 'ExperienceNormalizationError';
+    this.code = code;
+  }
+}
+
+const LegacyAttractCompatibilitySchema = z
+  .object({
+    mode: z.enum(['session_then_attract', 'attract_only', 'off']),
+    sessionIdleBeforeWarningSec: z.number().int().positive().max(3_600),
+    sessionIdleCountdownSec: z.number().int().positive().max(300),
+    showAttractAfterSessionEnd: z.boolean(),
+    attractIdleSec: z.number().int().min(10).max(600),
+    showQueueDepthOnAttract: z.boolean(),
+    signage: z
+      .object({
+        mode: z.enum(['inherit', 'playlist', 'materials']),
+        playlistId: z.string().optional(),
+        materialIds: z.array(z.string()).optional(),
+        slideDurationSec: z.number().int().min(1).max(300).optional()
+      })
+      .strict()
+  })
+  .strict();
+
+type LegacyRouteSlot =
+  | 'service-info'
+  | 'service-form'
+  | 'identity'
+  | 'confirmation'
+  | 'success';
+
+const CANONICAL_ROUTE_SLOTS: readonly LegacyRouteSlot[] = [
+  'service-info',
+  'service-form',
+  'identity',
+  'confirmation',
+  'success'
+];
+
+function fail(code: ExperienceNormalizationErrorCode): never {
+  throw new ExperienceNormalizationError(code);
+}
 
 function isOwnRecord(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -68,6 +153,10 @@ function isOwnRecord(value: unknown): value is Record<string, unknown> {
   }
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
+}
+
+function hasOwn(record: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(record, key);
 }
 
 function semanticId(value: string, fallback: string): string {
@@ -88,24 +177,204 @@ function screenWidgetId(
   return disambiguate ? `${id}-${encodeURIComponent(sourceId)}` : id;
 }
 
-function toScreenCellGrid(input: unknown): ScreenTemplateCellGrid {
-  const parsed = ScreenTemplateUnionSchema.parse(
-    normalizeScreenTemplateInput(input)
-  );
-  if (parsed.layoutKind === 'cellGrid') {
-    return parsed;
+function normalizeHexColor(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
   }
-  return migrateRegionsToCellGrid(parsed.id, parsed.layout, parsed.widgets);
+  const match = value.trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!match) {
+    return undefined;
+  }
+  const hex = match[1]!.toLowerCase();
+  if (hex.length === 6) {
+    return `#${hex}`;
+  }
+  return `#${[...hex].map((part) => `${part}${part}`).join('')}`;
 }
 
-function signagePage(grid: ScreenTemplateCellGrid): ExperiencePage {
+function normalizeHexColorWithFallback(
+  value: unknown,
+  fallback: string
+): string {
+  return normalizeHexColor(value) ?? fallback;
+}
+
+function sanitizeWidgetStyle(
+  style:
+    | {
+        backgroundColor?: string;
+        textColor?: string;
+        fontSize?: string;
+        padding?: string;
+      }
+    | undefined
+) {
+  if (!style) {
+    return undefined;
+  }
+  const sanitized = {
+    ...(normalizeHexColor(style.backgroundColor)
+      ? { backgroundColor: normalizeHexColor(style.backgroundColor) }
+      : {}),
+    ...(normalizeHexColor(style.textColor)
+      ? { textColor: normalizeHexColor(style.textColor) }
+      : {}),
+    ...(style.fontSize?.trim() ? { fontSize: style.fontSize.trim() } : {}),
+    ...(style.padding?.trim() ? { padding: style.padding.trim() } : {})
+  };
+  return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+}
+
+function parseScreenTemplate(
+  input: unknown
+):
+  | { kind: 'regions'; template: ScreenTemplateRegions }
+  | { kind: 'cellGrid'; template: ScreenTemplateCellGrid } {
+  if (!isOwnRecord(input)) {
+    return fail('invalid-screen-template');
+  }
+
+  const regionsDiscriminator =
+    input.layoutKind === 'regions' || hasOwn(input, 'layout');
+  const cellGridDiscriminator =
+    input.layoutKind === 'cellGrid' ||
+    (hasOwn(input, 'portrait') && hasOwn(input, 'landscape'));
+  if (regionsDiscriminator && cellGridDiscriminator) {
+    return fail('ambiguous-legacy-input');
+  }
+  if (!regionsDiscriminator && !cellGridDiscriminator) {
+    return fail('invalid-screen-template');
+  }
+
+  if (regionsDiscriminator) {
+    const result = ScreenTemplateRegionsSchema.safeParse({
+      ...input,
+      layoutKind: 'regions'
+    });
+    if (!result.success) {
+      return fail('invalid-screen-template');
+    }
+    return { kind: 'regions', template: result.data };
+  }
+
+  const result = ScreenTemplateCellGridSchema.safeParse({
+    ...input,
+    layoutKind: 'cellGrid'
+  });
+  if (!result.success) {
+    return fail('invalid-screen-template');
+  }
+  return { kind: 'cellGrid', template: result.data };
+}
+
+function stableContent(value: unknown): string {
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
+  if (typeof value === 'string') return `string:${JSON.stringify(value)}`;
+  if (typeof value === 'boolean') return `boolean:${value}`;
+  if (typeof value === 'number') return `number:${value}`;
+  if (Array.isArray(value)) {
+    return `array:[${value.map((entry) => stableContent(entry)).join(',')}]`;
+  }
+  if (isOwnRecord(value)) {
+    return `record:{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableContent(value[key])}`)
+      .join(',')}}`;
+  }
+  return `unsupported:${Object.prototype.toString.call(value)}`;
+}
+
+function assertEquivalentCellGridContent(grid: ScreenTemplateCellGrid): void {
+  const landscapeWidgets = new Map(
+    grid.landscape.widgets.map((widget) => [widget.id, widget])
+  );
+  for (const portraitWidget of grid.portrait.widgets) {
+    const landscapeWidget = landscapeWidgets.get(portraitWidget.id);
+    if (
+      !landscapeWidget ||
+      portraitWidget.type !== landscapeWidget.type ||
+      stableContent(portraitWidget.config ?? {}) !==
+        stableContent(landscapeWidget.config ?? {}) ||
+      stableContent(portraitWidget.style ?? {}) !==
+        stableContent(landscapeWidget.style ?? {})
+    ) {
+      fail('incompatible-orientation-content');
+    }
+  }
+}
+
+function assertUniqueWidgetIds(widgets: readonly { id: string }[]): void {
+  const ids = new Set<string>();
+  for (const widget of widgets) {
+    if (ids.has(widget.id)) {
+      fail('invalid-screen-template');
+    }
+    ids.add(widget.id);
+  }
+}
+
+function regionFace(template: ScreenTemplateRegions): ScreenCellGridFace {
+  const count = template.widgets.length;
+  if (count === 0) {
+    return { columns: SIGNAGE_COLUMNS, rows: SIGNAGE_ROWS, widgets: [] };
+  }
+  if (count <= SIGNAGE_ROWS) {
+    const rowSpan = Math.floor(SIGNAGE_ROWS / count);
+    return {
+      columns: SIGNAGE_COLUMNS,
+      rows: SIGNAGE_ROWS,
+      widgets: template.widgets.map((widget, index) => {
+        const row = index * rowSpan + 1;
+        return {
+          id: widget.id,
+          type: widget.type,
+          placement: {
+            col: 1,
+            row,
+            colSpan: SIGNAGE_COLUMNS,
+            rowSpan: index === count - 1 ? SIGNAGE_ROWS - row + 1 : rowSpan
+          },
+          config: widget.config,
+          style: widget.style
+        };
+      })
+    };
+  }
+
+  const rows = Math.max(SIGNAGE_ROWS, Math.ceil(count / SIGNAGE_COLUMNS));
+  if (rows > 48) {
+    return fail('invalid-screen-template');
+  }
+  return {
+    columns: SIGNAGE_COLUMNS,
+    rows,
+    widgets: template.widgets.map((widget, index) => ({
+      id: widget.id,
+      type: widget.type,
+      placement: {
+        col: (index % SIGNAGE_COLUMNS) + 1,
+        row: Math.floor(index / SIGNAGE_COLUMNS) + 1,
+        colSpan: 1,
+        rowSpan: 1
+      },
+      config: widget.config,
+      style: widget.style
+    }))
+  };
+}
+
+function semanticScreenWidgetIds(
+  widgets: readonly { id: string; type: string }[]
+): Map<string, string> {
+  assertUniqueWidgetIds(widgets);
   const semanticIdCounts = new Map<string, number>();
-  for (const widget of grid.portrait.widgets) {
+  for (const widget of widgets) {
     const id = screenWidgetId(widget.type, widget.id);
     semanticIdCounts.set(id, (semanticIdCounts.get(id) ?? 0) + 1);
   }
-  const widgetIds = new Map(
-    grid.portrait.widgets.map((widget) => [
+  return new Map(
+    widgets.map((widget) => [
       widget.id,
       screenWidgetId(
         widget.type,
@@ -114,31 +383,88 @@ function signagePage(grid: ScreenTemplateCellGrid): ExperiencePage {
       )
     ])
   );
-  const widgets: ExperienceWidget[] = grid.portrait.widgets.map((widget) => ({
+}
+
+function regionWidgetConfig(
+  template: ScreenTemplateRegions,
+  widget: ScreenTemplateRegions['widgets'][number]
+): Record<string, unknown> {
+  const region = template.layout.regions.find(
+    (candidate) => candidate.id === widget.regionId
+  );
+  if (!region) {
+    return fail('invalid-screen-template');
+  }
+  const style = sanitizeWidgetStyle(widget.style);
+  return {
+    ...(widget.config ?? {}),
+    compatibility: {
+      source: 'legacy-screen-regions',
+      region: {
+        id: region.id,
+        area: region.area,
+        size: region.size,
+        ...(region.panelStyle ? { panelStyle: region.panelStyle } : {}),
+        ...(normalizeHexColor(region.backgroundColor)
+          ? { backgroundColor: normalizeHexColor(region.backgroundColor) }
+          : {})
+      },
+      widget: {
+        ...(widget.position ? { position: { ...widget.position } } : {}),
+        ...(widget.size ? { size: { ...widget.size } } : {}),
+        ...(style ? { style } : {})
+      }
+    }
+  };
+}
+
+function cellGridWidgetConfig(
+  widget: ScreenTemplateCellGrid['portrait']['widgets'][number]
+): Record<string, unknown> {
+  const style = sanitizeWidgetStyle(widget.style);
+  return {
+    ...(widget.config ?? {}),
+    compatibility: {
+      source: 'legacy-screen-cell-grid',
+      widget: {
+        ...(style ? { style } : {})
+      }
+    }
+  };
+}
+
+function signagePage(
+  portrait: ScreenCellGridFace,
+  landscape: ScreenCellGridFace | undefined,
+  configForWidget: (sourceId: string) => Record<string, unknown>
+): ExperiencePage {
+  const widgetIds = semanticScreenWidgetIds(portrait.widgets);
+  const widgets: ExperienceWidget[] = portrait.widgets.map((widget) => ({
     id: widgetIds.get(widget.id)!,
     type: widget.type,
-    config: widget.config ?? {},
+    config: configForWidget(widget.id),
     actions: []
   }));
-  const layouts = {
+  const layouts: ExperiencePage['layouts'] = {
     [SIGNAGE_PORTRAIT_VARIANT_ID]: {
       placements: Object.fromEntries(
-        grid.portrait.widgets.map((widget) => [
-          widgetIds.get(widget.id)!,
-          { ...widget.placement }
-        ])
-      )
-    },
-    [SIGNAGE_LANDSCAPE_VARIANT_ID]: {
-      placements: Object.fromEntries(
-        grid.landscape.widgets.map((widget) => [
+        portrait.widgets.map((widget) => [
           widgetIds.get(widget.id)!,
           { ...widget.placement }
         ])
       )
     }
   };
-
+  if (landscape) {
+    layouts[SIGNAGE_LANDSCAPE_VARIANT_ID] = {
+      placements: Object.fromEntries(
+        landscape.widgets.map((widget) => [
+          widgetIds.get(widget.id)!,
+          { ...widget.placement }
+        ])
+      )
+    };
+  }
   return { id: 'queue-display', name: 'Queue display', widgets, layouts };
 }
 
@@ -146,64 +472,76 @@ function signagePage(grid: ScreenTemplateCellGrid): ExperiencePage {
 export function experienceFromScreenTemplate(
   input: unknown
 ): ExperienceTemplate {
-  const grid = toScreenCellGrid(input);
-  const template = {
-    schemaVersion: 1 as const,
-    id: grid.id || 'legacy-screen',
-    surface: 'queue-display' as const,
+  const source = parseScreenTemplate(input);
+  if (source.kind === 'regions') {
+    assertUniqueWidgetIds(source.template.widgets);
+    const portrait = regionFace(source.template);
+    const sourceWidgets = new Map(
+      source.template.widgets.map((widget) => [widget.id, widget])
+    );
+    return ExperienceTemplateSchema.parse({
+      schemaVersion: 1,
+      id: source.template.id || 'legacy-screen',
+      surface: 'queue-display',
+      startPageId: 'queue-display',
+      variants: [
+        {
+          id: SIGNAGE_PORTRAIT_VARIANT_ID,
+          profile: SIGNAGE_PORTRAIT_PROFILE,
+          grid: { columns: portrait.columns, rows: portrait.rows }
+        }
+      ],
+      pages: [
+        signagePage(portrait, undefined, (sourceId) => {
+          const widget = sourceWidgets.get(sourceId);
+          return widget
+            ? regionWidgetConfig(source.template, widget)
+            : fail('invalid-screen-template');
+        })
+      ]
+    });
+  }
+
+  assertEquivalentCellGridContent(source.template);
+  const portraitWidgets = new Map(
+    source.template.portrait.widgets.map((widget) => [widget.id, widget])
+  );
+  return ExperienceTemplateSchema.parse({
+    schemaVersion: 1,
+    id: source.template.id || 'legacy-screen',
+    surface: 'queue-display',
     startPageId: 'queue-display',
     variants: [
       {
         id: SIGNAGE_PORTRAIT_VARIANT_ID,
-        profile: {
-          id: 'signage-1080x1920',
-          name: 'Signage 1080×1920',
-          width: 1080,
-          height: 1920,
-          interactionMode: 'non-touch' as const,
-          viewingDistance: 'far' as const,
-          safeArea: { top: 0, right: 0, bottom: 0, left: 0 }
-        },
+        profile: SIGNAGE_PORTRAIT_PROFILE,
         grid: {
-          columns: grid.portrait.columns,
-          rows: grid.portrait.rows
+          columns: source.template.portrait.columns,
+          rows: source.template.portrait.rows
         }
       },
       {
         id: SIGNAGE_LANDSCAPE_VARIANT_ID,
-        profile: {
-          id: 'signage-1920x1080',
-          name: 'Signage 1920×1080',
-          width: 1920,
-          height: 1080,
-          interactionMode: 'non-touch' as const,
-          viewingDistance: 'far' as const,
-          safeArea: { top: 0, right: 0, bottom: 0, left: 0 }
-        },
+        profile: SIGNAGE_LANDSCAPE_PROFILE,
         grid: {
-          columns: grid.landscape.columns,
-          rows: grid.landscape.rows
+          columns: source.template.landscape.columns,
+          rows: source.template.landscape.rows
         }
       }
     ],
-    pages: [signagePage(grid)]
-  };
-  return ExperienceTemplateSchema.parse(template);
-}
-
-function normalizeHexColor(value: unknown, fallback: string): string {
-  if (typeof value !== 'string') {
-    return fallback;
-  }
-  const match = value.trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
-  if (!match) {
-    return fallback;
-  }
-  const hex = match[1]!.toLowerCase();
-  if (hex.length === 6) {
-    return `#${hex}`;
-  }
-  return `#${[...hex].map((part) => `${part}${part}`).join('')}`;
+    pages: [
+      signagePage(
+        source.template.portrait,
+        source.template.landscape,
+        (sourceId) => {
+          const widget = portraitWidgets.get(sourceId);
+          return widget
+            ? cellGridWidgetConfig(widget)
+            : fail('invalid-screen-template');
+        }
+      )
+    ]
+  });
 }
 
 function legacyKioskTheme(config: KioskConfig) {
@@ -221,9 +559,15 @@ function legacyKioskTheme(config: KioskConfig) {
   return {
     preset: 'legacy-kiosk' as const,
     tokens: {
-      header: normalizeHexColor(config.headerColor, DEFAULT_KIOSK_THEME.header),
-      surface: normalizeHexColor(config.bodyColor, DEFAULT_KIOSK_THEME.surface),
-      serviceGrid: normalizeHexColor(
+      header: normalizeHexColorWithFallback(
+        config.headerColor,
+        DEFAULT_KIOSK_THEME.header
+      ),
+      surface: normalizeHexColorWithFallback(
+        config.bodyColor,
+        DEFAULT_KIOSK_THEME.surface
+      ),
+      serviceGrid: normalizeHexColorWithFallback(
         config.serviceGridColor,
         DEFAULT_KIOSK_THEME.serviceGrid
       )
@@ -231,12 +575,22 @@ function legacyKioskTheme(config: KioskConfig) {
   };
 }
 
+function parseKioskConfig(input: unknown): KioskConfig {
+  const parsed = KioskConfigSchema.safeParse(input);
+  return parsed.success ? parsed.data : fail('invalid-kiosk-input');
+}
+
+function parseServices(input: unknown): ServiceModel[] {
+  const parsed = z.array(ServiceModelSchema).safeParse(input);
+  return parsed.success ? parsed.data : fail('invalid-kiosk-input');
+}
+
 function flattenServices(services: readonly ServiceModel[]): ServiceModel[] {
   const result: ServiceModel[] = [];
   const seen = new Set<string>();
   const visit = (service: ServiceModel) => {
     if (seen.has(service.id)) {
-      return;
+      fail('invalid-kiosk-input');
     }
     seen.add(service.id);
     result.push(service);
@@ -261,33 +615,6 @@ function serviceHasChildren(
   );
 }
 
-function activeLocales(config: LegacyKioskConfig, services: ServiceModel[]) {
-  const configured = config.activeLocales ?? config.locales;
-  if (Array.isArray(configured)) {
-    const unique = [
-      ...new Set(
-        configured
-          .filter(
-            (locale): locale is string =>
-              typeof locale === 'string' && locale.trim() !== ''
-          )
-          .map((locale) => locale.trim())
-      )
-    ];
-    if (unique.length > 0) {
-      return unique;
-    }
-  }
-  const locales = new Set<string>();
-  if (services.some((service) => Boolean(service.nameRu?.trim()))) {
-    locales.add('ru');
-  }
-  if (services.some((service) => Boolean(service.nameEn?.trim()))) {
-    locales.add('en');
-  }
-  return [...locales].sort();
-}
-
 function autoGrid(total: number) {
   if (total <= 1) return { rows: 1, columns: 1 };
   if (total === 2) return { rows: 1, columns: 2 };
@@ -298,14 +625,63 @@ function autoGrid(total: number) {
   return { rows: 3, columns: 3 };
 }
 
-function hasBehaviorRouteSlot(
+function serviceRouteSlots(service: ServiceModel): LegacyRouteSlot[] {
+  const slots = new Set<LegacyRouteSlot>();
+  if (service.behavior?.information !== undefined) {
+    slots.add('service-info');
+  }
+  if (service.behavior?.fields.length) {
+    slots.add('service-form');
+  }
+  if (
+    (service.identificationMode !== undefined &&
+      service.identificationMode !== 'none') ||
+    service.offerIdentification === true
+  ) {
+    slots.add('identity');
+  }
+  if (service.behavior?.route?.mode === 'page-slot') {
+    slots.add(service.behavior.route.slot);
+  }
+  slots.add('success');
+  return CANONICAL_ROUTE_SLOTS.filter((slot) => slots.has(slot));
+}
+
+function isTerminalService(
   service: ServiceModel,
-  slot: 'service-info' | 'service-form' | 'confirmation'
+  all: ServiceModel[]
 ): boolean {
-  return (
-    service.behavior?.route?.mode === 'page-slot' &&
-    service.behavior.route.slot === slot
-  );
+  return !serviceHasChildren(service, all) && service.isLeaf !== false;
+}
+
+function manualPlacements(services: ServiceModel[]) {
+  return services
+    .filter(
+      (service) =>
+        typeof service.gridRow === 'number' &&
+        typeof service.gridCol === 'number'
+    )
+    .map((service) => {
+      const row = service.gridRow!;
+      const col = service.gridCol!;
+      const rowSpan = service.gridRowSpan ?? 1;
+      const colSpan = service.gridColSpan ?? 1;
+      if (
+        !Number.isInteger(row) ||
+        !Number.isInteger(col) ||
+        !Number.isInteger(rowSpan) ||
+        !Number.isInteger(colSpan) ||
+        row < 0 ||
+        col < 0 ||
+        rowSpan < 1 ||
+        colSpan < 1 ||
+        row + rowSpan > MANUAL_GRID_ROWS ||
+        col + colSpan > MANUAL_GRID_COLUMNS
+      ) {
+        return fail('invalid-kiosk-input');
+      }
+      return { serviceId: service.id, row, col, rowSpan, colSpan };
+    });
 }
 
 function kioskPage(
@@ -345,33 +721,59 @@ function widget(
   return { id, type, config, actions };
 }
 
-function selectedServiceActions(
-  targetPageId: string
-): ExperienceWidget['actions'] {
-  const actions: ExperienceWidget['actions'] = [
+function selectedServiceActions(): ExperienceWidget['actions'] {
+  return [
     {
       type: 'set-session',
       key: 'selectedServiceId',
       value: { source: 'event', field: 'serviceId' }
     }
   ];
-  if (targetPageId === 'success') {
-    actions.push({ type: 'submit-ticket' });
-  }
-  actions.push({ type: 'navigate', toPageId: targetPageId });
-  return actions;
+}
+
+function legacyAttractCompatibility(config: KioskConfig) {
+  const mode = config.kioskAttractInactivityMode ?? 'session_then_attract';
+  const signageMode =
+    config.kioskAttractSignageMode === 'materials'
+      ? 'materials'
+      : config.kioskAttractSignageMode === 'playlist' &&
+          config.kioskAttractPlaylistId?.trim()
+        ? 'playlist'
+        : 'inherit';
+  const signage = {
+    mode: signageMode,
+    ...(signageMode === 'playlist'
+      ? { playlistId: config.kioskAttractPlaylistId! }
+      : {}),
+    ...(signageMode === 'materials' && config.kioskAttractActiveMaterialIds
+      ? { materialIds: [...config.kioskAttractActiveMaterialIds] }
+      : {}),
+    ...(config.kioskAttractSlideDurationSec !== undefined
+      ? { slideDurationSec: config.kioskAttractSlideDurationSec }
+      : {})
+  };
+  return LegacyAttractCompatibilitySchema.parse({
+    mode,
+    sessionIdleBeforeWarningSec: config.sessionIdleBeforeWarningSec ?? 45,
+    sessionIdleCountdownSec: config.sessionIdleCountdownSec ?? 15,
+    showAttractAfterSessionEnd: config.showAttractAfterSessionEnd !== false,
+    attractIdleSec: config.attractIdleSec ?? 60,
+    showQueueDepthOnAttract: config.showQueueDepthOnAttract !== false,
+    signage
+  });
 }
 
 /**
- * Derive the portable ticket-station shell. Service data remains runtime-owned;
- * the compatibility config captures only legacy navigation, grid, and pagination intent.
+ * Derive the portable ticket-station shell. KioskConfig has no persisted locale
+ * selector, so this compatibility import deliberately does not synthesize a
+ * one-locale language-switch rule from localized service labels.
  */
 export function experienceFromKioskConfig(
-  config: KioskConfig = {},
-  sourceServices: readonly ServiceModel[] = []
+  configInput: unknown = {},
+  sourceServicesInput: unknown = []
 ): ExperienceTemplate {
-  const legacyConfig = config as LegacyKioskConfig;
-  const services = flattenServices(sourceServices);
+  const config = parseKioskConfig(configInput);
+  const services = flattenServices(parseServices(sourceServicesInput));
   const topLevel = services.filter((service) => !service.parentId);
   const categoryIds = topLevel
     .filter((service) => serviceHasChildren(service, services))
@@ -385,61 +787,38 @@ export function experienceFromKioskConfig(
   }
   const largestLevel = Math.max(0, ...siblingCounts);
   const usesAutoGrid = config.serviceGridLayout === 'auto';
-  const usesPagination = largestLevel > AUTO_PAGE_THRESHOLD;
-  const activeLocaleIds = activeLocales(legacyConfig, services);
-  const hasInfo = services.some(
-    (service) =>
-      service.behavior?.information !== undefined ||
-      hasBehaviorRouteSlot(service, 'service-info')
+  const usesPagination = usesAutoGrid && largestLevel > AUTO_PAGE_THRESHOLD;
+  const serviceRoutes = services
+    .filter((service) => isTerminalService(service, services))
+    .map((service) => ({
+      serviceId: service.id,
+      slots: serviceRouteSlots(service),
+      terminalActions: [{ type: 'submit-ticket' as const }]
+    }));
+  const hasInfo = serviceRoutes.some((route) =>
+    route.slots.includes('service-info')
   );
-  const hasForm = services.some(
-    (service) =>
-      service.behavior?.fields.length ||
-      hasBehaviorRouteSlot(service, 'service-form')
+  const hasForm = serviceRoutes.some((route) =>
+    route.slots.includes('service-form')
   );
-  const hasIdentity =
-    services.some(
-      (service) =>
-        service.identificationMode !== undefined &&
-        service.identificationMode !== 'none'
-    ) || services.some((service) => service.offerIdentification === true);
-  const hasConfirmation = services.some((service) =>
-    hasBehaviorRouteSlot(service, 'confirmation')
+  const hasIdentity = serviceRoutes.some((route) =>
+    route.slots.includes('identity')
+  );
+  const hasConfirmation = serviceRoutes.some((route) =>
+    route.slots.includes('confirmation')
   );
   const hasAppointment = Boolean(
     config.isAppointmentCheckinEnabled ?? config.isPreRegistrationEnabled
   );
-  const hasAttract =
-    config.kioskAttractInactivityMode === undefined ||
-    config.kioskAttractInactivityMode !== 'off';
-
-  const serviceTarget = hasInfo
-    ? 'service-info'
-    : hasForm
-      ? 'service-form'
-      : hasIdentity
-        ? 'identity'
-        : hasConfirmation
-          ? 'confirmation'
-          : 'success';
+  const attractCompatibility = legacyAttractCompatibility(config);
+  const hasAttract = attractCompatibility.mode !== 'off';
   const presentation = usesAutoGrid
     ? { mode: 'auto', grid: autoGrid(largestLevel) }
     : {
         mode: 'manual',
-        grid: { rows: 8, columns: 8 },
-        placements: services
-          .filter(
-            (service) =>
-              typeof service.gridRow === 'number' &&
-              typeof service.gridCol === 'number'
-          )
-          .map((service) => ({
-            serviceId: service.id,
-            row: service.gridRow!,
-            col: service.gridCol!,
-            rowSpan: service.gridRowSpan || 1,
-            colSpan: service.gridColSpan || 1
-          }))
+        grid: { rows: MANUAL_GRID_ROWS, columns: MANUAL_GRID_COLUMNS },
+        coordinateBase: 'zero-based' as const,
+        placements: manualPlacements(services)
       };
   const serviceWidgets: ExperienceWidget[] = [
     widget(
@@ -456,19 +835,16 @@ export function experienceFromKioskConfig(
           enabled: usesPagination,
           pageSize: PAGINATED_PAGE_SIZE,
           threshold: AUTO_PAGE_THRESHOLD
+        },
+        legacyRouting: {
+          source: 'legacy-service-routes',
+          canonicalSlots: [...CANONICAL_ROUTE_SLOTS],
+          routes: serviceRoutes
         }
       },
-      selectedServiceActions(serviceTarget)
+      selectedServiceActions()
     )
   ];
-  if (activeLocaleIds.length > 1) {
-    serviceWidgets.push(
-      widget('language-switch', 'language-switch', {
-        source: 'legacy-active-locales',
-        locales: activeLocaleIds
-      })
-    );
-  }
   if (hasAppointment) {
     serviceWidgets.push(
       widget(
@@ -484,9 +860,10 @@ export function experienceFromKioskConfig(
   if (hasAttract) {
     pages.push(
       kioskPage('attract', 'Attract', [
-        widget('attract-media', 'media', { source: 'legacy-kiosk-attract' }, [
-          { type: 'navigate', toPageId: 'services' }
-        ])
+        widget('attract-media', 'media', {
+          source: 'legacy-kiosk-attract',
+          compatibility: attractCompatibility
+        })
       ])
     );
   }
@@ -494,61 +871,30 @@ export function experienceFromKioskConfig(
   if (hasInfo) {
     pages.push(
       kioskPage('service-info', 'Service information', [
-        widget(
-          'service-information',
-          'rich-info',
-          { source: 'selected-service-behavior', section: 'information' },
-          [
-            {
-              type: 'navigate',
-              toPageId: hasForm
-                ? 'service-form'
-                : hasIdentity
-                  ? 'identity'
-                  : hasConfirmation
-                    ? 'confirmation'
-                    : 'success'
-            }
-          ]
-        )
+        widget('service-information', 'rich-info', {
+          source: 'legacy-service-routes',
+          slot: 'service-info'
+        })
       ])
     );
   }
   if (hasForm) {
     pages.push(
       kioskPage('service-form', 'Service form', [
-        widget(
-          'service-form',
-          'ticket-form',
-          { source: 'selected-service-behavior', section: 'fields' },
-          [
-            {
-              type: 'navigate',
-              toPageId: hasIdentity
-                ? 'identity'
-                : hasConfirmation
-                  ? 'confirmation'
-                  : 'success'
-            }
-          ]
-        )
+        widget('service-form', 'ticket-form', {
+          source: 'legacy-service-routes',
+          slot: 'service-form'
+        })
       ])
     );
   }
   if (hasIdentity) {
     pages.push(
       kioskPage('identity', 'Identification', [
-        widget(
-          'legacy-identification',
-          'identify',
-          { source: 'legacy-service-identification' },
-          [
-            {
-              type: 'navigate',
-              toPageId: hasConfirmation ? 'confirmation' : 'success'
-            }
-          ]
-        )
+        widget('legacy-identification', 'identify', {
+          source: 'legacy-service-identification',
+          routingSource: 'legacy-service-routes'
+        })
       ])
     );
   }
@@ -570,12 +916,10 @@ export function experienceFromKioskConfig(
   if (hasConfirmation) {
     pages.push(
       kioskPage('confirmation', 'Confirmation', [
-        widget(
-          'ticket-confirmation',
-          'rich-info',
-          { source: 'selected-service-behavior', section: 'confirmation' },
-          [{ type: 'submit-ticket' }, { type: 'navigate', toPageId: 'success' }]
-        )
+        widget('ticket-confirmation', 'rich-info', {
+          source: 'legacy-service-routes',
+          slot: 'confirmation'
+        })
       ])
     );
   }
@@ -585,10 +929,7 @@ export function experienceFromKioskConfig(
         'ticket-success',
         'ticket-success',
         { source: 'legacy-ticket-success' },
-        [
-          { type: 'reset-session' },
-          { type: 'navigate', toPageId: hasAttract ? 'attract' : 'services' }
-        ]
+        [{ type: 'reset-session' }, { type: 'navigate', toPageId: 'services' }]
       )
     ])
   );
@@ -606,7 +947,7 @@ export function experienceFromKioskConfig(
     schemaVersion: 1,
     id: 'legacy-kiosk',
     surface: 'ticket-station',
-    startPageId: hasAttract ? 'attract' : 'services',
+    startPageId: 'services',
     variants: [
       {
         id: KIOSK_VARIANT_ID,
@@ -620,32 +961,63 @@ export function experienceFromKioskConfig(
   });
 }
 
+function hasScreenRegionsDiscriminator(
+  input: Record<string, unknown>
+): boolean {
+  return input.layoutKind === 'regions' || hasOwn(input, 'layout');
+}
+
+function hasScreenCellGridDiscriminator(
+  input: Record<string, unknown>
+): boolean {
+  return (
+    input.layoutKind === 'cellGrid' ||
+    (hasOwn(input, 'portrait') && hasOwn(input, 'landscape'))
+  );
+}
+
+function kioskConfigFromEnvelope(input: Record<string, unknown>): unknown {
+  if (hasOwn(input, 'kiosk')) {
+    return input.kiosk;
+  }
+  if (isOwnRecord(input.config) && hasOwn(input.config, 'kiosk')) {
+    return input.config.kiosk;
+  }
+  return isOwnRecord(input.config) ? input.config : {};
+}
+
 /** Normalize a versioned experience or either supported legacy source without mutation. */
 export function normalizeExperienceInput(input: unknown): ExperienceTemplate {
-  if (isOwnRecord(input) && input.schemaVersion === 1) {
+  if (!isOwnRecord(input)) {
+    return fail('unsupported-experience-input');
+  }
+  if (hasOwn(input, 'schemaVersion') && input.schemaVersion !== undefined) {
+    if (input.schemaVersion !== 1) {
+      return fail('unsupported-schema-version');
+    }
     const parsed = ExperienceTemplateSchema.safeParse(input);
     if (!parsed.success) {
-      throw parsed.error;
+      return fail('invalid-versioned-experience');
     }
-    return structuredClone(input) as ExperienceTemplate;
+    return structuredClone(parsed.data);
   }
-  if (
-    isOwnRecord(input) &&
-    (Object.prototype.hasOwnProperty.call(input, 'layout') ||
-      (Object.prototype.hasOwnProperty.call(input, 'portrait') &&
-        Object.prototype.hasOwnProperty.call(input, 'landscape')))
-  ) {
-    return experienceFromScreenTemplate(input);
+
+  const sourceKinds = [
+    hasScreenRegionsDiscriminator(input),
+    hasScreenCellGridDiscriminator(input),
+    Array.isArray(input.services)
+  ].filter(Boolean).length;
+  if (sourceKinds > 1) {
+    return fail('ambiguous-legacy-input');
   }
-  if (isOwnRecord(input) && Array.isArray(input.services)) {
-    const nestedConfig = isOwnRecord(input.config)
-      ? input.config.kiosk
-      : undefined;
-    const config = (input.kiosk ??
-      nestedConfig ??
-      input.config ??
-      {}) as KioskConfig;
-    return experienceFromKioskConfig(config, input.services as ServiceModel[]);
+  if (sourceKinds === 0) {
+    return fail('unsupported-experience-input');
   }
-  throw new TypeError('Unsupported experience input');
+  if (Array.isArray(input.services)) {
+    return experienceFromKioskConfig(
+      kioskConfigFromEnvelope(input),
+      input.services
+    );
+  }
+  return experienceFromScreenTemplate(input);
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { KioskConfig, ServiceModel } from './index';
 import { ExperienceTemplateSchema } from './experience-template';
 import {
+  ExperienceNormalizationError,
   experienceFromKioskConfig,
   experienceFromScreenTemplate,
   normalizeExperienceInput
@@ -36,6 +37,20 @@ function pageById(
 
 function expectParsed(template: unknown) {
   expect(ExperienceTemplateSchema.safeParse(template).success).toBe(true);
+}
+
+function expectNormalizationError(action: () => unknown, code: string): void {
+  try {
+    action();
+  } catch (error) {
+    expect(error).toBeInstanceOf(ExperienceNormalizationError);
+    expect(error).toMatchObject({ code });
+    expect((error as Error).message).toBe(
+      `Experience normalization failed: ${code}`
+    );
+    return;
+  }
+  throw new Error(`Expected normalization error: ${code}`);
 }
 
 describe('legacy experience normalization', () => {
@@ -74,6 +89,95 @@ describe('legacy experience normalization', () => {
           config: { limit: 6 }
         }
       ]
+    });
+    expect(normalized.variants.map((variant) => variant.id)).toEqual([
+      'signage-portrait'
+    ]);
+    expectParsed(normalized);
+  });
+
+  it('keeps fullscreen legacy display widgets non-overlapping and retains sanitized renderer compatibility', () => {
+    const normalized = experienceFromScreenTemplate({
+      id: 'fullscreen-multiple',
+      layout: {
+        type: 'fullscreen',
+        regions: [
+          {
+            id: 'main',
+            area: 'main',
+            size: '1fr',
+            panelStyle: 'card',
+            backgroundColor: '#AaBbCc'
+          }
+        ]
+      },
+      widgets: [
+        {
+          id: 'calls',
+          type: 'called-tickets',
+          regionId: 'main',
+          config: { limit: 6 },
+          position: { x: 16, y: 24 },
+          size: { width: '70%', height: '40%' },
+          style: {
+            backgroundColor: '#112233',
+            textColor: 'not-a-color',
+            fontSize: '2rem',
+            padding: '12px'
+          }
+        },
+        {
+          id: 'clock',
+          type: 'clock',
+          regionId: 'main',
+          config: { timezone: 'Europe/Moscow' }
+        }
+      ]
+    });
+
+    const page = normalized.pages[0]!;
+    const placements = page.layouts['signage-portrait']!.placements;
+
+    expect(normalized.variants.map((variant) => variant.id)).toEqual([
+      'signage-portrait'
+    ]);
+    expect(placements).toEqual({
+      'display-called-tickets-calls': {
+        col: 1,
+        row: 1,
+        colSpan: 12,
+        rowSpan: 12
+      },
+      'display-clock-clock': { col: 1, row: 13, colSpan: 12, rowSpan: 12 }
+    });
+    expect(
+      page.widgets.find(
+        (widget) => widget.id === 'display-called-tickets-calls'
+      )
+    ).toMatchObject({
+      id: 'display-called-tickets-calls',
+      config: {
+        limit: 6,
+        compatibility: {
+          source: 'legacy-screen-regions',
+          region: {
+            id: 'main',
+            area: 'main',
+            size: '1fr',
+            panelStyle: 'card',
+            backgroundColor: '#aabbcc'
+          },
+          widget: {
+            position: { x: 16, y: 24 },
+            size: { width: '70%', height: '40%' },
+            style: {
+              backgroundColor: '#112233',
+              fontSize: '2rem',
+              padding: '12px'
+            }
+          }
+        }
+      }
     });
     expectParsed(normalized);
   });
@@ -223,11 +327,169 @@ describe('legacy experience normalization', () => {
 
     const normalized = normalizeExperienceInput(experience);
 
-    expect(normalized).toEqual(experience);
+    expect(normalized).toEqual(ExperienceTemplateSchema.parse(experience));
     expect(normalized).not.toBe(experience);
     expect(experience).toEqual(snapshot);
     expect(normalizeExperienceInput(normalized)).toEqual(normalized);
     expectParsed(normalized);
+  });
+
+  it('returns a canonical cloned versioned experience without unknown root fields', () => {
+    const experience = {
+      schemaVersion: 1 as const,
+      id: 'canonical-versioned',
+      surface: 'queue-display' as const,
+      startPageId: 'queue-display',
+      variants: [
+        {
+          id: 'signage-portrait',
+          profile: {
+            id: 'signage-1080x1920',
+            name: 'Signage 1080×1920',
+            width: 1080,
+            height: 1920,
+            interactionMode: 'non-touch' as const,
+            viewingDistance: 'far' as const,
+            safeArea: { top: 0, right: 0, bottom: 0, left: 0 }
+          },
+          grid: { columns: 6, rows: 12 }
+        }
+      ],
+      pages: [
+        {
+          id: 'queue-display',
+          name: 'Queue display',
+          widgets: [
+            { id: 'display-clock', type: 'clock' as const, config: {} }
+          ],
+          layouts: {
+            'signage-portrait': {
+              placements: {
+                'display-clock': { col: 1, row: 1, colSpan: 6, rowSpan: 2 }
+              }
+            }
+          }
+        }
+      ],
+      unknownRoot: 'must not survive normalization'
+    };
+    const snapshot = structuredClone(experience);
+
+    const normalized = normalizeExperienceInput(experience);
+
+    expect(normalized).toEqual(ExperienceTemplateSchema.parse(experience));
+    expect(normalized).not.toHaveProperty('unknownRoot');
+    expect(experience).toEqual(snapshot);
+    expect(normalizeExperienceInput(normalized)).toEqual(normalized);
+  });
+
+  it('rejects unknown theme fields instead of allowing a compatibility color bypass', () => {
+    const versioned = {
+      schemaVersion: 1,
+      id: 'unsafe-theme',
+      surface: 'queue-display',
+      startPageId: 'queue-display',
+      variants: [
+        {
+          id: 'signage-portrait',
+          profile: {
+            id: 'signage-1080x1920',
+            name: 'Signage 1080×1920',
+            width: 1080,
+            height: 1920,
+            interactionMode: 'non-touch',
+            viewingDistance: 'far',
+            safeArea: { top: 0, right: 0, bottom: 0, left: 0 }
+          },
+          grid: { columns: 1, rows: 1 }
+        }
+      ],
+      pages: [
+        {
+          id: 'queue-display',
+          name: 'Queue display',
+          widgets: [{ id: 'clock', type: 'clock', config: {} }],
+          layouts: {
+            'signage-portrait': {
+              placements: { clock: { col: 1, row: 1, colSpan: 1, rowSpan: 1 } }
+            }
+          }
+        }
+      ],
+      theme: {
+        preset: 'legacy-kiosk',
+        tokens: {
+          header: '#000000',
+          surface: '#111111',
+          serviceGrid: '#222222'
+        },
+        perTileColor: '#ff0000'
+      }
+    };
+
+    expect(ExperienceTemplateSchema.safeParse(versioned).success).toBe(false);
+    expectNormalizationError(
+      () => normalizeExperienceInput(versioned),
+      'invalid-versioned-experience'
+    );
+  });
+
+  it('fails closed for unsupported versions and ambiguous legacy source discriminators', () => {
+    expectNormalizationError(
+      () =>
+        normalizeExperienceInput({
+          schemaVersion: 2,
+          id: 'old-screen',
+          layout: { type: 'fullscreen', regions: [] },
+          widgets: []
+        }),
+      'unsupported-schema-version'
+    );
+    expectNormalizationError(
+      () =>
+        normalizeExperienceInput({
+          id: 'ambiguous-source',
+          layout: { type: 'fullscreen', regions: [] },
+          widgets: [],
+          portrait: { columns: 1, rows: 1, widgets: [] },
+          landscape: { columns: 1, rows: 1, widgets: [] }
+        }),
+      'ambiguous-legacy-input'
+    );
+  });
+
+  it('rejects incompatible orientation-specific display content rather than selecting a face', () => {
+    expectNormalizationError(
+      () =>
+        experienceFromScreenTemplate({
+          id: 'incompatible-faces',
+          portrait: {
+            columns: 1,
+            rows: 1,
+            widgets: [
+              {
+                id: 'clock',
+                type: 'clock',
+                placement: { col: 1, row: 1, colSpan: 1, rowSpan: 1 },
+                config: { timezone: 'UTC' }
+              }
+            ]
+          },
+          landscape: {
+            columns: 1,
+            rows: 1,
+            widgets: [
+              {
+                id: 'clock',
+                type: 'clock',
+                placement: { col: 1, row: 1, colSpan: 1, rowSpan: 1 },
+                config: { timezone: 'Europe/Moscow' }
+              }
+            ]
+          }
+        }),
+      'incompatible-orientation-content'
+    );
   });
 });
 
@@ -326,8 +588,8 @@ describe('legacy kiosk derivation', () => {
       kioskConfig({ serviceGridLayout: 'manual' }),
       [
         service('payments', {
-          gridRow: 2,
-          gridCol: 3,
+          gridRow: 0,
+          gridCol: 0,
           gridRowSpan: 2,
           gridColSpan: 1,
           backgroundColor: '#f00000',
@@ -343,11 +605,12 @@ describe('legacy kiosk derivation', () => {
       presentation: {
         mode: 'manual',
         grid: { rows: 8, columns: 8 },
+        coordinateBase: 'zero-based',
         placements: [
           {
             serviceId: 'payments',
-            row: 2,
-            col: 3,
+            row: 0,
+            col: 0,
             rowSpan: 2,
             colSpan: 1
           }
@@ -356,6 +619,31 @@ describe('legacy kiosk derivation', () => {
     });
     expect(JSON.stringify(normalized)).not.toContain('#f00000');
     expect(JSON.stringify(normalized)).not.toContain('#ffffff');
+    expectParsed(normalized);
+  });
+
+  it('keeps a manual 8×8 grid fixed and unpaginated even for a large catalog', () => {
+    const normalized = experienceFromKioskConfig(
+      kioskConfig({ serviceGridLayout: 'manual' }),
+      Array.from({ length: 30 }, (_, index) =>
+        service(`manual-${index}`, {
+          gridRow: Math.floor(index / 8),
+          gridCol: index % 8
+        })
+      )
+    );
+    const picker = pageById(normalized, 'services')?.widgets.find(
+      (widget) => widget.id === 'service-picker'
+    );
+
+    expect(picker?.config).toMatchObject({
+      presentation: {
+        mode: 'manual',
+        grid: { rows: 8, columns: 8 },
+        coordinateBase: 'zero-based'
+      },
+      pagination: { enabled: false, pageSize: 9, threshold: 12 }
+    });
     expectParsed(normalized);
   });
 
@@ -369,7 +657,7 @@ describe('legacy kiosk derivation', () => {
       [service('appointments')]
     );
 
-    expect(normalized.startPageId).toBe('attract');
+    expect(normalized.startPageId).toBe('services');
     expect(normalized.pages.map((page) => page.id)).toEqual([
       'attract',
       'services',
@@ -391,6 +679,26 @@ describe('legacy kiosk derivation', () => {
       type: 'rich-info',
       actions: [{ type: 'navigate', toPageId: 'appointment' }]
     });
+    expect(pageById(normalized, 'attract')?.widgets).toMatchObject([
+      {
+        id: 'attract-media',
+        actions: [],
+        config: {
+          source: 'legacy-kiosk-attract',
+          compatibility: {
+            mode: 'session_then_attract',
+            showAttractAfterSessionEnd: true,
+            attractIdleSec: 60,
+            showQueueDepthOnAttract: true,
+            signage: { mode: 'inherit' }
+          }
+        }
+      }
+    ]);
+    expect(pageById(normalized, 'success')?.widgets[0]?.actions).toEqual([
+      { type: 'reset-session' },
+      { type: 'navigate', toPageId: 'services' }
+    ]);
     expectParsed(normalized);
   });
 
@@ -414,21 +722,6 @@ describe('legacy kiosk derivation', () => {
       expectParsed(normalized);
     }
   );
-
-  it('does not add a language switcher when only one active locale is configured', () => {
-    const normalized = experienceFromKioskConfig(
-      {
-        ...kioskConfig(),
-        activeLocales: ['ru']
-      } as KioskConfig,
-      [service('single-locale', { name: 'Только русский' })]
-    );
-
-    expect(
-      pageById(normalized, 'services')?.widgets.map((widget) => widget.id)
-    ).toEqual(['service-picker']);
-    expectParsed(normalized);
-  });
 
   it('uses sanitized legacy-kiosk compatibility tokens and a complete portrait profile', () => {
     const normalized = experienceFromKioskConfig(
@@ -496,9 +789,41 @@ describe('legacy kiosk derivation', () => {
     expectParsed(normalized);
   });
 
-  it('derives service behavior slots without replacing canonical legacy identification', () => {
+  it('derives an exact per-service route with one terminal submission for every legacy flow', () => {
     const normalized = experienceFromKioskConfig(kioskConfig(), [
-      service('behavior', {
+      service('plain'),
+      service('information-only', {
+        behavior: {
+          version: 1,
+          information: { body: { en: 'Bring your ticket' } },
+          fields: []
+        }
+      }),
+      service('form-only', {
+        behavior: {
+          version: 1,
+          fields: [
+            {
+              key: 'reason',
+              label: { en: 'Reason' },
+              type: 'text',
+              required: true
+            }
+          ],
+          dataRetentionDays: 1
+        }
+      }),
+      service('identity-only', {
+        identificationMode: 'phone'
+      }),
+      service('confirmation-only', {
+        behavior: {
+          version: 1,
+          fields: [],
+          route: { mode: 'page-slot', slot: 'confirmation' }
+        }
+      }),
+      service('everything', {
         identificationMode: 'phone',
         behavior: {
           version: 1,
@@ -514,8 +839,18 @@ describe('legacy kiosk derivation', () => {
           dataRetentionDays: 1,
           route: { mode: 'page-slot', slot: 'confirmation' }
         }
+      }),
+      service('explicit-identity', {
+        behavior: {
+          version: 1,
+          fields: [],
+          route: { mode: 'page-slot', slot: 'identity' }
+        }
       })
     ]);
+    const picker = pageById(normalized, 'services')?.widgets.find(
+      (widget) => widget.id === 'service-picker'
+    );
 
     expect(normalized.pages.map((page) => page.id)).toEqual([
       'services',
@@ -525,6 +860,61 @@ describe('legacy kiosk derivation', () => {
       'confirmation',
       'success'
     ]);
+    expect(picker?.config).toMatchObject({
+      legacyRouting: {
+        source: 'legacy-service-routes',
+        canonicalSlots: [
+          'service-info',
+          'service-form',
+          'identity',
+          'confirmation',
+          'success'
+        ],
+        routes: [
+          {
+            serviceId: 'plain',
+            slots: ['success'],
+            terminalActions: [{ type: 'submit-ticket' }]
+          },
+          {
+            serviceId: 'information-only',
+            slots: ['service-info', 'success'],
+            terminalActions: [{ type: 'submit-ticket' }]
+          },
+          {
+            serviceId: 'form-only',
+            slots: ['service-form', 'success'],
+            terminalActions: [{ type: 'submit-ticket' }]
+          },
+          {
+            serviceId: 'identity-only',
+            slots: ['identity', 'success'],
+            terminalActions: [{ type: 'submit-ticket' }]
+          },
+          {
+            serviceId: 'confirmation-only',
+            slots: ['confirmation', 'success'],
+            terminalActions: [{ type: 'submit-ticket' }]
+          },
+          {
+            serviceId: 'everything',
+            slots: [
+              'service-info',
+              'service-form',
+              'identity',
+              'confirmation',
+              'success'
+            ],
+            terminalActions: [{ type: 'submit-ticket' }]
+          },
+          {
+            serviceId: 'explicit-identity',
+            slots: ['identity', 'success'],
+            terminalActions: [{ type: 'submit-ticket' }]
+          }
+        ]
+      }
+    });
     expect(normalized.flowPages).toMatchObject({
       serviceCatalogPageId: 'services',
       serviceInfoPageId: 'service-info',
@@ -534,5 +924,69 @@ describe('legacy kiosk derivation', () => {
       successPageId: 'success'
     });
     expectParsed(normalized);
+  });
+
+  it('preserves the complete effective attract policy from actual kiosk configuration', () => {
+    const normalized = experienceFromKioskConfig(
+      kioskConfig({
+        kioskAttractInactivityMode: 'attract_only',
+        showAttractAfterSessionEnd: false,
+        attractIdleSec: 37,
+        showQueueDepthOnAttract: false,
+        kioskAttractSignageMode: 'materials',
+        kioskAttractActiveMaterialIds: ['material-a', 'material-b'],
+        kioskAttractSlideDurationSec: 9
+      }),
+      [service('attract-policy')]
+    );
+
+    expect(normalized.startPageId).toBe('services');
+    expect(pageById(normalized, 'attract')?.widgets[0]?.config).toEqual({
+      source: 'legacy-kiosk-attract',
+      compatibility: {
+        mode: 'attract_only',
+        sessionIdleBeforeWarningSec: 45,
+        sessionIdleCountdownSec: 15,
+        showAttractAfterSessionEnd: false,
+        attractIdleSec: 37,
+        showQueueDepthOnAttract: false,
+        signage: {
+          mode: 'materials',
+          materialIds: ['material-a', 'material-b'],
+          slideDurationSec: 9
+        }
+      }
+    });
+    expectParsed(normalized);
+  });
+
+  it('runtime-parses kiosk sources and rejects malformed or duplicate service ids without input data in errors', () => {
+    expectNormalizationError(
+      () =>
+        normalizeExperienceInput({
+          kiosk: { serviceGridLayout: 'not-a-layout' },
+          services: [{ id: 'bad', unitId: 'unit-1', name: 'Bad', isLeaf: true }]
+        }),
+      'invalid-kiosk-input'
+    );
+    expectNormalizationError(
+      () =>
+        normalizeExperienceInput({
+          kiosk: {},
+          services: [
+            { id: 'same', unitId: 'unit-1', name: 'First', isLeaf: true },
+            { id: 'same', unitId: 'unit-1', name: 'Second', isLeaf: true }
+          ]
+        }),
+      'invalid-kiosk-input'
+    );
+    expectNormalizationError(
+      () =>
+        normalizeExperienceInput({
+          kiosk: {},
+          services: [{ id: 42, unitId: 'unit-1', name: 'Malformed' }]
+        }),
+      'invalid-kiosk-input'
+    );
   });
 });

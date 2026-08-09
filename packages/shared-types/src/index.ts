@@ -848,9 +848,11 @@ export {
 } from './experience-template';
 
 export {
+  ExperienceNormalizationError,
   experienceFromScreenTemplate,
   experienceFromKioskConfig,
-  normalizeExperienceInput
+  normalizeExperienceInput,
+  type ExperienceNormalizationErrorCode
 } from './experience-legacy';
 
 import {

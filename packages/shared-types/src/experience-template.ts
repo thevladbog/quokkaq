@@ -73,16 +73,18 @@ const ExperienceThemeColorSchema = z.string().regex(/^#[0-9a-f]{6}$/i);
  * Legacy imports must not turn individual widget or service tiles into builder
  * styling controls.
  */
-export const ExperienceThemeSchema = z.object({
-  preset: z.literal('legacy-kiosk'),
-  tokens: z
-    .object({
-      header: ExperienceThemeColorSchema,
-      surface: ExperienceThemeColorSchema,
-      serviceGrid: ExperienceThemeColorSchema
-    })
-    .strict()
-});
+export const ExperienceThemeSchema = z
+  .object({
+    preset: z.literal('legacy-kiosk'),
+    tokens: z
+      .object({
+        header: ExperienceThemeColorSchema,
+        surface: ExperienceThemeColorSchema,
+        serviceGrid: ExperienceThemeColorSchema
+      })
+      .strict()
+  })
+  .strict();
 
 export const ExperienceWidgetSchema = z.object({
   id: z.string().min(1),
