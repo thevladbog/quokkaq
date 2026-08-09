@@ -598,7 +598,7 @@ func run() error {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Use(authmiddleware.RequireTerminalUnitMatchOrUnitAnyPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", []string{rbac.PermAccessKiosk, rbac.PermAccessStaffPanel}))
 			r.Get("/{unitId}/services", serviceHandler.GetServicesByUnit)
-			r.Get("/{unitId}/services-tree", serviceHandler.GetServicesByUnit)
+			r.Get("/{unitId}/services-tree", serviceHandler.GetServicesTreeByUnit)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))

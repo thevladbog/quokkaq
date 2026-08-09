@@ -83,7 +83,7 @@ import { StaffOperatorDetailCard } from '@/components/statistics/StaffOperatorDe
 import { StaffingForecastPanel } from '@/components/statistics/StaffingForecastPanel';
 import { KioskOperationsAnalyticsCard } from '@/components/statistics/kiosk-operations-analytics-card';
 import { useGetUnitsUnitIdShiftActivityActors } from '@/lib/api/generated/shift';
-import { useGetUnitsUnitIdServices } from '@/lib/api/generated/services';
+import { useGetServicesByUnit } from '@/lib/api/generated/services';
 import { isApiHttpError } from '@/lib/api-errors';
 import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import {
@@ -644,7 +644,7 @@ export default function StatisticsPage() {
     { query: { enabled: statsEnabled } }
   );
 
-  const servicesListQuery = useGetUnitsUnitIdServices(statsSubdivisionId, {
+  const servicesListQuery = useGetServicesByUnit(statsSubdivisionId, {
     query: { enabled: statsEnabled }
   });
 

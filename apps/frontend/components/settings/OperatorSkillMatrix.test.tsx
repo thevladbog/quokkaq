@@ -73,7 +73,7 @@ vi.mock('@/lib/api/generated/shift', () => ({
 }));
 
 vi.mock('@/lib/api/generated/services', () => ({
-  useGetUnitsUnitIdServices: () => ({
+  useGetServicesByUnit: () => ({
     data: {
       status: 200,
       data: [
