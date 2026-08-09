@@ -108,6 +108,45 @@ describe('condition evaluator', () => {
     });
   });
 
+  it.each([
+    {
+      name: 'an empty AND group',
+      node: { kind: 'group', combinator: 'and', children: [] }
+    },
+    {
+      name: 'an empty OR group',
+      node: { kind: 'group', combinator: 'or', children: [] }
+    },
+    {
+      name: 'a boolean rule with an invalid operator',
+      node: {
+        kind: 'rule',
+        field: 'identity.isAuthenticated',
+        operator: 'eq',
+        value: true
+      }
+    },
+    {
+      name: 'a rule with an unknown field',
+      node: {
+        kind: 'rule',
+        field: 'live.waitingRoomCapacity',
+        operator: 'is-true'
+      }
+    },
+    {
+      name: 'a malformed node',
+      node: null
+    }
+  ])('fails closed for $name', ({ node }) => {
+    expect(() => evaluateConditionResult(node as never, context)).not.toThrow();
+    expect(evaluateCondition(node as never, context)).toBe(false);
+    expect(evaluateConditionResult(node as never, context)).toEqual({
+      matches: false,
+      diagnostics: [{ code: 'invalid-condition' }]
+    });
+  });
+
   it('summarizes conditions with localized human-readable wording', () => {
     const rule = {
       kind: 'group' as const,
@@ -132,6 +171,82 @@ describe('condition evaluator', () => {
     );
     expect(conditionSummary(rule, 'ru')).toBe(
       'Авторизован и группа содержит Back office'
+    );
+  });
+
+  it('keeps an OR group inside an AND group unambiguous in both locales', () => {
+    const rule = {
+      kind: 'group' as const,
+      combinator: 'and' as const,
+      children: [
+        {
+          kind: 'rule' as const,
+          field: 'identity.isAuthenticated' as const,
+          operator: 'is-true' as const
+        },
+        {
+          kind: 'group' as const,
+          combinator: 'or' as const,
+          children: [
+            {
+              kind: 'rule' as const,
+              field: 'identity.groups' as const,
+              operator: 'contains' as const,
+              value: 'Back office'
+            },
+            {
+              kind: 'rule' as const,
+              field: 'live.isOpen' as const,
+              operator: 'is-true' as const
+            }
+          ]
+        }
+      ]
+    };
+
+    expect(conditionSummary(rule, 'en')).toBe(
+      'Authenticated and (group contains Back office or Open)'
+    );
+    expect(conditionSummary(rule, 'ru')).toBe(
+      'Авторизован и (группа содержит Back office или Открыто)'
+    );
+  });
+
+  it('keeps an AND group inside an OR group unambiguous in both locales', () => {
+    const rule = {
+      kind: 'group' as const,
+      combinator: 'or' as const,
+      children: [
+        {
+          kind: 'rule' as const,
+          field: 'identity.isEmployee' as const,
+          operator: 'is-true' as const
+        },
+        {
+          kind: 'group' as const,
+          combinator: 'and' as const,
+          children: [
+            {
+              kind: 'rule' as const,
+              field: 'identity.groups' as const,
+              operator: 'contains' as const,
+              value: 'Back office'
+            },
+            {
+              kind: 'rule' as const,
+              field: 'live.isConnected' as const,
+              operator: 'is-true' as const
+            }
+          ]
+        }
+      ]
+    };
+
+    expect(conditionSummary(rule, 'en')).toBe(
+      'Employee or (group contains Back office and Connected)'
+    );
+    expect(conditionSummary(rule, 'ru')).toBe(
+      'Сотрудник или (группа содержит Back office и Подключено)'
     );
   });
 });

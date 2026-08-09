@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import {
+  AccessPolicySchema,
+  ConditionNodeSchema
+} from './experience-condition';
 import { ExperienceTemplateSchema } from './experience-template';
 
 function validTemplate() {
@@ -106,5 +110,66 @@ describe('experience condition schema', () => {
     };
 
     expect(() => ExperienceTemplateSchema.parse(template)).toThrow();
+  });
+
+  it.each([
+    {
+      name: 'a rule whose fields are inherited',
+      value: Object.create({
+        kind: 'rule',
+        field: 'identity.isAuthenticated',
+        operator: 'is-true'
+      })
+    },
+    {
+      name: 'a recursive group whose fields are inherited',
+      value: Object.create({
+        kind: 'group',
+        combinator: 'and',
+        children: [
+          {
+            kind: 'rule',
+            field: 'identity.isAuthenticated',
+            operator: 'is-true'
+          }
+        ]
+      })
+    }
+  ])('rejects $name', ({ value }) => {
+    expect(ConditionNodeSchema.safeParse(value).success).toBe(false);
+  });
+
+  it('rejects an access policy whose fields are inherited', () => {
+    const policy = Object.create({
+      when: {
+        kind: 'rule',
+        field: 'identity.isAuthenticated',
+        operator: 'is-true'
+      },
+      whenFalse: 'hide'
+    });
+
+    expect(AccessPolicySchema.safeParse(policy).success).toBe(false);
+  });
+
+  it('accepts normal JSON-parsed condition and access-policy records', () => {
+    const policy = JSON.parse(
+      JSON.stringify({
+        when: {
+          kind: 'group',
+          combinator: 'and',
+          children: [
+            {
+              kind: 'rule',
+              field: 'identity.isAuthenticated',
+              operator: 'is-true'
+            }
+          ]
+        },
+        whenFalse: 'hide'
+      })
+    );
+
+    expect(AccessPolicySchema.safeParse(policy).success).toBe(true);
   });
 });

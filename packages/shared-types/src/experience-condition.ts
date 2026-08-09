@@ -71,79 +71,127 @@ export type ConditionGroup = {
 
 export type ConditionNode = ConditionRule | ConditionGroup;
 
-const BooleanConditionRuleSchema = z
-  .object({
-    kind: z.literal('rule'),
-    field: z.enum([
-      'identity.isAuthenticated',
-      'identity.isEmployee',
-      'live.isOpen',
-      'live.isConnected'
-    ]),
-    operator: z.enum(['is-true', 'is-false'])
-  })
-  .strict();
+function isPlainOwnRecord(
+  value: unknown,
+  requiredKeys: readonly string[]
+): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
 
-const GroupsConditionRuleSchema = z
-  .object({
-    kind: z.literal('rule'),
-    field: z.literal('identity.groups'),
-    operator: z.enum(['contains', 'not-contains']),
-    value: z.string().min(1)
-  })
-  .strict();
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    return false;
+  }
 
-const QueueLengthConditionRuleSchema = z
-  .object({
-    kind: z.literal('rule'),
-    field: z.literal('live.queueLength'),
-    operator: z.enum(['eq', 'ne', 'gt', 'gte', 'lt', 'lte']),
-    value: z.number()
-  })
-  .strict();
+  return requiredKeys.every((key) =>
+    Object.prototype.hasOwnProperty.call(value, key)
+  );
+}
 
-const SelectedServiceConditionRuleSchema = z
-  .object({
-    kind: z.literal('rule'),
-    field: z.literal('session.selectedServiceId'),
-    operator: z.enum(['eq', 'ne']),
-    value: z.string().min(1)
-  })
-  .strict();
+function plainOwnRecord<T extends z.ZodType>(
+  schema: T,
+  requiredKeys: readonly string[]
+) {
+  return z.preprocess(
+    (value) => (isPlainOwnRecord(value, requiredKeys) ? value : undefined),
+    schema
+  );
+}
 
-export const ConditionRuleSchema: z.ZodType<ConditionRule> =
-  z.discriminatedUnion('field', [
-    BooleanConditionRuleSchema,
-    GroupsConditionRuleSchema,
-    QueueLengthConditionRuleSchema,
-    SelectedServiceConditionRuleSchema
-  ]);
+const BooleanConditionRuleSchema = plainOwnRecord(
+  z
+    .object({
+      kind: z.literal('rule'),
+      field: z.enum([
+        'identity.isAuthenticated',
+        'identity.isEmployee',
+        'live.isOpen',
+        'live.isConnected'
+      ]),
+      operator: z.enum(['is-true', 'is-false'])
+    })
+    .strict(),
+  ['kind', 'field', 'operator']
+);
 
-export const ConditionGroupSchema: z.ZodType<ConditionGroup> = z
-  .object({
-    kind: z.literal('group'),
-    combinator: z.enum(['and', 'or']),
-    children: z.array(z.lazy(() => ConditionNodeSchema)).min(1)
-  })
-  .strict();
+const GroupsConditionRuleSchema = plainOwnRecord(
+  z
+    .object({
+      kind: z.literal('rule'),
+      field: z.literal('identity.groups'),
+      operator: z.enum(['contains', 'not-contains']),
+      value: z.string().min(1)
+    })
+    .strict(),
+  ['kind', 'field', 'operator', 'value']
+);
+
+const QueueLengthConditionRuleSchema = plainOwnRecord(
+  z
+    .object({
+      kind: z.literal('rule'),
+      field: z.literal('live.queueLength'),
+      operator: z.enum(['eq', 'ne', 'gt', 'gte', 'lt', 'lte']),
+      value: z.number()
+    })
+    .strict(),
+  ['kind', 'field', 'operator', 'value']
+);
+
+const SelectedServiceConditionRuleSchema = plainOwnRecord(
+  z
+    .object({
+      kind: z.literal('rule'),
+      field: z.literal('session.selectedServiceId'),
+      operator: z.enum(['eq', 'ne']),
+      value: z.string().min(1)
+    })
+    .strict(),
+  ['kind', 'field', 'operator', 'value']
+);
+
+export const ConditionRuleSchema: z.ZodType<ConditionRule> = z.union([
+  BooleanConditionRuleSchema,
+  GroupsConditionRuleSchema,
+  QueueLengthConditionRuleSchema,
+  SelectedServiceConditionRuleSchema
+]);
+
+export const ConditionGroupSchema: z.ZodType<ConditionGroup> = plainOwnRecord(
+  z
+    .object({
+      kind: z.literal('group'),
+      combinator: z.enum(['and', 'or']),
+      children: z.array(z.lazy(() => ConditionNodeSchema)).min(1)
+    })
+    .strict(),
+  ['kind', 'combinator', 'children']
+);
 
 export const ConditionNodeSchema: z.ZodType<ConditionNode> = z.lazy(() =>
   z.union([ConditionRuleSchema, ConditionGroupSchema])
 );
 
-export const AccessPolicySchema = z
-  .object({
-    when: ConditionNodeSchema,
-    whenFalse: z.enum(['hide', 'lock'])
-  })
-  .strict();
+export const AccessPolicySchema = plainOwnRecord(
+  z
+    .object({
+      when: ConditionNodeSchema,
+      whenFalse: z.enum(['hide', 'lock'])
+    })
+    .strict(),
+  ['when', 'whenFalse']
+);
 
-export const PageAccessPolicySchema = z
-  .object({
-    when: ConditionNodeSchema,
-    whenFalse: z.literal('hide')
-  })
-  .strict();
+export const PageAccessPolicySchema = plainOwnRecord(
+  z
+    .object({
+      when: ConditionNodeSchema,
+      whenFalse: z.literal('hide')
+    })
+    .strict(),
+  ['when', 'whenFalse']
+);
 
 export const ConditionContextSchema = z.object({
   identity: z

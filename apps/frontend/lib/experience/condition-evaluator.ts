@@ -1,3 +1,4 @@
+import { ConditionNodeSchema } from '@quokkaq/shared-types';
 import type {
   ConditionContext,
   ConditionField,
@@ -5,12 +6,17 @@ import type {
   ConditionRule
 } from '@quokkaq/shared-types';
 
-export type ConditionDiagnosticCode = 'missing-value' | 'type-mismatch';
+export type ConditionDiagnosticCode =
+  | 'invalid-condition'
+  | 'missing-value'
+  | 'type-mismatch';
 
-export type ConditionDiagnostic = {
-  code: ConditionDiagnosticCode;
-  field: ConditionField;
-};
+export type ConditionDiagnostic =
+  | { code: 'invalid-condition' }
+  | {
+      code: 'missing-value' | 'type-mismatch';
+      field: ConditionField;
+    };
 
 export type ConditionEvaluationResult = {
   matches: boolean;
@@ -49,6 +55,13 @@ function typeMismatch(field: ConditionField): ConditionEvaluationResult {
   return {
     matches: false,
     diagnostics: [{ code: 'type-mismatch', field }]
+  };
+}
+
+function invalidCondition(): ConditionEvaluationResult {
+  return {
+    matches: false,
+    diagnostics: [{ code: 'invalid-condition' }]
   };
 }
 
@@ -129,7 +142,7 @@ function compareNumbers(
   }
 }
 
-export function evaluateConditionResult(
+function evaluateParsedCondition(
   node: ConditionNode,
   context: ConditionContext
 ): ConditionEvaluationResult {
@@ -138,7 +151,7 @@ export function evaluateConditionResult(
   }
 
   const children = node.children.map((child) =>
-    evaluateConditionResult(child, context)
+    evaluateParsedCondition(child, context)
   );
 
   return {
@@ -150,10 +163,17 @@ export function evaluateConditionResult(
   };
 }
 
-export function evaluateCondition(
-  node: ConditionNode,
+export function evaluateConditionResult(
+  node: unknown,
   context: ConditionContext
-) {
+): ConditionEvaluationResult {
+  const parsed = ConditionNodeSchema.safeParse(node);
+  return parsed.success
+    ? evaluateParsedCondition(parsed.data, context)
+    : invalidCondition();
+}
+
+export function evaluateCondition(node: unknown, context: ConditionContext) {
   return evaluateConditionResult(node, context).matches;
 }
 
@@ -242,14 +262,19 @@ function summarizeRule(rule: ConditionRule, locale: ConditionSummaryLocale) {
 
 export function conditionSummary(
   node: ConditionNode,
-  locale: ConditionSummaryLocale
+  locale: ConditionSummaryLocale,
+  parentCombinator?: 'and' | 'or'
 ): string {
   if (node.kind === 'rule') {
     return summarizeRule(node, locale);
   }
 
   const labels = conditionSummaryLabels[locale];
-  return node.children
-    .map((child) => conditionSummary(child, locale))
+  const summary = node.children
+    .map((child) => conditionSummary(child, locale, node.combinator))
     .join(` ${node.combinator === 'and' ? labels.and : labels.or} `);
+
+  return parentCombinator && parentCombinator !== node.combinator
+    ? `(${summary})`
+    : summary;
 }
