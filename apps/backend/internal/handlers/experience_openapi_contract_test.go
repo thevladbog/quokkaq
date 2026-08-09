@@ -1,12 +1,15 @@
 package handlers
 
 import (
+	"encoding/json"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/swaggo/swag"
+
+	"quokkaq-go-backend/internal/models"
 )
 
 type silentSwagLogger struct{}
@@ -102,6 +105,45 @@ func TestExperienceOpenAPISourceAnnotationsAreGeneratable(t *testing.T) {
 		if nullable, _ := publisher.Extensions["x-nullable"].(bool); !nullable {
 			t.Errorf("%s.publishedBy x-nullable = %v", schemaName, publisher.Extensions["x-nullable"])
 		}
+	}
+	pageSchema, ok := document.Definitions["models.ExperienceTemplateVersionPage"]
+	if !ok {
+		t.Fatal("missing generated schema models.ExperienceTemplateVersionPage")
+	}
+	nextCursor, ok := pageSchema.Properties["nextBeforeVersion"]
+	if !ok {
+		t.Fatal("version page missing nextBeforeVersion")
+	}
+	if nullable, _ := nextCursor.Extensions["x-nullable"].(bool); !nullable {
+		t.Errorf("models.ExperienceTemplateVersionPage.nextBeforeVersion x-nullable = %v", nextCursor.Extensions["x-nullable"])
+	}
+	required := false
+	for _, propertyName := range pageSchema.Required {
+		if propertyName == "nextBeforeVersion" {
+			required = true
+			break
+		}
+	}
+	if !required {
+		t.Error("models.ExperienceTemplateVersionPage.nextBeforeVersion must be required because runtime JSON always includes it")
+	}
+}
+
+func TestExperienceVersionPageAlwaysIncludesNullableCursor(t *testing.T) {
+	payload, err := json.Marshal(models.ExperienceTemplateVersionPage{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	value, present := decoded["nextBeforeVersion"]
+	if !present {
+		t.Fatalf("nextBeforeVersion absent from runtime JSON: %s", payload)
+	}
+	if value != nil {
+		t.Fatalf("nextBeforeVersion = %#v, want null", value)
 	}
 }
 

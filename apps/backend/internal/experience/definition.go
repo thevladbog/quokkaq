@@ -7,6 +7,7 @@ import (
 	"math"
 	"regexp"
 	"sort"
+	"strconv"
 )
 
 const (
@@ -40,6 +41,7 @@ const (
 	maxDefinitionIssues     = 200
 	maxDefinitionPlacements = 200
 	minimumTouchTargetPX    = 56
+	maxJavaScriptSafeInt    = int64(1<<53 - 1)
 )
 
 var (
@@ -96,7 +98,7 @@ type ValidationError struct {
 func (e *ValidationError) Error() string { return "experience definition is not publishable" }
 
 type definitionEnvelope struct {
-	SchemaVersion int                 `json:"schemaVersion"`
+	SchemaVersion definitionInteger   `json:"schemaVersion"`
 	ID            string              `json:"id"`
 	Surface       string              `json:"surface"`
 	StartPageID   string              `json:"startPageId"`
@@ -115,23 +117,23 @@ type definitionVariant struct {
 type definitionProfile struct {
 	ID              string              `json:"id"`
 	Name            string              `json:"name"`
-	Width           int                 `json:"width"`
-	Height          int                 `json:"height"`
+	Width           definitionInteger   `json:"width"`
+	Height          definitionInteger   `json:"height"`
 	InteractionMode string              `json:"interactionMode"`
 	ViewingDistance string              `json:"viewingDistance"`
 	SafeArea        *definitionSafeArea `json:"safeArea"`
 }
 
 type definitionSafeArea struct {
-	Top    int `json:"top"`
-	Right  int `json:"right"`
-	Bottom int `json:"bottom"`
-	Left   int `json:"left"`
+	Top    definitionInteger `json:"top"`
+	Right  definitionInteger `json:"right"`
+	Bottom definitionInteger `json:"bottom"`
+	Left   definitionInteger `json:"left"`
 }
 
 type definitionGrid struct {
-	Columns int `json:"columns"`
-	Rows    int `json:"rows"`
+	Columns definitionInteger `json:"columns"`
+	Rows    definitionInteger `json:"rows"`
 }
 
 type definitionPage struct {
@@ -157,10 +159,37 @@ type definitionLayout struct {
 }
 
 type definitionPlacement struct {
-	Col     int `json:"col"`
-	Row     int `json:"row"`
-	ColSpan int `json:"colSpan"`
-	RowSpan int `json:"rowSpan"`
+	Col     definitionInteger `json:"col"`
+	Row     definitionInteger `json:"row"`
+	ColSpan definitionInteger `json:"colSpan"`
+	RowSpan definitionInteger `json:"rowSpan"`
+}
+
+// definitionInteger retains whether a JSON number is a JavaScript safe integer.
+// Unsafe values are never converted to Go integers. PositiveUnsafeInteger is
+// only a structural classification used to mirror canonical overflow issues.
+type definitionInteger struct {
+	Value                 int64
+	Valid                 bool
+	PositiveUnsafeInteger bool
+}
+
+func (value *definitionInteger) UnmarshalJSON(raw []byte) error {
+	number, err := strconv.ParseFloat(string(bytes.TrimSpace(raw)), 64)
+	if err != nil || math.IsNaN(number) || math.IsInf(number, 0) {
+		return nil
+	}
+	if math.Trunc(number) != number || number < -float64(maxJavaScriptSafeInt) || number > float64(maxJavaScriptSafeInt) {
+		value.PositiveUnsafeInteger = number > float64(maxJavaScriptSafeInt)
+		return nil
+	}
+	value.Value = int64(number)
+	value.Valid = true
+	return nil
+}
+
+func (value definitionInteger) between(minimum, maximum int64) bool {
+	return value.Valid && value.Value >= minimum && value.Value <= maximum
 }
 
 type definitionAction struct {
@@ -264,18 +293,21 @@ func rawBool(raw json.RawMessage) (bool, bool) {
 	return value, true
 }
 
-func rawInt(raw json.RawMessage) (int, bool) {
-	var value int
-	if len(raw) == 0 || json.Unmarshal(raw, &value) != nil {
+func rawInt(raw json.RawMessage) (int64, bool) {
+	if len(raw) == 0 {
 		return 0, false
 	}
-	return value, true
+	number, err := strconv.ParseFloat(string(bytes.TrimSpace(raw)), 64)
+	if err != nil || math.IsNaN(number) || math.IsInf(number, 0) || math.Trunc(number) != number || number < -float64(maxJavaScriptSafeInt) || number > float64(maxJavaScriptSafeInt) {
+		return 0, false
+	}
+	return int64(number), true
 }
 
 func validIdentifier(value string) bool { return value != "" }
 
 func validProfile(profile *definitionProfile) bool {
-	if profile == nil || profile.SafeArea == nil || !validIdentifier(profile.ID) || !validIdentifier(profile.Name) || profile.Width < 320 || profile.Width > 7680 || profile.Height < 320 || profile.Height > 7680 {
+	if profile == nil || profile.SafeArea == nil || !validIdentifier(profile.ID) || !validIdentifier(profile.Name) || !profile.Width.between(320, 7680) || !profile.Height.between(320, 7680) {
 		return false
 	}
 	if profile.InteractionMode != "touch" && profile.InteractionMode != "non-touch" {
@@ -285,11 +317,14 @@ func validProfile(profile *definitionProfile) bool {
 		return false
 	}
 	sa := profile.SafeArea
-	return sa.Top >= 0 && sa.Right >= 0 && sa.Bottom >= 0 && sa.Left >= 0 && sa.Left+sa.Right < profile.Width && sa.Top+sa.Bottom < profile.Height
+	if !sa.Top.between(0, maxJavaScriptSafeInt) || !sa.Right.between(0, maxJavaScriptSafeInt) || !sa.Bottom.between(0, maxJavaScriptSafeInt) || !sa.Left.between(0, maxJavaScriptSafeInt) {
+		return false
+	}
+	return sa.Left.Value < profile.Width.Value && sa.Right.Value < profile.Width.Value-sa.Left.Value && sa.Top.Value < profile.Height.Value && sa.Bottom.Value < profile.Height.Value-sa.Top.Value
 }
 
 func validGrid(grid *definitionGrid) bool {
-	return grid != nil && grid.Columns >= 1 && grid.Columns <= 48 && grid.Rows >= 1 && grid.Rows <= 48
+	return grid != nil && grid.Columns.between(1, 48) && grid.Rows.between(1, 48)
 }
 
 func conditionExceedsNodeLimit(access json.RawMessage) bool {
@@ -706,8 +741,32 @@ func widgetSupportsSurface(surface string, widget definitionWidget, actions []de
 	return surface == SurfaceTicketStation
 }
 
+func axisOverlaps(leftStart, leftSpan, rightStart, rightSpan int64) bool {
+	if leftStart <= rightStart {
+		return rightStart-leftStart < leftSpan
+	}
+	return leftStart-rightStart < rightSpan
+}
+
 func overlaps(left, right definitionPlacement) bool {
-	return left.Col < right.Col+right.ColSpan && right.Col < left.Col+left.ColSpan && left.Row < right.Row+right.RowSpan && right.Row < left.Row+left.RowSpan
+	return axisOverlaps(left.Col.Value, left.ColSpan.Value, right.Col.Value, right.ColSpan.Value) && axisOverlaps(left.Row.Value, left.RowSpan.Value, right.Row.Value, right.RowSpan.Value)
+}
+
+func placementAxisExceedsGrid(start, span, bound definitionInteger) bool {
+	if !bound.Valid || bound.Value < 1 {
+		return false
+	}
+	if !start.Valid || !span.Valid {
+		return start.PositiveUnsafeInteger || span.PositiveUnsafeInteger
+	}
+	if start.Value < 1 || span.Value < 1 {
+		return false
+	}
+	return start.Value > bound.Value || span.Value-1 > bound.Value-start.Value
+}
+
+func placementExceedsGrid(placement definitionPlacement, grid *definitionGrid) bool {
+	return grid != nil && (placementAxisExceedsGrid(placement.Col, placement.ColSpan, grid.Columns) || placementAxisExceedsGrid(placement.Row, placement.RowSpan, grid.Rows))
 }
 
 func runtimeAttractPage(surface string, page definitionPage) bool {
@@ -875,7 +934,7 @@ func servicePickerScrollRequired(configRaw json.RawMessage) bool {
 		if json.Unmarshal(presentation["placements"], &rawPlacements) != nil || rawPlacements == nil {
 			return false
 		}
-		minimum := 0
+		minimum := int64(0)
 		if coordinateBase == "one-based" {
 			minimum = 1
 		}
@@ -894,7 +953,7 @@ func servicePickerScrollRequired(configRaw json.RawMessage) bool {
 			}
 			zeroRow := row - minimum
 			zeroCol := col - minimum
-			if zeroRow < 0 || zeroCol < 0 || zeroRow+rowSpan > rows || zeroCol+colSpan > columns {
+			if zeroRow < 0 || zeroCol < 0 || zeroRow >= rows || zeroCol >= columns || rowSpan > rows-zeroRow || colSpan > columns-zeroCol {
 				return true
 			}
 		}
@@ -957,7 +1016,7 @@ func ValidateDefinition(raw json.RawMessage, expectedSurface string) (err error)
 		structuralValid = false
 		issues.add(CodeSchemaInvalid, path)
 	}
-	if definition.SchemaVersion != 1 || !validIdentifier(definition.ID) {
+	if !definition.SchemaVersion.between(1, 1) || !validIdentifier(definition.ID) {
 		markSchema("schema")
 	}
 	if _, ok := allowedSurfaces[definition.Surface]; !ok || definition.Surface != expectedSurface {
@@ -1073,12 +1132,11 @@ func ValidateDefinition(raw json.RawMessage, expectedSurface string) (err error)
 					placementsValid = false
 					markSchema("pages.layouts.placements")
 				}
-				if _, exists := widgetIDs[widgetID]; !exists || placement.Col < 1 || placement.Row < 1 || placement.ColSpan < 1 || placement.RowSpan < 1 {
+				if _, exists := widgetIDs[widgetID]; !exists || !placement.Col.between(1, maxJavaScriptSafeInt) || !placement.Row.between(1, maxJavaScriptSafeInt) || !placement.ColSpan.between(1, maxJavaScriptSafeInt) || !placement.RowSpan.between(1, maxJavaScriptSafeInt) {
 					placementsValid = false
 					markSchema("pages.layouts.placements")
-					continue
 				}
-				if placement.Col+placement.ColSpan-1 > variant.Grid.Columns || placement.Row+placement.RowSpan-1 > variant.Grid.Rows {
+				if placementExceedsGrid(placement, variant.Grid) {
 					structuralValid = false
 					issues.add(CodeVariantPlacementOverflow, "pages.layouts.placements")
 				}
@@ -1193,8 +1251,8 @@ func ValidateDefinition(raw json.RawMessage, expectedSurface string) (err error)
 	for pageIndex, page := range definition.Pages {
 		for _, variant := range definition.Variants {
 			layout := page.Layouts[variant.ID]
-			availableWidth := variant.Profile.Width - variant.Profile.SafeArea.Left - variant.Profile.SafeArea.Right
-			availableHeight := variant.Profile.Height - variant.Profile.SafeArea.Top - variant.Profile.SafeArea.Bottom
+			availableWidth := (variant.Profile.Width.Value - variant.Profile.SafeArea.Left.Value) - variant.Profile.SafeArea.Right.Value
+			availableHeight := (variant.Profile.Height.Value - variant.Profile.SafeArea.Top.Value) - variant.Profile.SafeArea.Bottom.Value
 			for widgetIndex, widget := range page.Widgets {
 				if variant.Profile.InteractionMode != "touch" {
 					continue
@@ -1204,8 +1262,8 @@ func ValidateDefinition(raw json.RawMessage, expectedSurface string) (err error)
 					continue
 				}
 				placement := layout.Placements[widget.ID]
-				width := int(math.Floor((float64(availableWidth) / float64(variant.Grid.Columns)) * float64(placement.ColSpan)))
-				height := int(math.Floor((float64(availableHeight) / float64(variant.Grid.Rows)) * float64(placement.RowSpan)))
+				width := int64(math.Floor((float64(availableWidth) / float64(variant.Grid.Columns.Value)) * float64(placement.ColSpan.Value)))
+				height := int64(math.Floor((float64(availableHeight) / float64(variant.Grid.Rows.Value)) * float64(placement.RowSpan.Value)))
 				if width < minimumTouchTargetPX || height < minimumTouchTargetPX {
 					issues.add(CodeTouchTargetTooSmall, "pages.layouts.placements")
 				}

@@ -80,6 +80,36 @@
       "name": "invalid nine variant resource boundary",
       "expected": { "canPublish": false, "errorCodes": ["schema.invalid"] },
       "definition": { "schemaVersion": 1, "id": "variants-nine", "surface": "queue-display", "startPageId": "queue", "variants": [{}, {}, {}, {}, {}, {}, {}, {}, {}], "pages": [] }
+    },
+    {
+      "name": "invalid maximum Go int profile width",
+      "expected": { "canPublish": false, "errorCodes": ["schema.invalid"] },
+      "definition": { "schemaVersion": 1, "id": "profile-max-int", "surface": "queue-display", "startPageId": "queue", "variants": [{ "id": "display", "profile": { "id": "display-profile", "name": "Display", "width": 9223372036854775807, "height": 1080, "interactionMode": "non-touch", "viewingDistance": "far", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 1, "rows": 1 } }], "pages": [{ "id": "queue", "name": "Queue", "widgets": [{ "id": "clock", "type": "clock", "config": {}, "actions": [] }], "layouts": { "display": { "placements": { "clock": { "col": 1, "row": 1, "colSpan": 1, "rowSpan": 1 } } } } }] }
+    },
+    {
+      "name": "invalid maximum Go int safe area does not overflow drawable check",
+      "expected": { "canPublish": false, "errorCodes": ["schema.invalid"] },
+      "definition": { "schemaVersion": 1, "id": "safe-area-max-int", "surface": "queue-display", "startPageId": "queue", "variants": [{ "id": "display", "profile": { "id": "display-profile", "name": "Display", "width": 820, "height": 1080, "interactionMode": "non-touch", "viewingDistance": "far", "safeArea": { "top": 0, "right": 9223372036854775807, "bottom": 0, "left": 9223372036854775807 } }, "grid": { "columns": 1, "rows": 1 } }], "pages": [{ "id": "queue", "name": "Queue", "widgets": [{ "id": "clock", "type": "clock", "config": {}, "actions": [] }], "layouts": { "display": { "placements": { "clock": { "col": 1, "row": 1, "colSpan": 1, "rowSpan": 1 } } } } }] }
+    },
+    {
+      "name": "invalid maximum Go int placement does not overflow end bound",
+      "expected": { "canPublish": false, "errorCodes": ["schema.invalid", "variant.placement_overflow"] },
+      "definition": { "schemaVersion": 1, "id": "placement-max-int", "surface": "queue-display", "startPageId": "queue", "variants": [{ "id": "display", "profile": { "id": "display-profile", "name": "Display", "width": 820, "height": 1080, "interactionMode": "non-touch", "viewingDistance": "far", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 1, "rows": 1 } }], "pages": [{ "id": "queue", "name": "Queue", "widgets": [{ "id": "clock", "type": "clock", "config": {}, "actions": [] }], "layouts": { "display": { "placements": { "clock": { "col": 9223372036854775807, "row": 1, "colSpan": 2, "rowSpan": 1 } } } } }] }
+    },
+    {
+      "name": "valid integer exact safe boundary reaches placement overflow validation",
+      "expected": { "canPublish": false, "errorCodes": ["variant.placement_overflow"] },
+      "definition": { "schemaVersion": 1, "id": "placement-safe-max", "surface": "queue-display", "startPageId": "queue", "variants": [{ "id": "display", "profile": { "id": "display-profile", "name": "Display", "width": 820, "height": 1080, "interactionMode": "non-touch", "viewingDistance": "far", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 1, "rows": 1 } }], "pages": [{ "id": "queue", "name": "Queue", "widgets": [{ "id": "clock", "type": "clock", "config": {}, "actions": [] }], "layouts": { "display": { "placements": { "clock": { "col": 9007199254740991, "row": 1, "colSpan": 1, "rowSpan": 1 } } } } }] }
+    },
+    {
+      "name": "invalid integer immediately above safe boundary",
+      "expected": { "canPublish": false, "errorCodes": ["schema.invalid", "variant.placement_overflow"] },
+      "definition": { "schemaVersion": 1, "id": "placement-first-unsafe", "surface": "queue-display", "startPageId": "queue", "variants": [{ "id": "display", "profile": { "id": "display-profile", "name": "Display", "width": 820, "height": 1080, "interactionMode": "non-touch", "viewingDistance": "far", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 1, "rows": 1 } }], "pages": [{ "id": "queue", "name": "Queue", "widgets": [{ "id": "clock", "type": "clock", "config": {}, "actions": [] }], "layouts": { "display": { "placements": { "clock": { "col": 9007199254740992, "row": 1, "colSpan": 1, "rowSpan": 1 } } } } }] }
+    },
+    {
+      "name": "valid opaque service picker ignores unsafe pagination integer",
+      "expected": { "canPublish": true, "errorCodes": [] },
+      "definition": { "schemaVersion": 1, "id": "picker-unsafe-page-size", "surface": "ticket-station", "startPageId": "services", "variants": [{ "id": "desktop", "profile": { "id": "desktop-profile", "name": "Desktop", "width": 1280, "height": 800, "interactionMode": "non-touch", "viewingDistance": "standing", "safeArea": { "top": 0, "right": 0, "bottom": 0, "left": 0 } }, "grid": { "columns": 10, "rows": 10 } }], "pages": [{ "id": "services", "name": "Services", "widgets": [{ "id": "catalog", "type": "service-picker", "config": { "presentation": { "mode": "auto", "grid": { "rows": 2, "columns": 2 } }, "pagination": { "enabled": true, "pageSize": 9007199254740992 } }, "actions": [] }], "layouts": { "desktop": { "placements": { "catalog": { "col": 1, "row": 1, "colSpan": 10, "rowSpan": 10 } } } } }], "flowPages": { "serviceCatalogPageId": "services" } }
     }
   ]
 }

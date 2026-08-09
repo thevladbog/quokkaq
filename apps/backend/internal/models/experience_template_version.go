@@ -29,6 +29,6 @@ type ExperienceTemplateVersionMetadata struct {
 // ExperienceTemplateVersionPage is a deterministic descending version page.
 type ExperienceTemplateVersionPage struct {
 	Items             []ExperienceTemplateVersionMetadata `json:"items"`
-	NextBeforeVersion *int                                `json:"nextBeforeVersion"`
+	NextBeforeVersion *int                                `json:"nextBeforeVersion" binding:"required" extensions:"x-nullable"`
 	HasMore           bool                                `json:"hasMore"`
 }

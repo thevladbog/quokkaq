@@ -2981,6 +2981,27 @@ END $$;
 		return fmt.Errorf("failed to run v1.8.18_experience_templates migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.8.19_experience_template_repairs", func(db *gorm.DB) error {
+		// v1.8.18 was deployed before its publisher nullability/FK and history
+		// index were corrected in source. Keep v1.8.18 correct for new installs,
+		// and repair databases where that migration is already recorded.
+		return db.Exec(`
+ALTER TABLE experience_template_versions
+	ALTER COLUMN published_by DROP NOT NULL,
+	DROP CONSTRAINT IF EXISTS fk_experience_template_versions_publisher;
+ALTER TABLE experience_template_versions
+	ADD CONSTRAINT fk_experience_template_versions_publisher
+	FOREIGN KEY (published_by) REFERENCES users(id)
+	ON UPDATE CASCADE ON DELETE SET NULL;
+DROP INDEX IF EXISTS idx_experience_template_versions_published_at;
+CREATE INDEX idx_experience_template_versions_published_at
+	ON experience_template_versions (template_id, published_at DESC);
+`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.19_experience_template_repairs migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

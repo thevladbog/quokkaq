@@ -221,6 +221,69 @@ func TestExperienceDefinitionValidator_ValidatesCanonicalSchemaFields(t *testing
 	}
 }
 
+func TestExperienceDefinitionValidator_RejectsUnsafeIntegersWithoutOverflow(t *testing.T) {
+	t.Run("safe area maximum int", func(t *testing.T) {
+		definition := validDefinition(t, SurfaceQueueDisplay)
+		profile := definition["variants"].([]any)[0].(map[string]any)["profile"].(map[string]any)
+		profile["interactionMode"] = "non-touch"
+		profile["safeArea"] = map[string]any{
+			"top": int64(0), "right": int64(9223372036854775807), "bottom": int64(0), "left": int64(9223372036854775807),
+		}
+		widget := definition["pages"].([]any)[0].(map[string]any)["widgets"].([]any)[0].(map[string]any)
+		widget["type"] = "clock"
+		delete(definition, "flowPages")
+		requireValidationCode(t, validationCodes(t, marshalDefinition(t, definition), SurfaceQueueDisplay), CodeSchemaInvalid)
+	})
+
+	t.Run("placement maximum int", func(t *testing.T) {
+		definition := validDefinition(t, SurfaceQueueDisplay)
+		profile := definition["variants"].([]any)[0].(map[string]any)["profile"].(map[string]any)
+		profile["interactionMode"] = "non-touch"
+		widget := definition["pages"].([]any)[0].(map[string]any)["widgets"].([]any)[0].(map[string]any)
+		widget["type"] = "clock"
+		placement := definition["pages"].([]any)[0].(map[string]any)["layouts"].(map[string]any)["portrait"].(map[string]any)["placements"].(map[string]any)["catalog"].(map[string]any)
+		placement["col"] = int64(9223372036854775807)
+		placement["colSpan"] = int64(2)
+		delete(definition, "flowPages")
+		requireValidationCode(t, validationCodes(t, marshalDefinition(t, definition), SurfaceQueueDisplay), CodeSchemaInvalid)
+	})
+
+	t.Run("unsafe service picker integer is not used", func(t *testing.T) {
+		definition := validDefinition(t, SurfaceTicketStation)
+		widget := definition["pages"].([]any)[0].(map[string]any)["widgets"].([]any)[0].(map[string]any)
+		widget["config"] = map[string]any{
+			"presentation": map[string]any{"mode": "auto", "grid": map[string]any{"rows": 2, "columns": 2}},
+			"pagination":   map[string]any{"enabled": true, "pageSize": int64(9007199254740992)},
+		}
+		if err := ValidateDefinition(marshalDefinition(t, definition), SurfaceTicketStation); err != nil {
+			t.Fatalf("opaque invalid picker config should not drive scroll validation: %v", err)
+		}
+	})
+}
+
+func TestRawIntMatchesJavaScriptSafeIntegerRange(t *testing.T) {
+	tests := []struct {
+		name  string
+		raw   json.RawMessage
+		valid bool
+	}{
+		{name: "maximum safe", raw: json.RawMessage(`9007199254740991`), valid: true},
+		{name: "minimum safe", raw: json.RawMessage(`-9007199254740991`), valid: true},
+		{name: "first positive unsafe", raw: json.RawMessage(`9007199254740992`)},
+		{name: "first negative unsafe", raw: json.RawMessage(`-9007199254740992`)},
+		{name: "maximum Go int", raw: json.RawMessage(`9223372036854775807`)},
+		{name: "fraction", raw: json.RawMessage(`1.5`)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, valid := rawInt(tt.raw)
+			if valid != tt.valid {
+				t.Fatalf("rawInt(%s) valid = %v, want %v", tt.raw, valid, tt.valid)
+			}
+		})
+	}
+}
+
 func TestExperienceDefinitionValidator_ValidatesCanonicalAccessConditions(t *testing.T) {
 	validRules := []map[string]any{
 		{"kind": "rule", "field": "identity.isAuthenticated", "operator": "is-false"},
