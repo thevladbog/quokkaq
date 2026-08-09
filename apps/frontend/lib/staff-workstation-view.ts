@@ -1,10 +1,17 @@
 import type { Ticket } from '@/lib/api';
 
 export type StaffPrimaryAction =
-  'call_next' | 'start_service' | 'complete' | 'resume' | 'blocked';
+  | 'call_next'
+  | 'start_service'
+  | 'complete'
+  | 'resume'
+  | 'blocked';
 
 export type StaffServiceScopeStatus =
-  'pending' | 'error' | 'hydrating' | 'ready';
+  | 'pending'
+  | 'error'
+  | 'hydrating'
+  | 'ready';
 
 export interface StaffQueueViewInput {
   waitingTickets: readonly Ticket[];
