@@ -216,7 +216,14 @@ export async function updateExperienceDraft(
   if (envelope.data.id !== templateId) {
     return responseIssue(['id'], 'response template id does not match');
   }
-  return parseExperienceDefinition(envelope.data.definition);
+  const parsedDefinition = parseExperienceDefinition(envelope.data.definition);
+  if (parsedDefinition.kind === 'invalid-definition') {
+    return parsedDefinition;
+  }
+  if (parsedDefinition.template.id !== templateId) {
+    return responseIssue(['definition', 'id'], 'definition id does not match');
+  }
+  return parsedDefinition;
 }
 
 /** Publishes the draft into an immutable version and validates its definition. */

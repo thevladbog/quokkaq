@@ -122,6 +122,32 @@ describe('experience API wrappers', () => {
     expect(updateScreenLayoutTemplate).not.toHaveBeenCalled();
   });
 
+  it('rejects a draft response whose parsed definition belongs to another template', async () => {
+    const mismatchedDefinition = validDefinition();
+    mismatchedDefinition.id = 'template-b';
+    vi.mocked(updateScreenLayoutTemplate).mockResolvedValue(
+      successfulResponse(
+        { id: 'template-a', definition: mismatchedDefinition },
+        200
+      )
+    );
+
+    const result = await updateExperienceDraft('template-a', {
+      definition: validDefinition()
+    });
+
+    expect(result).toEqual({
+      kind: 'invalid-definition',
+      issues: [
+        {
+          code: 'response.invalid',
+          path: ['definition', 'id'],
+          message: 'definition id does not match'
+        }
+      ]
+    });
+  });
+
   it('maps a published immutable version to a parsed experience result', async () => {
     vi.mocked(publishScreenLayoutTemplate).mockResolvedValue(
       successfulResponse(
