@@ -80,6 +80,7 @@ describe('VisitorPhotoFrame', () => {
       /(?:rotate|gradient|violet|fuchsia|amber|shadow)/
     );
     expect(smFrame).not.toHaveAttribute('style');
+    expect(smFrame.firstElementChild).toHaveClass('h-24', 'w-[4.5rem]');
 
     rerender(<VisitorPhotoFrame {...baseProps} size='md' />);
     const mdFrame = screen.getByTestId('visitor-photo-frame');
