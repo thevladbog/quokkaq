@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -191,9 +192,11 @@ func (h *ExperienceRuntimeHandler) Manifest(w http.ResponseWriter, r *http.Reque
 // terminalExperienceAckPayload is decoded strictly before being projected to a
 // concrete acknowledgement variant. Terminal identity always comes from JWT.
 type terminalExperienceAckPayload struct {
-	VersionID  string  `json:"versionId" binding:"required"`
-	Status     string  `json:"status" enums:"applied,rejected"`
-	ReasonCode *string `json:"reasonCode,omitempty" maxLength:"64" example:"renderer.timeout"`
+	VersionID         string          `json:"versionId" binding:"required"`
+	Status            string          `json:"status" enums:"applied,rejected"`
+	ReasonCodeRaw     json.RawMessage `json:"reasonCode,omitempty" maxLength:"64" example:"renderer.timeout"`
+	reasonCode        *string
+	reasonCodePresent bool
 }
 
 func decodeTerminalExperienceAck(w http.ResponseWriter, r *http.Request) (terminalExperienceAckPayload, error) {
@@ -212,9 +215,17 @@ func decodeTerminalExperienceAck(w http.ResponseWriter, r *http.Request) (termin
 	}
 	request.VersionID = strings.TrimSpace(request.VersionID)
 	request.Status = strings.TrimSpace(request.Status)
-	if request.ReasonCode != nil {
-		reasonCode := strings.TrimSpace(*request.ReasonCode)
-		request.ReasonCode = &reasonCode
+	if request.ReasonCodeRaw != nil {
+		request.reasonCodePresent = true
+		if bytes.Equal(bytes.TrimSpace(request.ReasonCodeRaw), []byte("null")) {
+			return terminalExperienceAckPayload{}, errors.New("reasonCode must not be null")
+		}
+		var reasonCode string
+		if err := json.Unmarshal(request.ReasonCodeRaw, &reasonCode); err != nil {
+			return terminalExperienceAckPayload{}, err
+		}
+		reasonCode = strings.TrimSpace(reasonCode)
+		request.reasonCode = &reasonCode
 	}
 	return request, nil
 }
@@ -244,15 +255,15 @@ func terminalExperienceAcknowledgementFromPayload(request terminalExperienceAckP
 	}
 	switch request.Status {
 	case "applied":
-		if request.ReasonCode != nil {
+		if request.reasonCodePresent {
 			return nil, false
 		}
 		return AppliedExperienceAcknowledgement{VersionID: request.VersionID, Status: "applied"}, true
 	case "rejected":
-		if request.ReasonCode == nil || len(*request.ReasonCode) > 64 || !terminalExperienceReasonCodePattern.MatchString(*request.ReasonCode) {
+		if !request.reasonCodePresent || request.reasonCode == nil || len(*request.reasonCode) > 64 || !terminalExperienceReasonCodePattern.MatchString(*request.reasonCode) {
 			return nil, false
 		}
-		return RejectedExperienceAcknowledgement{VersionID: request.VersionID, Status: "rejected", ReasonCode: *request.ReasonCode}, true
+		return RejectedExperienceAcknowledgement{VersionID: request.VersionID, Status: "rejected", ReasonCode: *request.reasonCode}, true
 	default:
 		return nil, false
 	}

@@ -35,6 +35,85 @@ func (l *terminalAcknowledgementInterleaveLogger) Trace(ctx context.Context, beg
 	}
 }
 
+const postgresTerminalInterleavingTimeout = 5 * time.Second
+
+func awaitTerminalInterleavingSignal(t *testing.T, signal <-chan struct{}, description string) {
+	t.Helper()
+	select {
+	case <-signal:
+	case <-time.After(postgresTerminalInterleavingTimeout):
+		t.Fatalf("timed out waiting for %s", description)
+	}
+}
+
+func awaitTerminalInterleavingResult(t *testing.T, result <-chan error, description string) error {
+	t.Helper()
+	select {
+	case err := <-result:
+		return err
+	case <-time.After(postgresTerminalInterleavingTimeout):
+		t.Fatalf("timed out waiting for %s", description)
+		return nil
+	}
+}
+
+// waitForPostgresTerminalWriteWait proves that the competing database command
+// has actually reached PostgreSQL and is blocked on a lock. Starting a
+// goroutine is not enough: the old stale-row Save race can otherwise slip past
+// before the competing write begins.
+func waitForPostgresTerminalWriteWait(t *testing.T, db *gorm.DB, queryNeedle, description string) {
+	t.Helper()
+	deadline := time.Now().Add(postgresTerminalInterleavingTimeout)
+	for {
+		var waiting int64
+		err := db.Raw(`
+SELECT count(*)
+FROM pg_stat_activity
+WHERE datname = current_database()
+  AND pid <> pg_backend_pid()
+  AND wait_event_type = 'Lock'
+  AND query ILIKE ?
+`, "%"+queryNeedle+"%").Scan(&waiting).Error
+		if err != nil {
+			t.Fatalf("inspect PostgreSQL wait for %s: %v", description, err)
+		}
+		if waiting > 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for PostgreSQL lock: %s", description)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func holdPostgresAdvisoryLock(t *testing.T, db *gorm.DB, key int64) func() {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), postgresTerminalInterleavingTimeout)
+	t.Cleanup(cancel)
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := sqlDB.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var once sync.Once
+	release := func() {
+		once.Do(func() {
+			_, _ = conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, key)
+			_ = conn.Close()
+		})
+	}
+	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, key); err != nil {
+		release()
+		t.Fatal(err)
+	}
+	t.Cleanup(release)
+	return release
+}
+
 func repositoryDefinition(id, variant string) json.RawMessage {
 	return json.RawMessage(`{
 		"schemaVersion":1,
@@ -687,10 +766,6 @@ func openExperienceRepositoryPostgres(t *testing.T) *gorm.DB {
 	return db
 }
 
-type terminalExperienceRevoker interface {
-	Revoke(context.Context, string) error
-}
-
 func seedPostgresTerminalExperienceAcknowledgement(t *testing.T) (*gorm.DB, *desktopTerminalRepository, *models.ExperienceTemplateVersion) {
 	t.Helper()
 	db := openExperienceRepositoryPostgres(t)
@@ -726,25 +801,34 @@ func seedPostgresTerminalExperienceAcknowledgement(t *testing.T) (*gorm.DB, *des
 
 func TestExperienceRuntimeAcknowledgement_PostgresAcknowledgementWinsOverConcurrentRevoke(t *testing.T) {
 	db, terminalRepo, published := seedPostgresTerminalExperienceAcknowledgement(t)
-	revoker, ok := any(terminalRepo).(terminalExperienceRevoker)
-	if !ok {
-		t.Fatal("desktop terminal repository must expose a column-only Revoke operation")
+	terminalLocked := make(chan struct{})
+	releaseAcknowledgement := make(chan struct{})
+	var releaseAcknowledgementOnce sync.Once
+	releaseAck := func() {
+		releaseAcknowledgementOnce.Do(func() { close(releaseAcknowledgement) })
 	}
-
-	revokeInvoked := make(chan struct{})
-	revokeResult := make(chan error, 1)
+	t.Cleanup(releaseAck)
 	interleavingLogger := &terminalAcknowledgementInterleaveLogger{Interface: gormlogger.Default, afterTerminalRead: func() {
-		go func() {
-			close(revokeInvoked)
-			revokeResult <- revoker.Revoke(context.Background(), "terminal-a")
-		}()
-		<-revokeInvoked
+		close(terminalLocked)
+		<-releaseAcknowledgement
 	}}
 	ackRepo := &desktopTerminalRepository{db: db.Session(&gorm.Session{Logger: interleavingLogger})}
-	if err := ackRepo.AcknowledgeExperience(context.Background(), "terminal-a", published.ID, "applied", nil); err != nil {
+	ackResult := make(chan error, 1)
+	go func() {
+		ackResult <- ackRepo.AcknowledgeExperience(context.Background(), "terminal-a", published.ID, "applied", nil)
+	}()
+	awaitTerminalInterleavingSignal(t, terminalLocked, "acknowledgement terminal FOR UPDATE lock")
+
+	revokeResult := make(chan error, 1)
+	go func() {
+		revokeResult <- terminalRepo.Revoke(context.Background(), "terminal-a")
+	}()
+	waitForPostgresTerminalWriteWait(t, db, `UPDATE "desktop_terminals"`, "revoke UPDATE behind acknowledgement lock")
+	releaseAck()
+	if err := awaitTerminalInterleavingResult(t, ackResult, "acknowledgement after release"); err != nil {
 		t.Fatalf("acknowledgement that acquired the row lock first: %v", err)
 	}
-	if err := <-revokeResult; err != nil {
+	if err := awaitTerminalInterleavingResult(t, revokeResult, "revoke after acknowledgement commit"); err != nil {
 		t.Fatalf("concurrent revoke after acknowledgement: %v", err)
 	}
 
@@ -759,15 +843,44 @@ func TestExperienceRuntimeAcknowledgement_PostgresAcknowledgementWinsOverConcurr
 
 func TestExperienceRuntimeAcknowledgement_PostgresRevokeWinsAndAcknowledgementDoesNotMutate(t *testing.T) {
 	db, terminalRepo, published := seedPostgresTerminalExperienceAcknowledgement(t)
-	revoker, ok := any(terminalRepo).(terminalExperienceRevoker)
-	if !ok {
-		t.Fatal("desktop terminal repository must expose a column-only Revoke operation")
+	const advisoryLockKey int64 = 7062026
+	if err := db.Exec(`
+CREATE OR REPLACE FUNCTION task7_block_terminal_revoke() RETURNS trigger AS $$
+BEGIN
+		IF NEW.revoked_at IS NOT NULL AND OLD.revoked_at IS NULL THEN
+			PERFORM pg_advisory_lock(7062026);
+			PERFORM pg_advisory_unlock(7062026);
+		END IF;
+		RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER task7_block_terminal_revoke
+BEFORE UPDATE OF revoked_at ON desktop_terminals
+FOR EACH ROW EXECUTE FUNCTION task7_block_terminal_revoke();
+`).Error; err != nil {
+		t.Fatalf("create revoke interleaving trigger: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = db.Exec(`DROP TRIGGER IF EXISTS task7_block_terminal_revoke ON desktop_terminals; DROP FUNCTION IF EXISTS task7_block_terminal_revoke();`).Error
+	})
+	releaseRevokeTrigger := holdPostgresAdvisoryLock(t, db, advisoryLockKey)
 
-	if err := revoker.Revoke(context.Background(), "terminal-a"); err != nil {
+	revokeResult := make(chan error, 1)
+	go func() {
+		revokeResult <- terminalRepo.Revoke(context.Background(), "terminal-a")
+	}()
+	waitForPostgresTerminalWriteWait(t, db, `UPDATE "desktop_terminals"`, "revoke trigger advisory lock")
+
+	ackResult := make(chan error, 1)
+	go func() {
+		ackResult <- terminalRepo.AcknowledgeExperience(context.Background(), "terminal-a", published.ID, "applied", nil)
+	}()
+	waitForPostgresTerminalWriteWait(t, db, `FOR UPDATE`, "acknowledgement terminal lock behind revoke")
+	releaseRevokeTrigger()
+	if err := awaitTerminalInterleavingResult(t, revokeResult, "revoke after advisory release"); err != nil {
 		t.Fatalf("revoke: %v", err)
 	}
-	if err := terminalRepo.AcknowledgeExperience(context.Background(), "terminal-a", published.ID, "applied", nil); !errors.Is(err, gorm.ErrRecordNotFound) {
+	if err := awaitTerminalInterleavingResult(t, ackResult, "acknowledgement after revoke"); !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatalf("acknowledgement after winning revoke = %v, want not found", err)
 	}
 
@@ -780,35 +893,27 @@ func TestExperienceRuntimeAcknowledgement_PostgresRevokeWinsAndAcknowledgementDo
 	}
 }
 
-func TestExperienceRuntimeAcknowledgement_PostgresRevokeAndLastSeenDoNotClobberEachOther(t *testing.T) {
+func TestExperienceRuntimeAcknowledgement_PostgresRevokePreventsActivityTouchAfterBootstrapRead(t *testing.T) {
 	db, terminalRepo, _ := seedPostgresTerminalExperienceAcknowledgement(t)
-	if err := terminalRepo.TouchLastSeen(context.Background(), "terminal-a"); err != nil {
-		t.Fatalf("touch active terminal: %v", err)
+	staleBootstrapRead, err := terminalRepo.FindByID("terminal-a")
+	if err != nil {
+		t.Fatalf("bootstrap read: %v", err)
+	}
+	if staleBootstrapRead.RevokedAt != nil {
+		t.Fatal("fixture terminal unexpectedly revoked before bootstrap read")
 	}
 	if err := terminalRepo.Revoke(context.Background(), "terminal-a"); err != nil {
-		t.Fatalf("revoke after activity: %v", err)
-	}
-	var touchedThenRevoked models.DesktopTerminal
-	if err := db.First(&touchedThenRevoked, "id = ?", "terminal-a").Error; err != nil {
-		t.Fatal(err)
-	}
-	if touchedThenRevoked.LastSeenAt == nil || touchedThenRevoked.RevokedAt == nil {
-		t.Fatalf("touch then revoke lost activity or revocation: %#v", touchedThenRevoked)
-	}
-
-	db, terminalRepo, _ = seedPostgresTerminalExperienceAcknowledgement(t)
-	if err := terminalRepo.Revoke(context.Background(), "terminal-a"); err != nil {
-		t.Fatalf("revoke before activity: %v", err)
+		t.Fatalf("revoke after bootstrap read: %v", err)
 	}
 	if err := terminalRepo.TouchLastSeen(context.Background(), "terminal-a"); !errors.Is(err, gorm.ErrRecordNotFound) {
-		t.Fatalf("touch after revoke = %v, want not found", err)
+		t.Fatalf("activity touch after revocation = %v, want not found", err)
 	}
-	var revokedThenTouched models.DesktopTerminal
-	if err := db.First(&revokedThenTouched, "id = ?", "terminal-a").Error; err != nil {
+	var stored models.DesktopTerminal
+	if err := db.First(&stored, "id = ?", "terminal-a").Error; err != nil {
 		t.Fatal(err)
 	}
-	if revokedThenTouched.RevokedAt == nil || revokedThenTouched.LastSeenAt != nil {
-		t.Fatalf("revoke then touch resurrected or changed terminal: %#v", revokedThenTouched)
+	if stored.RevokedAt == nil || stored.LastSeenAt != nil {
+		t.Fatalf("bootstrap read followed by revoke changed terminal: %#v", stored)
 	}
 }
 

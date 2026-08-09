@@ -196,7 +196,9 @@ func TestExperienceRuntimeHandler_AcknowledgementRequestIsStrictAndTerminalOnly(
 		{name: "unknown terminal selector", body: `{"versionId":"version-a","status":"applied","terminalId":"terminal-other"}`, tokenType: "terminal", wantStatus: http.StatusBadRequest},
 		{name: "trailing JSON", body: `{"versionId":"version-a","status":"applied"} {}`, tokenType: "terminal", wantStatus: http.StatusBadRequest},
 		{name: "applied with reason", body: `{"versionId":"version-a","status":"applied","reasonCode":"renderer.timeout"}`, tokenType: "terminal", wantStatus: http.StatusBadRequest},
+		{name: "applied with explicit null reason", body: `{"versionId":"version-a","status":"applied","reasonCode":null}`, tokenType: "terminal", wantStatus: http.StatusBadRequest},
 		{name: "rejected without reason", body: `{"versionId":"version-a","status":"rejected"}`, tokenType: "terminal", wantStatus: http.StatusBadRequest},
+		{name: "rejected with explicit null reason", body: `{"versionId":"version-a","status":"rejected","reasonCode":null}`, tokenType: "terminal", wantStatus: http.StatusBadRequest},
 		{name: "rejected raw error", body: `{"versionId":"version-a","status":"rejected","reasonCode":"Renderer error: timed out"}`, tokenType: "terminal", wantStatus: http.StatusBadRequest},
 		{name: "rejected overlong reason", body: `{"versionId":"version-a","status":"rejected","reasonCode":"` + strings.Repeat("a", 65) + `"}`, tokenType: "terminal", wantStatus: http.StatusBadRequest},
 		{name: "oversized body", body: `{"versionId":"version-a","status":"rejected","reasonCode":"` + strings.Repeat("a", 4096) + `"}`, tokenType: "terminal", wantStatus: http.StatusBadRequest},
@@ -310,6 +312,8 @@ func TestRegisterTerminalExperienceRoutes_SetsNoStoreBeforeTerminalAuthenticatio
 		{name: "revoked terminal service denial", method: http.MethodGet, path: "/terminal/experience", auth: terminalAuth, serviceErr: gorm.ErrRecordNotFound, wantStatus: http.StatusUnauthorized, wantBody: "Unauthorized\n"},
 		{name: "acknowledgement revoked terminal service denial", method: http.MethodPost, path: "/terminal/experience/ack", auth: terminalAuth, body: `{"versionId":"version-a","status":"applied"}`, serviceAckErr: gorm.ErrRecordNotFound, wantStatus: http.StatusUnauthorized, wantBody: "Unauthorized\n"},
 		{name: "strict acknowledgement validation", method: http.MethodPost, path: "/terminal/experience/ack", auth: terminalAuth, body: `{"versionId":"version-a","status":"applied","unexpected":true}`, wantStatus: http.StatusBadRequest, wantBody: "Invalid acknowledgement payload\n"},
+		{name: "acknowledgement applied explicit null reason", method: http.MethodPost, path: "/terminal/experience/ack", auth: terminalAuth, body: `{"versionId":"version-a","status":"applied","reasonCode":null}`, wantStatus: http.StatusBadRequest, wantBody: "Invalid acknowledgement payload\n"},
+		{name: "acknowledgement rejected explicit null reason", method: http.MethodPost, path: "/terminal/experience/ack", auth: terminalAuth, body: `{"versionId":"version-a","status":"rejected","reasonCode":null}`, wantStatus: http.StatusBadRequest, wantBody: "Invalid acknowledgement payload\n"},
 		{name: "manifest success", method: http.MethodGet, path: "/terminal/experience", auth: terminalAuth, wantStatus: http.StatusOK, wantBody: ""},
 		{name: "acknowledgement success", method: http.MethodPost, path: "/terminal/experience/ack", auth: terminalAuth, body: `{"versionId":"version-a","status":"applied"}`, wantStatus: http.StatusNoContent, wantBody: ""},
 	}
