@@ -1140,6 +1140,79 @@ components:
                         type: object
                     type: array
             type: object
+        handlers.ServiceCreateRequest:
+            properties:
+                backgroundColor:
+                    type: string
+                behavior:
+                    allOf:
+                        - $ref: '#/components/schemas/models.ServiceBehavior'
+                    nullable: true
+                calendarSlotKey:
+                    type: string
+                children:
+                    items:
+                        $ref: '#/components/schemas/models.Service'
+                    type: array
+                description:
+                    type: string
+                descriptionEn:
+                    type: string
+                descriptionRu:
+                    type: string
+                duration:
+                    type: integer
+                gridCol:
+                    type: integer
+                gridColSpan:
+                    type: integer
+                gridRow:
+                    type: integer
+                gridRowSpan:
+                    type: integer
+                iconKey:
+                    type: string
+                id:
+                    type: string
+                identificationMode:
+                    type: string
+                imageUrl:
+                    type: string
+                isLeaf:
+                    type: boolean
+                kioskDocumentSettings:
+                    type: object
+                kioskIdentificationConfig:
+                    type: object
+                maxServiceTime:
+                    type: integer
+                maxWaitingTime:
+                    type: integer
+                name:
+                    type: string
+                nameEn:
+                    type: string
+                nameRu:
+                    type: string
+                numberSequence:
+                    type: string
+                offerIdentification:
+                    type: boolean
+                parentId:
+                    type: string
+                prebook:
+                    type: boolean
+                prefix:
+                    type: string
+                restrictedServiceZoneId:
+                    type: string
+                sortOrder:
+                    type: integer
+                textColor:
+                    type: string
+                unitId:
+                    type: string
+            type: object
         handlers.ServiceUpdateRequest:
             properties:
                 backgroundColor:
@@ -10719,7 +10792,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/models.Service'
+                            $ref: '#/components/schemas/handlers.ServiceCreateRequest'
                 description: Service Data
                 required: true
                 x-originalParamName: service

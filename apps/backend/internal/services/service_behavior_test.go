@@ -140,6 +140,80 @@ func TestValidateServiceBehaviorJSON_resourceBounds(t *testing.T) {
 	}
 }
 
+func TestValidateServiceBehaviorJSONLocalizedTextUsesUnicodeCodePoints(t *testing.T) {
+	tests := []struct {
+		name     string
+		behavior map[string]any
+		want     error
+	}{
+		{
+			name: "accepts 160-code-point Cyrillic field label",
+			behavior: map[string]any{
+				"version":           1,
+				"fields":            []any{map[string]any{"key": "room", "label": map[string]any{"ru": strings.Repeat("Ж", 160)}, "type": "text", "required": true}},
+				"dataRetentionDays": 1,
+			},
+		},
+		{
+			name: "rejects 161-code-point Cyrillic field label",
+			behavior: map[string]any{
+				"version":           1,
+				"fields":            []any{map[string]any{"key": "room", "label": map[string]any{"ru": strings.Repeat("Ж", 161)}, "type": "text", "required": true}},
+				"dataRetentionDays": 1,
+			},
+			want: ErrServiceBehaviorInvalid,
+		},
+		{
+			name: "accepts 160-code-point supplementary-plane emoji field label",
+			behavior: map[string]any{
+				"version":           1,
+				"fields":            []any{map[string]any{"key": "room", "label": map[string]any{"en": strings.Repeat("😀", 160)}, "type": "text", "required": true}},
+				"dataRetentionDays": 1,
+			},
+		},
+		{
+			name: "rejects 161-code-point supplementary-plane emoji field label",
+			behavior: map[string]any{
+				"version":           1,
+				"fields":            []any{map[string]any{"key": "room", "label": map[string]any{"en": strings.Repeat("😀", 161)}, "type": "text", "required": true}},
+				"dataRetentionDays": 1,
+			},
+			want: ErrServiceBehaviorInvalid,
+		},
+		{
+			name:     "accepts 4000-code-point Cyrillic information body",
+			behavior: map[string]any{"version": 1, "information": map[string]any{"body": map[string]any{"ru": strings.Repeat("Ж", 4000)}}},
+		},
+		{
+			name:     "rejects 4001-code-point Cyrillic information body",
+			behavior: map[string]any{"version": 1, "information": map[string]any{"body": map[string]any{"ru": strings.Repeat("Ж", 4001)}}},
+			want:     ErrServiceBehaviorInvalid,
+		},
+		{
+			name:     "accepts 4000-code-point supplementary-plane emoji information body",
+			behavior: map[string]any{"version": 1, "information": map[string]any{"body": map[string]any{"en": strings.Repeat("😀", 4000)}}},
+		},
+		{
+			name:     "rejects 4001-code-point supplementary-plane emoji information body",
+			behavior: map[string]any{"version": 1, "information": map[string]any{"body": map[string]any{"en": strings.Repeat("😀", 4001)}}},
+			want:     ErrServiceBehaviorInvalid,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw, err := json.Marshal(tt.behavior)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = ValidateServiceBehaviorJSON(raw)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("ValidateServiceBehaviorJSON() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
 func conditionGroupAtDepth(groups int) map[string]any {
 	var node any = map[string]any{"kind": "rule", "field": "live.isOpen", "operator": "is-true"}
 	for i := 0; i < groups; i++ {

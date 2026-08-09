@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
@@ -338,7 +339,8 @@ func validateServiceBehaviorLocalizedText(raw json.RawMessage, maxValueLength in
 	}
 	for locale, rawText := range localized {
 		text, valid := serviceBehaviorString(rawText)
-		if len(locale) < 1 || len(locale) > 16 || !valid || len(text) < 1 || len(text) > maxValueLength {
+		textLength := utf8.RuneCountInString(text)
+		if len(locale) < 1 || len(locale) > 16 || !valid || textLength < 1 || textLength > maxValueLength {
 			return false
 		}
 	}

@@ -285,6 +285,67 @@ describe('service behavior schema', () => {
     expect(ServiceBehaviorSchema.safeParse(behavior).success).toBe(false);
   });
 
+  it.each([
+    [
+      'accepts a 160-code-point Cyrillic field label',
+      {
+        version: 1,
+        fields: [{ ...textField(), label: { ru: 'Ж'.repeat(160) } }],
+        dataRetentionDays: 1
+      },
+      true
+    ],
+    [
+      'rejects a 161-code-point Cyrillic field label',
+      {
+        version: 1,
+        fields: [{ ...textField(), label: { ru: 'Ж'.repeat(161) } }],
+        dataRetentionDays: 1
+      },
+      false
+    ],
+    [
+      'accepts a 160-code-point supplementary-plane emoji field label',
+      {
+        version: 1,
+        fields: [{ ...textField(), label: { en: '😀'.repeat(160) } }],
+        dataRetentionDays: 1
+      },
+      true
+    ],
+    [
+      'rejects a 161-code-point supplementary-plane emoji field label',
+      {
+        version: 1,
+        fields: [{ ...textField(), label: { en: '😀'.repeat(161) } }],
+        dataRetentionDays: 1
+      },
+      false
+    ],
+    [
+      'accepts a 4000-code-point Cyrillic information body',
+      { version: 1, information: { body: { ru: 'Ж'.repeat(4000) } } },
+      true
+    ],
+    [
+      'rejects a 4001-code-point Cyrillic information body',
+      { version: 1, information: { body: { ru: 'Ж'.repeat(4001) } } },
+      false
+    ],
+    [
+      'accepts a 4000-code-point supplementary-plane emoji information body',
+      { version: 1, information: { body: { en: '😀'.repeat(4000) } } },
+      true
+    ],
+    [
+      'rejects a 4001-code-point supplementary-plane emoji information body',
+      { version: 1, information: { body: { en: '😀'.repeat(4001) } } },
+      false
+    ]
+  ])('%s', (_name, behavior, success) => {
+    expect(ServiceBehaviorSchema.safeParse(behavior).success).toBe(success);
+  });
+
   it('accepts the access AST boundaries and rejects raw behavior above 64 KiB', () => {
     const oneHundredNodes = Array.from({ length: 20 }, (_, groupIndex) => ({
       kind: 'group' as const,

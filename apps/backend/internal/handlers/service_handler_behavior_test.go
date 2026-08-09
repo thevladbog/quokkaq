@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -100,4 +101,41 @@ func TestServiceHandlerCreateService_BehaviorValidationAndBodyBounds(t *testing.
 			t.Fatal("oversized request reached the service layer")
 		}
 	})
+}
+
+func TestServiceHandlerCreateService_CanonicalizesAbsentAndNullBehavior(t *testing.T) {
+	for _, tt := range []struct {
+		name         string
+		body         string
+		wantBehavior bool
+	}{
+		{name: "omitted", body: `{"unitId":"unit-1","name":"Service"}`},
+		{name: "null", body: `{"unitId":"unit-1","name":"Service","behavior":null}`},
+		{name: "object", body: `{"unitId":"unit-1","name":"Service","behavior":{"version":1}}`, wantBehavior: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			stub := &serviceHandlerBehaviorService{}
+			h := NewServiceHandler(stub, serviceHandlerBehaviorUserRepo{})
+			w := httptest.NewRecorder()
+			h.CreateService(w, serviceHandlerBehaviorRequest(tt.body))
+			if w.Code != http.StatusCreated {
+				t.Fatalf("status = %d, body = %q", w.Code, w.Body.String())
+			}
+			if (stub.created.Behavior != nil) != tt.wantBehavior {
+				t.Fatalf("created behavior present = %v, want %v", stub.created.Behavior != nil, tt.wantBehavior)
+			}
+
+			var response map[string]json.RawMessage
+			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+				t.Fatal(err)
+			}
+			behavior, behaviorPresent := response["behavior"]
+			if tt.wantBehavior && (!behaviorPresent || string(behavior) == "null") {
+				t.Fatalf("response behavior = %s, want object", behavior)
+			}
+			if !tt.wantBehavior && behaviorPresent {
+				t.Fatalf("response behavior = %s, want omitted", behavior)
+			}
+		})
+	}
 }

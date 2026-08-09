@@ -21,6 +21,85 @@ type ServiceHandler struct {
 	userRepo repository.UserRepository
 }
 
+// ServiceCreateRequest documents the Service payload accepted by CreateService.
+// Behavior is explicitly nullable: omission and JSON null both create no
+// behavior, while an object is passed through to service-layer validation.
+type ServiceCreateRequest struct {
+	ID                        string                  `json:"id"`
+	UnitID                    string                  `json:"unitId"`
+	ParentID                  *string                 `json:"parentId,omitempty"`
+	Name                      string                  `json:"name"`
+	NameRu                    *string                 `json:"nameRu,omitempty"`
+	NameEn                    *string                 `json:"nameEn,omitempty"`
+	Description               *string                 `json:"description,omitempty"`
+	DescriptionRu             *string                 `json:"descriptionRu,omitempty"`
+	DescriptionEn             *string                 `json:"descriptionEn,omitempty"`
+	ImageURL                  *string                 `json:"imageUrl,omitempty"`
+	IconKey                   *string                 `json:"iconKey,omitempty"`
+	BackgroundColor           *string                 `json:"backgroundColor,omitempty"`
+	TextColor                 *string                 `json:"textColor,omitempty"`
+	Prefix                    *string                 `json:"prefix,omitempty"`
+	NumberSequence            *string                 `json:"numberSequence,omitempty"`
+	Duration                  *int                    `json:"duration,omitempty"`
+	MaxWaitingTime            *int                    `json:"maxWaitingTime,omitempty"`
+	MaxServiceTime            *int                    `json:"maxServiceTime,omitempty"`
+	Prebook                   bool                    `json:"prebook"`
+	CalendarSlotKey           *string                 `json:"calendarSlotKey,omitempty"`
+	OfferIdentification       bool                    `json:"offerIdentification"`
+	IdentificationMode        string                  `json:"identificationMode"`
+	KioskDocumentSettings     json.RawMessage         `json:"kioskDocumentSettings,omitempty" swaggertype:"object"`
+	KioskIdentificationConfig json.RawMessage         `json:"kioskIdentificationConfig,omitempty" swaggertype:"object"`
+	Behavior                  *models.ServiceBehavior `json:"behavior,omitempty" extensions:"x-nullable"`
+	IsLeaf                    bool                    `json:"isLeaf"`
+	RestrictedServiceZoneID   *string                 `json:"restrictedServiceZoneId,omitempty"`
+	SortOrder                 int                     `json:"sortOrder"`
+	GridRow                   *int                    `json:"gridRow,omitempty"`
+	GridCol                   *int                    `json:"gridCol,omitempty"`
+	GridRowSpan               *int                    `json:"gridRowSpan,omitempty"`
+	GridColSpan               *int                    `json:"gridColSpan,omitempty"`
+	Parent                    *models.Service         `json:"parent,omitempty" swaggerignore:"true"`
+	Children                  []models.Service        `json:"children,omitempty"`
+}
+
+func (request ServiceCreateRequest) serviceModel() models.Service {
+	return models.Service{
+		ID:                        request.ID,
+		UnitID:                    request.UnitID,
+		ParentID:                  request.ParentID,
+		Name:                      request.Name,
+		NameRu:                    request.NameRu,
+		NameEn:                    request.NameEn,
+		Description:               request.Description,
+		DescriptionRu:             request.DescriptionRu,
+		DescriptionEn:             request.DescriptionEn,
+		ImageUrl:                  request.ImageURL,
+		IconKey:                   request.IconKey,
+		BackgroundColor:           request.BackgroundColor,
+		TextColor:                 request.TextColor,
+		Prefix:                    request.Prefix,
+		NumberSequence:            request.NumberSequence,
+		Duration:                  request.Duration,
+		MaxWaitingTime:            request.MaxWaitingTime,
+		MaxServiceTime:            request.MaxServiceTime,
+		Prebook:                   request.Prebook,
+		CalendarSlotKey:           request.CalendarSlotKey,
+		OfferIdentification:       request.OfferIdentification,
+		IdentificationMode:        request.IdentificationMode,
+		KioskDocumentSettings:     request.KioskDocumentSettings,
+		KioskIdentificationConfig: request.KioskIdentificationConfig,
+		Behavior:                  request.Behavior,
+		IsLeaf:                    request.IsLeaf,
+		RestrictedServiceZoneID:   request.RestrictedServiceZoneID,
+		SortOrder:                 request.SortOrder,
+		GridRow:                   request.GridRow,
+		GridCol:                   request.GridCol,
+		GridRowSpan:               request.GridRowSpan,
+		GridColSpan:               request.GridColSpan,
+		Parent:                    request.Parent,
+		Children:                  request.Children,
+	}
+}
+
 // ServiceUpdateRequest documents the sparse service patch accepted by
 // UpdateService. Runtime merging remains in the service layer; Behavior is
 // explicitly nullable so clients can distinguish omission from clearing it.
@@ -70,7 +149,7 @@ func NewServiceHandler(service services.ServiceService, userRepo repository.User
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        service body models.Service true "Service Data"
+// @Param        service body ServiceCreateRequest true "Service Data"
 // @Success      201  {object}  models.Service
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      401  {string}  string "Unauthorized"
@@ -91,11 +170,12 @@ func (h *ServiceHandler) CreateService(w http.ResponseWriter, r *http.Request) {
 		writeServiceRequestBodyError(w, err)
 		return
 	}
-	var service models.Service
-	if err := json.Unmarshal(body, &service); err != nil {
+	var request ServiceCreateRequest
+	if err := json.Unmarshal(body, &request); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	service := request.serviceModel()
 	if service.UnitID == "" {
 		http.Error(w, "unitId is required", http.StatusBadRequest)
 		return

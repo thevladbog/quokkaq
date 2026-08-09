@@ -41,10 +41,22 @@ function plainOwnRecord<T extends z.ZodType>(
   );
 }
 
+function unicodeCodePointString(maxLength: number) {
+  return z.string().superRefine((value, ctx) => {
+    const length = Array.from(value).length;
+    if (length < 1 || length > maxLength) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `text must contain between 1 and ${maxLength} Unicode code points`
+      });
+    }
+  });
+}
+
 function localizedTextSchema(maxValueLength: number) {
   return plainOwnRecord(
     z
-      .record(z.string().min(1).max(16), z.string().min(1).max(maxValueLength))
+      .record(z.string().min(1).max(16), unicodeCodePointString(maxValueLength))
       .superRefine((value, ctx) => {
         if (Object.keys(value).length === 0) {
           ctx.addIssue({

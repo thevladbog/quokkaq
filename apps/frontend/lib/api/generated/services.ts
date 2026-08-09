@@ -1272,6 +1272,46 @@ export interface HandlersSaasVendorResponse {
   paymentAccounts?: HandlersSaasVendorResponsePaymentAccountsItem[];
 }
 
+export type HandlersServiceCreateRequestKioskDocumentSettings = { [key: string]: unknown };
+
+export type HandlersServiceCreateRequestKioskIdentificationConfig = { [key: string]: unknown };
+
+export interface HandlersServiceCreateRequest {
+  backgroundColor?: string;
+  behavior?: ModelsServiceBehavior | null;
+  calendarSlotKey?: string;
+  children?: ModelsService[];
+  description?: string;
+  descriptionEn?: string;
+  descriptionRu?: string;
+  duration?: number;
+  gridCol?: number;
+  gridColSpan?: number;
+  gridRow?: number;
+  gridRowSpan?: number;
+  iconKey?: string;
+  id?: string;
+  identificationMode?: string;
+  imageUrl?: string;
+  isLeaf?: boolean;
+  kioskDocumentSettings?: HandlersServiceCreateRequestKioskDocumentSettings;
+  kioskIdentificationConfig?: HandlersServiceCreateRequestKioskIdentificationConfig;
+  maxServiceTime?: number;
+  maxWaitingTime?: number;
+  name?: string;
+  nameEn?: string;
+  nameRu?: string;
+  numberSequence?: string;
+  offerIdentification?: boolean;
+  parentId?: string;
+  prebook?: boolean;
+  prefix?: string;
+  restrictedServiceZoneId?: string;
+  sortOrder?: number;
+  textColor?: string;
+  unitId?: string;
+}
+
 /**
  * @nullable
  */
@@ -3365,7 +3405,7 @@ export const getCreateServiceUrl = () => {
   return `/services`
 }
 
-export const createService = async (modelsService: ModelsService, options?: RequestInit): Promise<createServiceResponse> => {
+export const createService = async (handlersServiceCreateRequest: HandlersServiceCreateRequest, options?: RequestInit): Promise<createServiceResponse> => {
 
   return orvalMutator<createServiceResponse>(getCreateServiceUrl(),
   {
@@ -3373,7 +3413,7 @@ export const createService = async (modelsService: ModelsService, options?: Requ
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      modelsService,)
+      handlersServiceCreateRequest,)
   }
 );}
 
@@ -3381,8 +3421,8 @@ export const createService = async (modelsService: ModelsService, options?: Requ
 
 
 export const getCreateServiceMutationOptions = <TError = string | HandlersQuotaExceededError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createService>>, TError,{data: ModelsService}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof createService>>, TError,{data: ModelsService}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createService>>, TError,{data: HandlersServiceCreateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createService>>, TError,{data: HandlersServiceCreateRequest}, TContext> => {
 
 const mutationKey = ['createService'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -3394,7 +3434,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createService>>, {data: ModelsService}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createService>>, {data: HandlersServiceCreateRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  createService(data,requestOptions)
@@ -3408,18 +3448,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CreateServiceMutationResult = NonNullable<Awaited<ReturnType<typeof createService>>>
-    export type CreateServiceMutationBody = ModelsService
+    export type CreateServiceMutationBody = HandlersServiceCreateRequest
     export type CreateServiceMutationError = string | HandlersQuotaExceededError
 
     /**
  * @summary Create a new service
  */
 export const useCreateService = <TError = string | HandlersQuotaExceededError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createService>>, TError,{data: ModelsService}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createService>>, TError,{data: HandlersServiceCreateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof createService>>,
         TError,
-        {data: ModelsService},
+        {data: HandlersServiceCreateRequest},
         TContext
       > => {
       return useMutation(getCreateServiceMutationOptions(options), queryClient);

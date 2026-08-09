@@ -1272,6 +1272,46 @@ export interface HandlersSaasVendorResponse {
   paymentAccounts?: HandlersSaasVendorResponsePaymentAccountsItem[];
 }
 
+export type HandlersServiceCreateRequestKioskDocumentSettings = { [key: string]: unknown };
+
+export type HandlersServiceCreateRequestKioskIdentificationConfig = { [key: string]: unknown };
+
+export interface HandlersServiceCreateRequest {
+  backgroundColor?: string;
+  behavior?: ModelsServiceBehavior | null;
+  calendarSlotKey?: string;
+  children?: ModelsService[];
+  description?: string;
+  descriptionEn?: string;
+  descriptionRu?: string;
+  duration?: number;
+  gridCol?: number;
+  gridColSpan?: number;
+  gridRow?: number;
+  gridRowSpan?: number;
+  iconKey?: string;
+  id?: string;
+  identificationMode?: string;
+  imageUrl?: string;
+  isLeaf?: boolean;
+  kioskDocumentSettings?: HandlersServiceCreateRequestKioskDocumentSettings;
+  kioskIdentificationConfig?: HandlersServiceCreateRequestKioskIdentificationConfig;
+  maxServiceTime?: number;
+  maxWaitingTime?: number;
+  name?: string;
+  nameEn?: string;
+  nameRu?: string;
+  numberSequence?: string;
+  offerIdentification?: boolean;
+  parentId?: string;
+  prebook?: boolean;
+  prefix?: string;
+  restrictedServiceZoneId?: string;
+  sortOrder?: number;
+  textColor?: string;
+  unitId?: string;
+}
+
 /**
  * @nullable
  */
