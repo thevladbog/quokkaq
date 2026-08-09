@@ -22,9 +22,22 @@ import { logger } from '@/lib/logger';
 import { useTicketTimer } from '@/lib/ticket-timer';
 import { StaffServiceScopeSelector } from '@/components/staff/StaffServiceScopeSelector';
 import { StaffCreateTicketModal } from '@/components/staff/StaffCreateTicketModal';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import { Info, ListChecks, Plus } from 'lucide-react';
+import {
+  AlertTriangle,
+  Info,
+  ListChecks,
+  Plus,
+  SlidersHorizontal
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   getDocumentsDataPreviewString,
@@ -50,6 +63,11 @@ export interface StaffQueuePanelProps {
   /** When true, picking tickets and creating tickets from the panel are blocked. */
   counterOnBreak?: boolean;
   waitingTickets: Ticket[];
+  scopedWaitingCount: number;
+  queuePending: boolean;
+  queueRefreshing: boolean;
+  queueError?: Error | null;
+  onRetryQueue: () => void;
   /** When true, list shows all waiting tickets in the unit; false = only tickets for services selected in scope modal. */
   showAllTicketsInQueue: boolean;
   onShowAllTicketsInQueueChange: (value: boolean) => void;
@@ -66,8 +84,14 @@ export interface StaffQueuePanelProps {
   }) => Promise<void>;
   scopeLeaves: { id: string; label: string }[];
   selectedScopeIds: string[];
+  scopeSummary: {
+    kind: 'all' | 'single' | 'multiple';
+    labels: string[];
+    count: number;
+  };
   onScopeChange: (ids: string[]) => void;
   pickPending: boolean;
+  conflictingActionPending: boolean;
   inProgressTicketId: string | null;
   setInProgressTicketId: (id: string | null) => void;
   currentTicket: Ticket | undefined;
@@ -92,6 +116,11 @@ export function StaffQueuePanel({
   unitId,
   counterOnBreak = false,
   waitingTickets,
+  scopedWaitingCount,
+  queuePending,
+  queueRefreshing,
+  queueError,
+  onRetryQueue,
   showAllTicketsInQueue,
   onShowAllTicketsInQueueChange,
   onlyMyZone = false,
@@ -102,8 +131,10 @@ export function StaffQueuePanel({
   onCreateTicket,
   scopeLeaves,
   selectedScopeIds,
+  scopeSummary,
   onScopeChange,
   pickPending,
+  conflictingActionPending,
   inProgressTicketId,
   setInProgressTicketId,
   currentTicket,
@@ -137,36 +168,99 @@ export function StaffQueuePanel({
   return (
     <>
       <TooltipProvider>
-        <Card className='border-border/70 shadow-sm lg:sticky lg:top-4 lg:max-h-[calc(100vh-5rem)] lg:self-start lg:overflow-hidden'>
-          <CardHeader className='border-border/50 space-y-1.5 border-b py-2'>
+        <Card className='border-border/70 flex h-full min-h-0 flex-col gap-0 overflow-hidden py-0 shadow-sm'>
+          <CardHeader className='border-border/50 shrink-0 space-y-1.5 border-b py-2'>
             <div className='flex items-start justify-between gap-2'>
               <div className='min-w-0 flex-1'>
                 <CardTitle className='text-sm leading-tight font-semibold'>
-                  {t('queue.title')}
+                  <h2>{t('queue.title')}</h2>
                 </CardTitle>
                 <CardDescription className='text-[11px] leading-snug'>
                   {t('queue.description')}
                 </CardDescription>
               </div>
-              <div className='flex shrink-0 flex-col items-end gap-1'>
+              <div className='flex shrink-0 flex-wrap justify-end gap-1'>
                 {scopeLeaves.length > 0 && (
                   <Button
                     type='button'
                     variant='outline'
                     size='sm'
-                    className='h-7 gap-1 px-2 text-xs'
+                    className='h-9 gap-1 px-2 text-xs'
                     onClick={() => setScopeOpen(true)}
                   >
                     <ListChecks className='h-3.5 w-3.5' />
                     {t('scope.configure')}
                   </Button>
                 )}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      className='h-9 gap-1 px-2 text-xs'
+                    >
+                      <SlidersHorizontal className='h-3.5 w-3.5' />
+                      {t('queue.filters')}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align='end' className='w-72 space-y-3 p-3'>
+                    <div className='space-y-1'>
+                      <div className='flex min-h-9 items-center justify-between gap-1'>
+                        <Label
+                          htmlFor='staff-queue-show-all'
+                          className='flex min-h-9 flex-1 cursor-pointer items-center text-xs leading-snug'
+                        >
+                          {t('queue.list_show_all')}
+                        </Label>
+                        <span className='flex size-9 items-center justify-center'>
+                          <Switch
+                            id='staff-queue-show-all'
+                            checked={showAllTicketsInQueue}
+                            onCheckedChange={onShowAllTicketsInQueueChange}
+                            className="relative h-5 w-9 before:absolute before:inset-x-0 before:-inset-y-2 before:content-['']"
+                          />
+                        </span>
+                      </div>
+                      <p className='text-muted-foreground text-[10px] leading-tight'>
+                        {showAllTicketsInQueue
+                          ? t('queue.list_show_all_hint')
+                          : t('queue.list_scoped_hint')}
+                      </p>
+                    </div>
+                    {onOnlyMyZoneChange ? (
+                      <div className='border-border/50 space-y-1 border-t pt-3'>
+                        <div className='flex min-h-9 items-center justify-between gap-1'>
+                          <Label
+                            htmlFor='staff-queue-only-my-zone'
+                            className='flex min-h-9 flex-1 cursor-pointer items-center text-xs leading-snug'
+                          >
+                            {t('queue.only_my_zone')}
+                          </Label>
+                          <span className='flex size-9 items-center justify-center'>
+                            <Switch
+                              id='staff-queue-only-my-zone'
+                              checked={onlyMyZone}
+                              onCheckedChange={onOnlyMyZoneChange}
+                              className="relative h-5 w-9 before:absolute before:inset-x-0 before:-inset-y-2 before:content-['']"
+                            />
+                          </span>
+                        </div>
+                        <p className='text-muted-foreground text-[10px] leading-tight'>
+                          {onlyMyZone
+                            ? t('queue.only_my_zone_hint_on')
+                            : t('queue.only_my_zone_hint_off')}
+                        </p>
+                      </div>
+                    ) : null}
+                  </PopoverContent>
+                </Popover>
                 {leafServicesForCreate.length > 0 && (
                   <Button
                     type='button'
                     variant='outline'
                     size='sm'
-                    className='h-7 gap-1 px-2 text-xs'
+                    className='h-9 gap-1 px-2 text-xs'
                     disabled={counterOnBreak || createTicketPending}
                     onClick={() => {
                       setCreateTicketModalKey((k) => k + 1);
@@ -182,52 +276,75 @@ export function StaffQueuePanel({
             <p className='text-muted-foreground text-[10px] leading-tight'>
               {t('queue.sorted_by_wait')}
             </p>
-            <div className='border-border/40 bg-muted/10 flex flex-col gap-1 rounded-md border px-2 py-1.5'>
-              <div className='flex items-center justify-between gap-2'>
-                <Label
-                  htmlFor='staff-queue-show-all'
-                  className='text-foreground cursor-pointer text-[11px] leading-snug font-normal'
-                >
-                  {t('queue.list_show_all')}
-                </Label>
-                <Switch
-                  id='staff-queue-show-all'
-                  checked={showAllTicketsInQueue}
-                  onCheckedChange={onShowAllTicketsInQueueChange}
-                />
-              </div>
-              <p className='text-muted-foreground text-[10px] leading-tight'>
-                {showAllTicketsInQueue
-                  ? t('queue.list_show_all_hint')
-                  : t('queue.list_scoped_hint')}
+            {queueRefreshing ? (
+              <p
+                className='text-muted-foreground text-[10px] leading-tight'
+                role='status'
+              >
+                {t('queue.refreshing')}
               </p>
-              {onOnlyMyZoneChange ? (
-                <div className='flex items-center justify-between gap-2 pt-0.5'>
-                  <Label
-                    htmlFor='staff-queue-only-my-zone'
-                    className='text-foreground cursor-pointer text-[11px] leading-snug font-normal'
-                  >
-                    {t('queue.only_my_zone')}
-                  </Label>
-                  <Switch
-                    id='staff-queue-only-my-zone'
-                    checked={onlyMyZone}
-                    onCheckedChange={onOnlyMyZoneChange}
-                  />
-                </div>
-              ) : null}
-              {onOnlyMyZoneChange ? (
-                <p className='text-muted-foreground text-[10px] leading-tight'>
-                  {onlyMyZone
-                    ? t('queue.only_my_zone_hint_on')
-                    : t('queue.only_my_zone_hint_off')}
-                </p>
-              ) : null}
-            </div>
+            ) : null}
           </CardHeader>
-          <CardContent className='max-h-[min(70vh,32rem)] overflow-y-auto pt-2 lg:max-h-[calc(100vh-10rem)]'>
+
+          <div className='shrink-0 px-3 pt-2'>
+            <StaffServiceScopeSelector
+              t={t}
+              leaves={scopeLeaves}
+              selectedIds={selectedScopeIds}
+              onChange={onScopeChange}
+              summary={scopeSummary}
+              waitingCount={scopedWaitingCount}
+            />
+          </div>
+
+          {showAllTicketsInQueue ? (
+            <Alert role='status' className='mx-3 mt-2 w-auto shrink-0 py-2'>
+              <AlertTriangle aria-hidden />
+              <AlertDescription className='text-xs'>
+                {t('queue.temporary_all_warning')}
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          <CardContent
+            data-testid='staff-queue-scroll'
+            className='min-h-0 flex-1 overflow-y-auto px-3 py-2'
+          >
             <div className='space-y-1.5'>
-              {sortedWaiting.length > 0 ? (
+              {queuePending ? (
+                <div aria-label={t('queue.loading')} role='status'>
+                  <p className='sr-only'>{t('queue.loading')}</p>
+                  <div className='space-y-1.5' aria-hidden>
+                    {Array.from({ length: 5 }, (_, index) => (
+                      <Skeleton
+                        key={index}
+                        data-testid='staff-queue-skeleton'
+                        className='h-20 w-full'
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : queueError ? (
+                <Alert variant='destructive'>
+                  <AlertTriangle aria-hidden />
+                  <AlertDescription>
+                    <p>
+                      {t('queue.load_error', {
+                        message: queueError.message
+                      })}
+                    </p>
+                    <Button
+                      type='button'
+                      size='sm'
+                      variant='outline'
+                      className='mt-2 h-9'
+                      onClick={onRetryQueue}
+                    >
+                      {t('queue.retry')}
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              ) : sortedWaiting.length > 0 ? (
                 sortedWaiting.map((ticket) => (
                   <StaffQueueTicketRow
                     key={ticket.id}
@@ -255,6 +372,7 @@ export function StaffQueuePanel({
                     }}
                     disabled={
                       counterOnBreak ||
+                      conflictingActionPending ||
                       pickPending ||
                       Boolean(inProgressTicketId) ||
                       !!currentTicket
@@ -267,7 +385,14 @@ export function StaffQueuePanel({
                 ))
               ) : (
                 <div className='text-muted-foreground py-6 text-center text-sm'>
-                  {t('queue.noTickets')}
+                  {scopeLeaves.length > 0 && !showAllTicketsInQueue
+                    ? t('queue.empty_scoped', {
+                        scope:
+                          scopeSummary.kind === 'all'
+                            ? t('scope.all_services')
+                            : scopeSummary.labels.join(', ')
+                      })
+                    : t('queue.noTickets')}
                 </div>
               )}
             </div>
@@ -423,6 +548,23 @@ function StaffQueueTicketRow({
               {formatTime(ticket.maxWaitingTime as number)}
             </div>
           )}
+          {(isWarning || isOverdue) && (
+            <div
+              className={cn(
+                'mt-1 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold',
+                isOverdue &&
+                  'border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300',
+                isWarning &&
+                  !isOverdue &&
+                  'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+              )}
+            >
+              <span>{t('queue.sla_label')}</span>
+              <span>
+                {isOverdue ? t('queue.sla_overdue') : t('queue.sla_warning')}
+              </span>
+            </div>
+          )}
         </div>
         <div className='flex items-center gap-1'>
           {showInfo && (
@@ -432,7 +574,7 @@ function StaffQueueTicketRow({
                   type='button'
                   size='sm'
                   variant='ghost'
-                  className='h-8 w-8 p-0'
+                  className='size-9 p-0'
                   aria-label={
                     preReg ? preRegistrationDetailsLabel : userDataDetailsLabel
                   }
@@ -457,7 +599,7 @@ function StaffQueueTicketRow({
           )}
           <Button
             size='sm'
-            className='h-8 rounded-md px-3 text-xs font-semibold'
+            className='h-9 rounded-md px-3 text-xs font-semibold'
             onClick={onCall}
             disabled={disabled}
           >

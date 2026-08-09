@@ -6,11 +6,12 @@ import {
   CheckCircle2,
   PhoneCall,
   PhoneForwarded,
+  Play,
   Undo2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Ticket } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { getStaffPrimaryAction } from '@/lib/staff-workstation-view';
 
 type TFn = (
   key: string,
@@ -19,10 +20,13 @@ type TFn = (
 
 export interface StaffWorkstationActionPanelProps {
   t: TFn;
-  /** When true, all queue actions are disabled (operator on break). */
   workstationOnBreak?: boolean;
   currentTicket: Ticket | undefined;
   waitingCount: number;
+  conflictingActionPending: boolean;
+  actionError?: string | null;
+  resumePending?: boolean;
+  releasePending?: boolean;
   callNextPending: boolean;
   confirmArrivalPending: boolean;
   completePending: boolean;
@@ -30,6 +34,7 @@ export interface StaffWorkstationActionPanelProps {
   noShowPending: boolean;
   returnToQueuePending?: boolean;
   recallPending?: boolean;
+  onResume?: () => void;
   onCallNext: () => void;
   onConfirmArrival: () => void;
   onComplete: () => void;
@@ -44,6 +49,10 @@ export function StaffWorkstationActionPanel({
   workstationOnBreak = false,
   currentTicket,
   waitingCount,
+  conflictingActionPending,
+  actionError = null,
+  resumePending = false,
+  releasePending = false,
   callNextPending,
   confirmArrivalPending,
   completePending,
@@ -51,6 +60,7 @@ export function StaffWorkstationActionPanel({
   noShowPending,
   returnToQueuePending = false,
   recallPending = false,
+  onResume,
   onCallNext,
   onConfirmArrival,
   onComplete,
@@ -59,92 +69,141 @@ export function StaffWorkstationActionPanel({
   onReturnToQueue,
   onRecall
 }: StaffWorkstationActionPanelProps) {
-  const hasCurrent = Boolean(currentTicket);
-  const callNextDisabled =
-    workstationOnBreak || callNextPending || waitingCount === 0 || hasCurrent;
-  /** Call next is always disabled here; hiding saves vertical space until the guest is confirmed. */
-  const showCallNext = currentTicket?.status !== 'called';
+  const primaryAction = getStaffPrimaryAction(
+    currentTicket?.status,
+    workstationOnBreak
+  );
+  const isCalled = currentTicket?.status === 'called';
+  const isInService = currentTicket?.status === 'in_service';
   const showReturnToQueue =
-    Boolean(onReturnToQueue) &&
-    (currentTicket?.status === 'called' ||
-      currentTicket?.status === 'in_service');
-
-  // Recall is only useful while the ticket is in "called" status (visitor hasn't arrived yet).
-  const showRecall = Boolean(onRecall) && currentTicket?.status === 'called';
+    Boolean(onReturnToQueue) && (isCalled || isInService);
+  const showRecall = Boolean(onRecall) && isCalled;
+  const showTransfer = isCalled || isInService;
+  const showNoShow = isCalled;
+  const isCallNextDisabled =
+    waitingCount === 0 || conflictingActionPending || callNextPending;
 
   return (
     <div className='border-border/60 bg-muted/20 flex flex-col gap-3 rounded-lg border p-2.5'>
-      <div className='flex min-w-0 flex-wrap items-start gap-3'>
-        {showCallNext ? (
-          <Button
-            size='sm'
-            className={cn(
-              'h-9 min-w-[10rem] shrink-0 font-semibold',
-              'bg-primary text-primary-foreground hover:bg-primary/90'
-            )}
-            onClick={onCallNext}
-            disabled={callNextDisabled}
-          >
-            <PhoneForwarded className='mr-1.5 h-4 w-4 shrink-0' />
-            {callNextPending ? t('processing') : t('actions.callNext')}
-          </Button>
-        ) : null}
-        {currentTicket?.status === 'called' && (
-          <Button
-            size='sm'
-            className='h-9 min-w-[11rem] shrink-0 border-0 bg-emerald-600 font-semibold text-white hover:bg-emerald-700'
-            onClick={onConfirmArrival}
-            disabled={workstationOnBreak || confirmArrivalPending}
-          >
-            <CheckCircle2 className='mr-1.5 h-4 w-4 shrink-0' />
-            {t('actions.startService')}
-          </Button>
-        )}
+      {primaryAction === 'call_next' && (
         <Button
-          size='sm'
-          variant='outline'
-          className='h-9 min-w-[7rem] shrink-0 font-medium'
+          type='button'
+          className='h-11 w-full font-semibold'
+          data-variant='primary-workflow'
+          onClick={onCallNext}
+          disabled={isCallNextDisabled}
+          aria-busy={callNextPending || undefined}
+        >
+          <PhoneForwarded className='h-4 w-4' />
+          {callNextPending
+            ? t('actions.processing_action')
+            : t('actions.callNext')}
+        </Button>
+      )}
+      {primaryAction === 'start_service' && (
+        <Button
+          type='button'
+          className='h-11 w-full font-semibold'
+          data-variant='primary-workflow'
+          onClick={onConfirmArrival}
+          disabled={conflictingActionPending || confirmArrivalPending}
+          aria-busy={confirmArrivalPending || undefined}
+        >
+          <CheckCircle2 className='h-4 w-4' />
+          {confirmArrivalPending
+            ? t('actions.processing_action')
+            : t('actions.startService')}
+        </Button>
+      )}
+      {primaryAction === 'complete' && (
+        <Button
+          type='button'
+          className='h-11 w-full font-semibold'
+          data-variant='primary-workflow'
           onClick={onComplete}
-          disabled={workstationOnBreak || !hasCurrent || completePending}
+          disabled={conflictingActionPending || completePending}
+          aria-busy={completePending || undefined}
         >
-          <CheckCircle2 className='mr-1.5 h-3.5 w-3.5' />
-          {t('current.complete')}
+          <CheckCircle2 className='h-4 w-4' />
+          {completePending
+            ? t('actions.processing_action')
+            : t('current.complete')}
         </Button>
+      )}
+      {primaryAction === 'resume' && (
         <Button
-          size='sm'
-          variant='outline'
-          className='h-9 min-w-[7rem] shrink-0 font-medium'
-          onClick={onOpenTransfer}
-          disabled={workstationOnBreak || !hasCurrent || transferPending}
+          type='button'
+          className='h-11 w-full font-semibold'
+          data-variant='primary-workflow'
+          onClick={onResume}
+          disabled={
+            !onResume ||
+            conflictingActionPending ||
+            resumePending ||
+            releasePending
+          }
+          aria-busy={resumePending || undefined}
         >
-          <ArrowRightLeft className='mr-1.5 h-3.5 w-3.5' />
-          {t('actions.transfer')}
+          <Play className='h-4 w-4' />
+          {resumePending
+            ? t('actions.processing_action')
+            : t('workstation.resume')}
         </Button>
-        <Button
-          size='sm'
-          variant='outline'
-          className='text-destructive hover:text-destructive h-9 min-w-[7rem] shrink-0 border-red-200/80 bg-red-50/50 font-medium hover:bg-red-50 dark:border-red-900/50 dark:bg-red-950/25 dark:hover:bg-red-950/40'
-          onClick={onNoShow}
-          disabled={workstationOnBreak || !hasCurrent || noShowPending}
-        >
-          <Ban className='mr-1.5 h-3.5 w-3.5' />
-          {t('actions.noShow')}
-        </Button>
-      </div>
-      {showReturnToQueue || showRecall ? (
+      )}
+      {primaryAction === 'blocked' && (
+        <p className='text-destructive text-sm' role='status'>
+          {t('actions.unavailable_status')}
+        </p>
+      )}
+
+      {primaryAction === 'call_next' && waitingCount === 0 && (
+        <p className='text-muted-foreground text-sm' role='status'>
+          {t('actions.call_next_empty_reason')}
+        </p>
+      )}
+      {primaryAction === 'resume' && (
+        <p className='text-muted-foreground text-sm' role='status'>
+          {t('actions.disabled_on_break_reason')}
+        </p>
+      )}
+      {actionError && (
+        <p className='text-destructive text-sm' role='alert'>
+          {t('actions.action_error', { message: actionError })}
+        </p>
+      )}
+
+      {primaryAction !== 'resume' &&
+      (showRecall || showNoShow || showReturnToQueue || showTransfer) ? (
         <div className='flex flex-wrap items-start gap-3'>
           {showRecall && (
             <Button
               type='button'
               size='sm'
               variant='outline'
-              className='h-9 min-w-[9rem] shrink-0 font-medium'
+              className='h-9 font-medium'
               title={t('actions.recall_hint')}
               onClick={onRecall}
-              disabled={workstationOnBreak || recallPending}
+              disabled={conflictingActionPending || recallPending}
             >
-              <PhoneCall className='mr-1.5 h-4 w-4 shrink-0' />
-              {recallPending ? t('processing') : t('actions.recall')}
+              <PhoneCall className='h-4 w-4' />
+              {recallPending
+                ? t('actions.processing_action')
+                : t('actions.recall')}
+            </Button>
+          )}
+          {showNoShow && (
+            <Button
+              type='button'
+              size='sm'
+              variant='outline'
+              className='text-destructive hover:text-destructive h-9 border-red-200/80 bg-red-50/50 font-medium hover:bg-red-50 dark:border-red-900/50 dark:bg-red-950/25 dark:hover:bg-red-950/40'
+              onClick={onNoShow}
+              disabled={conflictingActionPending || noShowPending}
+            >
+              <Ban className='h-3.5 w-3.5' />
+              {noShowPending
+                ? t('actions.processing_action')
+                : t('actions.noShow')}
             </Button>
           )}
           {showReturnToQueue && (
@@ -152,21 +211,30 @@ export function StaffWorkstationActionPanel({
               type='button'
               size='sm'
               variant='outline'
-              className='h-9 min-w-[9rem] shrink-0 font-medium'
+              className='h-9 font-medium'
               title={t('actions.returnToQueue_hint')}
               onClick={onReturnToQueue}
-              disabled={
-                workstationOnBreak ||
-                returnToQueuePending ||
-                transferPending ||
-                completePending ||
-                noShowPending
-              }
+              disabled={conflictingActionPending || returnToQueuePending}
             >
-              <Undo2 className='mr-1.5 h-4 w-4 shrink-0' />
+              <Undo2 className='h-4 w-4' />
               {returnToQueuePending
-                ? t('processing')
+                ? t('actions.processing_action')
                 : t('actions.returnToQueue')}
+            </Button>
+          )}
+          {showTransfer && (
+            <Button
+              type='button'
+              size='sm'
+              variant='outline'
+              className='h-9 font-medium'
+              onClick={onOpenTransfer}
+              disabled={conflictingActionPending || transferPending}
+            >
+              <ArrowRightLeft className='h-3.5 w-3.5' />
+              {transferPending
+                ? t('actions.processing_action')
+                : t('actions.transfer')}
             </Button>
           )}
         </div>

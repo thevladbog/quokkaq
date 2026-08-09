@@ -15,6 +15,12 @@ export interface StaffServiceScopeSelectorProps {
   leaves: StaffServiceScopeLeaf[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
+  summary?: {
+    kind: 'all' | 'single' | 'multiple';
+    labels: string[];
+    count: number;
+  };
+  waitingCount?: number;
   className?: string;
   /** In a dialog, omit outer card chrome and duplicate headings (title lives in DialogHeader). */
   variant?: 'card' | 'dialog';
@@ -34,7 +40,7 @@ function SelectAllButton({
       type='button'
       size='sm'
       variant='outline'
-      className='h-8 text-xs'
+      className='h-9 text-xs'
       onClick={onSelectAll}
       disabled={disabled}
     >
@@ -48,9 +54,46 @@ export function StaffServiceScopeSelector({
   leaves,
   selectedIds,
   onChange,
+  summary,
+  waitingCount,
   className,
   variant = 'card'
 }: StaffServiceScopeSelectorProps) {
+  const isDialog = variant === 'dialog';
+
+  if (!isDialog && summary) {
+    const summaryLabel =
+      summary.kind === 'all'
+        ? t('scope.all_services')
+        : summary.kind === 'single'
+          ? t('scope.selected_one', { service: summary.labels[0] ?? '' })
+          : t('scope.selected_many', {
+              service: summary.labels[0] ?? '',
+              count: Math.max(0, summary.count - 1)
+            });
+
+    return (
+      <div
+        className={cn(
+          'border-border/60 bg-muted/15 flex items-center justify-between gap-3 rounded-lg border px-3 py-2 shadow-xs',
+          className
+        )}
+      >
+        <div className='min-w-0'>
+          <p className='text-muted-foreground text-[10px] font-semibold tracking-wide uppercase'>
+            {t('scope.title')}
+          </p>
+          <p className='truncate text-sm font-semibold'>{summaryLabel}</p>
+        </div>
+        {waitingCount !== undefined ? (
+          <p className='text-muted-foreground shrink-0 text-xs tabular-nums'>
+            {t('scope.matching_count', { count: waitingCount })}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
   if (!leaves.length) return null;
 
   const allIds = leaves.map((l) => l.id);
@@ -66,8 +109,6 @@ export function StaffServiceScopeSelector({
     if (selectedIds.length <= 1) return;
     onChange(selectedIds.filter((x) => x !== id));
   };
-
-  const isDialog = variant === 'dialog';
 
   return (
     <div
@@ -120,18 +161,18 @@ export function StaffServiceScopeSelector({
           return (
             <li
               key={leaf.id}
-              className='border-border/40 bg-background/60 flex items-start gap-2 rounded-md border px-2 py-1.5'
+              className='border-border/40 bg-background/60 flex min-h-9 items-center gap-1 rounded-md border px-1'
             >
               <Checkbox
                 id={`staff-scope-${leaf.id}`}
                 checked={checked}
                 disabled={disableUncheck}
                 onCheckedChange={(v) => toggle(leaf.id, v === true)}
-                className='mt-0.5'
+                className='size-9 rounded-md'
               />
               <label
                 htmlFor={`staff-scope-${leaf.id}`}
-                className='cursor-pointer text-sm leading-snug select-none'
+                className='flex min-h-9 flex-1 cursor-pointer items-center py-1.5 text-sm leading-snug select-none'
               >
                 {leaf.label}
               </label>

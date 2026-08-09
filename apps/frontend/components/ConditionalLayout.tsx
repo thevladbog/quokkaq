@@ -23,6 +23,17 @@ interface ConditionalLayoutProps {
   children: ReactNode;
 }
 
+export function isStaffWorkstationPath(path: string): boolean {
+  if (path === '/staff/support' || path.startsWith('/staff/support/')) {
+    return false;
+  }
+
+  return /^\/staff\/[^/]+\/[^/]+$/.test(path);
+}
+
+export const STAFF_WORKSTATION_CONTENT_CLASS =
+  'min-[1366px]:h-dvh min-[1366px]:min-h-0 min-[1366px]:overflow-hidden min-[1366px]:p-3';
+
 const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
   const pathname = usePathname();
 
@@ -30,6 +41,8 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
     () => stripLocaleFromPath(pathname),
     [pathname]
   );
+
+  const isStaffWorkstation = isStaffWorkstationPath(pathWithoutLocale);
 
   const layoutConfig = useMemo(() => {
     if (pathWithoutLocale.startsWith('/platform')) {
@@ -204,6 +217,9 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
             requiredPermission={layoutConfig.requiredPermission}
             requiredAnyPermission={layoutConfig.requiredAnyPermission}
             SidebarComponent={layoutConfig.SidebarComponent}
+            contentClassName={
+              isStaffWorkstation ? STAFF_WORKSTATION_CONTENT_CLASS : undefined
+            }
             fallbackComponent={
               <div className='flex min-h-screen items-center justify-center p-4'>
                 <div className='text-center'>

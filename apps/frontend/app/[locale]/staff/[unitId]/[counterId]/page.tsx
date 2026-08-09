@@ -19,26 +19,41 @@ import {
   useConfirmArrivalTicket,
   useReturnToQueueTicket,
   useRecallTicket,
-  useUnitServices
+  useUnitServices,
+  useClientVisits
 } from '@/lib/hooks';
 import { getGetUnitsUnitIdCountersQueryKey } from '@/lib/api/generated/tickets-counters';
 import {
   getGetUnitByIDQueryKey,
   getGetUnitsUnitIdChildUnitsQueryKey
 } from '@/lib/api/generated/units';
-import { countersApi, unitsApi, Ticket, type Service } from '@/lib/api';
+import {
+  ApiHttpError,
+  countersApi,
+  unitsApi,
+  Ticket,
+  type Service
+} from '@/lib/api';
 import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import { getUnitDisplayName } from '@/lib/unit-display';
 
 /** Stable empty refs so React Query “no data yet” does not allocate a new [] every render (avoids effect loops on [data]). */
 const EMPTY_TICKET_LIST: Ticket[] = [];
 const EMPTY_SERVICE_LIST: Service[] = [];
+const EMPTY_SERVICE_ID_LIST: string[] = [];
+const NON_ACTIVE_TICKET_STATUSES = new Set([
+  'waiting',
+  'served',
+  'completed',
+  'no_show',
+  'cancelled'
+]);
 import { socketClient } from '@/lib/socket';
 import { logger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/src/i18n/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Coffee, LogOut } from 'lucide-react';
+import { AlertTriangle, Coffee, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -60,8 +75,9 @@ import { PreRegistrationDetailsModal } from '@/components/staff/PreRegistrationD
 import { StaffCurrentTicketHero } from '@/components/staff/StaffCurrentTicketHero';
 import { StaffIdleWorkstationHero } from '@/components/staff/StaffIdleWorkstationHero';
 import { StaffWorkstationActionPanel } from '@/components/staff/StaffWorkstationActionPanel';
-import { StaffVisitorContextPanel } from '@/components/staff/StaffVisitorContextPanel';
 import { StaffQueuePanel } from '@/components/staff/StaffQueuePanel';
+import { StaffVisitorDetailsSheet } from '@/components/staff/StaffVisitorDetailsSheet';
+import { StaffWorkstationShell } from '@/components/staff/StaffWorkstationShell';
 import { useSyncActiveUnit } from '@/contexts/ActiveUnitContext';
 import { useAuthContext } from '@/contexts/AuthContext';
 import {
@@ -72,11 +88,13 @@ import { isTenantAdminUser } from '@/lib/tenant-admin-access';
 import { cn } from '@/lib/utils';
 import { formatWaitDurationSeconds } from '@/components/supervisor/supervisor-queue-utils';
 import { useLiveElapsedSecondsSince } from '@/lib/use-live-elapsed-since';
-
-function normPool(z?: string | null): string | null {
-  const x = z?.trim();
-  return x || null;
-}
+import {
+  deriveStaffQueueView,
+  summarizeServiceScope,
+  type StaffServiceScopeStatus
+} from '@/lib/staff-workstation-view';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 
 function serviceAllowedInZone(s: Service, zoneId: string): boolean {
   const r = s.restrictedServiceZoneId?.trim();
@@ -114,6 +132,8 @@ export default function StaffWorkspacePage({
   );
   const [detailsTicket, setDetailsTicket] = useState<Ticket | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [visitorDetailsOpen, setVisitorDetailsOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const openDetails = (ticket: Ticket) => {
     setDetailsTicket(ticket);
@@ -145,10 +165,12 @@ export default function StaffWorkspacePage({
   // Ticket Hooks
   const {
     data: ticketsData,
-    error,
+    error: ticketsError,
+    isPending: ticketsPending,
+    isFetching: ticketsFetching,
     refetch
   } = useTickets(unitId, {
-    enabled: !!unitId,
+    enabled: Boolean(unitId),
     refetchInterval: 12_000
   });
   const tickets = ticketsData ?? EMPTY_TICKET_LIST;
@@ -164,12 +186,18 @@ export default function StaffWorkspacePage({
   const createTicketMutation = useMutation({
     mutationFn: (vars: { serviceId: string; clientId?: string }) =>
       unitsApi.createTicket(unitId, vars),
+    onMutate: () => setActionError(null),
     onSuccess: () => {
+      setActionError(null);
       toast.success(t('messages.ticketCreated'));
       refetch();
     },
     onError: () => {
-      toast.error(t('messages.failed', { action: 'create ticket' }));
+      const message = t('messages.failed', {
+        action: t('actions.createTicket')
+      });
+      setActionError(message);
+      toast.error(message);
     }
   });
 
@@ -178,7 +206,9 @@ export default function StaffWorkspacePage({
   // Logout / Release Mutation
   const releaseMutation = useMutation({
     mutationFn: () => countersApi.release(counterId),
+    onMutate: () => setActionError(null),
     onSuccess: () => {
+      setActionError(null);
       queryClient.invalidateQueries({
         queryKey: getGetUnitsUnitIdCountersQueryKey(unitId)
       });
@@ -191,13 +221,16 @@ export default function StaffWorkspacePage({
     },
     onError: (error: Error) => {
       logger.error('Failed to release counter', { error });
+      setActionError(t('logout_failed', { error: error.message }));
       toast.error(t('logout_failed', { error: error.message }));
     }
   });
 
   const startBreakMutation = useMutation({
     mutationFn: () => countersApi.startBreak(counterId),
+    onMutate: () => setActionError(null),
     onSuccess: () => {
+      setActionError(null);
       queryClient.invalidateQueries({
         queryKey: getGetUnitsUnitIdCountersQueryKey(unitId)
       });
@@ -206,19 +239,24 @@ export default function StaffWorkspacePage({
       refetch();
     },
     onError: (error: Error) => {
-      const msg = (error.message || '').toLowerCase();
-      toast.error(t('workstation.break_error'), {
-        description:
-          msg.includes('active') || msg.includes('ticket')
-            ? t('workstation.break_needs_no_ticket')
-            : error.message
+      const detail = error.message.trim() ? error.message : undefined;
+      const message =
+        error instanceof ApiHttpError &&
+        error.code === 'counter_break_active_ticket'
+          ? t('workstation.break_needs_no_ticket')
+          : t('workstation.break_error');
+      setActionError(message);
+      toast.error(message, {
+        description: detail
       });
     }
   });
 
   const endBreakMutation = useMutation({
     mutationFn: () => countersApi.endBreak(counterId),
+    onMutate: () => setActionError(null),
     onSuccess: () => {
+      setActionError(null);
       queryClient.invalidateQueries({
         queryKey: getGetUnitsUnitIdCountersQueryKey(unitId)
       });
@@ -227,21 +265,52 @@ export default function StaffWorkspacePage({
       refetch();
     },
     onError: (error: Error) => {
+      const detail = error.message.trim() ? error.message : undefined;
+      setActionError(t('workstation.break_error'));
       toast.error(t('workstation.break_error'), {
-        description: error.message
+        description: detail
       });
     }
   });
 
-  const currentTicket = tickets.find(
-    (ticket) => ticket.status === 'called' || ticket.status === 'in_service'
-  );
+  const currentTicket =
+    tickets.find(
+      (ticket) => ticket.status === 'called' || ticket.status === 'in_service'
+    ) ??
+    tickets.find(
+      (ticket) =>
+        ticket.counter?.id === counterId &&
+        !NON_ACTIVE_TICKET_STATUSES.has(ticket.status)
+    );
   const waitingTickets = tickets.filter(
     (ticket) => ticket.status === 'waiting'
   );
 
-  const { data: servicesData, isPending: servicesPending } =
-    useUnitServices(unitId);
+  const activeClientId =
+    currentTicket?.client && !currentTicket.client.isAnonymous
+      ? currentTicket.client.id
+      : undefined;
+  const { data: activeClientVisits } = useClientVisits(unitId, activeClientId, {
+    enabled: Boolean(activeClientId)
+  });
+  const activeVisitTransferTrail = useMemo(
+    () =>
+      activeClientVisits?.items.find((visit) => visit.id === currentTicket?.id)
+        ?.transferTrail,
+    [activeClientVisits?.items, currentTicket?.id]
+  );
+
+  useEffect(() => {
+    setVisitorDetailsOpen(false);
+  }, [currentTicket?.id]);
+
+  const {
+    data: servicesData,
+    error: servicesError,
+    isPending: servicesPending,
+    isFetching: servicesFetching,
+    refetch: refetchServices
+  } = useUnitServices(unitId);
   const services = servicesData ?? EMPTY_SERVICE_LIST;
 
   const leafServiceIds = useMemo(
@@ -253,12 +322,18 @@ export default function StaffWorkspacePage({
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[] | null>(
     null
   );
+  const [hydratedScopeStorageKey, setHydratedScopeStorageKey] = useState<
+    string | null
+  >(null);
+  const serviceCatalogReady =
+    !servicesPending && !servicesError && servicesData !== undefined;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!serviceCatalogReady) return;
     if (!leafServiceIds.length) {
-      if (servicesPending) return;
       setSelectedServiceIds([]);
+      setHydratedScopeStorageKey(scopeStorageKey);
       return;
     }
     let next = [...leafServiceIds];
@@ -278,75 +353,98 @@ export default function StaffWorkspacePage({
       /* ignore corrupt storage */
     }
     setSelectedServiceIds(next);
-  }, [unitId, counterId, scopeStorageKey, leafServiceIds, servicesPending]);
+    setHydratedScopeStorageKey(scopeStorageKey);
+  }, [scopeStorageKey, leafServiceIds, serviceCatalogReady]);
+
+  const scopeHydrated =
+    hydratedScopeStorageKey === scopeStorageKey && selectedServiceIds !== null;
 
   useEffect(() => {
     if (selectedServiceIds === null || typeof window === 'undefined') return;
-    if (servicesPending && leafServiceIds.length === 0) return;
+    if (!scopeHydrated) return;
     localStorage.setItem(scopeStorageKey, JSON.stringify(selectedServiceIds));
-  }, [
-    scopeStorageKey,
-    selectedServiceIds,
-    servicesPending,
-    leafServiceIds.length
-  ]);
+  }, [scopeStorageKey, scopeHydrated, selectedServiceIds]);
 
   const scopeForFilter =
-    selectedServiceIds === null ? leafServiceIds : selectedServiceIds;
+    scopeHydrated && selectedServiceIds
+      ? selectedServiceIds
+      : EMPTY_SERVICE_ID_LIST;
+  const serviceScopeStatus: StaffServiceScopeStatus = servicesError
+    ? 'error'
+    : servicesPending || servicesData === undefined
+      ? 'pending'
+      : scopeHydrated
+        ? 'ready'
+        : 'hydrating';
 
-  /** List-only: show whole unit queue vs only tickets for services selected in «Услуги». Call next always uses scope. */
-  const queueViewAllKey = `staff-queue-show-all:${unitId}:${counterId}`;
   const [showAllQueueTickets, setShowAllQueueTickets] = useState(false);
 
   const onlyMyZoneKey = `staff-queue-only-my-zone:${unitId}:${counterId}`;
   const [onlyMyZone, setOnlyMyZone] = useState(false);
+  const [loadedOnlyMyZoneKey, setLoadedOnlyMyZoneKey] = useState<string | null>(
+    null
+  );
 
-  /** Avoid persisting default `false` before values are read from localStorage (same commit as load). */
-  const skipQueuePrefsPersistRef = useRef(true);
+  useEffect(() => {
+    setShowAllQueueTickets(false);
+  }, [unitId, counterId]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    skipQueuePrefsPersistRef.current = true;
     try {
-      setShowAllQueueTickets(localStorage.getItem(queueViewAllKey) === '1');
       setOnlyMyZone(localStorage.getItem(onlyMyZoneKey) === '1');
     } catch {
       /* ignore */
+    } finally {
+      setLoadedOnlyMyZoneKey(onlyMyZoneKey);
     }
-  }, [queueViewAllKey, onlyMyZoneKey]);
+  }, [onlyMyZoneKey]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (skipQueuePrefsPersistRef.current) {
-      skipQueuePrefsPersistRef.current = false;
-      return;
-    }
+    if (loadedOnlyMyZoneKey !== onlyMyZoneKey) return;
     try {
-      localStorage.setItem(queueViewAllKey, showAllQueueTickets ? '1' : '0');
       localStorage.setItem(onlyMyZoneKey, onlyMyZone ? '1' : '0');
     } catch {
       /* ignore */
     }
-  }, [queueViewAllKey, onlyMyZoneKey, showAllQueueTickets, onlyMyZone]);
+  }, [loadedOnlyMyZoneKey, onlyMyZoneKey, onlyMyZone]);
 
-  const poolFilteredWaiting = useMemo(() => {
-    if (!onlyMyZone) return waitingTickets;
-    const cz = normPool(myCounter?.serviceZoneId);
-    return waitingTickets.filter((tk) => normPool(tk.serviceZoneId) === cz);
-  }, [waitingTickets, onlyMyZone, myCounter?.serviceZoneId]);
-
-  const scopedWaitingTickets = useMemo(() => {
-    if (!leafServiceIds.length) return poolFilteredWaiting;
-    if (!scopeForFilter.length) return [];
-    return poolFilteredWaiting.filter((t) =>
-      scopeForFilter.includes(t.serviceId)
-    );
-  }, [poolFilteredWaiting, scopeForFilter, leafServiceIds]);
-
-  const queueDisplayTickets = useMemo(
-    () => (showAllQueueTickets ? poolFilteredWaiting : scopedWaitingTickets),
-    [showAllQueueTickets, poolFilteredWaiting, scopedWaitingTickets]
+  const queueView = useMemo(
+    () =>
+      deriveStaffQueueView({
+        waitingTickets,
+        serviceScopeStatus,
+        selectedServiceIds: scopeForFilter,
+        allLeafServiceIds: leafServiceIds,
+        onlyMyZone,
+        counterServiceZoneId: myCounter?.serviceZoneId,
+        showAllTemporarily: showAllQueueTickets
+      }),
+    [
+      waitingTickets,
+      serviceScopeStatus,
+      scopeForFilter,
+      leafServiceIds,
+      onlyMyZone,
+      myCounter?.serviceZoneId,
+      showAllQueueTickets
+    ]
   );
+
+  const conflictingActionPending =
+    Boolean(inProgressTicketId) ||
+    callNextMutation.isPending ||
+    pickMutation.isPending ||
+    confirmArrivalMutation.isPending ||
+    completeMutation.isPending ||
+    noShowMutation.isPending ||
+    returnToQueueMutation.isPending ||
+    recallMutation.isPending ||
+    transferMutation.isPending ||
+    startBreakMutation.isPending ||
+    endBreakMutation.isPending ||
+    releaseMutation.isPending;
 
   const refetchTicketsRef = useRef(refetch);
   useEffect(() => {
@@ -402,6 +500,11 @@ export default function StaffWorkspacePage({
       .filter(Boolean) as { id: string; label: string }[];
   }, [services, leafServiceIds, locale]);
 
+  const scopeSummary = useMemo(
+    () => summarizeServiceScope(leafServicesForScope, scopeForFilter),
+    [leafServicesForScope, scopeForFilter]
+  );
+
   // Service Names Cache - derived from services list, with full hierarchical path
   const serviceNames = useMemo(() => {
     const names: Record<string, string> = {};
@@ -449,82 +552,98 @@ export default function StaffWorkspacePage({
 
   // Actions
   const handleCallNext = async () => {
+    if (conflictingActionPending || !queueView.serviceScopeReady) return;
+    setActionError(null);
+    const fallbackMessage = t('messages.failed', {
+      action: t('actions.callNext')
+    });
     try {
-      const idsForCall =
-        selectedServiceIds === null ? leafServiceIds : selectedServiceIds;
-      let serviceIds: string[] | undefined;
-      if (
-        leafServiceIds.length > 0 &&
-        (idsForCall.length !== leafServiceIds.length ||
-          !leafServiceIds.every((id) => idsForCall.includes(id)))
-      ) {
-        serviceIds = idsForCall;
-      }
       const result = await callNextMutation.mutateAsync({
         counterId,
-        serviceIds
+        serviceIds: queueView.callNextServiceIds
       });
       if (!result || !result.ok) {
-        toast.error(
-          result?.message || t('messages.failed', { action: 'call' })
-        );
+        const message = result?.message || fallbackMessage;
+        setActionError(message);
+        toast.error(message);
       } else {
+        setActionError(null);
         const number = result.ticket?.queueNumber || 'NEXT';
         toast.success(t('messages.called', { number }));
       }
       await refetch();
     } catch (error) {
       logger.error('Failed to call next', { error });
-      toast.error(t('messages.failed', { action: 'call' }));
+      setActionError(fallbackMessage);
+      toast.error(fallbackMessage);
     }
   };
 
   const handleConfirmArrival = async () => {
-    if (!currentTicket) return;
+    if (!currentTicket || conflictingActionPending) return;
+    setActionError(null);
+    const message = t('messages.failed', {
+      action: t('actions.startService')
+    });
     try {
       await confirmArrivalMutation.mutateAsync(currentTicket.id);
+      setActionError(null);
       toast.success(
         t('messages.serviceStarted', { number: currentTicket.queueNumber })
       );
       await refetch();
     } catch (error) {
       logger.error('Failed to start service', { error });
-      toast.error(t('messages.failed', { action: 'start service' }));
+      setActionError(message);
+      toast.error(message);
     }
   };
 
   const handleComplete = async () => {
-    if (!currentTicket) return;
+    if (!currentTicket || conflictingActionPending) return;
+    setActionError(null);
+    const message = t('messages.failed', { action: t('current.complete') });
     try {
       await completeMutation.mutateAsync(currentTicket.id);
+      setActionError(null);
       toast.success(
         t('messages.completed', { number: currentTicket.queueNumber })
       );
       await refetch();
     } catch (error) {
       logger.error('Failed to complete ticket', { error });
-      toast.error(t('messages.failed', { action: 'complete' }));
+      setActionError(message);
+      toast.error(message);
     }
   };
 
   const handleNoShow = async () => {
-    if (!currentTicket) return;
+    if (!currentTicket || conflictingActionPending) return;
+    setActionError(null);
+    const message = t('messages.failed', { action: t('actions.noShow') });
     try {
       await noShowMutation.mutateAsync(currentTicket.id);
+      setActionError(null);
       toast.success(
         t('messages.noShow', { number: currentTicket.queueNumber })
       );
       await refetch();
     } catch (error) {
       logger.error('Failed to mark no-show', { error });
-      toast.error(t('messages.failed', { action: 'mark no-show' }));
+      setActionError(message);
+      toast.error(message);
     }
   };
 
   const handleReturnToQueue = async () => {
-    if (!currentTicket) return;
+    if (!currentTicket || conflictingActionPending) return;
+    setActionError(null);
+    const message = t('messages.failed', {
+      action: t('actions.returnToQueue')
+    });
     try {
       await returnToQueueMutation.mutateAsync(currentTicket.id);
+      setActionError(null);
       toast.success(
         t('messages.returnedToQueue', { number: currentTicket.queueNumber })
       );
@@ -536,21 +655,26 @@ export default function StaffWorkspacePage({
         counterId,
         unitId
       });
-      toast.error(t('messages.failed', { action: 'return to queue' }));
+      setActionError(message);
+      toast.error(message);
     }
   };
 
   const handleRecall = async () => {
-    if (!currentTicket) return;
+    if (!currentTicket || conflictingActionPending) return;
+    setActionError(null);
+    const message = t('messages.failed', { action: t('actions.recall') });
     try {
       await recallMutation.mutateAsync(currentTicket.id);
+      setActionError(null);
       toast.success(
         t('messages.recalled', { number: currentTicket.queueNumber })
       );
       await refetch();
     } catch (error) {
       logger.error('Failed to recall ticket', { error });
-      toast.error(t('messages.failed', { action: 're-call' }));
+      setActionError(message);
+      toast.error(message);
     }
   };
 
@@ -604,6 +728,8 @@ export default function StaffWorkspacePage({
   }, [transferZoneId, transferMode, isTransferOpen]);
 
   const openTransferDialog = () => {
+    if (conflictingActionPending) return;
+    setActionError(null);
     if (currentTicket) {
       setTransferCommentDraft(currentTicket.operatorComment ?? '');
       setTransferMode('counter');
@@ -615,7 +741,11 @@ export default function StaffWorkspacePage({
   };
 
   const handleTransfer = async () => {
-    if (!currentTicket) return;
+    if (!currentTicket || conflictingActionPending) return;
+    setActionError(null);
+    const failureMessage = t('messages.failed', {
+      action: t('actions.transfer')
+    });
     const origComment = (currentTicket.operatorComment ?? '').trim();
     const draft = transferCommentDraft.trim();
     const commentPatch =
@@ -633,7 +763,9 @@ export default function StaffWorkspacePage({
       } else {
         if (!transferZoneId) return;
         if (zoneTransferNeedsService && !transferServiceId.trim()) {
-          toast.error(t('transfer_service_required'));
+          const message = t('transfer_service_required');
+          setActionError(message);
+          toast.error(message);
           return;
         }
         let toServiceId: string | undefined;
@@ -654,6 +786,7 @@ export default function StaffWorkspacePage({
       toast.success(
         t('messages.transferred', { number: currentTicket.queueNumber })
       );
+      setActionError(null);
       setIsTransferOpen(false);
       setTransferTargetId('');
       setTransferZoneId('');
@@ -661,65 +794,271 @@ export default function StaffWorkspacePage({
       await refetch();
     } catch (error) {
       logger.error('Failed to transfer ticket', { error });
-      toast.error(t('messages.failed', { action: 'transfer' }));
+      setActionError(failureMessage);
+      toast.error(failureMessage);
     }
   };
 
   const transferSubmitDisabled =
-    transferMutation.isPending ||
+    conflictingActionPending ||
     (transferMode === 'counter' && !transferTargetId) ||
     (transferMode === 'zone' &&
       (!transferZoneId ||
         (zoneTransferNeedsService && !transferServiceId.trim())));
 
-  if (error) {
-    return (
-      <div className='container mx-auto p-4'>
-        {t('error_loading', { error: (error as Error).message })}
-      </div>
-    );
-  }
-
   return (
-    <div className='container mx-auto max-w-[88rem] flex-1 px-3 py-3 pb-8 sm:px-4'>
-      <div className='border-border/60 bg-background/80 rounded-xl border p-4 shadow-sm sm:p-5'>
-        <header className='border-border/50 mb-4 flex flex-col gap-3 border-b pb-4 sm:mb-5 sm:flex-row sm:items-center sm:justify-between sm:pb-4'>
-          <div className='flex min-w-0 items-center gap-3'>
-            <div className='from-primary to-primary/70 hidden h-10 w-1 shrink-0 rounded-full bg-gradient-to-b sm:block' />
-            <div className='min-w-0'>
-              <p className='text-muted-foreground truncate text-[11px] font-medium tracking-wide uppercase'>
-                {unit ? getUnitDisplayName(unit, locale) : '—'}
+    <>
+      {/* Transfer Dialog */}
+      <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
+        <DialogContent className='max-h-[min(90vh,40rem)] overflow-y-auto sm:max-w-lg'>
+          <DialogHeader>
+            <DialogTitle>{t('actions.transfer')}</DialogTitle>
+          </DialogHeader>
+          <div className='space-y-4 py-2'>
+            <div className='space-y-2'>
+              <Label>{t('transfer_mode_label')}</Label>
+              <Select
+                value={transferMode}
+                onValueChange={(v) => {
+                  setTransferMode(v as 'counter' | 'zone');
+                  setTransferTargetId('');
+                  setTransferZoneId('');
+                  setTransferServiceId('');
+                }}
+              >
+                <SelectTrigger className='w-full'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='counter'>
+                    {t('transfer_mode_counter')}
+                  </SelectItem>
+                  <SelectItem value='zone'>
+                    {t('transfer_mode_zone')}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {transferMode === 'counter' ? (
+              <div>
+                <Label className='mb-2 block'>
+                  {t('select_counter_label')}
+                </Label>
+                <div className='grid max-h-48 gap-2 overflow-y-auto'>
+                  {countersForTransfer
+                    .filter((c) => c.id !== counterId)
+                    .map((counter) => (
+                      <Button
+                        key={counter.id}
+                        type='button'
+                        variant={
+                          transferTargetId === counter.id
+                            ? 'default'
+                            : 'outline'
+                        }
+                        className='justify-start'
+                        onClick={() => setTransferTargetId(counter.id)}
+                      >
+                        {counter.name}
+                      </Button>
+                    ))}
+                  {countersForTransfer.filter((c) => c.id !== counterId)
+                    .length === 0 && (
+                    <p className='text-muted-foreground text-sm'>
+                      {t('no_other_counters')}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className='space-y-3'>
+                <div className='space-y-2'>
+                  <Label>{t('transfer_zone_label')}</Label>
+                  <Select
+                    value={transferZoneId || undefined}
+                    onValueChange={setTransferZoneId}
+                  >
+                    <SelectTrigger className='w-full'>
+                      <SelectValue
+                        placeholder={t('transfer_zone_placeholder')}
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {serviceZones
+                        .filter(
+                          (z): z is typeof z & { id: string } =>
+                            typeof z.id === 'string' && z.id.trim().length > 0
+                        )
+                        .map((z) => (
+                          <SelectItem key={z.id} value={z.id}>
+                            {z.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {serviceZones.length === 0 && (
+                    <p className='text-muted-foreground text-xs'>
+                      {t('transfer_no_zones')}
+                    </p>
+                  )}
+                </div>
+                {transferZoneId ? (
+                  <div className='space-y-2'>
+                    <Label>
+                      {zoneTransferNeedsService
+                        ? t('transfer_service_required_label')
+                        : t('transfer_service_optional_label')}
+                    </Label>
+                    {zoneTransferNeedsService ? (
+                      <Select
+                        value={transferServiceId || undefined}
+                        onValueChange={setTransferServiceId}
+                      >
+                        <SelectTrigger className='w-full'>
+                          <SelectValue
+                            placeholder={t('transfer_service_placeholder')}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {zoneTransferServices.map((s) => {
+                            const label =
+                              locale === 'ru'
+                                ? s.nameRu || s.nameEn || s.name
+                                : s.nameEn || s.nameRu || s.name;
+                            return (
+                              <SelectItem key={s.id} value={s.id}>
+                                {label}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Select
+                        value={transferServiceId || '__keep__'}
+                        onValueChange={(v) =>
+                          setTransferServiceId(v === '__keep__' ? '' : v)
+                        }
+                      >
+                        <SelectTrigger className='w-full'>
+                          <SelectValue
+                            placeholder={t('transfer_service_placeholder')}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value='__keep__'>
+                            {t('transfer_service_keep_current')}
+                          </SelectItem>
+                          {zoneTransferServices.map((s) => {
+                            const label =
+                              locale === 'ru'
+                                ? s.nameRu || s.nameEn || s.name
+                                : s.nameEn || s.nameRu || s.name;
+                            return (
+                              <SelectItem key={s.id} value={s.id}>
+                                {label}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {zoneTransferNeedsService &&
+                      zoneTransferServices.length === 0 && (
+                        <p className='text-destructive text-xs'>
+                          {t('transfer_no_services_in_zone')}
+                        </p>
+                      )}
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            <div className='space-y-2'>
+              <Label htmlFor='transfer-operator-comment'>
+                {t('visitor_context.comment_label')}
+              </Label>
+              <Textarea
+                id='transfer-operator-comment'
+                rows={3}
+                className='resize-y'
+                placeholder={t('visitor_context.comment_placeholder')}
+                value={transferCommentDraft}
+                onChange={(e) => setTransferCommentDraft(e.target.value)}
+              />
+              <p className='text-muted-foreground text-[11px] leading-snug'>
+                {t('transfer_comment_hint')}
               </p>
-              <h1 className='truncate text-xl font-bold tracking-tight sm:text-2xl'>
-                {counterName}
-              </h1>
             </div>
           </div>
-          <div className='flex shrink-0 flex-wrap items-center gap-2 self-start sm:self-center'>
-            {workstationOnBreak ? (
-              <Button
-                type='button'
-                size='sm'
-                className='h-9'
-                onClick={() => endBreakMutation.mutate()}
-                disabled={
-                  endBreakMutation.isPending || releaseMutation.isPending
-                }
-              >
-                {t('workstation.resume')}
-              </Button>
-            ) : (
+          {actionError && (
+            <p className='text-destructive text-sm' role='alert'>
+              {t('actions.action_error', { message: actionError })}
+            </p>
+          )}
+          <DialogFooter>
+            <Button
+              variant='outline'
+              type='button'
+              onClick={() => setIsTransferOpen(false)}
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              type='button'
+              onClick={handleTransfer}
+              disabled={transferSubmitDisabled}
+            >
+              {t('transfer_button')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <PreRegistrationDetailsModal
+        isOpen={isDetailsOpen}
+        onClose={() => setIsDetailsOpen(false)}
+        ticket={detailsTicket}
+        canReadUserData={canReadUserData}
+      />
+
+      <StaffVisitorDetailsSheet
+        open={visitorDetailsOpen}
+        onOpenChange={setVisitorDetailsOpen}
+        unitId={unitId}
+        ticket={currentTicket}
+        locale={locale}
+        t={t}
+      />
+
+      <StaffWorkstationShell
+        unitName={unit ? getUnitDisplayName(unit, locale) : '—'}
+        counterName={counterName}
+        operatorName={user?.name?.trim() || '—'}
+        statusControls={
+          <div className='flex flex-wrap items-center justify-end gap-2'>
+            <span
+              className={cn(
+                'inline-flex h-9 items-center rounded-md border px-3 text-xs font-semibold',
+                workstationOnBreak
+                  ? 'border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100'
+                  : 'border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100'
+              )}
+              role='status'
+            >
+              {workstationOnBreak
+                ? t('current.break_title')
+                : t('workstation.status_active')}
+            </span>
+            {!workstationOnBreak && (
               <Button
                 type='button'
                 variant='outline'
                 size='sm'
                 className='h-9'
                 onClick={() => startBreakMutation.mutate()}
-                disabled={
-                  startBreakMutation.isPending ||
-                  releaseMutation.isPending ||
-                  Boolean(currentTicket)
-                }
+                disabled={conflictingActionPending || Boolean(currentTicket)}
               >
                 {t('workstation.break')}
               </Button>
@@ -730,322 +1069,159 @@ export default function StaffWorkspacePage({
               size='sm'
               className='h-9'
               onClick={() => releaseMutation.mutate()}
-              disabled={releaseMutation.isPending}
+              disabled={conflictingActionPending}
             >
               <LogOut className='mr-2 h-3.5 w-3.5' />
               {t('logout')}
             </Button>
           </div>
-        </header>
-
-        {/* Transfer Dialog */}
-        <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
-          <DialogContent className='max-h-[min(90vh,40rem)] overflow-y-auto sm:max-w-lg'>
-            <DialogHeader>
-              <DialogTitle>{t('actions.transfer')}</DialogTitle>
-            </DialogHeader>
-            <div className='space-y-4 py-2'>
-              <div className='space-y-2'>
-                <Label>{t('transfer_mode_label')}</Label>
-                <Select
-                  value={transferMode}
-                  onValueChange={(v) => {
-                    setTransferMode(v as 'counter' | 'zone');
-                    setTransferTargetId('');
-                    setTransferZoneId('');
-                    setTransferServiceId('');
-                  }}
-                >
-                  <SelectTrigger className='w-full'>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='counter'>
-                      {t('transfer_mode_counter')}
-                    </SelectItem>
-                    <SelectItem value='zone'>
-                      {t('transfer_mode_zone')}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {transferMode === 'counter' ? (
-                <div>
-                  <Label className='mb-2 block'>
-                    {t('select_counter_label')}
-                  </Label>
-                  <div className='grid max-h-48 gap-2 overflow-y-auto'>
-                    {countersForTransfer
-                      .filter((c) => c.id !== counterId)
-                      .map((counter) => (
-                        <Button
-                          key={counter.id}
-                          type='button'
-                          variant={
-                            transferTargetId === counter.id
-                              ? 'default'
-                              : 'outline'
-                          }
-                          className='justify-start'
-                          onClick={() => setTransferTargetId(counter.id)}
-                        >
-                          {counter.name}
-                        </Button>
-                      ))}
-                    {countersForTransfer.filter((c) => c.id !== counterId)
-                      .length === 0 && (
-                      <p className='text-muted-foreground text-sm'>
-                        {t('no_other_counters')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className='space-y-3'>
-                  <div className='space-y-2'>
-                    <Label>{t('transfer_zone_label')}</Label>
-                    <Select
-                      value={transferZoneId || undefined}
-                      onValueChange={setTransferZoneId}
-                    >
-                      <SelectTrigger className='w-full'>
-                        <SelectValue
-                          placeholder={t('transfer_zone_placeholder')}
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {serviceZones
-                          .filter(
-                            (z): z is typeof z & { id: string } =>
-                              typeof z.id === 'string' && z.id.trim().length > 0
-                          )
-                          .map((z) => (
-                            <SelectItem key={z.id} value={z.id}>
-                              {z.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    {serviceZones.length === 0 && (
-                      <p className='text-muted-foreground text-xs'>
-                        {t('transfer_no_zones')}
-                      </p>
-                    )}
-                  </div>
-                  {transferZoneId ? (
-                    <div className='space-y-2'>
-                      <Label>
-                        {zoneTransferNeedsService
-                          ? t('transfer_service_required_label')
-                          : t('transfer_service_optional_label')}
-                      </Label>
-                      {zoneTransferNeedsService ? (
-                        <Select
-                          value={transferServiceId || undefined}
-                          onValueChange={setTransferServiceId}
-                        >
-                          <SelectTrigger className='w-full'>
-                            <SelectValue
-                              placeholder={t('transfer_service_placeholder')}
-                            />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {zoneTransferServices.map((s) => {
-                              const label =
-                                locale === 'ru'
-                                  ? s.nameRu || s.nameEn || s.name
-                                  : s.nameEn || s.nameRu || s.name;
-                              return (
-                                <SelectItem key={s.id} value={s.id}>
-                                  {label}
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Select
-                          value={transferServiceId || '__keep__'}
-                          onValueChange={(v) =>
-                            setTransferServiceId(v === '__keep__' ? '' : v)
-                          }
-                        >
-                          <SelectTrigger className='w-full'>
-                            <SelectValue
-                              placeholder={t('transfer_service_placeholder')}
-                            />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value='__keep__'>
-                              {t('transfer_service_keep_current')}
-                            </SelectItem>
-                            {zoneTransferServices.map((s) => {
-                              const label =
-                                locale === 'ru'
-                                  ? s.nameRu || s.nameEn || s.name
-                                  : s.nameEn || s.nameRu || s.name;
-                              return (
-                                <SelectItem key={s.id} value={s.id}>
-                                  {label}
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectContent>
-                        </Select>
-                      )}
-                      {zoneTransferNeedsService &&
-                        zoneTransferServices.length === 0 && (
-                          <p className='text-destructive text-xs'>
-                            {t('transfer_no_services_in_zone')}
-                          </p>
-                        )}
-                    </div>
-                  ) : null}
-                </div>
-              )}
-
-              <div className='space-y-2'>
-                <Label htmlFor='transfer-operator-comment'>
-                  {t('visitor_context.comment_label')}
-                </Label>
-                <Textarea
-                  id='transfer-operator-comment'
-                  rows={3}
-                  className='resize-y'
-                  placeholder={t('visitor_context.comment_placeholder')}
-                  value={transferCommentDraft}
-                  onChange={(e) => setTransferCommentDraft(e.target.value)}
-                />
-                <p className='text-muted-foreground text-[11px] leading-snug'>
-                  {t('transfer_comment_hint')}
-                </p>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant='outline'
-                type='button'
-                onClick={() => setIsTransferOpen(false)}
-              >
-                {t('cancel')}
-              </Button>
-              <Button
-                type='button'
-                onClick={handleTransfer}
-                disabled={transferSubmitDisabled}
-              >
-                {t('transfer_button')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <PreRegistrationDetailsModal
-          isOpen={isDetailsOpen}
-          onClose={() => setIsDetailsOpen(false)}
-          ticket={detailsTicket}
-          canReadUserData={canReadUserData}
-        />
-
-        <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_17.5rem] xl:grid-cols-[minmax(0,1fr)_19rem]'>
-          <div className='min-w-0 space-y-4'>
-            <Card className='border-border/70 gap-0 overflow-hidden py-0 shadow-sm'>
-              <CardHeader className='border-border/50 space-y-0.5 border-b px-4 py-1.5 [.border-b]:pb-1.5'>
-                <CardTitle className='text-sm leading-tight font-semibold'>
-                  {t('current.title')}
-                </CardTitle>
-                <CardDescription className='text-[11px] leading-snug'>
-                  {t('current.description')}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className='space-y-2.5 px-4 pt-3 pb-4'>
-                {workstationOnBreak ? (
-                  <div
-                    className={cn(
-                      'flex flex-col items-center rounded-xl border border-dashed px-4 py-8 text-center',
-                      'border-amber-400/50 bg-amber-50/40 dark:border-amber-700/50 dark:bg-amber-950/25'
-                    )}
-                  >
-                    <Coffee
-                      className='h-12 w-12 text-amber-900/75 dark:text-amber-200/85'
-                      strokeWidth={1.5}
-                    />
-                    <p className='text-foreground mt-4 text-lg font-semibold'>
-                      {t('current.break_title')}
-                    </p>
-                    <p className='text-muted-foreground mx-auto mt-2 max-w-md text-sm leading-relaxed'>
-                      {t('current.break_subtitle')}
-                    </p>
-                    <p className='text-foreground mt-4 font-mono text-base font-semibold tabular-nums'>
-                      {t('current.break_duration')}:{' '}
-                      {formatWaitDurationSeconds(breakElapsedSec)}
+        }
+        main={
+          <Card className='border-border/70 flex h-full min-h-0 flex-col gap-0 overflow-hidden py-0 shadow-sm'>
+            <CardHeader className='border-border/50 shrink-0 space-y-0.5 border-b px-4 py-1.5 [.border-b]:pb-1.5'>
+              <CardTitle className='text-sm leading-tight font-semibold'>
+                {t('current.title')}
+              </CardTitle>
+              <CardDescription className='text-[11px] leading-snug'>
+                {t('current.description')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className='flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden px-4 pt-3 pb-4'>
+              {ticketsError && (
+                <Alert variant='destructive' className='shrink-0'>
+                  <AlertTriangle aria-hidden />
+                  <AlertDescription>
+                    <p>
+                      {t('current.load_error', {
+                        message: ticketsError.message
+                      })}
                     </p>
                     <Button
                       type='button'
-                      className='mt-5'
                       size='sm'
-                      onClick={() => endBreakMutation.mutate()}
-                      disabled={endBreakMutation.isPending}
+                      variant='outline'
+                      className='mt-2 h-9'
+                      onClick={() => void refetch()}
                     >
-                      {t('workstation.resume')}
+                      {t('current.retry')}
                     </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {ticketsPending && !ticketsData ? (
+                <div
+                  data-testid='staff-current-ticket-skeleton'
+                  className='border-border/60 bg-muted/20 flex shrink-0 items-center gap-3 rounded-lg border p-3'
+                  role='status'
+                >
+                  <Skeleton className='size-16 shrink-0 rounded-lg' />
+                  <div className='flex-1 space-y-2'>
+                    <p className='text-muted-foreground text-sm'>
+                      {t('current.loading')}
+                    </p>
+                    <Skeleton className='h-5 w-2/3' />
+                    <Skeleton className='h-4 w-1/2' />
                   </div>
-                ) : currentTicket ? (
-                  <StaffCurrentTicketHero
-                    unitId={unitId}
-                    ticket={currentTicket}
-                    t={t}
-                    onShowDetails={() => openDetails(currentTicket)}
-                    canReadUserData={canReadUserData}
+                </div>
+              ) : workstationOnBreak ? (
+                <div
+                  className={cn(
+                    'flex shrink-0 flex-col items-center rounded-xl border border-dashed px-4 py-5 text-center',
+                    'border-amber-400/50 bg-amber-50/40 dark:border-amber-700/50 dark:bg-amber-950/25'
+                  )}
+                >
+                  <Coffee
+                    className='h-10 w-10 text-amber-900/75 dark:text-amber-200/85'
+                    strokeWidth={1.5}
                   />
-                ) : (
-                  <StaffIdleWorkstationHero
-                    waitingCount={scopedWaitingTickets.length}
-                    t={t}
-                  />
-                )}
-                {!workstationOnBreak && (
-                  <StaffWorkstationActionPanel
-                    t={t}
-                    currentTicket={currentTicket}
-                    waitingCount={scopedWaitingTickets.length}
-                    callNextPending={callNextMutation.isPending}
-                    confirmArrivalPending={confirmArrivalMutation.isPending}
-                    completePending={completeMutation.isPending}
-                    transferPending={transferMutation.isPending}
-                    noShowPending={noShowMutation.isPending}
-                    returnToQueuePending={returnToQueueMutation.isPending}
-                    recallPending={recallMutation.isPending}
-                    onCallNext={handleCallNext}
-                    onConfirmArrival={handleConfirmArrival}
-                    onComplete={handleComplete}
-                    onOpenTransfer={openTransferDialog}
-                    onNoShow={handleNoShow}
-                    onReturnToQueue={handleReturnToQueue}
-                    onRecall={handleRecall}
-                  />
-                )}
-                {currentTicket && !workstationOnBreak && (
-                  <div className='border-border/40 mt-1 border-t pt-3'>
-                    <StaffVisitorContextPanel
-                      key={currentTicket.id}
-                      unitId={unitId}
-                      ticket={currentTicket}
-                      locale={locale}
-                      t={t}
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                  <p className='text-foreground mt-3 text-lg font-semibold'>
+                    {t('current.break_title')}
+                  </p>
+                  <p className='text-muted-foreground mx-auto mt-1 max-w-md text-sm leading-relaxed'>
+                    {t('current.break_subtitle')}
+                  </p>
+                  <p className='text-foreground mt-3 font-mono text-base font-semibold tabular-nums'>
+                    {t('current.break_duration')}:{' '}
+                    {formatWaitDurationSeconds(breakElapsedSec)}
+                  </p>
+                </div>
+              ) : currentTicket ? (
+                <StaffCurrentTicketHero
+                  unitId={unitId}
+                  ticket={currentTicket}
+                  serviceName={
+                    serviceNames[currentTicket.serviceId] ||
+                    currentTicket.serviceId ||
+                    t('queue.uncategorized')
+                  }
+                  t={t}
+                  onShowDetails={() => openDetails(currentTicket)}
+                  transferTrail={activeVisitTransferTrail}
+                  locale={locale}
+                  onOpenVisitorDetails={() => setVisitorDetailsOpen(true)}
+                  canReadUserData={canReadUserData}
+                />
+              ) : (
+                <StaffIdleWorkstationHero
+                  waitingCount={queueView.scopedWaiting.length}
+                  scopeSummary={t('current.scope_empty_hint', {
+                    count: queueView.scopedWaiting.length
+                  })}
+                  t={t}
+                />
+              )}
+
+              <StaffWorkstationActionPanel
+                t={t}
+                workstationOnBreak={workstationOnBreak}
+                currentTicket={currentTicket}
+                waitingCount={queueView.scopedWaiting.length}
+                conflictingActionPending={conflictingActionPending}
+                actionError={actionError}
+                resumePending={endBreakMutation.isPending}
+                releasePending={releaseMutation.isPending}
+                callNextPending={callNextMutation.isPending}
+                confirmArrivalPending={confirmArrivalMutation.isPending}
+                completePending={completeMutation.isPending}
+                transferPending={transferMutation.isPending}
+                noShowPending={noShowMutation.isPending}
+                returnToQueuePending={returnToQueueMutation.isPending}
+                recallPending={recallMutation.isPending}
+                onResume={() => endBreakMutation.mutate()}
+                onCallNext={handleCallNext}
+                onConfirmArrival={handleConfirmArrival}
+                onComplete={handleComplete}
+                onOpenTransfer={openTransferDialog}
+                onNoShow={handleNoShow}
+                onReturnToQueue={handleReturnToQueue}
+                onRecall={handleRecall}
+              />
+            </CardContent>
+          </Card>
+        }
+        queue={
           <StaffQueuePanel
             t={t}
             unitId={unitId}
             canReadUserData={canReadUserData}
             counterOnBreak={workstationOnBreak}
-            waitingTickets={queueDisplayTickets}
+            waitingTickets={queueView.visibleWaiting}
+            scopedWaitingCount={queueView.scopedWaiting.length}
+            queuePending={
+              ticketsPending ||
+              serviceScopeStatus === 'pending' ||
+              serviceScopeStatus === 'hydrating'
+            }
+            queueRefreshing={
+              (ticketsFetching && !ticketsPending) ||
+              (servicesFetching && serviceScopeStatus === 'ready')
+            }
+            queueError={ticketsError ?? servicesError}
+            onRetryQueue={() => {
+              void refetch();
+              void refetchServices();
+            }}
             showAllTicketsInQueue={showAllQueueTickets}
             onShowAllTicketsInQueueChange={setShowAllQueueTickets}
             onlyMyZone={onlyMyZone}
@@ -1057,26 +1233,40 @@ export default function StaffWorkspacePage({
               await createTicketMutation.mutateAsync(input);
             }}
             scopeLeaves={leafServicesForScope}
-            selectedScopeIds={
-              selectedServiceIds === null ? leafServiceIds : selectedServiceIds
-            }
+            selectedScopeIds={scopeForFilter}
+            scopeSummary={scopeSummary}
             onScopeChange={setSelectedServiceIds}
             pickPending={pickMutation.isPending}
+            conflictingActionPending={conflictingActionPending}
             inProgressTicketId={inProgressTicketId}
             setInProgressTicketId={setInProgressTicketId}
             currentTicket={currentTicket}
             onPickTicket={async (ticket) => {
-              await pickMutation.mutateAsync({
-                id: ticket.id,
-                counterId
+              if (conflictingActionPending || !queueView.serviceScopeReady) {
+                return;
+              }
+              setActionError(null);
+              const message = t('messages.failed', {
+                action: t('actions.call')
               });
-              await refetch();
+              try {
+                await pickMutation.mutateAsync({
+                  id: ticket.id,
+                  counterId
+                });
+                setActionError(null);
+                await refetch();
+              } catch (error) {
+                setActionError(message);
+                toast.error(message);
+                throw error;
+              }
             }}
             onShowDetails={openDetails}
             services={services}
           />
-        </div>
-      </div>
-    </div>
+        }
+      />
+    </>
   );
 }

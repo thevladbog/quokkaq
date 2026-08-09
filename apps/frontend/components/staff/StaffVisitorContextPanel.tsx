@@ -35,6 +35,7 @@ export interface StaffVisitorContextPanelProps {
   ticket: Ticket;
   locale: string;
   t: TFn;
+  variant?: 'card' | 'sheet';
   className?: string;
 }
 
@@ -57,6 +58,7 @@ export function StaffVisitorContextPanel({
   ticket,
   locale,
   t,
+  variant = 'card',
   className
 }: StaffVisitorContextPanelProps) {
   const client = ticket.client;
@@ -254,7 +256,8 @@ export function StaffVisitorContextPanel({
   return (
     <div
       className={cn(
-        'border-border/60 bg-card rounded-xl border p-3 shadow-sm sm:p-4',
+        variant === 'card' &&
+          'border-border/60 bg-card rounded-xl border p-3 shadow-sm sm:p-4',
         className
       )}
     >
@@ -520,7 +523,12 @@ export function StaffVisitorContextPanel({
               {t('visitor_context.no_history')}
             </p>
           ) : (
-            <ul className='max-h-56 space-y-2 overflow-y-auto pr-1 text-sm'>
+            <ul
+              className={cn(
+                'space-y-2 pr-1 text-sm',
+                variant === 'card' && 'max-h-56 overflow-y-auto'
+              )}
+            >
               {historyItems.map((v) => {
                 const servedBy = (v.servedByName ?? '').trim();
                 const visitComment = (v.operatorComment ?? '').trim();

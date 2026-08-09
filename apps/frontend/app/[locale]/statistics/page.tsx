@@ -2357,8 +2357,11 @@ export default function StatisticsPage() {
                         <ChartTooltip
                           content={
                             <ChartTooltipContent
-                              labelFormatter={(v) =>
-                                formatUtilizationTooltipLabel(v)
+                              labelFormatter={(value) =>
+                                typeof value === 'string' ||
+                                typeof value === 'number'
+                                  ? formatUtilizationTooltipLabel(value)
+                                  : value
                               }
                               formatter={(value) => {
                                 if (
