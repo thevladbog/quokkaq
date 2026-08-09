@@ -9,7 +9,7 @@ import {
 function ticket(
   id: string,
   serviceId: string,
-  serviceZoneId: string,
+  serviceZoneId?: string | null,
   createdAt = '2026-08-09T09:00:00.000Z'
 ): Ticket {
   return TicketModelSchema.parse({
@@ -85,6 +85,25 @@ describe('deriveStaffQueueView', () => {
 
     expect(result.zoneWaiting.map((item) => item.id)).toEqual(['my-zone']);
     expect(result.scopedWaiting).toEqual([]);
+  });
+
+  it('keeps only unzoned tickets for an unzoned counter', () => {
+    const result = deriveStaffQueueView({
+      waitingTickets: [
+        ticket('unzoned', 'service-a'),
+        ticket('zoned', 'service-a', 'zone-1')
+      ],
+      selectedServiceIds: ['service-a'],
+      allLeafServiceIds: ['service-a', 'service-b'],
+      onlyMyZone: true,
+      counterServiceZoneId: null,
+      showAllTemporarily: false
+    });
+
+    expect(result.zoneWaiting.map((item) => item.id)).toEqual(['unzoned']);
+    expect(result.scopedWaiting.map((item) => item.id)).toEqual(['unzoned']);
+    expect(result.visibleWaiting.map((item) => item.id)).toEqual(['unzoned']);
+    expect(result.callNextServiceIds).toEqual(['service-a']);
   });
 
   it('keeps the queue unfiltered when there are no leaf services', () => {

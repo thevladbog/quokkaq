@@ -225,13 +225,14 @@ export default function StaffWorkspacePage({
     },
     onError: (error: Error) => {
       const msg = (error.message || '').toLowerCase();
+      const detail = error.message.trim() || undefined;
       const message =
         msg.includes('active') || msg.includes('ticket')
           ? t('workstation.break_needs_no_ticket')
-          : error.message;
+          : t('workstation.break_error');
       setActionError(message);
       toast.error(t('workstation.break_error'), {
-        description: message
+        description: detail
       });
     }
   });
@@ -249,9 +250,10 @@ export default function StaffWorkspacePage({
       refetch();
     },
     onError: (error: Error) => {
-      setActionError(error.message);
+      const detail = error.message.trim() || undefined;
+      setActionError(t('workstation.break_error'));
       toast.error(t('workstation.break_error'), {
-        description: error.message
+        description: detail
       });
     }
   });

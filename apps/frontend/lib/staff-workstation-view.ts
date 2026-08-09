@@ -23,6 +23,13 @@ function byCreationTime(left: Ticket, right: Ticket): number {
   return (left.createdAt ?? '').localeCompare(right.createdAt ?? '');
 }
 
+function normalizeServiceZoneId(
+  serviceZoneId: string | null | undefined
+): string | null {
+  const normalized = serviceZoneId?.trim();
+  return normalized ? normalized : null;
+}
+
 export function deriveStaffQueueView({
   waitingTickets,
   selectedServiceIds,
@@ -31,12 +38,14 @@ export function deriveStaffQueueView({
   counterServiceZoneId,
   showAllTemporarily
 }: StaffQueueViewInput): StaffQueueView {
+  const normalizedCounterServiceZoneId =
+    normalizeServiceZoneId(counterServiceZoneId);
   const zoneWaiting = waitingTickets
     .filter(
       (ticket) =>
         !onlyMyZone ||
-        !counterServiceZoneId ||
-        ticket.serviceZoneId === counterServiceZoneId
+        normalizeServiceZoneId(ticket.serviceZoneId) ===
+          normalizedCounterServiceZoneId
     )
     .sort(byCreationTime);
   const hasLeafServices = allLeafServiceIds.length > 0;

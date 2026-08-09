@@ -29,6 +29,7 @@ const state = vi.hoisted(() => ({
   },
   clientVisitCalls: [] as unknown[][],
   counterOnBreak: false,
+  counterServiceZoneId: 'zone-1' as string | null | undefined,
   complete: { mutateAsync: vi.fn(), isPending: false },
   noShow: { mutateAsync: vi.fn(), isPending: false },
   callNext: { mutateAsync: vi.fn(), isPending: false },
@@ -342,6 +343,7 @@ beforeEach(() => {
   state.clientVisits.isLoading = false;
   state.clientVisitCalls.length = 0;
   state.counterOnBreak = false;
+  state.counterServiceZoneId = 'zone-1';
 
   for (const mutation of [
     state.complete,
@@ -394,7 +396,7 @@ beforeEach(() => {
     {
       id: 'counter-1',
       unitId: 'unit-1',
-      serviceZoneId: 'zone-1',
+      serviceZoneId: state.counterServiceZoneId,
       name: 'Counter 1',
       onBreak: state.counterOnBreak,
       breakStartedAt: state.counterOnBreak ? '2026-08-09T08:00:00.000Z' : null
@@ -469,6 +471,29 @@ describe('StaffWorkspacePage integration', () => {
     expect(state.callNext.mutateAsync).toHaveBeenCalledWith({
       counterId: 'counter-1',
       serviceIds: ['service-a']
+    });
+  });
+
+  it('aligns the unzoned queue count and call-next for an unzoned counter', async () => {
+    const user = userEvent.setup();
+    state.counterServiceZoneId = null;
+    localStorage.setItem('staff-queue-only-my-zone:unit-1:counter-1', '1');
+    state.ticketsQuery.data = [
+      ticket('u001', 'waiting', { serviceZoneId: null }),
+      ticket('z002', 'waiting', { serviceZoneId: 'zone-1' })
+    ];
+    renderPage();
+
+    expect(await screen.findByText('U001')).toBeVisible();
+    await waitFor(() => {
+      expect(screen.queryByText('Z002')).not.toBeInTheDocument();
+      expect(screen.getByText('1 waiting')).toBeVisible();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Call next' }));
+    expect(state.callNext.mutateAsync).toHaveBeenCalledWith({
+      counterId: 'counter-1',
+      serviceIds: undefined
     });
   });
 
@@ -562,6 +587,42 @@ describe('StaffWorkspacePage integration', () => {
 
     await user.click(screen.getByRole('button', { name: 'Resume work' }));
     await waitFor(() => expect(state.api.endBreak).toHaveBeenCalledTimes(1));
+  });
+
+  it('shows a localized inline fallback when starting a break fails without detail', async () => {
+    const user = userEvent.setup();
+    state.api.startBreak.mockRejectedValueOnce(new Error(''));
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Take break' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Action failed: Could not change break'
+    );
+    expect(state.toast.error).toHaveBeenCalledWith('Could not change break', {
+      description: undefined
+    });
+  });
+
+  it('shows a localized inline fallback while keeping end-break detail in the toast', async () => {
+    const user = userEvent.setup();
+    state.counterOnBreak = true;
+    state.api.endBreak.mockRejectedValueOnce(new Error('Backend unavailable'));
+    renderPage();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Resume work' })
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Action failed: Could not change break'
+    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent(
+      'Backend unavailable'
+    );
+    expect(state.toast.error).toHaveBeenCalledWith('Could not change break', {
+      description: 'Backend unavailable'
+    });
   });
 
   it('keeps stable current-card and queue skeletons while tickets are pending', async () => {
