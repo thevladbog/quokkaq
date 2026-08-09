@@ -604,10 +604,29 @@ describe('StaffWorkspacePage integration', () => {
     });
   });
 
+  it('preserves non-empty start-break toast detail exactly', async () => {
+    const user = userEvent.setup();
+    state.api.startBreak.mockRejectedValueOnce(
+      new Error('  Start backend detail  ')
+    );
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Take break' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Action failed: Could not change break'
+    );
+    expect(state.toast.error).toHaveBeenCalledWith('Could not change break', {
+      description: '  Start backend detail  '
+    });
+  });
+
   it('shows a localized inline fallback while keeping end-break detail in the toast', async () => {
     const user = userEvent.setup();
     state.counterOnBreak = true;
-    state.api.endBreak.mockRejectedValueOnce(new Error('Backend unavailable'));
+    state.api.endBreak.mockRejectedValueOnce(
+      new Error('  Backend unavailable  ')
+    );
     renderPage();
 
     await user.click(
@@ -621,7 +640,7 @@ describe('StaffWorkspacePage integration', () => {
       'Backend unavailable'
     );
     expect(state.toast.error).toHaveBeenCalledWith('Could not change break', {
-      description: 'Backend unavailable'
+      description: '  Backend unavailable  '
     });
   });
 
