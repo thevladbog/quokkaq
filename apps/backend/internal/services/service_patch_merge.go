@@ -216,10 +216,11 @@ func MergeServiceJSONPatch(dst *models.Service, raw map[string]json.RawMessage) 
 				dst.Behavior = nil
 				break
 			}
-			if !json.Valid(b) {
+			behavior, err := models.ParseServiceBehaviorJSON(b)
+			if err != nil {
 				return fmt.Errorf("behavior: invalid json")
 			}
-			dst.Behavior = append(json.RawMessage(nil), b...)
+			dst.Behavior = behavior
 		default:
 			// Ignore unknown keys so generated clients can add read-only metadata without breaking updates.
 			continue

@@ -132,10 +132,146 @@ export interface ModelsUnitOperationsPublic {
   phase?: string;
 }
 
-/**
- * Behavior is optional portable station flow configuration. It complements, but never replaces, identification mode.
- */
-export type ModelsServiceBehavior = { [key: string]: unknown };
+export type ModelsServiceBehaviorConditionCombinator = typeof ModelsServiceBehaviorConditionCombinator[keyof typeof ModelsServiceBehaviorConditionCombinator];
+
+
+export const ModelsServiceBehaviorConditionCombinator = {
+  and: 'and',
+  or: 'or',
+} as const;
+
+export type ModelsServiceBehaviorConditionField = typeof ModelsServiceBehaviorConditionField[keyof typeof ModelsServiceBehaviorConditionField];
+
+
+export const ModelsServiceBehaviorConditionField = {
+  identityisAuthenticated: 'identity.isAuthenticated',
+  identityisEmployee: 'identity.isEmployee',
+  identitygroups: 'identity.groups',
+  livequeueLength: 'live.queueLength',
+  liveisOpen: 'live.isOpen',
+  liveisConnected: 'live.isConnected',
+  sessionselectedServiceId: 'session.selectedServiceId',
+} as const;
+
+export type ModelsServiceBehaviorConditionKind = typeof ModelsServiceBehaviorConditionKind[keyof typeof ModelsServiceBehaviorConditionKind];
+
+
+export const ModelsServiceBehaviorConditionKind = {
+  rule: 'rule',
+  group: 'group',
+} as const;
+
+export type ModelsServiceBehaviorConditionOperator = typeof ModelsServiceBehaviorConditionOperator[keyof typeof ModelsServiceBehaviorConditionOperator];
+
+
+export const ModelsServiceBehaviorConditionOperator = {
+  eq: 'eq',
+  ne: 'ne',
+  gt: 'gt',
+  gte: 'gte',
+  lt: 'lt',
+  lte: 'lte',
+  contains: 'contains',
+  'not-contains': 'not-contains',
+  'is-true': 'is-true',
+  'is-false': 'is-false',
+} as const;
+
+export interface ModelsServiceBehaviorCondition {
+  children?: ModelsServiceBehaviorCondition[];
+  combinator?: ModelsServiceBehaviorConditionCombinator;
+  field?: ModelsServiceBehaviorConditionField;
+  kind: ModelsServiceBehaviorConditionKind;
+  operator?: ModelsServiceBehaviorConditionOperator;
+  value?: unknown;
+}
+
+export type ModelsServiceBehaviorAccessPolicyWhenFalse = typeof ModelsServiceBehaviorAccessPolicyWhenFalse[keyof typeof ModelsServiceBehaviorAccessPolicyWhenFalse];
+
+
+export const ModelsServiceBehaviorAccessPolicyWhenFalse = {
+  hide: 'hide',
+  lock: 'lock',
+} as const;
+
+export interface ModelsServiceBehaviorAccessPolicy {
+  when: ModelsServiceBehaviorCondition;
+  whenFalse: ModelsServiceBehaviorAccessPolicyWhenFalse;
+}
+
+export interface ModelsServiceBehaviorLocalizedText {[key: string]: string}
+
+export interface ModelsServiceBehaviorSelectOption {
+  key: string;
+  label: ModelsServiceBehaviorLocalizedText;
+}
+
+export type ModelsServiceBehaviorFieldType = typeof ModelsServiceBehaviorFieldType[keyof typeof ModelsServiceBehaviorFieldType];
+
+
+export const ModelsServiceBehaviorFieldType = {
+  text: 'text',
+  number: 'number',
+  phone: 'phone',
+  checkbox: 'checkbox',
+  select: 'select',
+} as const;
+
+export interface ModelsServiceBehaviorField {
+  key: string;
+  label: ModelsServiceBehaviorLocalizedText;
+  options?: ModelsServiceBehaviorSelectOption[];
+  required: boolean;
+  type: ModelsServiceBehaviorFieldType;
+}
+
+export interface ModelsServiceBehaviorInformation {
+  body: ModelsServiceBehaviorLocalizedText;
+  requireAcknowledgement?: boolean;
+}
+
+export type ModelsServiceBehaviorRouteMode = typeof ModelsServiceBehaviorRouteMode[keyof typeof ModelsServiceBehaviorRouteMode];
+
+
+export const ModelsServiceBehaviorRouteMode = {
+  auto: 'auto',
+  'page-slot': 'page-slot',
+} as const;
+
+export type ModelsServiceBehaviorRouteSlot = typeof ModelsServiceBehaviorRouteSlot[keyof typeof ModelsServiceBehaviorRouteSlot];
+
+
+export const ModelsServiceBehaviorRouteSlot = {
+  'service-info': 'service-info',
+  'service-form': 'service-form',
+  identity: 'identity',
+  confirmation: 'confirmation',
+} as const;
+
+export interface ModelsServiceBehaviorRoute {
+  mode: ModelsServiceBehaviorRouteMode;
+  slot?: ModelsServiceBehaviorRouteSlot;
+}
+
+export type ModelsServiceBehaviorVersion = typeof ModelsServiceBehaviorVersion[keyof typeof ModelsServiceBehaviorVersion];
+
+
+export const ModelsServiceBehaviorVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export interface ModelsServiceBehavior {
+  access?: ModelsServiceBehaviorAccessPolicy;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  dataRetentionDays?: number;
+  fields?: ModelsServiceBehaviorField[];
+  information?: ModelsServiceBehaviorInformation;
+  route?: ModelsServiceBehaviorRoute;
+  version: ModelsServiceBehaviorVersion;
+}
 
 /**
  * KioskDocumentSettings: JSON, e.g. { "retentionDays": 1–30 } for identificationMode=document.
@@ -1134,6 +1270,73 @@ export interface HandlersSaasVendorResponse {
   counterparty?: HandlersSaasVendorResponseCounterparty;
   name?: string;
   paymentAccounts?: HandlersSaasVendorResponsePaymentAccountsItem[];
+}
+
+/**
+ * @nullable
+ */
+export type HandlersServiceUpdateRequestKioskDocumentSettings = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type HandlersServiceUpdateRequestKioskIdentificationConfig = { [key: string]: unknown } | null;
+
+export interface HandlersServiceUpdateRequest {
+  /** @nullable */
+  backgroundColor?: string | null;
+  behavior?: ModelsServiceBehavior | null;
+  /** @nullable */
+  calendarSlotKey?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  descriptionEn?: string | null;
+  /** @nullable */
+  descriptionRu?: string | null;
+  /** @nullable */
+  duration?: number | null;
+  /** @nullable */
+  gridCol?: number | null;
+  /** @nullable */
+  gridColSpan?: number | null;
+  /** @nullable */
+  gridRow?: number | null;
+  /** @nullable */
+  gridRowSpan?: number | null;
+  /** @nullable */
+  iconKey?: string | null;
+  identificationMode?: string;
+  /** @nullable */
+  imageUrl?: string | null;
+  isLeaf?: boolean;
+  /** @nullable */
+  kioskDocumentSettings?: HandlersServiceUpdateRequestKioskDocumentSettings;
+  /** @nullable */
+  kioskIdentificationConfig?: HandlersServiceUpdateRequestKioskIdentificationConfig;
+  /** @nullable */
+  maxServiceTime?: number | null;
+  /** @nullable */
+  maxWaitingTime?: number | null;
+  name?: string;
+  /** @nullable */
+  nameEn?: string | null;
+  /** @nullable */
+  nameRu?: string | null;
+  /** @nullable */
+  numberSequence?: string | null;
+  offerIdentification?: boolean;
+  /** @nullable */
+  parentId?: string | null;
+  prebook?: boolean;
+  /** @nullable */
+  prefix?: string | null;
+  /** @nullable */
+  restrictedServiceZoneId?: string | null;
+  sortOrder?: number;
+  /** @nullable */
+  textColor?: string | null;
+  unitId?: string;
 }
 
 /**
@@ -3135,6 +3338,11 @@ export type createServiceResponse409 = {
   status: 409
 }
 
+export type createServiceResponse413 = {
+  data: string
+  status: 413
+}
+
 export type createServiceResponse500 = {
   data: string
   status: 500
@@ -3143,7 +3351,7 @@ export type createServiceResponse500 = {
 export type createServiceResponseSuccess = (createServiceResponse201) & {
   headers: Headers;
 };
-export type createServiceResponseError = (createServiceResponse400 | createServiceResponse401 | createServiceResponse402 | createServiceResponse403 | createServiceResponse409 | createServiceResponse500) & {
+export type createServiceResponseError = (createServiceResponse400 | createServiceResponse401 | createServiceResponse402 | createServiceResponse403 | createServiceResponse409 | createServiceResponse413 | createServiceResponse500) & {
   headers: Headers;
 };
 
@@ -3452,6 +3660,11 @@ export type putServicesIdResponse409 = {
   status: 409
 }
 
+export type putServicesIdResponse413 = {
+  data: string
+  status: 413
+}
+
 export type putServicesIdResponse500 = {
   data: string
   status: 500
@@ -3460,7 +3673,7 @@ export type putServicesIdResponse500 = {
 export type putServicesIdResponseSuccess = (putServicesIdResponse200) & {
   headers: Headers;
 };
-export type putServicesIdResponseError = (putServicesIdResponse400 | putServicesIdResponse404 | putServicesIdResponse409 | putServicesIdResponse500) & {
+export type putServicesIdResponseError = (putServicesIdResponse400 | putServicesIdResponse404 | putServicesIdResponse409 | putServicesIdResponse413 | putServicesIdResponse500) & {
   headers: Headers;
 };
 
@@ -3475,7 +3688,7 @@ export const getPutServicesIdUrl = (id: string,) => {
 }
 
 export const putServicesId = async (id: string,
-    modelsService: ModelsService, options?: RequestInit): Promise<putServicesIdResponse> => {
+    handlersServiceUpdateRequest: HandlersServiceUpdateRequest, options?: RequestInit): Promise<putServicesIdResponse> => {
 
   return orvalMutator<putServicesIdResponse>(getPutServicesIdUrl(id),
   {
@@ -3483,7 +3696,7 @@ export const putServicesId = async (id: string,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      modelsService,)
+      handlersServiceUpdateRequest,)
   }
 );}
 
@@ -3491,8 +3704,8 @@ export const putServicesId = async (id: string,
 
 
 export const getPutServicesIdMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putServicesId>>, TError,{id: string;data: ModelsService}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof putServicesId>>, TError,{id: string;data: ModelsService}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putServicesId>>, TError,{id: string;data: HandlersServiceUpdateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof putServicesId>>, TError,{id: string;data: HandlersServiceUpdateRequest}, TContext> => {
 
 const mutationKey = ['putServicesId'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -3504,7 +3717,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putServicesId>>, {id: string;data: ModelsService}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putServicesId>>, {id: string;data: HandlersServiceUpdateRequest}> = (props) => {
           const {id,data} = props ?? {};
 
           return  putServicesId(id,data,requestOptions)
@@ -3518,18 +3731,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PutServicesIdMutationResult = NonNullable<Awaited<ReturnType<typeof putServicesId>>>
-    export type PutServicesIdMutationBody = ModelsService
+    export type PutServicesIdMutationBody = HandlersServiceUpdateRequest
     export type PutServicesIdMutationError = string
 
     /**
  * @summary Update a service
  */
 export const usePutServicesId = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putServicesId>>, TError,{id: string;data: ModelsService}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putServicesId>>, TError,{id: string;data: HandlersServiceUpdateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof putServicesId>>,
         TError,
-        {id: string;data: ModelsService},
+        {id: string;data: HandlersServiceUpdateRequest},
         TContext
       > => {
       return useMutation(getPutServicesIdMutationOptions(options), queryClient);

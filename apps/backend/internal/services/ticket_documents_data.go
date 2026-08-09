@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/phoneutil"
 )
 
 const (
@@ -59,11 +61,12 @@ func ResolveDocumentsDataForNewTicket(service *models.Service, in *json.RawMessa
 	if len(trim) > maxTicketDocumentsDataBytes {
 		return nil, nil, fmt.Errorf("%w: max %d bytes", ErrDocumentsDataPayloadTooLarge, maxTicketDocumentsDataBytes)
 	}
-	var m map[string]json.RawMessage
-	if err := json.Unmarshal(trim, &m); err != nil || m == nil {
+	requestData := json.RawMessage(trim)
+	m, behaviorForm, validObject := classifyServiceBehaviorFormDocumentsData(service, &requestData)
+	if !validObject {
 		return nil, nil, ErrDocumentsDataInvalid
 	}
-	if isServiceBehaviorFormDocumentsData(service, m) {
+	if behaviorForm {
 		return resolveServiceBehaviorFormDocumentsData(service, m)
 	}
 	mode := service.IdentificationMode
@@ -106,26 +109,41 @@ func ResolveDocumentsDataForNewTicket(service *models.Service, in *json.RawMessa
 // allow behavior fields with employee identity while preserving the legacy
 // document/custom identity conflict rule.
 func IsServiceBehaviorFormDocumentsData(service *models.Service, in *json.RawMessage) bool {
-	if in == nil || len(*in) == 0 {
-		return false
-	}
-	trimmed := bytes.TrimSpace(*in)
-	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
-		return false
-	}
-	var object map[string]json.RawMessage
-	if err := json.Unmarshal(trimmed, &object); err != nil || object == nil {
-		return false
-	}
-	return isServiceBehaviorFormDocumentsData(service, object)
+	_, behaviorForm, validObject := classifyServiceBehaviorFormDocumentsData(service, in)
+	return validObject && behaviorForm
 }
 
-func isServiceBehaviorFormDocumentsData(service *models.Service, data map[string]json.RawMessage) bool {
-	if service == nil || len(bytes.TrimSpace(service.Behavior)) == 0 || bytes.Equal(bytes.TrimSpace(service.Behavior), []byte("null")) {
+// classifyServiceBehaviorFormDocumentsData is the only behavior-form classifier.
+// It checks the complete documentsData size before parsing and returns the parsed
+// object so resolver and employee-identity paths share the exact same decision.
+func classifyServiceBehaviorFormDocumentsData(service *models.Service, in *json.RawMessage) (map[string]json.RawMessage, bool, bool) {
+	if in == nil || len(*in) == 0 {
+		return nil, false, false
+	}
+	trimmed := bytes.TrimSpace(*in)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) || len(trimmed) > maxTicketDocumentsDataBytes {
+		return nil, false, false
+	}
+	var data map[string]json.RawMessage
+	if err := json.Unmarshal(trimmed, &data); err != nil || data == nil {
+		return nil, false, false
+	}
+	return data, isExactServiceBehaviorFormDocumentsData(service, data), true
+}
+
+func isExactServiceBehaviorFormDocumentsData(service *models.Service, data map[string]json.RawMessage) bool {
+	if service == nil || models.CanonicalServiceBehavior(service.Behavior) == nil {
 		return false
 	}
-	_, hasForm := data["form"]
-	return hasForm
+	if len(data) != 1 {
+		return false
+	}
+	form, hasForm := data["form"]
+	if !hasForm {
+		return false
+	}
+	_, validObject := serviceBehaviorObject(form, nil)
+	return validObject
 }
 
 type serviceBehaviorFormField struct {
@@ -148,15 +166,18 @@ func resolveServiceBehaviorFormDocumentsData(service *models.Service, data map[s
 		return nil, nil, ErrServiceBehaviorFormInvalid
 	}
 
-	fields, retentionDays, err := parseServiceBehaviorFormDefinition(service.Behavior)
+	fields, retentionDays, err := parseServiceBehaviorFormDefinition(service.Behavior.RawJSON())
 	if err != nil {
 		return nil, nil, err
 	}
+	normalized := make(map[string]json.RawMessage, len(values))
 	for key, value := range values {
 		field, declared := fields[key]
-		if !declared || !validateServiceBehaviorFormValue(value, field) {
+		normalizedValue, valid := normalizeServiceBehaviorFormValue(value, field)
+		if !declared || !valid {
 			return nil, nil, ErrServiceBehaviorFormInvalid
 		}
+		normalized[key] = normalizedValue
 	}
 	for key, field := range fields {
 		if field.required {
@@ -166,7 +187,11 @@ func resolveServiceBehaviorFormDocumentsData(service *models.Service, data map[s
 		}
 	}
 
-	out, err := json.Marshal(data)
+	normalizedForm, err := json.Marshal(normalized)
+	if err != nil {
+		return nil, nil, err
+	}
+	out, err := json.Marshal(map[string]json.RawMessage{"form": normalizedForm})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -208,11 +233,9 @@ func parseServiceBehaviorFormDefinition(raw json.RawMessage) (map[string]service
 				definition.selectValues = make(map[string]struct{})
 				options, _ := serviceBehaviorArray(field["options"])
 				for _, option := range options {
-					localized, _ := serviceBehaviorObject(option, nil)
-					for _, rawText := range localized {
-						text, _ := serviceBehaviorString(rawText)
-						definition.selectValues[text] = struct{}{}
-					}
+					optionObject, _ := serviceBehaviorObject(option, nil)
+					optionKey, _ := serviceBehaviorString(optionObject["key"])
+					definition.selectValues[optionKey] = struct{}{}
 				}
 			}
 			fields[key] = definition
@@ -230,25 +253,55 @@ func parseServiceBehaviorFormDefinition(raw json.RawMessage) (map[string]service
 	return fields, retentionDays, nil
 }
 
-func validateServiceBehaviorFormValue(raw json.RawMessage, field serviceBehaviorFormField) bool {
+func normalizeServiceBehaviorFormValue(raw json.RawMessage, field serviceBehaviorFormField) (json.RawMessage, bool) {
 	switch field.fieldType {
-	case "text", "phone":
-		_, valid := serviceBehaviorString(raw)
-		return valid
+	case "text":
+		value, valid := serviceBehaviorString(raw)
+		if !valid || (field.required && strings.TrimSpace(value) == "") {
+			return nil, false
+		}
+		return append(json.RawMessage(nil), bytes.TrimSpace(raw)...), true
+	case "phone":
+		value, valid := serviceBehaviorString(raw)
+		if !valid {
+			return nil, false
+		}
+		if strings.TrimSpace(value) == "" {
+			if field.required {
+				return nil, false
+			}
+			return append(json.RawMessage(nil), bytes.TrimSpace(raw)...), true
+		}
+		normalized, err := phoneutil.ParseAndNormalize(value, phoneutil.DefaultRegion())
+		if err != nil {
+			return nil, false
+		}
+		out, err := json.Marshal(normalized)
+		return out, err == nil
 	case "number":
-		return serviceBehaviorNumber(raw)
+		if !serviceBehaviorNumber(raw) {
+			return nil, false
+		}
+		return append(json.RawMessage(nil), bytes.TrimSpace(raw)...), true
 	case "checkbox":
-		_, valid := serviceBehaviorBool(raw)
-		return valid
+		value, valid := serviceBehaviorBool(raw)
+		if !valid {
+			return nil, false
+		}
+		out, err := json.Marshal(value)
+		return out, err == nil
 	case "select":
 		value, valid := serviceBehaviorString(raw)
 		if !valid {
-			return false
+			return nil, false
 		}
 		_, valid = field.selectValues[value]
-		return valid
+		if !valid {
+			return nil, false
+		}
+		return append(json.RawMessage(nil), bytes.TrimSpace(raw)...), true
 	default:
-		return false
+		return nil, false
 	}
 }
 

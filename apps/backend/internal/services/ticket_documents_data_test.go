@@ -25,9 +25,13 @@ func svcCustom(kiosk string) *models.Service {
 }
 
 func svcBehavior(mode, behavior string) *models.Service {
+	parsed, err := models.ParseServiceBehaviorJSON(json.RawMessage(behavior))
+	if err != nil {
+		panic(err)
+	}
 	return &models.Service{
 		IdentificationMode: mode,
-		Behavior:           json.RawMessage(behavior),
+		Behavior:           parsed,
 	}
 }
 
@@ -197,16 +201,42 @@ func TestResolveDocumentsDataForNewTicketBehaviorForm(t *testing.T) {
 	behavior := `{
   "version": 1,
   "fields": [
-    {"key": "room", "label": {"en": "Room"}, "type": "text", "required": true},
-    {"key": "floor", "label": {"en": "Floor"}, "type": "number", "required": false},
-    {"key": "arrival", "label": {"en": "Arrival"}, "type": "checkbox", "required": true}
+    {"key": "required_text", "label": {"en": "Required text"}, "type": "text", "required": true},
+    {"key": "optional_text", "label": {"en": "Optional text"}, "type": "text", "required": false},
+    {"key": "required_phone", "label": {"en": "Required phone"}, "type": "phone", "required": true},
+    {"key": "optional_phone", "label": {"en": "Optional phone"}, "type": "phone", "required": false},
+    {"key": "required_number", "label": {"en": "Required number"}, "type": "number", "required": true},
+    {"key": "optional_number", "label": {"en": "Optional number"}, "type": "number", "required": false},
+    {"key": "reason", "label": {"en": "Reason"}, "type": "select", "required": true, "options": [{"key":"consultation","label":{"en":"Consultation"}},{"key":"pickup","label":{"en":"Pickup"}}]},
+    {"key": "optional_reason", "label": {"en": "Optional reason"}, "type": "select", "required": false, "options": [{"key":"consultation","label":{"en":"Consultation"}}]},
+    {"key": "arrival", "label": {"en": "Arrival"}, "type": "checkbox", "required": true},
+    {"key": "optional_checkbox", "label": {"en": "Optional checkbox"}, "type": "checkbox", "required": false}
   ],
   "dataRetentionDays": 2
 }`
+	form := func(omit string, values map[string]any) json.RawMessage {
+		t.Helper()
+		base := map[string]any{
+			"required_text":   "A-101",
+			"required_phone":  "+79001234567",
+			"required_number": 4,
+			"reason":          "consultation",
+			"arrival":         false,
+		}
+		delete(base, omit)
+		for key, value := range values {
+			base[key] = value
+		}
+		out, err := json.Marshal(map[string]any{"form": base})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
 
 	t.Run("accepts namespaced form with employee identity", func(t *testing.T) {
 		service := svcBehavior(models.IdentificationModeBadge, behavior)
-		in := json.RawMessage(`{"form":{"room":"A-101","floor":4,"arrival":true}}`)
+		in := form("", nil)
 		if !IsServiceBehaviorFormDocumentsData(service, &in) {
 			t.Fatal("employee ticket path must allow a declared behavior form")
 		}
@@ -227,7 +257,7 @@ func TestResolveDocumentsDataForNewTicketBehaviorForm(t *testing.T) {
 	})
 
 	t.Run("uses behavior retention expiry", func(t *testing.T) {
-		in := json.RawMessage(`{"form":{"room":"A-101","arrival":true}}`)
+		in := form("", nil)
 		_, exp, err := ResolveDocumentsDataForNewTicket(
 			svcBehavior(models.IdentificationModeNone, behavior),
 			&in,
@@ -248,7 +278,25 @@ func TestResolveDocumentsDataForNewTicketBehaviorForm(t *testing.T) {
 	t.Run("preserves stricter document retention", func(t *testing.T) {
 		service := svcBehavior(models.IdentificationModeDocument, behavior)
 		service.KioskDocumentSettings = json.RawMessage(`{"retentionDays":1}`)
-		in := json.RawMessage(`{"form":{"room":"A-101","arrival":true}}`)
+		in := form("", nil)
+		_, exp, err := ResolveDocumentsDataForNewTicket(service, &in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if exp == nil {
+			t.Fatal("expected expiry")
+		}
+		before := time.Now().UTC().AddDate(0, 0, 0)
+		after := time.Now().UTC().AddDate(0, 0, 2)
+		if exp.Before(before) || exp.After(after) {
+			t.Fatalf("exp ~1d, got %v", exp)
+		}
+	})
+
+	t.Run("preserves stricter sensitive custom retention", func(t *testing.T) {
+		service := svcBehavior(models.IdentificationModeCustom, behavior)
+		service.KioskIdentificationConfig = json.RawMessage(`{"sensitive":true,"retentionDays":1}`)
+		in := form("", nil)
 		_, exp, err := ResolveDocumentsDataForNewTicket(service, &in)
 		if err != nil {
 			t.Fatal(err)
@@ -264,7 +312,7 @@ func TestResolveDocumentsDataForNewTicketBehaviorForm(t *testing.T) {
 	})
 
 	t.Run("rejects undeclared form key", func(t *testing.T) {
-		in := json.RawMessage(`{"form":{"room":"A-101","arrival":true,"secret":"x"}}`)
+		in := form("", map[string]any{"secret": "x"})
 		_, _, err := ResolveDocumentsDataForNewTicket(
 			svcBehavior(models.IdentificationModeNone, behavior),
 			&in,
@@ -274,25 +322,133 @@ func TestResolveDocumentsDataForNewTicketBehaviorForm(t *testing.T) {
 		}
 	})
 
-	t.Run("rejects wrong field value type", func(t *testing.T) {
-		in := json.RawMessage(`{"form":{"room":101,"arrival":true}}`)
-		_, _, err := ResolveDocumentsDataForNewTicket(
-			svcBehavior(models.IdentificationModeNone, behavior),
-			&in,
-		)
-		if !errors.Is(err, ErrServiceBehaviorFormInvalid) {
-			t.Fatalf("err = %v, want %v", err, ErrServiceBehaviorFormInvalid)
-		}
-	})
+	for _, tt := range []struct {
+		name  string
+		omit  string
+		value map[string]any
+		valid bool
+	}{
+		{name: "required text omitted", omit: "required_text"},
+		{name: "required text null", value: map[string]any{"required_text": nil}},
+		{name: "required text whitespace", value: map[string]any{"required_text": "  "}},
+		{name: "required text valid", valid: true},
+		{name: "optional text omitted", omit: "optional_text", valid: true},
+		{name: "optional text null", value: map[string]any{"optional_text": nil}},
+		{name: "optional text empty", value: map[string]any{"optional_text": ""}, valid: true},
+		{name: "optional text wrong type", value: map[string]any{"optional_text": 1}},
+		{name: "required phone omitted", omit: "required_phone"},
+		{name: "required phone null", value: map[string]any{"required_phone": nil}},
+		{name: "required phone empty", value: map[string]any{"required_phone": ""}},
+		{name: "required phone invalid", value: map[string]any{"required_phone": "not-a-phone"}},
+		{name: "required phone valid", valid: true},
+		{name: "optional phone omitted", omit: "optional_phone", valid: true},
+		{name: "optional phone null", value: map[string]any{"optional_phone": nil}},
+		{name: "optional phone empty", value: map[string]any{"optional_phone": ""}, valid: true},
+		{name: "optional phone invalid", value: map[string]any{"optional_phone": "not-a-phone"}},
+		{name: "optional phone valid", value: map[string]any{"optional_phone": "8 900 123 45 67"}, valid: true},
+		{name: "required number omitted", omit: "required_number"},
+		{name: "required number null", value: map[string]any{"required_number": nil}},
+		{name: "required number empty", value: map[string]any{"required_number": ""}},
+		{name: "required number valid", value: map[string]any{"required_number": 1.0}, valid: true},
+		{name: "optional number omitted", omit: "optional_number", valid: true},
+		{name: "optional number null", value: map[string]any{"optional_number": nil}},
+		{name: "optional number wrong type", value: map[string]any{"optional_number": "1"}},
+		{name: "optional number valid", value: map[string]any{"optional_number": 1.5}, valid: true},
+		{name: "required select omitted", omit: "reason"},
+		{name: "required select null", value: map[string]any{"reason": nil}},
+		{name: "required select empty", value: map[string]any{"reason": ""}},
+		{name: "required select localized label", value: map[string]any{"reason": "Consultation"}},
+		{name: "required select stable key", value: map[string]any{"reason": "pickup"}, valid: true},
+		{name: "optional select omitted", omit: "optional_reason", valid: true},
+		{name: "optional select null", value: map[string]any{"optional_reason": nil}},
+		{name: "optional select invalid", value: map[string]any{"optional_reason": "pickup"}},
+		{name: "optional select stable key", value: map[string]any{"optional_reason": "consultation"}, valid: true},
+		{name: "required checkbox omitted", omit: "arrival"},
+		{name: "required checkbox null", value: map[string]any{"arrival": nil}},
+		{name: "required checkbox wrong type", value: map[string]any{"arrival": "false"}},
+		{name: "required checkbox false", value: map[string]any{"arrival": false}, valid: true},
+		{name: "optional checkbox omitted", omit: "optional_checkbox", valid: true},
+		{name: "optional checkbox null", value: map[string]any{"optional_checkbox": nil}},
+		{name: "optional checkbox wrong type", value: map[string]any{"optional_checkbox": "false"}},
+		{name: "optional checkbox false", value: map[string]any{"optional_checkbox": false}, valid: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			in := form(tt.omit, tt.value)
+			_, _, err := ResolveDocumentsDataForNewTicket(svcBehavior(models.IdentificationModeNone, behavior), &in)
+			if tt.valid && err != nil {
+				t.Fatalf("valid behavior form rejected: %v", err)
+			}
+			if !tt.valid && !errors.Is(err, ErrServiceBehaviorFormInvalid) {
+				t.Fatalf("invalid behavior form error = %v", err)
+			}
+		})
+	}
 
-	t.Run("keeps legacy flat document payloads compatible", func(t *testing.T) {
-		in := json.RawMessage(`{"idDocumentOcr":"MRZ"}`)
-		data, exp, err := ResolveDocumentsDataForNewTicket(svcDoc(`{"retentionDays":3}`), &in)
+	t.Run("normalizes phone values before persistence", func(t *testing.T) {
+		in := form("", map[string]any{"optional_phone": "8 900 123 45 67"})
+		data, _, err := ResolveDocumentsDataForNewTicket(svcBehavior(models.IdentificationModeNone, behavior), &in)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(data), "idDocumentOcr") || exp == nil {
-			t.Fatalf("legacy data = %s, expiry = %v", data, exp)
+		var stored struct {
+			Form map[string]any `json:"form"`
+		}
+		if err := json.Unmarshal(data, &stored); err != nil {
+			t.Fatal(err)
+		}
+		if stored.Form["optional_phone"] != "+79001234567" {
+			t.Fatalf("stored normalized phone = %v", stored.Form["optional_phone"])
+		}
+	})
+
+	t.Run("recognizes only an exact non-null object form namespace", func(t *testing.T) {
+		service := svcBehavior(models.IdentificationModeBadge, behavior)
+		for _, tt := range []struct {
+			name string
+			body string
+			want bool
+		}{
+			{name: "exact object", body: `{"form":{"required_text":"A-101","required_phone":"+79001234567","required_number":4,"reason":"consultation","arrival":false}}`, want: true},
+			{name: "scalar form", body: `{"form":"legacy"}`},
+			{name: "null form", body: `{"form":null}`},
+			{name: "multi root form", body: `{"form":{},"idDocumentOcr":"legacy"}`},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				in := json.RawMessage(tt.body)
+				if got := IsServiceBehaviorFormDocumentsData(service, &in); got != tt.want {
+					t.Fatalf("classifier = %v, want %v", got, tt.want)
+				}
+			})
+		}
+	})
+
+	t.Run("keeps legacy document and custom payloads containing form compatible", func(t *testing.T) {
+		for _, service := range []*models.Service{
+			svcDoc(`{"retentionDays":3}`),
+			svcCustom(`{"sensitive":false}`),
+		} {
+			in := json.RawMessage(`{"form":"legacy"}`)
+			data, _, err := ResolveDocumentsDataForNewTicket(service, &in)
+			if err != nil || !strings.Contains(string(data), `"form":"legacy"`) {
+				t.Fatalf("legacy form payload error = %v", err)
+			}
+		}
+	})
+
+	t.Run("keeps the 64 KiB documentsData boundary for exact behavior forms", func(t *testing.T) {
+		minimalBehavior := `{"version":1,"fields":[{"key":"note","label":{"en":"Note"},"type":"text","required":true}],"dataRetentionDays":1}`
+		const prefix = `{"form":{"note":"`
+		const suffix = `"}}`
+		atLimit := json.RawMessage(prefix + strings.Repeat("x", maxTicketDocumentsDataBytes-len(prefix)-len(suffix)) + suffix)
+		if len(atLimit) != maxTicketDocumentsDataBytes {
+			t.Fatalf("at-limit form length = %d", len(atLimit))
+		}
+		if _, _, err := ResolveDocumentsDataForNewTicket(svcBehavior(models.IdentificationModeNone, minimalBehavior), &atLimit); err != nil {
+			t.Fatalf("at-limit form rejected: %v", err)
+		}
+		aboveLimit := append(append(json.RawMessage(nil), atLimit...), 'x')
+		if _, _, err := ResolveDocumentsDataForNewTicket(svcBehavior(models.IdentificationModeNone, minimalBehavior), &aboveLimit); !errors.Is(err, ErrDocumentsDataPayloadTooLarge) {
+			t.Fatalf("above-limit form error = %v", err)
 		}
 	})
 }

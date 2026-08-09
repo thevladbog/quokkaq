@@ -4,14 +4,31 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
+	"math"
 	"regexp"
+	"strconv"
+	"strings"
+)
+
+const (
+	maxServiceBehaviorJSONBytes      = 64 * 1024
+	maxServiceBehaviorFields         = 50
+	maxServiceBehaviorLocalizedItems = 8
+	maxServiceBehaviorSelectOptions  = 50
+	maxServiceBehaviorConditionDepth = 8
+	maxServiceBehaviorConditionNodes = 100
+	maxServiceBehaviorGroupChildren  = 20
 )
 
 // ErrServiceBehaviorInvalid is returned when a service behavior does not match
 // the portable Phase 1 contract. It intentionally carries no submitted data.
 var ErrServiceBehaviorInvalid = errors.New("service behavior is invalid")
 
-var serviceBehaviorFieldKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+var (
+	serviceBehaviorFieldKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+	serviceBehaviorNumberPattern   = regexp.MustCompile(`^(-?)(0|[1-9][0-9]*)(?:\.([0-9]+))?(?:[eE]([+-]?[0-9]+))?$`)
+)
 
 // ValidateServiceBehaviorJSON verifies the portable Service behavior contract.
 // Empty and JSON-null values represent the optional legacy-compatible absence of behavior.
@@ -19,6 +36,9 @@ func ValidateServiceBehaviorJSON(raw json.RawMessage) error {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
 		return nil
+	}
+	if len(trimmed) > maxServiceBehaviorJSONBytes {
+		return ErrServiceBehaviorInvalid
 	}
 
 	behavior, ok := serviceBehaviorObject(trimmed, map[string]struct{}{
@@ -45,7 +65,7 @@ func ValidateServiceBehaviorJSON(raw json.RawMessage) error {
 	if rawFields, exists := behavior["fields"]; exists {
 		var fieldsOK bool
 		fields, fieldsOK = serviceBehaviorArray(rawFields)
-		if !fieldsOK {
+		if !fieldsOK || len(fields) > maxServiceBehaviorFields {
 			return ErrServiceBehaviorInvalid
 		}
 	}
@@ -89,7 +109,7 @@ func validateServiceBehaviorInformation(raw json.RawMessage) bool {
 		return false
 	}
 	body, ok := information["body"]
-	if !ok || !validateServiceBehaviorLocalizedText(body) {
+	if !ok || !validateServiceBehaviorLocalizedText(body, 4000) {
 		return false
 	}
 	if rawAcknowledgement, exists := information["requireAcknowledgement"]; exists {
@@ -116,7 +136,7 @@ func validateServiceBehaviorField(raw json.RawMessage) (string, bool) {
 		return "", false
 	}
 	label, hasLabel := field["label"]
-	if !hasLabel || !validateServiceBehaviorLocalizedText(label) {
+	if !hasLabel || !validateServiceBehaviorLocalizedText(label, 160) {
 		return "", false
 	}
 	if _, valid := serviceBehaviorBool(field["required"]); !valid {
@@ -136,18 +156,40 @@ func validateServiceBehaviorField(raw json.RawMessage) (string, bool) {
 			return "", false
 		}
 		options, valid := serviceBehaviorArray(rawOptions)
-		if !valid || len(options) < 1 || len(options) > 50 {
+		if !valid || len(options) < 1 || len(options) > maxServiceBehaviorSelectOptions {
 			return "", false
 		}
+		seen := make(map[string]struct{}, len(options))
 		for _, option := range options {
-			if !validateServiceBehaviorLocalizedText(option) {
+			optionKey, valid := validateServiceBehaviorSelectOption(option)
+			if !valid {
 				return "", false
 			}
+			if _, duplicate := seen[optionKey]; duplicate {
+				return "", false
+			}
+			seen[optionKey] = struct{}{}
 		}
 		return key, true
 	default:
 		return "", false
 	}
+}
+
+func validateServiceBehaviorSelectOption(raw json.RawMessage) (string, bool) {
+	option, ok := serviceBehaviorObject(raw, map[string]struct{}{
+		"key":   {},
+		"label": {},
+	})
+	if !ok {
+		return "", false
+	}
+	key, valid := serviceBehaviorString(option["key"])
+	if !valid || !serviceBehaviorFieldKeyPattern.MatchString(key) {
+		return "", false
+	}
+	label, hasLabel := option["label"]
+	return key, hasLabel && validateServiceBehaviorLocalizedText(label, 160)
 }
 
 func validateServiceBehaviorRoute(raw json.RawMessage) bool {
@@ -195,10 +237,22 @@ func validateServiceBehaviorAccess(raw json.RawMessage) bool {
 	if !hasWhen || !valid || (whenFalse != "hide" && whenFalse != "lock") {
 		return false
 	}
-	return validateServiceBehaviorCondition(when)
+	budget := &serviceBehaviorConditionBudget{}
+	return validateServiceBehaviorCondition(when, 1, budget)
 }
 
-func validateServiceBehaviorCondition(raw json.RawMessage) bool {
+type serviceBehaviorConditionBudget struct {
+	nodes int
+}
+
+func validateServiceBehaviorCondition(raw json.RawMessage, depth int, budget *serviceBehaviorConditionBudget) bool {
+	if depth > maxServiceBehaviorConditionDepth {
+		return false
+	}
+	budget.nodes++
+	if budget.nodes > maxServiceBehaviorConditionNodes {
+		return false
+	}
 	condition, ok := serviceBehaviorObject(raw, map[string]struct{}{
 		"kind":       {},
 		"field":      {},
@@ -218,7 +272,7 @@ func validateServiceBehaviorCondition(raw json.RawMessage) bool {
 	case "rule":
 		return validateServiceBehaviorConditionRule(condition)
 	case "group":
-		return validateServiceBehaviorConditionGroup(condition)
+		return validateServiceBehaviorConditionGroup(condition, depth, budget)
 	default:
 		return false
 	}
@@ -255,7 +309,7 @@ func validateServiceBehaviorConditionRule(rule map[string]json.RawMessage) bool 
 	}
 }
 
-func validateServiceBehaviorConditionGroup(group map[string]json.RawMessage) bool {
+func validateServiceBehaviorConditionGroup(group map[string]json.RawMessage, depth int, budget *serviceBehaviorConditionBudget) bool {
 	for key := range group {
 		if key != "kind" && key != "combinator" && key != "children" {
 			return false
@@ -266,25 +320,25 @@ func validateServiceBehaviorConditionGroup(group map[string]json.RawMessage) boo
 		return false
 	}
 	children, valid := serviceBehaviorArray(group["children"])
-	if !valid || len(children) == 0 {
+	if !valid || len(children) == 0 || len(children) > maxServiceBehaviorGroupChildren {
 		return false
 	}
 	for _, child := range children {
-		if !validateServiceBehaviorCondition(child) {
+		if !validateServiceBehaviorCondition(child, depth+1, budget) {
 			return false
 		}
 	}
 	return true
 }
 
-func validateServiceBehaviorLocalizedText(raw json.RawMessage) bool {
+func validateServiceBehaviorLocalizedText(raw json.RawMessage, maxValueLength int) bool {
 	localized, ok := serviceBehaviorObject(raw, nil)
-	if !ok || len(localized) == 0 {
+	if !ok || len(localized) == 0 || len(localized) > maxServiceBehaviorLocalizedItems {
 		return false
 	}
 	for locale, rawText := range localized {
 		text, valid := serviceBehaviorString(rawText)
-		if locale == "" || !valid || text == "" {
+		if len(locale) < 1 || len(locale) > 16 || !valid || len(text) < 1 || len(text) > maxValueLength {
 			return false
 		}
 	}
@@ -341,16 +395,73 @@ func serviceBehaviorBool(raw json.RawMessage) (bool, bool) {
 }
 
 func serviceBehaviorInt(raw json.RawMessage) (int, bool) {
-	trimmed := bytes.TrimSpace(raw)
-	var value int
-	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) || json.Unmarshal(trimmed, &value) != nil {
+	number, ok := serviceBehaviorJSONNumber(raw)
+	if !ok {
 		return 0, false
 	}
-	return value, true
+	matches := serviceBehaviorNumberPattern.FindStringSubmatch(number)
+	if matches == nil {
+		return 0, false
+	}
+
+	exponent := 0
+	if matches[4] != "" {
+		parsedExponent, err := strconv.Atoi(matches[4])
+		if err != nil || parsedExponent < -128 || parsedExponent > 128 {
+			return 0, false
+		}
+		exponent = parsedExponent
+	}
+	digits := strings.TrimLeft(matches[2]+matches[3], "0")
+	if digits == "" {
+		return 0, true
+	}
+	scale := len(matches[3]) - exponent
+	if scale > 0 {
+		if scale > len(digits) || strings.TrimRight(digits, "0") != digits[:len(digits)-scale] {
+			return 0, false
+		}
+		digits = digits[:len(digits)-scale]
+	} else if scale < 0 {
+		digits += strings.Repeat("0", -scale)
+	}
+	value, err := strconv.ParseInt(digits, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	if matches[1] == "-" {
+		value = -value
+	}
+	if int64(int(value)) != value {
+		return 0, false
+	}
+	return int(value), true
 }
 
 func serviceBehaviorNumber(raw json.RawMessage) bool {
+	number, ok := serviceBehaviorJSONNumber(raw)
+	if !ok {
+		return false
+	}
+	value, err := strconv.ParseFloat(number, 64)
+	return err == nil && !math.IsInf(value, 0) && !math.IsNaN(value)
+}
+
+func serviceBehaviorJSONNumber(raw json.RawMessage) (string, bool) {
 	trimmed := bytes.TrimSpace(raw)
-	var value float64
-	return len(trimmed) > 0 && !bytes.Equal(trimmed, []byte("null")) && json.Unmarshal(trimmed, &value) == nil
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		return "", false
+	}
+	decoder := json.NewDecoder(bytes.NewReader(trimmed))
+	decoder.UseNumber()
+	var value any
+	if err := decoder.Decode(&value); err != nil {
+		return "", false
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return "", false
+	}
+	number, ok := value.(json.Number)
+	return number.String(), ok
 }

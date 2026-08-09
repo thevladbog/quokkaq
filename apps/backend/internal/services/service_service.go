@@ -99,7 +99,8 @@ func (s *serviceService) CreateService(service *models.Service) error {
 	if err := ValidateServiceKioskFields(service); err != nil {
 		return err
 	}
-	if err := ValidateServiceBehaviorJSON(service.Behavior); err != nil {
+	service.Behavior = models.CanonicalServiceBehavior(service.Behavior)
+	if err := ValidateServiceBehaviorJSON(service.Behavior.RawJSON()); err != nil {
 		return err
 	}
 	service.CalendarSlotKey = normalizeCalendarSlotKeyPtr(service.CalendarSlotKey)
@@ -163,7 +164,8 @@ func (s *serviceService) UpdateService(service *models.Service) error {
 	if err := ValidateServiceKioskFields(service); err != nil {
 		return err
 	}
-	if err := ValidateServiceBehaviorJSON(service.Behavior); err != nil {
+	service.Behavior = models.CanonicalServiceBehavior(service.Behavior)
+	if err := ValidateServiceBehaviorJSON(service.Behavior.RawJSON()); err != nil {
 		return err
 	}
 

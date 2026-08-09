@@ -1140,6 +1140,96 @@ components:
                         type: object
                     type: array
             type: object
+        handlers.ServiceUpdateRequest:
+            properties:
+                backgroundColor:
+                    nullable: true
+                    type: string
+                behavior:
+                    allOf:
+                        - $ref: '#/components/schemas/models.ServiceBehavior'
+                    nullable: true
+                calendarSlotKey:
+                    nullable: true
+                    type: string
+                description:
+                    nullable: true
+                    type: string
+                descriptionEn:
+                    nullable: true
+                    type: string
+                descriptionRu:
+                    nullable: true
+                    type: string
+                duration:
+                    nullable: true
+                    type: integer
+                gridCol:
+                    nullable: true
+                    type: integer
+                gridColSpan:
+                    nullable: true
+                    type: integer
+                gridRow:
+                    nullable: true
+                    type: integer
+                gridRowSpan:
+                    nullable: true
+                    type: integer
+                iconKey:
+                    nullable: true
+                    type: string
+                identificationMode:
+                    type: string
+                imageUrl:
+                    nullable: true
+                    type: string
+                isLeaf:
+                    type: boolean
+                kioskDocumentSettings:
+                    nullable: true
+                    type: object
+                kioskIdentificationConfig:
+                    nullable: true
+                    type: object
+                maxServiceTime:
+                    nullable: true
+                    type: integer
+                maxWaitingTime:
+                    nullable: true
+                    type: integer
+                name:
+                    type: string
+                nameEn:
+                    nullable: true
+                    type: string
+                nameRu:
+                    nullable: true
+                    type: string
+                numberSequence:
+                    nullable: true
+                    type: string
+                offerIdentification:
+                    type: boolean
+                parentId:
+                    nullable: true
+                    type: string
+                prebook:
+                    type: boolean
+                prefix:
+                    nullable: true
+                    type: string
+                restrictedServiceZoneId:
+                    nullable: true
+                    type: string
+                sortOrder:
+                    type: integer
+                textColor:
+                    nullable: true
+                    type: string
+                unitId:
+                    type: string
+            type: object
         handlers.SignupRequest:
             properties:
                 billingPeriod:
@@ -2888,8 +2978,9 @@ components:
                 backgroundColor:
                     type: string
                 behavior:
+                    allOf:
+                        - $ref: '#/components/schemas/models.ServiceBehavior'
                     description: Behavior is optional portable station flow configuration. It complements, but never replaces, identification mode.
-                    type: object
                 calendarSlotKey:
                     description: |-
                         CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).
@@ -2967,6 +3058,151 @@ components:
                     type: string
                 unitId:
                     type: string
+            type: object
+        models.ServiceBehavior:
+            properties:
+                access:
+                    $ref: '#/components/schemas/models.ServiceBehaviorAccessPolicy'
+                dataRetentionDays:
+                    maximum: 30
+                    minimum: 1
+                    type: integer
+                fields:
+                    items:
+                        $ref: '#/components/schemas/models.ServiceBehaviorField'
+                    type: array
+                information:
+                    $ref: '#/components/schemas/models.ServiceBehaviorInformation'
+                route:
+                    $ref: '#/components/schemas/models.ServiceBehaviorRoute'
+                version:
+                    enum:
+                        - 1
+                    type: integer
+            required:
+                - version
+            type: object
+        models.ServiceBehaviorAccessPolicy:
+            properties:
+                when:
+                    $ref: '#/components/schemas/models.ServiceBehaviorCondition'
+                whenFalse:
+                    enum:
+                        - hide
+                        - lock
+                    type: string
+            required:
+                - when
+                - whenFalse
+            type: object
+        models.ServiceBehaviorCondition:
+            properties:
+                children:
+                    items:
+                        $ref: '#/components/schemas/models.ServiceBehaviorCondition'
+                    type: array
+                combinator:
+                    enum:
+                        - and
+                        - or
+                    type: string
+                field:
+                    enum:
+                        - identity.isAuthenticated
+                        - identity.isEmployee
+                        - identity.groups
+                        - live.queueLength
+                        - live.isOpen
+                        - live.isConnected
+                        - session.selectedServiceId
+                    type: string
+                kind:
+                    enum:
+                        - rule
+                        - group
+                    type: string
+                operator:
+                    enum:
+                        - eq
+                        - ne
+                        - gt
+                        - gte
+                        - lt
+                        - lte
+                        - contains
+                        - not-contains
+                        - is-true
+                        - is-false
+                    type: string
+                value: {}
+            required:
+                - kind
+            type: object
+        models.ServiceBehaviorField:
+            properties:
+                key:
+                    type: string
+                label:
+                    $ref: '#/components/schemas/models.ServiceBehaviorLocalizedText'
+                options:
+                    items:
+                        $ref: '#/components/schemas/models.ServiceBehaviorSelectOption'
+                    type: array
+                required:
+                    type: boolean
+                type:
+                    enum:
+                        - text
+                        - number
+                        - phone
+                        - checkbox
+                        - select
+                    type: string
+            required:
+                - key
+                - label
+                - required
+                - type
+            type: object
+        models.ServiceBehaviorInformation:
+            properties:
+                body:
+                    $ref: '#/components/schemas/models.ServiceBehaviorLocalizedText'
+                requireAcknowledgement:
+                    type: boolean
+            required:
+                - body
+            type: object
+        models.ServiceBehaviorLocalizedText:
+            additionalProperties:
+                type: string
+            type: object
+        models.ServiceBehaviorRoute:
+            properties:
+                mode:
+                    enum:
+                        - auto
+                        - page-slot
+                    type: string
+                slot:
+                    enum:
+                        - service-info
+                        - service-form
+                        - identity
+                        - confirmation
+                    type: string
+            required:
+                - mode
+            type: object
+        models.ServiceBehaviorSelectOption:
+            properties:
+                key:
+                    type: string
+                label:
+                    $ref: '#/components/schemas/models.ServiceBehaviorLocalizedText'
+            required:
+                - key
+                - label
             type: object
         models.ServiceSlot:
             properties:
@@ -10524,6 +10760,12 @@ paths:
                             schema:
                                 type: string
                     description: Conflict (duplicate calendar slot key for unit)
+                "413":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Request body too large
                 "500":
                     content:
                         application/json:
@@ -10595,7 +10837,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/models.Service'
+                            $ref: '#/components/schemas/handlers.ServiceUpdateRequest'
                 description: Sparse or full service JSON; only sent fields are applied (grid-only updates no longer clear name/prefix).
                 required: true
                 x-originalParamName: service
@@ -10624,6 +10866,12 @@ paths:
                             schema:
                                 type: string
                     description: Conflict (e.g. unit change not allowed)
+                "413":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Request body too large
                 "500":
                     content:
                         application/json:

@@ -37,8 +37,8 @@ type Service struct {
 	// KioskIdentificationConfig: JSON (capture, labels, api key field, showInQueuePreview, sensitive+retention for identificationMode=custom). Validated in service layer.
 	KioskIdentificationConfig json.RawMessage `gorm:"type:jsonb;column:kiosk_identification_config" json:"kioskIdentificationConfig,omitempty" swaggertype:"object"`
 	// Behavior is optional portable station flow configuration. It complements, but never replaces, identification mode.
-	Behavior json.RawMessage `gorm:"type:jsonb;column:behavior" json:"behavior,omitempty" swaggertype:"object"`
-	IsLeaf   bool            `gorm:"default:false" json:"isLeaf"`
+	Behavior *ServiceBehavior `gorm:"type:jsonb;column:behavior" json:"behavior,omitempty"`
+	IsLeaf   bool             `gorm:"default:false" json:"isLeaf"`
 	// RestrictedServiceZoneID: when set, this leaf service is only offered in that service_zone's waiting pool (child of UnitID subdivision).
 	RestrictedServiceZoneID *string `json:"restrictedServiceZoneId,omitempty" gorm:"column:restricted_service_zone_id"`
 	// Display order within the unit (kiosk and lists). Lower = earlier. Independent of `units.sort_order`.

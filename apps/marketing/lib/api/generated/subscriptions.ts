@@ -113,6 +113,147 @@ export interface ModelsUnitOperationsPublic {
   phase?: string;
 }
 
+export type ModelsServiceBehaviorConditionCombinator = typeof ModelsServiceBehaviorConditionCombinator[keyof typeof ModelsServiceBehaviorConditionCombinator];
+
+
+export const ModelsServiceBehaviorConditionCombinator = {
+  and: 'and',
+  or: 'or',
+} as const;
+
+export type ModelsServiceBehaviorConditionField = typeof ModelsServiceBehaviorConditionField[keyof typeof ModelsServiceBehaviorConditionField];
+
+
+export const ModelsServiceBehaviorConditionField = {
+  identityisAuthenticated: 'identity.isAuthenticated',
+  identityisEmployee: 'identity.isEmployee',
+  identitygroups: 'identity.groups',
+  livequeueLength: 'live.queueLength',
+  liveisOpen: 'live.isOpen',
+  liveisConnected: 'live.isConnected',
+  sessionselectedServiceId: 'session.selectedServiceId',
+} as const;
+
+export type ModelsServiceBehaviorConditionKind = typeof ModelsServiceBehaviorConditionKind[keyof typeof ModelsServiceBehaviorConditionKind];
+
+
+export const ModelsServiceBehaviorConditionKind = {
+  rule: 'rule',
+  group: 'group',
+} as const;
+
+export type ModelsServiceBehaviorConditionOperator = typeof ModelsServiceBehaviorConditionOperator[keyof typeof ModelsServiceBehaviorConditionOperator];
+
+
+export const ModelsServiceBehaviorConditionOperator = {
+  eq: 'eq',
+  ne: 'ne',
+  gt: 'gt',
+  gte: 'gte',
+  lt: 'lt',
+  lte: 'lte',
+  contains: 'contains',
+  'not-contains': 'not-contains',
+  'is-true': 'is-true',
+  'is-false': 'is-false',
+} as const;
+
+export interface ModelsServiceBehaviorCondition {
+  children?: ModelsServiceBehaviorCondition[];
+  combinator?: ModelsServiceBehaviorConditionCombinator;
+  field?: ModelsServiceBehaviorConditionField;
+  kind: ModelsServiceBehaviorConditionKind;
+  operator?: ModelsServiceBehaviorConditionOperator;
+  value?: unknown;
+}
+
+export type ModelsServiceBehaviorAccessPolicyWhenFalse = typeof ModelsServiceBehaviorAccessPolicyWhenFalse[keyof typeof ModelsServiceBehaviorAccessPolicyWhenFalse];
+
+
+export const ModelsServiceBehaviorAccessPolicyWhenFalse = {
+  hide: 'hide',
+  lock: 'lock',
+} as const;
+
+export interface ModelsServiceBehaviorAccessPolicy {
+  when: ModelsServiceBehaviorCondition;
+  whenFalse: ModelsServiceBehaviorAccessPolicyWhenFalse;
+}
+
+export interface ModelsServiceBehaviorLocalizedText {[key: string]: string}
+
+export interface ModelsServiceBehaviorSelectOption {
+  key: string;
+  label: ModelsServiceBehaviorLocalizedText;
+}
+
+export type ModelsServiceBehaviorFieldType = typeof ModelsServiceBehaviorFieldType[keyof typeof ModelsServiceBehaviorFieldType];
+
+
+export const ModelsServiceBehaviorFieldType = {
+  text: 'text',
+  number: 'number',
+  phone: 'phone',
+  checkbox: 'checkbox',
+  select: 'select',
+} as const;
+
+export interface ModelsServiceBehaviorField {
+  key: string;
+  label: ModelsServiceBehaviorLocalizedText;
+  options?: ModelsServiceBehaviorSelectOption[];
+  required: boolean;
+  type: ModelsServiceBehaviorFieldType;
+}
+
+export interface ModelsServiceBehaviorInformation {
+  body: ModelsServiceBehaviorLocalizedText;
+  requireAcknowledgement?: boolean;
+}
+
+export type ModelsServiceBehaviorRouteMode = typeof ModelsServiceBehaviorRouteMode[keyof typeof ModelsServiceBehaviorRouteMode];
+
+
+export const ModelsServiceBehaviorRouteMode = {
+  auto: 'auto',
+  'page-slot': 'page-slot',
+} as const;
+
+export type ModelsServiceBehaviorRouteSlot = typeof ModelsServiceBehaviorRouteSlot[keyof typeof ModelsServiceBehaviorRouteSlot];
+
+
+export const ModelsServiceBehaviorRouteSlot = {
+  'service-info': 'service-info',
+  'service-form': 'service-form',
+  identity: 'identity',
+  confirmation: 'confirmation',
+} as const;
+
+export interface ModelsServiceBehaviorRoute {
+  mode: ModelsServiceBehaviorRouteMode;
+  slot?: ModelsServiceBehaviorRouteSlot;
+}
+
+export type ModelsServiceBehaviorVersion = typeof ModelsServiceBehaviorVersion[keyof typeof ModelsServiceBehaviorVersion];
+
+
+export const ModelsServiceBehaviorVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export interface ModelsServiceBehavior {
+  access?: ModelsServiceBehaviorAccessPolicy;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  dataRetentionDays?: number;
+  fields?: ModelsServiceBehaviorField[];
+  information?: ModelsServiceBehaviorInformation;
+  route?: ModelsServiceBehaviorRoute;
+  version: ModelsServiceBehaviorVersion;
+}
+
 /**
  * KioskDocumentSettings: JSON, e.g. { "retentionDays": 1–30 } for identificationMode=document.
  */
@@ -125,6 +266,8 @@ export type ModelsServiceKioskIdentificationConfig = { [key: string]: unknown };
 
 export interface ModelsService {
   backgroundColor?: string;
+  /** Behavior is optional portable station flow configuration. It complements, but never replaces, identification mode. */
+  behavior?: ModelsServiceBehavior;
   /** CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).
   When non-empty (after trim), it must be unique per unit — enforced by DB partial unique index and create/update validation. */
   calendarSlotKey?: string;
@@ -1108,6 +1251,73 @@ export interface HandlersSaasVendorResponse {
   counterparty?: HandlersSaasVendorResponseCounterparty;
   name?: string;
   paymentAccounts?: HandlersSaasVendorResponsePaymentAccountsItem[];
+}
+
+/**
+ * @nullable
+ */
+export type HandlersServiceUpdateRequestKioskDocumentSettings = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type HandlersServiceUpdateRequestKioskIdentificationConfig = { [key: string]: unknown } | null;
+
+export interface HandlersServiceUpdateRequest {
+  /** @nullable */
+  backgroundColor?: string | null;
+  behavior?: ModelsServiceBehavior | null;
+  /** @nullable */
+  calendarSlotKey?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  descriptionEn?: string | null;
+  /** @nullable */
+  descriptionRu?: string | null;
+  /** @nullable */
+  duration?: number | null;
+  /** @nullable */
+  gridCol?: number | null;
+  /** @nullable */
+  gridColSpan?: number | null;
+  /** @nullable */
+  gridRow?: number | null;
+  /** @nullable */
+  gridRowSpan?: number | null;
+  /** @nullable */
+  iconKey?: string | null;
+  identificationMode?: string;
+  /** @nullable */
+  imageUrl?: string | null;
+  isLeaf?: boolean;
+  /** @nullable */
+  kioskDocumentSettings?: HandlersServiceUpdateRequestKioskDocumentSettings;
+  /** @nullable */
+  kioskIdentificationConfig?: HandlersServiceUpdateRequestKioskIdentificationConfig;
+  /** @nullable */
+  maxServiceTime?: number | null;
+  /** @nullable */
+  maxWaitingTime?: number | null;
+  name?: string;
+  /** @nullable */
+  nameEn?: string | null;
+  /** @nullable */
+  nameRu?: string | null;
+  /** @nullable */
+  numberSequence?: string | null;
+  offerIdentification?: boolean;
+  /** @nullable */
+  parentId?: string | null;
+  prebook?: boolean;
+  /** @nullable */
+  prefix?: string | null;
+  /** @nullable */
+  restrictedServiceZoneId?: string | null;
+  sortOrder?: number;
+  /** @nullable */
+  textColor?: string | null;
+  unitId?: string;
 }
 
 /**
