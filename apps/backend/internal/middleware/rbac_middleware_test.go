@@ -151,3 +151,69 @@ func TestRequireTerminalUnitMatchOrUnitAnyPermission(t *testing.T) {
 		})
 	}
 }
+
+func TestTerminalUnitMatchMiddlewareNormalizesUUIDsButNotOpaqueIDs(t *testing.T) {
+	userRepo := &serviceReadUserRepository{}
+	singlePermission := RequireTerminalUnitMatchOrUnitPermission(
+		userRepo,
+		serviceReadTenantRepository{},
+		serviceReadUnitRepository{},
+		"unitId",
+		rbac.PermAccessKiosk,
+	)
+	anyPermission := RequireTerminalUnitMatchOrUnitAnyPermission(
+		userRepo,
+		serviceReadTenantRepository{},
+		serviceReadUnitRepository{},
+		"unitId",
+		[]string{rbac.PermAccessKiosk, rbac.PermAccessStaffPanel},
+	)
+
+	for middlewareName, middleware := range map[string]func(http.Handler) http.Handler{
+		"single permission": singlePermission,
+		"any permission":    anyPermission,
+	} {
+		t.Run(middlewareName, func(t *testing.T) {
+			tests := []struct {
+				name           string
+				routeUnitID    string
+				terminalUnitID string
+				wantStatus     int
+			}{
+				{
+					name:           "allows equivalent canonical UUIDs",
+					routeUnitID:    "70139919-83F0-451B-A22A-F29F8E1B95FA",
+					terminalUnitID: "70139919-83f0-451b-a22a-f29f8e1b95fa",
+					wantStatus:     http.StatusOK,
+				},
+				{
+					name:           "forbids case variants of opaque IDs",
+					routeUnitID:    "UNIT-1",
+					terminalUnitID: "unit-1",
+					wantStatus:     http.StatusForbidden,
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					req := httptest.NewRequest(http.MethodGet, "/units/"+tt.routeUnitID+"/services", nil)
+					routeCtx := chi.NewRouteContext()
+					routeCtx.URLParams.Add("unitId", tt.routeUnitID)
+					ctx := context.WithValue(req.Context(), chi.RouteCtxKey, routeCtx)
+					ctx = context.WithValue(ctx, TokenTypeKey, "terminal")
+					ctx = context.WithValue(ctx, TerminalUnitIDKey, tt.terminalUnitID)
+					req = req.WithContext(ctx)
+
+					rec := httptest.NewRecorder()
+					middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusOK)
+					})).ServeHTTP(rec, req)
+
+					if rec.Code != tt.wantStatus {
+						t.Fatalf("status = %d, want %d", rec.Code, tt.wantStatus)
+					}
+				})
+			}
+		})
+	}
+}

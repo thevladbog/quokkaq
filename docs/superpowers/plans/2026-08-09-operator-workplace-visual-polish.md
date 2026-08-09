@@ -46,6 +46,8 @@ Service authorization contract:
 - Modify: apps/backend/internal/middleware/rbac_middleware.go
 - Create: apps/backend/internal/middleware/rbac_middleware_test.go
 - Modify: apps/backend/cmd/api/main.go
+- Create: apps/backend/cmd/api/unit_access_routes.go
+- Create: apps/backend/cmd/api/unit_access_routes_test.go
 - Modify: apps/backend/internal/handlers/service_handler.go
 - Create: apps/backend/internal/handlers/service_openapi_contract_test.go
 - Modify generated: apps/backend/docs/swagger.json
@@ -110,6 +112,8 @@ Expected: unrelated untracked files remain untouched.
 - Modify: apps/backend/internal/middleware/rbac_middleware.go
 - Create: apps/backend/internal/middleware/rbac_middleware_test.go
 - Modify: apps/backend/cmd/api/main.go
+- Create: apps/backend/cmd/api/unit_access_routes.go
+- Create: apps/backend/cmd/api/unit_access_routes_test.go
 
 - [ ] **Step 1: Write the middleware contract test**
 
@@ -133,14 +137,20 @@ ctx = context.WithValue(ctx, UserIDKey, "user-1")
 
 Use small repositories that embed the existing interfaces/test doubles and override only invoked methods. For the tenant repository, embed repository.TenantRBACRepository and override UserHasTenantPermission. Record the slice passed to UserMatchesAnyUnitPermission to prove both permissions are checked.
 
+Cover both terminal-aware middleware variants with differently cased representations of the same valid UUID, which must be accepted after canonicalization, and with case variants of an opaque/non-UUID identifier, which must be rejected.
+
+Add a Chi route-integration test around the route-registration helper used by main.go. For every affected route, run authorized and forbidden requests. Prove that only GET /{unitId}/services and GET /{unitId}/services-tree accept either access.kiosk or access.staff_panel, while kiosk printer telemetry, kiosk telemetry, and employee IdP resolution accept access.kiosk and reject staff-panel-only access.
+
 - [ ] **Step 2: Run RED**
 
 ~~~bash
 cd apps/backend
 go test ./internal/middleware -run TestRequireTerminalUnitMatchOrUnitAnyPermission -count=1
+go test ./internal/middleware -run TestTerminalUnitMatchMiddlewareNormalizesUUIDsButNotOpaqueIDs -count=1
+go test ./cmd/api -run TestUnitAccessRoutesKeepServiceReadsSeparateFromKioskOperations -count=1
 ~~~
 
-Expected: FAIL because RequireTerminalUnitMatchOrUnitAnyPermission does not exist.
+Expected: FAIL on the named missing middleware or route-registration contract before production edits.
 
 - [ ] **Step 3: Add the compositional middleware**
 
@@ -164,12 +174,8 @@ func RequireTerminalUnitMatchOrUnitAnyPermission(
 				http.Error(w, "Unit ID required", http.StatusBadRequest)
 				return
 			}
-			if typ, _ := r.Context().Value(TokenTypeKey).(string); typ == "terminal" {
-				terminalUnitID, ok := r.Context().Value(TerminalUnitIDKey).(string)
-				if !ok || !strings.EqualFold(
-					strings.TrimSpace(terminalUnitID),
-					strings.TrimSpace(unitID),
-				) {
+			if isTerminal, allowed := terminalUnitAuthorization(r, unitID); isTerminal {
+				if !allowed {
 					http.Error(w, "Forbidden", http.StatusForbidden)
 					return
 				}
@@ -181,6 +187,8 @@ func RequireTerminalUnitMatchOrUnitAnyPermission(
 	}
 }
 ~~~
+
+Extract terminal authorization shared by both terminal-aware middleware variants. The helper owns TokenTypeKey, TerminalUnitIDKey, trimming, and ID comparison. Parse and compare valid UUIDs canonically; when either value is not a UUID, require exact trimmed equality. Do not use EqualFold for opaque identifiers and do not pass a case-variant ID to FindByIDLight.
 
 - [ ] **Step 4: Split the routes**
 
@@ -206,23 +214,39 @@ r.With(authmiddleware.EmployeeIdpResolveRateLimit).
 	Post("/{unitId}/employee-idp/resolve", employeeIdpHandler.PostPublicEmployeeIdpResolve)
 ~~~
 
+Register both groups through the small helper covered by the Chi integration test so future route moves cannot silently broaden kiosk-only operations.
+
 - [ ] **Step 5: Verify GREEN**
 
 ~~~bash
 cd apps/backend
 go test ./internal/middleware -count=1
+go test ./cmd/api -run TestUnitAccessRoutesKeepServiceReadsSeparateFromKioskOperations -count=1
 cd ../..
-pnpm nx test backend
+pnpm nx run backend:test
 ~~~
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the RBAC behavior**
+- [ ] **Step 6: REFACTOR and run the final focused tests**
+
+Remove duplication by making both terminal-aware middleware wrappers call the shared terminal authorization helper. Keep forbidden responses and handler flow unchanged, then run:
+
+~~~bash
+cd apps/backend
+go test ./internal/middleware ./cmd/api -run 'TestRequireTerminalUnitMatchOrUnitAnyPermission|TestTerminalUnitMatchMiddlewareNormalizesUUIDsButNotOpaqueIDs|TestUnitAccessRoutesKeepServiceReadsSeparateFromKioskOperations' -count=1
+~~~
+
+Expected: PASS after refactoring, before claiming Task 2 complete.
+
+- [ ] **Step 7: Commit the RBAC behavior**
 
 ~~~bash
 git add apps/backend/internal/middleware/rbac_middleware.go \
   apps/backend/internal/middleware/rbac_middleware_test.go \
-  apps/backend/cmd/api/main.go
+  apps/backend/cmd/api/main.go \
+  apps/backend/cmd/api/unit_access_routes.go \
+  apps/backend/cmd/api/unit_access_routes_test.go
 git commit -m "fix(api): allow staff to read unit services"
 ~~~
 
@@ -280,15 +304,15 @@ Switch only the services-tree route in apps/backend/cmd/api/main.go from GetServ
 
 - [ ] **Step 2: Add a generated-contract assertion and run RED**
 
-Create apps/backend/internal/handlers/service_openapi_contract_test.go. Load ../../docs/openapi.json and assert both GET paths expose 401 and 403 responses.
+Create apps/backend/internal/handlers/service_openapi_contract_test.go. Load ../../docs/openapi.json and assert both canonical paths exist with GET methods, exact operation IDs GetServicesByUnit and GetServicesTreeByUnit, and 401 and 403 responses. Scan all path/method operations and require each expected operation ID to occur exactly once at its assigned GET path, so missing, duplicated, and swapped/misassigned IDs fail while the response checks remain intact.
 
 Expected before regeneration: FAIL because the tree operation and auth responses are absent.
 
 - [ ] **Step 3: Regenerate in backend-owner order**
 
 ~~~bash
-pnpm nx openapi backend
-pnpm nx orval frontend
+pnpm nx run backend:openapi
+pnpm nx run frontend:orval
 ~~~
 
 Expected: both service-list operations and their auth responses exist in backend docs and frontend generated clients.
@@ -300,14 +324,25 @@ Delete only servicesApi.getByUnitId from apps/frontend/lib/api.ts. It calls the 
 - [ ] **Step 5: Verify contract consistency**
 
 ~~~bash
-pnpm nx test backend
-pnpm nx build frontend
+pnpm nx run backend:test
+pnpm nx run frontend:build
 git diff --check
 ~~~
 
 Expected: backend tests and generated clients compile. If the full frontend build reaches a pre-existing unrelated error, record the exact file/error, run focused touched-code checks, and do not report the build as accepted.
 
-- [ ] **Step 6: Commit docs and generated artifacts**
+- [ ] **Step 6: REFACTOR and run the final focused contract test**
+
+Keep shared response logic in respondServicesByUnit and keep only route-specific annotations/handlers separate. Remove any duplicate assertion setup without weakening the exact path, GET method, operation ID uniqueness/assignment, or 401/403 checks, then run:
+
+~~~bash
+cd apps/backend
+go test ./internal/handlers -run TestServiceListOpenAPIRequiresAuthenticationAndAuthorization -count=1
+~~~
+
+Expected: PASS after refactoring, before claiming Task 3 complete.
+
+- [ ] **Step 7: Commit docs and generated artifacts**
 
 ~~~bash
 git add apps/backend/internal/handlers/service_handler.go \
@@ -368,7 +403,13 @@ pnpm --dir=apps/frontend exec vitest run \
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: REFACTOR and run the final focused tests**
+
+Remove redundant portrait branches or test setup without changing size tokens, photo fallback, accessible name, or neutral styling. Re-run the same focused portrait and hero command from Step 4.
+
+Expected: PASS after refactoring, before claiming Task 4 complete.
+
+- [ ] **Step 6: Commit**
 
 ~~~bash
 git add apps/frontend/components/staff/VisitorPhotoFrame.tsx \
@@ -463,7 +504,13 @@ pnpm --dir=apps/frontend exec vitest run \
 
 Expected: PASS for normal, warning, overdue, no-SLA, snapshot-only, density, and order.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: REFACTOR and run the final focused test**
+
+Consolidate repeated SLA state/copy selection without changing ticket ordering, snapshot-only limits, or dense row geometry. Re-run the StaffQueuePanel focused command from Step 5.
+
+Expected: PASS after refactoring, before claiming Task 5 complete.
+
+- [ ] **Step 7: Commit**
 
 ~~~bash
 git add apps/frontend/components/staff/StaffQueuePanel.tsx \
@@ -535,7 +582,13 @@ pnpm --dir=apps/frontend exec vitest run \
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: REFACTOR and run the final focused tests**
+
+Remove redundant polling branches or duplicated assertions while keeping the indicator slot permanently mounted and non-live. Re-run the same queue and shell command from Step 4.
+
+Expected: PASS after refactoring, before claiming Task 6 complete.
+
+- [ ] **Step 6: Commit**
 
 ~~~bash
 git add apps/frontend/components/staff/StaffQueuePanel.tsx \
@@ -565,16 +618,20 @@ Expected: PASS.
 - [ ] **Step 2: Run full gates**
 
 ~~~bash
-pnpm nx test frontend
-pnpm nx lint frontend
-pnpm nx test backend
-pnpm nx lint backend
-pnpm nx build frontend
-pnpm nx build backend
+pnpm nx run frontend:test
+pnpm nx run frontend:lint
+pnpm nx run frontend:format:check
+# If format:check reports task-owned drift, repair it and re-run the check:
+pnpm nx run frontend:format:fix
+pnpm nx run frontend:format:check
+pnpm nx run backend:test
+pnpm nx run backend:lint
+pnpm nx run frontend:build
+pnpm nx run backend:build
 git diff --check
 ~~~
 
-Expected: touched-code gates PASS. Record unrelated pre-existing failures with exact evidence; never mark a blocked gate accepted.
+Expected: touched-code gates PASS. Run frontend:format:fix only for task-owned drift in a clean or safely isolated tree; do not rewrite known unrelated formatting debt. Record unrelated pre-existing failures with exact evidence and never mark a blocked gate accepted.
 
 - [ ] **Step 3: Confirm local listeners without stopping unrelated processes**
 
@@ -583,7 +640,9 @@ lsof -nP -iTCP:3000 -sTCP:LISTEN
 lsof -nP -iTCP:3001 -sTCP:LISTEN
 ~~~
 
-Start an absent app through its Nx dev/serve target on an available port. Preserve the user's authenticated browser session whenever possible.
+If any `apps/backend/**/*.go` file changed, browser acceptance must not reuse an API process started before those changes. Build and restart the worktree-owned backend through `pnpm nx run backend:build` and `pnpm nx run backend:serve`, then verify that the serving process was started from the current worktree after the rebuild. Point the worktree frontend at that rebuilt API and restart the worktree-owned frontend if its API environment changed.
+
+If ports 3000 or 3001 belong to unrelated processes, do not stop them. Start the worktree frontend/backend on available ports instead, preserve the user's authenticated browser session whenever possible, and perform acceptance only against the rebuilt worktree backend—not an already-running old binary.
 
 - [ ] **Step 4: Accept the authenticated 1440 px layout**
 
