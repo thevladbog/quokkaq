@@ -3,29 +3,14 @@
 import { useTranslations } from 'next-intl';
 import type { ClientVisitTransferEvent } from '@quokkaq/shared-types';
 import { cn } from '@/lib/utils';
+import {
+  getTransferDisplayLines,
+  localizedTransferServiceName
+} from '@/lib/visit-transfer-display';
 
-function dash(v: string | undefined) {
+function dash(v: string | null | undefined) {
   const s = (v ?? '').trim();
   return s || '—';
-}
-
-/** Matches `ticketServiceDisplayName` in `lib/ticket-display.ts` (ru → nameRu, en → nameEn, else name). */
-function localizedTransferServiceName(
-  ev: ClientVisitTransferEvent,
-  side: 'from' | 'to',
-  locale: string
-): string {
-  const lang = locale.split('-')[0]?.toLowerCase() ?? 'en';
-  const name = side === 'from' ? ev.fromServiceName : ev.toServiceName;
-  const nameRu = side === 'from' ? ev.fromServiceNameRu : ev.toServiceNameRu;
-  const nameEn = side === 'from' ? ev.fromServiceNameEn : ev.toServiceNameEn;
-  if (lang === 'ru' && nameRu?.trim()) {
-    return nameRu.trim();
-  }
-  if (lang === 'en' && nameEn?.trim()) {
-    return nameEn.trim();
-  }
-  return name?.trim() || nameRu?.trim() || nameEn?.trim() || '—';
 }
 
 export function VisitTransferTrail({
@@ -73,13 +58,15 @@ export function VisitTransferTrail({
         {trail.map((ev, idx) => {
           const fromSvc = localizedTransferServiceName(ev, 'from', locale);
           const toSvc = localizedTransferServiceName(ev, 'to', locale);
+          const displayLines = getTransferDisplayLines(ev, locale);
+          const counterLine = displayLines.find(
+            (line) => line.kind === 'counter'
+          );
+          const zoneLine = displayLines.find((line) => line.kind === 'zone');
           const zoneTransferToQueue =
             ev.transferKind === 'zone' &&
-            !!ev.fromCounterName?.trim() &&
-            !ev.toCounterName?.trim();
-          const hasCounter =
-            !!ev.fromCounterName?.trim() || !!ev.toCounterName?.trim();
-          const hasZone = !!(ev.fromZoneLabel || ev.toZoneLabel);
+            !!counterLine?.from &&
+            !counterLine.to;
           return (
             <li
               key={`${ev.at}-${idx}`}
@@ -94,23 +81,23 @@ export function VisitTransferTrail({
                   to: dash(toSvc)
                 })}
               </div>
-              {hasCounter ? (
+              {counterLine ? (
                 <div>
-                  {zoneTransferToQueue && ev.fromCounterName?.trim()
+                  {zoneTransferToQueue
                     ? t('visitor_context.transfer_counter_to_zone_queue', {
-                        from: ev.fromCounterName.trim()
+                        from: counterLine.from
                       })
                     : t('visitor_context.transfer_counter_flow', {
-                        from: dash(ev.fromCounterName),
-                        to: dash(ev.toCounterName)
+                        from: dash(counterLine.from),
+                        to: dash(counterLine.to)
                       })}
                 </div>
               ) : null}
-              {hasZone ? (
+              {zoneLine ? (
                 <div>
                   {t('visitor_context.transfer_zone_flow', {
-                    from: dash(ev.fromZoneLabel),
-                    to: dash(ev.toZoneLabel)
+                    from: dash(zoneLine.from),
+                    to: dash(zoneLine.to)
                   })}
                 </div>
               ) : null}

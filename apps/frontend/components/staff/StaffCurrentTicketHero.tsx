@@ -14,7 +14,9 @@ import { useTicketTimer } from '@/lib/ticket-timer';
 import { visitorTagPillStyles } from '@/lib/visitor-tag-styles';
 import { VisitorPhotoFrame } from '@/components/staff/VisitorPhotoFrame';
 import { StaffVisitorTagsEditModal } from '@/components/staff/StaffVisitorTagsEditModal';
+import { StaffCurrentTransferSummary } from '@/components/staff/StaffCurrentTransferSummary';
 import { cn } from '@/lib/utils';
+import type { ClientVisitTransferEvent } from '@quokkaq/shared-types';
 import {
   getDocumentsDataPreviewString,
   ticketHasDocumentsData
@@ -30,6 +32,9 @@ export interface StaffCurrentTicketHeroProps {
   ticket: Ticket;
   t: TFn;
   onShowDetails: () => void;
+  transferTrail?: ClientVisitTransferEvent[];
+  locale: string;
+  onOpenVisitorDetails: () => void;
   canReadUserData: boolean;
 }
 
@@ -49,6 +54,9 @@ export function StaffCurrentTicketHero({
   ticket,
   t,
   onShowDetails,
+  transferTrail,
+  locale,
+  onOpenVisitorDetails,
   canReadUserData
 }: StaffCurrentTicketHeroProps) {
   const [tagsModalOpen, setTagsModalOpen] = useState(false);
@@ -204,6 +212,16 @@ export function StaffCurrentTicketHero({
                   )}
                 </div>
               )}
+              <Button
+                type='button'
+                variant='outline'
+                size='sm'
+                className='mt-2 h-8'
+                onClick={onOpenVisitorDetails}
+              >
+                <Info className='h-3.5 w-3.5' />
+                {t('visitor_context.open_details')}
+              </Button>
             </div>
           </div>
 
@@ -275,6 +293,13 @@ export function StaffCurrentTicketHero({
                 )}
               </div>
             </div>
+
+            <StaffCurrentTransferSummary
+              trail={transferTrail}
+              locale={locale}
+              t={t}
+              onOpenFullTrail={onOpenVisitorDetails}
+            />
 
             {ticket.preRegistration && (
               <div className='border-border/60 bg-muted/20 rounded-lg border p-2.5'>
