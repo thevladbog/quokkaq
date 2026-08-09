@@ -126,6 +126,21 @@ describe('ExperienceTemplateSchema', () => {
     expectIssuePath(template, ['pages', 0, 'layouts', 'landscape']);
   });
 
+  it('rejects prototype-chain variant ids with a Zod issue', () => {
+    const template = validTemplate();
+    template.variants[0]!.id = '__proto__';
+
+    const result = ExperienceTemplateSchema.safeParse(template);
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.issues.map((issue) => issue.path)).toContainEqual([
+      'pages',
+      0,
+      'layouts',
+      '__proto__'
+    ]);
+  });
+
   it('requires every page layout to place each shared widget', () => {
     const template = validTemplate();
     template.pages[0]!.widgets.push({

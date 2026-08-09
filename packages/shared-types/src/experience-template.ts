@@ -207,7 +207,12 @@ export const ExperienceTemplateSchema =
       }
 
       for (const variant of template.variants) {
-        const layout = page.layouts[variant.id];
+        const layout = Object.prototype.hasOwnProperty.call(
+          page.layouts,
+          variant.id
+        )
+          ? page.layouts[variant.id]
+          : undefined;
         const layoutPath = ['pages', pageIndex, 'layouts', variant.id];
         if (!layout) {
           ctx.addIssue({
@@ -219,9 +224,13 @@ export const ExperienceTemplateSchema =
         }
 
         for (const widget of page.widgets) {
-          if (
-            !Object.prototype.hasOwnProperty.call(layout.placements, widget.id)
-          ) {
+          const placement = Object.prototype.hasOwnProperty.call(
+            layout.placements,
+            widget.id
+          )
+            ? layout.placements[widget.id]
+            : undefined;
+          if (!placement) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               message: 'Page layout must place every widget',
