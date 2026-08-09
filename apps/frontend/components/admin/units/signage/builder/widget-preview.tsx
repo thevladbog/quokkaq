@@ -1,11 +1,17 @@
 'use client';
 
 import {
+  BadgeCheck,
   Bell,
+  ClipboardList,
   CloudSun,
   Clock,
   Code2,
   Film,
+  Images,
+  Info,
+  Languages,
+  LayoutGrid,
   ListOrdered,
   PanelTop,
   QrCode,
@@ -13,6 +19,7 @@ import {
   Radio,
   Timer,
   Ticket,
+  UserRoundCheck,
   Users
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -35,7 +42,14 @@ const WIDGET_ICONS: Record<ScreenWidgetType, LucideIcon> = {
   'custom-html': Code2,
   'screen-header': PanelTop,
   'screen-footer-qr': QrCode,
-  'join-queue-qr': ScanQrCode
+  'join-queue-qr': ScanQrCode,
+  'service-picker': LayoutGrid,
+  'rich-info': Info,
+  'ticket-form': ClipboardList,
+  identify: UserRoundCheck,
+  'language-switch': Languages,
+  'ticket-success': BadgeCheck,
+  media: Images
 };
 
 export function widgetShortLabel(
@@ -55,7 +69,17 @@ export function widgetShortLabel(
     'custom-html': { key: 'widget.customHtml', d: 'HTML' },
     'screen-header': { key: 'widget.screenHeader', d: 'Header' },
     'screen-footer-qr': { key: 'widget.screenFooterQr', d: 'Footer + QR' },
-    'join-queue-qr': { key: 'widget.joinQueueQr', d: 'Join queue QR' }
+    'join-queue-qr': { key: 'widget.joinQueueQr', d: 'Join queue QR' },
+    'service-picker': { key: 'widget.servicePicker', d: 'Service picker' },
+    'rich-info': { key: 'widget.richInfo', d: 'Rich information' },
+    'ticket-form': { key: 'widget.ticketForm', d: 'Ticket form' },
+    identify: { key: 'widget.identify', d: 'Identification' },
+    'language-switch': {
+      key: 'widget.languageSwitch',
+      d: 'Language switch'
+    },
+    'ticket-success': { key: 'widget.ticketSuccess', d: 'Ticket success' },
+    media: { key: 'widget.media', d: 'Media' }
   };
   const m = map[type] ?? { key: 'widget.unknown', d: type };
   return t(m.key, { default: m.d });
