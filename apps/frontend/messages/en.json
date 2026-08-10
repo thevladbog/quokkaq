@@ -44,6 +44,184 @@
         "contains": "{field} contains {value}",
         "notContains": "{field} does not contain {value}"
       }
+    },
+    "builder": {
+      "common": { "cancel": "Cancel" },
+      "create": {
+        "title": "Create experience",
+        "description": "Choose the fixed screen role and its real device profiles.",
+        "surface": "Experience surface",
+        "surfaceHint": "The surface is immutable after creation.",
+        "profiles": "Device profiles",
+        "profilesHint": "Select one or two concrete profiles. Layout is kept separately for each.",
+        "submit": "Create experience",
+        "surfaces": {
+          "ticketStation": {
+            "title": "Ticket station",
+            "description": "Touch-first ticket and identity flows."
+          },
+          "queueDisplay": {
+            "title": "Queue display",
+            "description": "Public queue calls and operational information."
+          },
+          "counterDisplay": {
+            "title": "Counter display",
+            "description": "Focused information at a service counter."
+          },
+          "visitorMobile": {
+            "title": "Visitor mobile",
+            "description": "A responsive experience for a visitor device."
+          }
+        }
+      },
+      "shell": {
+        "label": "Experience builder",
+        "back": "Back",
+        "surfaceLocked": "Surface is fixed for this experience.",
+        "surfaces": {
+          "ticketStation": "Ticket station",
+          "queueDisplay": "Queue display",
+          "counterDisplay": "Counter display",
+          "visitorMobile": "Visitor mobile"
+        }
+      },
+      "toolbar": {
+        "draft": "Unpublished draft",
+        "saved": "Draft saved",
+        "variant": "Layout variant",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "undo": "Undo",
+        "redo": "Redo",
+        "preview": "Preview",
+        "save": "Save draft",
+        "publish": "Publish"
+      },
+      "tabs": { "pages": "Pages", "add": "Add", "layers": "Layers" },
+      "sidePanel": { "label": "Builder navigation" },
+      "pages": {
+        "label": "Pages",
+        "widgets": "widgets",
+        "duplicate": "Duplicate",
+        "rename": "Rename",
+        "renamePrompt": "Page name",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "moveUpAria": "Move {name} up",
+        "actions": "Open {name} actions",
+        "delete": "Delete",
+        "add": "Add page",
+        "status": {
+          "start": "Start",
+          "error": "Error",
+          "unreachable": "Unreachable",
+          "service-reference": "Service reference",
+          "conditional": "Conditional"
+        }
+      },
+      "catalog": {
+        "label": "Add widgets",
+        "searchLabel": "Search widgets",
+        "search": "Search widgets",
+        "none": "Not available on this surface.",
+        "groups": {
+          "queue": "Queue",
+          "information": "Information",
+          "media": "Media",
+          "navigation": "Navigation",
+          "input": "Input"
+        },
+        "widgets": {
+          "servicePicker": {
+            "label": "Service picker",
+            "description": "Categories and services"
+          },
+          "calledTickets": {
+            "label": "Called tickets",
+            "description": "Current queue calls"
+          },
+          "queueStats": {
+            "label": "Queue stats",
+            "description": "Waiting and service metrics"
+          },
+          "richInfo": {
+            "label": "Information",
+            "description": "Guidance and instructions"
+          },
+          "header": {
+            "label": "Header",
+            "description": "Venue and status header"
+          },
+          "media": {
+            "label": "Media",
+            "description": "Image or managed media"
+          },
+          "contentPlayer": {
+            "label": "Content player",
+            "description": "Scheduled signage content"
+          },
+          "languageSwitch": {
+            "label": "Language switch",
+            "description": "Select the active locale"
+          },
+          "ticketSuccess": {
+            "label": "Ticket success",
+            "description": "End-of-flow confirmation"
+          },
+          "ticketForm": {
+            "label": "Ticket form",
+            "description": "Service-owned visitor fields"
+          },
+          "identify": {
+            "label": "Identify visitor",
+            "description": "Badge, login, or document step"
+          }
+        }
+      },
+      "layers": {
+        "label": "Layers",
+        "empty": "Add a widget to create a layer.",
+        "note": "Locks and hidden layers affect this editor only.",
+        "locked": "Locked",
+        "lockedForEditing": "Locked for editing",
+        "hidden": "Hidden in editor",
+        "moveUp": "Move {title} up",
+        "moveDown": "Move {title} down",
+        "lock": "Lock {title}",
+        "unlock": "Unlock {title}",
+        "hide": "Hide {title}",
+        "show": "Show {title}"
+      },
+      "canvas": {
+        "label": "Experience layout canvas",
+        "workspace": "Device workspace",
+        "incomplete": "{count} unplaced",
+        "ready": "Ready",
+        "safeArea": "Safe area · {value}px",
+        "cell": "Column {col}, row {row}",
+        "placeInCell": "Place {title} in column {col}, row {row}"
+      },
+      "unplaced": {
+        "label": "Unplaced widgets",
+        "ready": "All widgets are placed",
+        "count": "{count} widgets need placement",
+        "copyLabel": "Copy layout from…",
+        "place": "Place {title}",
+        "instructions": "Choose a cell on the device frame, or drag the widget to it.",
+        "overflowing": "overflowing",
+        "unplaced": "unplaced"
+      },
+      "inspector": {
+        "label": "Inspector",
+        "title": "Inspector",
+        "placeholder": "Select a page or widget to inspect its shared content and current variant layout.",
+        "shared": "Shared across variants",
+        "access": "Visibility and access",
+        "accessibility": "Accessibility",
+        "comingSoon": "Available in the next builder step.",
+        "unplaced": "Place or copy the remaining widgets before publishing.",
+        "editorOnly": "Layer lock and hide are editor-only."
+      }
     }
   },
   "clients": {
