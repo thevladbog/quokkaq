@@ -139,6 +139,8 @@ export type ExperienceCanvasProps = {
   selectedWidgetId?: string;
   canEdit: boolean;
   zoom: number;
+  /** Preview may suppress the editor's safe-area guide without changing the layout. */
+  showSafeArea?: boolean;
   editorState: ExperienceEditorLayerState;
   orderedWidgetIds?: readonly string[];
   pendingPlacement?: { id: string; title: string };
@@ -153,6 +155,7 @@ export function ExperienceCanvas({
   selectedWidgetId,
   canEdit,
   zoom,
+  showSafeArea = true,
   editorState,
   orderedWidgetIds,
   pendingPlacement,
@@ -181,7 +184,7 @@ export function ExperienceCanvas({
       canEdit={canEdit}
       zoom={zoom}
       minimumInteractiveCellSize={canPlacePending ? 44 : undefined}
-      safeArea={variant.profile.safeArea}
+      safeArea={showSafeArea ? variant.profile.safeArea : undefined}
       deviceSize={{
         width: variant.profile.width,
         height: variant.profile.height

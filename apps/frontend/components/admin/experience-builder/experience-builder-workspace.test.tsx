@@ -1,5 +1,11 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ExperienceTemplate } from '@quokkaq/shared-types';
 
@@ -15,6 +21,7 @@ import {
 } from './create-experience-dialog';
 import { ExperienceCanvas, validCanvasItems } from './experience-canvas';
 import { ExperienceBuilderShell } from './experience-builder-shell';
+import type { ExperiencePreviewRenderProps } from './experience-preview-dialog';
 import { classifyExperienceLayout } from './experience-layout-classification';
 import { editorLayerKey } from './experience-layers-panel';
 import { parseExperienceBuilderTab } from './experience-side-panel';
@@ -309,6 +316,7 @@ describe('ExperienceBuilderShell', () => {
     expect(screen.getByLabelText(/open services actions/i)).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: /preview/i }));
     expect(onPreview).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: /close preview/i }));
 
     fireEvent.click(screen.getByRole('tab', { name: /layers/i }));
     expect(
@@ -328,6 +336,147 @@ describe('ExperienceBuilderShell', () => {
     ).toBeDisabled();
     expect(JSON.stringify(useExperienceBuilderStore.getState().draft)).toBe(
       before
+    );
+  });
+
+  it('keeps save and publish separate and never assigns a device from this workspace', async () => {
+    const publishableDraft: ExperienceTemplate = {
+      schemaVersion: 1,
+      id: 'lobby-display',
+      surface: 'queue-display',
+      startPageId: 'queue',
+      variants: [
+        {
+          id: 'display',
+          profile: {
+            id: 'display',
+            name: 'Hall display',
+            width: 1920,
+            height: 1080,
+            interactionMode: 'non-touch',
+            viewingDistance: 'far',
+            safeArea: { top: 0, right: 0, bottom: 0, left: 0 }
+          },
+          grid: { columns: 12, rows: 18 }
+        }
+      ],
+      pages: [
+        {
+          id: 'queue',
+          name: 'Queue',
+          widgets: [
+            { id: 'calls', type: 'called-tickets', config: {}, actions: [] }
+          ],
+          layouts: {
+            display: {
+              placements: {
+                calls: { col: 1, row: 1, colSpan: 12, rowSpan: 18 }
+              }
+            }
+          }
+        }
+      ]
+    };
+    useExperienceBuilderStore.getState().loadDraft(publishableDraft);
+    useExperienceBuilderStore.getState().updateWidgetShared('queue', 'calls', {
+      config: { title: 'Updated queue' }
+    });
+    const onSaveDraft = vi.fn();
+    const onPublish = vi.fn();
+    render(
+      <ExperienceBuilderShell
+        onSaveDraft={onSaveDraft}
+        onPublish={onPublish}
+        devices={[
+          {
+            id: 'terminal-1',
+            name: 'Lobby iPad',
+            variantName: 'Portrait',
+            lastSeenAt: null,
+            appliedVersion: null
+          }
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    expect(onPublish).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(useExperienceBuilderStore.getState().isDirty).toBe(false)
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    expect(
+      screen.getByText(/assignment becomes available after runtime validation/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /assign/i })).toBeNull();
+    expect(onPublish).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    expect(onPublish).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a failed parsed draft dirty and exposes the safe validation result', async () => {
+    useExperienceBuilderStore.getState().loadDraft(workspaceDraft());
+    useExperienceBuilderStore
+      .getState()
+      .updateWidgetShared('services', 'picker', {
+        config: { title: 'Employee services' }
+      });
+    const onSaveDraft = vi.fn().mockResolvedValue({
+      kind: 'invalid-definition',
+      issues: [
+        {
+          code: 'response.invalid',
+          path: ['definition'],
+          message: 'not rendered verbatim'
+        }
+      ]
+    });
+
+    render(<ExperienceBuilderShell onSaveDraft={onSaveDraft} />);
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'response.invalid'
+    );
+    expect(useExperienceBuilderStore.getState().isDirty).toBe(true);
+  });
+
+  it('forwards the selected synthetic scenario through the runtime preview seam', () => {
+    useExperienceBuilderStore.getState().loadDraft(workspaceDraft());
+    const renderPreview = vi.fn((props: ExperiencePreviewRenderProps) => (
+      <output data-testid='runtime-preview-context'>
+        {String(props.scenarioContext.identity?.isEmployee)}
+      </output>
+    ));
+
+    render(
+      <ExperienceBuilderShell
+        onPublish={vi.fn()}
+        renderPreview={renderPreview}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /preview/i }));
+    expect(screen.getByTestId('runtime-preview-context')).toHaveTextContent(
+      'false'
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /^authenticated employee$/i })
+    );
+    expect(screen.getByTestId('runtime-preview-context')).toHaveTextContent(
+      'true'
+    );
+    expect(renderPreview).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        draft: expect.objectContaining({ id: 'desk-experience' }),
+        variant: expect.objectContaining({ id: 'portrait' }),
+        scenarioContext: expect.objectContaining({
+          identity: expect.objectContaining({ isEmployee: true })
+        })
+      })
     );
   });
 

@@ -15,6 +15,8 @@ export type ExperienceToolbarProps = {
   canUndo: boolean;
   canRedo: boolean;
   canEdit?: boolean;
+  saveDisabled?: boolean;
+  publishDisabled?: boolean;
   onVariantChange: (variantId: string) => void;
   onZoomChange: (zoom: number) => void;
   onUndo: () => void;
@@ -32,6 +34,8 @@ export function ExperienceToolbar({
   canUndo,
   canRedo,
   canEdit = true,
+  saveDisabled = false,
+  publishDisabled = false,
   onVariantChange,
   onZoomChange,
   onUndo,
@@ -142,7 +146,7 @@ export function ExperienceToolbar({
             type='button'
             variant='outline'
             className='min-h-11'
-            disabled={!canEdit || !isDirty}
+            disabled={!canEdit || !isDirty || saveDisabled}
             onClick={onSaveDraft}
           >
             <Save />
@@ -151,7 +155,7 @@ export function ExperienceToolbar({
           <Button
             type='button'
             className='min-h-11'
-            disabled={!canEdit}
+            disabled={!canEdit || publishDisabled}
             onClick={onPublish}
           >
             {t('toolbar.publish', { default: 'Publish' })}

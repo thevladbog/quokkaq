@@ -1,8 +1,9 @@
 'use client';
 
-import type {
-  ExperienceTemplate,
-  ExperienceWidget
+import {
+  validateExperienceForPublish,
+  type ExperienceTemplate,
+  type ExperienceWidget
 } from '@quokkaq/shared-types';
 import {
   DndContext,
@@ -12,18 +13,13 @@ import {
   useSensors,
   type DragEndEvent
 } from '@dnd-kit/core';
-import {
-  ArrowLeft,
-  BoxSelect,
-  Layers3,
-  PanelsTopLeft,
-  TriangleAlert
-} from 'lucide-react';
+import { ArrowLeft, Layers3, TriangleAlert } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import { isApiHttpError } from '@/lib/api-errors';
+import type { ExperienceDefinitionParseResult } from '@/lib/experience/experience-api';
 import { useExperienceBuilderStore } from '@/lib/stores/experience-builder-store';
 import {
   ExperienceCanvas,
@@ -40,13 +36,42 @@ import {
   UnplacedWidgetsTray,
   collectUnplacedWidgets
 } from './unplaced-widgets-tray';
+import { ExperienceInspector } from './experience-inspector';
+import {
+  ExperiencePreviewDialog,
+  type ExperiencePreviewDialogProps
+} from './experience-preview-dialog';
+import {
+  ExperienceOperationFeedback,
+  PublishExperienceDialog,
+  type ExperienceOperationError,
+  type ExperienceOperationResult,
+  type PublishExperienceDialogProps
+} from './publish-experience-dialog';
+
+type SaveDraftResult = void | ExperienceDefinitionParseResult;
 
 export type ExperienceBuilderShellProps = {
   canEdit?: boolean;
   onBack?: () => void;
   onPreview?: (draft: ExperienceTemplate) => void;
-  onSaveDraft?: (draft: ExperienceTemplate) => void;
-  onPublish?: (draft: ExperienceTemplate) => void;
+  onSaveDraft?: (
+    draft: ExperienceTemplate
+  ) => SaveDraftResult | Promise<SaveDraftResult>;
+  onPublish?: (
+    draft: ExperienceTemplate
+  ) => ExperienceOperationResult | Promise<ExperienceOperationResult>;
+  onRestoreVersion?: PublishExperienceDialogProps['onRestoreVersion'];
+  renderPreview?: ExperiencePreviewDialogProps['renderPreview'];
+  publishedDefinition?: ExperienceTemplate | null;
+  currentPublishedVersion?: number | null;
+  unpublishedChanges?: boolean;
+  devices?: PublishExperienceDialogProps['devices'];
+  versions?: PublishExperienceDialogProps['versions'];
+  publishError?: ExperienceOperationError | null;
+  restoreError?: ExperienceOperationError | null;
+  /** Unit-specific service settings route, supplied by the builder host. */
+  serviceSettingsHref?: string;
 };
 
 function surfaceName(
@@ -98,7 +123,17 @@ export function ExperienceBuilderShell({
   onBack,
   onPreview,
   onSaveDraft,
-  onPublish
+  onPublish,
+  onRestoreVersion,
+  renderPreview,
+  publishedDefinition = null,
+  currentPublishedVersion,
+  unpublishedChanges,
+  devices,
+  versions,
+  publishError = null,
+  restoreError = null,
+  serviceSettingsHref
 }: ExperienceBuilderShellProps) {
   const t = useTranslations('experience.builder');
   const draft = useExperienceBuilderStore((state) => state.draft);
@@ -126,9 +161,16 @@ export function ExperienceBuilderShell({
   const reorderPage = useExperienceBuilderStore((state) => state.reorderPage);
   const addWidget = useExperienceBuilderStore((state) => state.addWidget);
   const setPlacement = useExperienceBuilderStore((state) => state.setPlacement);
+  const setTypographyScale = useExperienceBuilderStore(
+    (state) => state.setTypographyScale
+  );
+  const updateWidgetShared = useExperienceBuilderStore(
+    (state) => state.updateWidgetShared
+  );
   const copyLayout = useExperienceBuilderStore((state) => state.copyLayout);
   const undo = useExperienceBuilderStore((state) => state.undo);
   const redo = useExperienceBuilderStore((state) => state.redo);
+  const markSaved = useExperienceBuilderStore((state) => state.markSaved);
 
   const [activeTab, setActiveTab] = useState<'pages' | 'add' | 'layers'>(
     'pages'
@@ -141,6 +183,12 @@ export function ExperienceBuilderShell({
   const [pendingPlacementWidgetId, setPendingPlacementWidgetId] = useState<
     string | undefined
   >();
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [savePending, setSavePending] = useState(false);
+  const [saveError, setSaveError] = useState<ExperienceOperationError | null>(
+    null
+  );
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor)
@@ -156,6 +204,19 @@ export function ExperienceBuilderShell({
     selection.kind === 'widget' && selection.pageId === page.id
       ? selection.widgetId
       : undefined;
+  const selectedWidget = selectedWidgetId
+    ? page.widgets.find((widget) => widget.id === selectedWidgetId)
+    : undefined;
+  const selectedPlacement = selectedWidgetId
+    ? page.layouts[variant.id]?.placements[selectedWidgetId]
+    : undefined;
+  const activeTypographyScale = page.layouts[variant.id]?.typographyScale;
+  // Validation is calculated before the publish confirmation opens. The dialog
+  // only presents that same report; it never starts an assignment mutation.
+  const publishValidation = useMemo(
+    () => validateExperienceForPublish(draft),
+    [draft]
+  );
   const currentLayerOrder = stableWidgetOrder(
     page.id,
     page.widgets,
@@ -228,6 +289,36 @@ export function ExperienceBuilderShell({
     );
     if (next) renamePage(pageId, next);
   };
+  const saveDraft = async () => {
+    if (!canEdit || !onSaveDraft || savePending) return;
+    setSaveError(null);
+    setSavePending(true);
+    try {
+      const result = await onSaveDraft(draft);
+      if (result?.kind === 'invalid-definition') {
+        setSaveError({ kind: 'invalid-definition', issues: result.issues });
+        return;
+      }
+      markSaved();
+    } catch (error) {
+      setSaveError(
+        isApiHttpError(error)
+          ? {
+              kind: 'api-error',
+              message: error.message,
+              ...(error.code === undefined ? {} : { code: error.code })
+            }
+          : {
+              kind: 'api-error',
+              message: t('task11.save.failed', {
+                default: 'The draft could not be saved. Try again.'
+              })
+            }
+      );
+    } finally {
+      setSavePending(false);
+    }
+  };
 
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
@@ -268,6 +359,8 @@ export function ExperienceBuilderShell({
           canUndo={history.length > 0}
           canRedo={redoStack.length > 0}
           canEdit={canEdit}
+          saveDisabled={savePending || !onSaveDraft}
+          publishDisabled={!onPublish}
           onVariantChange={setActiveVariant}
           onZoomChange={(nextZoom) => {
             if (canEdit) setZoom(nextZoom);
@@ -278,14 +371,20 @@ export function ExperienceBuilderShell({
           onRedo={() => {
             if (canEdit) redo();
           }}
-          onPreview={() => onPreview?.(draft)}
-          onSaveDraft={() => {
-            if (canEdit) onSaveDraft?.(draft);
+          onPreview={() => {
+            onPreview?.(draft);
+            setPreviewOpen(true);
           }}
+          onSaveDraft={() => void saveDraft()}
           onPublish={() => {
-            if (canEdit) onPublish?.(draft);
+            if (canEdit && onPublish) setPublishOpen(true);
           }}
         />
+        {saveError ? (
+          <div className='bg-background border-b px-4 py-3'>
+            <ExperienceOperationFeedback error={saveError} />
+          </div>
+        ) : null}
         <div className='grid min-h-0 flex-1 grid-cols-[248px_minmax(480px,1fr)_264px]'>
           <ExperienceSidePanel
             template={draft}
@@ -399,69 +498,88 @@ export function ExperienceBuilderShell({
             className='bg-card min-h-0 overflow-y-auto border-l'
             aria-label={t('inspector.label', { default: 'Inspector' })}
           >
-            <div className='space-y-4 p-4'>
-              <div className='flex items-center gap-2'>
-                <PanelsTopLeft className='size-4' aria-hidden />
-                <h2 className='text-sm font-semibold'>
-                  {t('inspector.title', { default: 'Inspector' })}
-                </h2>
-              </div>
-              <p className='text-muted-foreground text-xs'>
-                {t('inspector.placeholder', {
+            <ExperienceInspector
+              pageId={page.id}
+              widget={selectedWidget}
+              variant={variant}
+              placement={selectedPlacement}
+              typographyScale={activeTypographyScale}
+              canEdit={canEdit}
+              serviceSettingsHref={serviceSettingsHref}
+              onSharedChange={(changes) => {
+                if (canEdit && selectedWidget) {
+                  updateWidgetShared(page.id, selectedWidget.id, changes);
+                }
+              }}
+              onPlacementChange={(placement) => {
+                if (canEdit && selectedWidget) {
+                  setPlacement(page.id, selectedWidget.id, placement);
+                }
+              }}
+              onTypographyScaleChange={(scale) => {
+                if (canEdit) setTypographyScale(page.id, scale);
+              }}
+            />
+            {unplaced.length > 0 ? (
+              <p className='mx-4 mb-4 flex gap-2 rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100'>
+                <TriangleAlert className='size-4 shrink-0' aria-hidden />
+                {t('inspector.unplaced', {
                   default:
-                    'Select a page or widget to inspect its shared content and current variant layout.'
+                    'Place or copy the remaining widgets before publishing.'
                 })}
               </p>
-              <Separator />
-              {[
-                [
-                  'shared',
-                  t('inspector.shared', { default: 'Shared across variants' })
-                ],
-                ['layout', variant.profile.name],
-                [
-                  'access',
-                  t('inspector.access', { default: 'Visibility and access' })
-                ],
-                [
-                  'a11y',
-                  t('inspector.accessibility', { default: 'Accessibility' })
-                ]
-              ].map(([key, label]) => (
-                <section key={key} className='rounded-lg border p-3'>
-                  <div className='flex items-center gap-2 text-sm font-medium'>
-                    <BoxSelect
-                      className='text-muted-foreground size-3.5'
-                      aria-hidden
-                    />
-                    {label}
-                  </div>
-                  <p className='text-muted-foreground mt-1 text-xs'>
-                    {t('inspector.comingSoon', {
-                      default: 'Available in the next builder step.'
-                    })}
-                  </p>
-                </section>
-              ))}
-              {unplaced.length > 0 ? (
-                <p className='flex gap-2 rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100'>
-                  <TriangleAlert className='size-4 shrink-0' aria-hidden />
-                  {t('inspector.unplaced', {
-                    default:
-                      'Place or copy the remaining widgets before publishing.'
-                  })}
-                </p>
-              ) : null}
-              <div className='text-muted-foreground flex items-center gap-2 text-xs'>
-                <Layers3 className='size-3.5' aria-hidden />
-                {t('inspector.editorOnly', {
-                  default: 'Layer lock and hide are editor-only.'
-                })}
-              </div>
+            ) : null}
+            <div className='text-muted-foreground mx-4 mb-4 flex items-center gap-2 text-xs'>
+              <Layers3 className='size-3.5' aria-hidden />
+              {t('inspector.editorOnly', {
+                default: 'Layer lock and hide are editor-only.'
+              })}
             </div>
           </aside>
         </div>
       </main>
+      <ExperiencePreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        draft={draft}
+        activeVariantId={variant.id}
+        publishedDefinition={publishedDefinition}
+        renderPreview={
+          renderPreview ??
+          (({ variant: previewVariant, scale, showSafeArea }) => (
+            <ExperienceCanvas
+              page={
+                draft.pages.find(
+                  (candidate) => candidate.id === draft.startPageId
+                ) ?? draft.pages[0]!
+              }
+              variant={previewVariant}
+              canEdit={false}
+              zoom={scale === '100' ? 1 / 0.48 : 1}
+              showSafeArea={showSafeArea}
+              editorState={{}}
+              onSelectWidget={() => undefined}
+              onPlacementChange={() => undefined}
+            />
+          ))
+        }
+      />
+      <PublishExperienceDialog
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        draft={draft}
+        selectedVariantName={variant.profile.name}
+        currentPublishedVersion={currentPublishedVersion}
+        unpublishedChanges={unpublishedChanges ?? isDirty}
+        validationReport={publishValidation}
+        devices={devices}
+        versions={versions}
+        publishError={publishError}
+        restoreError={restoreError}
+        disabled={!canEdit}
+        onPublish={onPublish}
+        onRestoreVersion={onRestoreVersion}
+      />
     </DndContext>
   );
 }
