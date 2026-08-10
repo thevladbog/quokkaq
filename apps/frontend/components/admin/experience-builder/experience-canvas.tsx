@@ -12,13 +12,13 @@ import {
   BuilderCanvasGrid,
   type BuilderCanvasGridItem
 } from '@/components/admin/units/signage/builder/builder-canvas';
-import {
-  canPlacePlacement,
-  type GridItem,
-  type GridPlacement
-} from '@/lib/screen-grid-editor';
+import { type GridPlacement } from '@/lib/screen-grid-editor';
 import { cn } from '@/lib/utils';
 import { experienceWidgetTitle } from './experience-widget-catalog';
+import {
+  classifyExperienceLayout,
+  isValidExperienceLayoutItem
+} from './experience-layout-classification';
 import {
   editorLayerKey,
   type ExperienceEditorLayerState
@@ -100,47 +100,37 @@ export function validCanvasItems(
   translate?: Parameters<typeof experienceWidgetTitle>[1],
   orderedWidgetIds?: readonly string[]
 ): CanvasItem[] {
-  const layout = page.layouts[variant.id];
-  if (!layout) return [];
-  const placed: GridItem[] = [];
-  const valid: CanvasItem[] = [];
-  const knownIds = new Set(orderedWidgetIds ?? []);
-  const widgets = [
-    ...(orderedWidgetIds ?? [])
-      .map((widgetId) => page.widgets.find((widget) => widget.id === widgetId))
-      .filter((widget): widget is ExperiencePage['widgets'][number] =>
-        Boolean(widget)
-      ),
-    ...page.widgets.filter((widget) => !knownIds.has(widget.id))
-  ];
-  for (const widget of widgets) {
-    const placement = layout.placements[widget.id];
-    if (
-      !placement ||
-      !canPlacePlacement(
-        variant.grid.columns,
-        variant.grid.rows,
-        placed,
-        placement
-      )
-    ) {
-      continue;
-    }
-    placed.push({ id: widget.id, placement });
-    const metadata = editorState[editorLayerKey(page.id, widget.id)] ?? {};
-    valid.push({
-      id: widget.id,
-      placement,
-      title: experienceWidgetTitle(widget, translate),
+  const canonicalValid = classifyExperienceLayout(page, variant).filter(
+    isValidExperienceLayoutItem
+  );
+  const validByID = new Map(
+    canonicalValid.map((item) => [item.widget.id, item])
+  );
+  const seen = new Set<string>();
+  const orderedValid: typeof canonicalValid = [];
+  for (const widgetID of orderedWidgetIds ?? []) {
+    const item = validByID.get(widgetID);
+    if (!item || seen.has(item.widget.id)) continue;
+    seen.add(item.widget.id);
+    orderedValid.push(item);
+  }
+  for (const item of canonicalValid) {
+    if (seen.has(item.widget.id)) continue;
+    seen.add(item.widget.id);
+    orderedValid.push(item);
+  }
+
+  return orderedValid.map((item, index) => {
+    const metadata = editorState[editorLayerKey(page.id, item.widget.id)] ?? {};
+    return {
+      id: item.widget.id,
+      placement: item.placement,
+      title: experienceWidgetTitle(item.widget, translate),
       locked: Boolean(metadata.locked),
       hidden: Boolean(metadata.hidden),
-      stackIndex: 0
-    });
-  }
-  return valid.map((item, index) => ({
-    ...item,
-    stackIndex: valid.length - index
-  }));
+      stackIndex: orderedValid.length - index
+    };
+  });
 }
 
 export type ExperienceCanvasProps = {
@@ -178,6 +168,8 @@ export function ExperienceCanvas({
     (entry) => t(entry.labelKey, { default: entry.label }),
     orderedWidgetIds
   );
+  // Hide is editor-only: visibility changes after canonical classification so
+  // hidden widgets continue to reserve their layout footprint.
   const visibleItems = items.filter((item) => !item.hidden);
   const canPlacePending = Boolean(pendingPlacement) && canEdit;
   return (

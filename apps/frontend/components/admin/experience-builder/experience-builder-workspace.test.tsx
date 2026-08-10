@@ -13,8 +13,10 @@ import {
   createExperienceDraft,
   EXPERIENCE_PROFILE_PRESETS
 } from './create-experience-dialog';
-import { validCanvasItems } from './experience-canvas';
+import { ExperienceCanvas, validCanvasItems } from './experience-canvas';
 import { ExperienceBuilderShell } from './experience-builder-shell';
+import { classifyExperienceLayout } from './experience-layout-classification';
+import { editorLayerKey } from './experience-layers-panel';
 import { parseExperienceBuilderTab } from './experience-side-panel';
 import { searchCatalogEntries } from './experience-widget-catalog';
 import { collectUnplacedWidgets } from './unplaced-widgets-tray';
@@ -389,6 +391,130 @@ describe('ExperienceBuilderShell', () => {
       expect.objectContaining({ id: 'picker', reason: 'overflowing' })
     ]);
     expect(validCanvasItems(page, landscape, {})).toEqual([]);
+  });
+
+  it('keeps canonical overlap validity and tray counts stable when editor layer order reverses', () => {
+    const draft = workspaceDraft();
+    const page = draft.pages[0]!;
+    const portrait = draft.variants[0]!;
+    page.widgets.push(
+      {
+        id: 'overlap',
+        type: 'media',
+        config: { title: 'Overlapping media' },
+        actions: []
+      },
+      {
+        id: 'independent',
+        type: 'media',
+        config: { title: 'Independent text' },
+        actions: []
+      }
+    );
+    page.layouts.portrait.placements.overlap = {
+      col: 1,
+      row: 1,
+      colSpan: 6,
+      rowSpan: 4
+    };
+    page.layouts.portrait.placements.independent = {
+      col: 8,
+      row: 1,
+      colSpan: 3,
+      rowSpan: 2
+    };
+
+    expect(
+      classifyExperienceLayout(page, portrait).map((item) => [
+        item.widget.id,
+        item.status
+      ])
+    ).toEqual([
+      ['picker', 'valid'],
+      ['overlap', 'overflowing'],
+      ['independent', 'valid']
+    ]);
+    const canonicalTray = collectUnplacedWidgets(page, portrait);
+    expect(canonicalTray).toEqual([
+      expect.objectContaining({ id: 'overlap', reason: 'overflowing' })
+    ]);
+
+    const canonicalItems = validCanvasItems(page, portrait, {}, undefined, [
+      'picker',
+      'overlap',
+      'independent'
+    ]);
+    const reversedItems = validCanvasItems(page, portrait, {}, undefined, [
+      'independent',
+      'overlap',
+      'picker'
+    ]);
+    expect(canonicalItems.map((item) => item.id)).toEqual([
+      'picker',
+      'independent'
+    ]);
+    expect(reversedItems.map((item) => item.id)).toEqual([
+      'independent',
+      'picker'
+    ]);
+    expect(collectUnplacedWidgets(page, portrait)).toEqual(canonicalTray);
+
+    const hiddenFirstItems = validCanvasItems(
+      page,
+      portrait,
+      { [editorLayerKey(page.id, 'picker')]: { hidden: true } },
+      undefined,
+      ['independent', 'overlap', 'picker']
+    );
+    expect(hiddenFirstItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'picker', hidden: true }),
+        expect.objectContaining({ id: 'independent' })
+      ])
+    );
+    expect(hiddenFirstItems.map((item) => item.id)).not.toContain('overlap');
+
+    const { unmount } = render(
+      <ExperienceCanvas
+        page={page}
+        variant={portrait}
+        canEdit
+        zoom={1}
+        editorState={{}}
+        orderedWidgetIds={['picker', 'overlap', 'independent']}
+        onSelectWidget={vi.fn()}
+        onPlacementChange={vi.fn()}
+      />
+    );
+    expect(
+      screen
+        .getAllByTestId('experience-canvas-widget')
+        .map((node) => node.getAttribute('data-widget-id'))
+    ).toEqual(['picker', 'independent']);
+    unmount();
+
+    render(
+      <ExperienceCanvas
+        page={page}
+        variant={portrait}
+        canEdit
+        zoom={1}
+        editorState={{}}
+        orderedWidgetIds={['independent', 'overlap', 'picker']}
+        onSelectWidget={vi.fn()}
+        onPlacementChange={vi.fn()}
+      />
+    );
+    expect(
+      screen
+        .getAllByTestId('experience-canvas-widget')
+        .map((node) => node.getAttribute('data-widget-id'))
+    ).toEqual(['independent', 'picker']);
+    expect(
+      screen
+        .getAllByTestId('experience-canvas-widget')
+        .map((node) => node.getAttribute('data-widget-id'))
+    ).not.toContain('overlap');
   });
 });
 

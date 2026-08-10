@@ -9,8 +9,8 @@ import { AlertTriangle, Copy, GripVertical, MousePointer2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
-import { canPlacePlacement, type GridItem } from '@/lib/screen-grid-editor';
 import { experienceWidgetTitle } from './experience-widget-catalog';
+import { classifyExperienceLayout } from './experience-layout-classification';
 import { experienceTrayDragId } from './experience-canvas';
 
 export type UnplacedWidget = {
@@ -24,30 +24,16 @@ export function collectUnplacedWidgets(
   variant: ExperienceLayoutVariant,
   translate?: Parameters<typeof experienceWidgetTitle>[1]
 ): UnplacedWidget[] {
-  const layout = page.layouts[variant.id];
-  const placed: GridItem[] = [];
-  const unplaced: UnplacedWidget[] = [];
-  for (const widget of page.widgets) {
-    const placement = layout?.placements[widget.id];
-    if (
-      !placement ||
-      !canPlacePlacement(
-        variant.grid.columns,
-        variant.grid.rows,
-        placed,
-        placement
-      )
-    ) {
-      unplaced.push({
-        id: widget.id,
-        title: experienceWidgetTitle(widget, translate),
-        reason: placement ? 'overflowing' : 'unplaced'
-      });
-      continue;
-    }
-    placed.push({ id: widget.id, placement });
-  }
-  return unplaced;
+  return classifyExperienceLayout(page, variant).flatMap((item) => {
+    if (item.status === 'valid') return [];
+    return [
+      {
+        id: item.widget.id,
+        title: experienceWidgetTitle(item.widget, translate),
+        reason: item.status
+      }
+    ];
+  });
 }
 
 export type UnplacedWidgetsTrayProps = {
