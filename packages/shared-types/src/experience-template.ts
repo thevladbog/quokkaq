@@ -200,29 +200,8 @@ const ExperienceTemplateBaseSchema = z.object({
   theme: ExperienceThemeSchema.optional()
 });
 
-/**
- * Editing drafts need explicit actions so a malformed remote draft cannot
- * become a later runtime error. Published templates remain backwards
- * compatible through ExperienceWidgetSchema's default empty action list.
- */
-export const ExperienceDraftWidgetSchema = ExperienceWidgetSchema.extend({
-  actions: z
-    .array(WidgetActionSchema)
-    .max(EXPERIENCE_TEMPLATE_LIMITS.maxActionsPerWidget)
-});
-
-const ExperienceDraftPageSchema = ExperiencePageSchema.extend({
-  widgets: z
-    .array(ExperienceDraftWidgetSchema)
-    .max(EXPERIENCE_TEMPLATE_LIMITS.maxWidgetsPerPage)
-});
-
-const ExperienceDraftTemplateBaseSchema = ExperienceTemplateBaseSchema.extend({
-  pages: z
-    .array(ExperienceDraftPageSchema)
-    .min(1)
-    .max(EXPERIENCE_TEMPLATE_LIMITS.maxPages)
-});
+/** Draft widgets use the canonical default `actions: []` normalization. */
+export const ExperienceDraftWidgetSchema = ExperienceWidgetSchema;
 
 export const ExperienceTemplateSchema =
   ExperienceTemplateBaseSchema.superRefine((template, ctx) => {
@@ -443,13 +422,13 @@ export const ExperienceTemplateSchema =
   });
 
 /**
- * Store-ingress schema: it enforces every canonical field and cross-reference
- * invariant, but permits a shared widget to be unplaced in a variant while a
- * user is editing that variant's layout. Publishing still uses the complete
- * ExperienceTemplateSchema above.
+ * Store-ingress schema differs from published validation only by permitting a
+ * shared widget to be unplaced in a variant while a user is editing that
+ * variant's layout. It otherwise keeps all canonical normalization and
+ * cross-reference checks from ExperienceTemplateSchema.
  */
-export const ExperienceDraftSchema =
-  ExperienceDraftTemplateBaseSchema.superRefine((template, ctx) => {
+export const ExperienceDraftSchema = ExperienceTemplateBaseSchema.superRefine(
+  (template, ctx) => {
     const published = ExperienceTemplateSchema.safeParse(template);
     if (published.success) return;
     for (const issue of published.error.issues) {
@@ -461,7 +440,8 @@ export const ExperienceDraftSchema =
         });
       }
     }
-  });
+  }
+);
 
 export type ExperienceSurface = z.infer<typeof ExperienceSurfaceSchema>;
 export type DeviceProfile = z.infer<typeof DeviceProfileSchema>;

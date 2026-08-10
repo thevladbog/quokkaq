@@ -94,6 +94,35 @@ function store() {
   });
 }
 
+function fullStateSnapshot(builder: ReturnType<typeof store>) {
+  const state = builder.getState();
+  return structuredClone({
+    draft: state.draft,
+    activePageId: state.activePageId,
+    activeVariantId: state.activeVariantId,
+    selection: state.selection,
+    history: state.history,
+    redoStack: state.redoStack,
+    lastSavedDraft: state.lastSavedDraft,
+    isDirty: state.isDirty
+  });
+}
+
+function storeWithHistoryAndRedo() {
+  const builder = store();
+  builder.getState().setActivePage('details');
+  builder.getState().setActiveVariant('landscape');
+  builder.getState().setSelection({
+    kind: 'widget',
+    pageId: 'details',
+    widgetId: 'info'
+  });
+  builder.getState().renamePage('details', 'First unsaved name');
+  builder.getState().renamePage('details', 'Second unsaved name');
+  expect(builder.getState().undo()).toBe(true);
+  return builder;
+}
+
 describe('experience builder store', () => {
   it('loads a remote draft atomically without retaining caller-owned references', () => {
     const builder = store();
@@ -112,6 +141,26 @@ describe('experience builder store', () => {
     expect(builder.getState().isDirty).toBe(false);
   });
 
+  it('normalizes omitted widget actions at store ingress', () => {
+    const builder = store();
+    const incoming = draft();
+    delete (incoming.pages[0]!.widgets[0] as { actions?: unknown }).actions;
+
+    expect(builder.getState().loadDraft(incoming)).toBe(true);
+    const loadedWidget = builder.getState().draft.pages[0]!.widgets[0]!;
+    expect(loadedWidget.actions).toEqual([]);
+    expect(Object.hasOwn(loadedWidget, 'actions')).toBe(true);
+
+    const widgetId = builder.getState().addWidget('services', 'media', {
+      actions: undefined
+    });
+    const addedWidget = builder
+      .getState()
+      .draft.pages[0]!.widgets.find((widget) => widget.id === widgetId)!;
+    expect(addedWidget.actions).toEqual([]);
+    expect(Object.hasOwn(addedWidget, 'actions')).toBe(true);
+  });
+
   it('rejects malformed drafts atomically before actions, layouts, or access can reach store state', () => {
     const malformedDrafts: Array<{
       name: string;
@@ -122,18 +171,6 @@ describe('experience builder store', () => {
         create: () => {
           const incoming = draft();
           incoming.pages[0]!.widgets[0]!.actions = {} as never;
-          return incoming;
-        }
-      },
-      {
-        name: 'missing widget actions',
-        create: () => {
-          const incoming = draft();
-          delete (
-            incoming.pages[0]!.widgets[0] as unknown as {
-              actions?: unknown;
-            }
-          ).actions;
           return incoming;
         }
       },
@@ -248,36 +285,74 @@ describe('experience builder store', () => {
       builder.getState().setActivePage('details');
       builder.getState().setActiveVariant('landscape');
       builder.getState().renamePage('details', 'Unsaved details');
-      const before = structuredClone({
-        draft: builder.getState().draft,
-        activePageId: builder.getState().activePageId,
-        activeVariantId: builder.getState().activeVariantId,
-        selection: builder.getState().selection,
-        history: builder.getState().history,
-        redoStack: builder.getState().redoStack,
-        lastSavedDraft: builder.getState().lastSavedDraft,
-        isDirty: builder.getState().isDirty
-      });
+      const before = fullStateSnapshot(builder);
 
       expect(
         builder.getState().loadDraft(malformed.create()),
         malformed.name
       ).toBe(false);
-      expect({
-        draft: builder.getState().draft,
-        activePageId: builder.getState().activePageId,
-        activeVariantId: builder.getState().activeVariantId,
-        selection: builder.getState().selection,
-        history: builder.getState().history,
-        redoStack: builder.getState().redoStack,
-        lastSavedDraft: builder.getState().lastSavedDraft,
-        isDirty: builder.getState().isDirty
-      }).toEqual(before);
+      expect(fullStateSnapshot(builder)).toEqual(before);
       expect(() =>
         getUnreachablePageIds(builder.getState().draft)
       ).not.toThrow();
       expect(() => builder.getState().duplicatePage('services')).not.toThrow();
     }
+  });
+
+  it('preserves full state for invalid placement, typography, and copy-layout edits', () => {
+    const invalidPlacements = [
+      { col: Number.NaN, row: 1, colSpan: 1, rowSpan: 1 },
+      { col: Number.POSITIVE_INFINITY, row: 1, colSpan: 1, rowSpan: 1 },
+      { col: 1.5, row: 1, colSpan: 1, rowSpan: 1 },
+      { col: 0, row: 1, colSpan: 1, rowSpan: 1 },
+      { col: 1, row: 1, colSpan: 0, rowSpan: 1 }
+    ];
+    for (const placement of invalidPlacements) {
+      const builder = storeWithHistoryAndRedo();
+      const before = fullStateSnapshot(builder);
+
+      expect(
+        builder.getState().setPlacement('services', 'picker', placement)
+      ).toBe(false);
+      expect(fullStateSnapshot(builder)).toEqual(before);
+    }
+
+    for (const scale of [Number.NaN, Number.POSITIVE_INFINITY, 0, -1]) {
+      const builder = storeWithHistoryAndRedo();
+      const before = fullStateSnapshot(builder);
+
+      expect(builder.getState().setTypographyScale('services', scale)).toBe(
+        false
+      );
+      expect(fullStateSnapshot(builder)).toEqual(before);
+    }
+
+    for (const [pageId, fromVariantId, toVariantId] of [
+      ['missing-page', 'landscape', 'portrait'],
+      ['services', 'missing-variant', 'portrait'],
+      ['services', 'landscape', 'missing-variant'],
+      ['services', 'landscape', 'landscape']
+    ]) {
+      const builder = storeWithHistoryAndRedo();
+      const before = fullStateSnapshot(builder);
+
+      expect(
+        builder.getState().copyLayout(pageId, fromVariantId, toVariantId)
+      ).toBe(false);
+      expect(fullStateSnapshot(builder)).toEqual(before);
+    }
+
+    const builder = storeWithHistoryAndRedo();
+    const malformedDraft = structuredClone(builder.getState().draft);
+    delete (malformedDraft.pages[0]!.layouts as Record<string, unknown>)
+      .landscape;
+    builder.setState({ draft: malformedDraft });
+    const before = fullStateSnapshot(builder);
+
+    expect(
+      builder.getState().copyLayout('services', 'landscape', 'portrait')
+    ).toBe(false);
+    expect(fullStateSnapshot(builder)).toEqual(before);
   });
 
   it('accepts a valid draft with an explicitly unplaced inactive variant widget', () => {

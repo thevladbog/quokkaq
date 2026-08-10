@@ -265,19 +265,20 @@ function isSafeWidgetInput(value: unknown): boolean {
   );
 }
 
-function isSafeDraftWidget(value: unknown): value is ExperienceWidget {
+function parseSafeDraftWidget(value: unknown): ExperienceWidget | null {
   if (
     !isPlainOwnRecord(value) ||
     !isSupportedJsonLike(value) ||
     !isSafeRecordID(value.id) ||
     !isPlainOwnRecord(value.config)
   ) {
-    return false;
+    return null;
   }
   try {
-    return ExperienceDraftWidgetSchema.safeParse(value).success;
+    const parsed = ExperienceDraftWidgetSchema.safeParse(value);
+    return parsed.success ? parsed.data : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -345,15 +346,18 @@ function hasSafeDraftRecordShape(value: unknown): value is ExperienceTemplate {
   return true;
 }
 
-function isSafeTemplateDraft(value: unknown): value is ExperienceTemplate {
+function parseSafeTemplateDraft(value: unknown): ExperienceTemplate | null {
   try {
-    return (
-      hasSafeDraftRecordShape(value) &&
-      ExperienceDraftSchema.safeParse(value).success
-    );
+    if (!hasSafeDraftRecordShape(value)) return null;
+    const parsed = ExperienceDraftSchema.safeParse(value);
+    return parsed.success ? parsed.data : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+function isSafeTemplateDraft(value: unknown): value is ExperienceTemplate {
+  return parseSafeTemplateDraft(value) !== null;
 }
 
 function defaultIdFactory(prefix: 'page' | 'widget'): string {
@@ -580,11 +584,12 @@ function defaultDraft(): ExperienceTemplate {
 }
 
 export function getUnreachablePageIds(template: ExperienceTemplate): string[] {
-  if (!isSafeTemplateDraft(template)) return [];
-  const pagesById = new Map(template.pages.map((page) => [page.id, page]));
+  const draft = parseSafeTemplateDraft(template);
+  if (!draft) return [];
+  const pagesById = new Map(draft.pages.map((page) => [page.id, page]));
   const pending = [
-    template.startPageId,
-    ...Object.values(template.flowPages ?? {}).filter(
+    draft.startPageId,
+    ...Object.values(draft.flowPages ?? {}).filter(
       (pageId): pageId is string => pageId !== undefined
     )
   ];
@@ -605,7 +610,7 @@ export function getUnreachablePageIds(template: ExperienceTemplate): string[] {
     }
   }
 
-  return template.pages
+  return draft.pages
     .filter((page) => !reachable.has(page.id))
     .map((page) => page.id);
 }
@@ -615,9 +620,7 @@ function createExperienceBuilderState(
   options: ExperienceBuilderOptions = {}
 ) {
   const idFactory = options.idFactory ?? defaultIdFactory;
-  const initial = clone(
-    isSafeTemplateDraft(initialDraft) ? initialDraft : defaultDraft()
-  );
+  const initial = clone(parseSafeTemplateDraft(initialDraft) ?? defaultDraft());
   const initialPageId = initial.pages[0]?.id ?? '';
   const initialVariantId = initial.variants[0]?.id ?? '';
 
@@ -632,10 +635,11 @@ function createExperienceBuilderState(
     isDirty: false,
 
     loadDraft: (draft) => {
-      if (!isSafeTemplateDraft(draft)) return false;
+      const normalizedDraft = parseSafeTemplateDraft(draft);
+      if (!normalizedDraft) return false;
       let changed = false;
       set((state) => {
-        const next = clone(draft);
+        const next = clone(normalizedDraft);
         state.draft = next;
         state.activePageId = next.pages[0]?.id ?? '';
         state.activeVariantId = next.variants[0]?.id ?? '';
@@ -887,13 +891,14 @@ function createExperienceBuilderState(
           colSpan: 1,
           rowSpan: 1
         };
-        if (!isSafeDraftWidget(nextWidget) || !isSafePageLayout(nextLayout)) {
+        const normalizedWidget = parseSafeDraftWidget(nextWidget);
+        if (!normalizedWidget || !isSafePageLayout(nextLayout)) {
           return;
         }
         const nextDraft = clone(state.draft);
         const nextPage = pageById(nextDraft, pageId);
         if (!nextPage) return;
-        nextPage.widgets.push(nextWidget);
+        nextPage.widgets.push(normalizedWidget);
         nextPage.layouts[state.activeVariantId] = nextLayout;
         if (!isSafeTemplateDraft(nextDraft)) return;
         const before = snapshot(state);
@@ -927,11 +932,12 @@ function createExperienceBuilderState(
         }
         if (updates.actions !== undefined)
           nextWidget.actions = clone(updates.actions);
-        if (!isSafeDraftWidget(nextWidget)) return;
+        const normalizedWidget = parseSafeDraftWidget(nextWidget);
+        if (!normalizedWidget) return;
         const nextDraft = clone(state.draft);
         const nextPage = pageById(nextDraft, pageId);
         if (!nextPage) return;
-        nextPage.widgets[widgetIndex] = nextWidget;
+        nextPage.widgets[widgetIndex] = normalizedWidget;
         if (!isSafeTemplateDraft(nextDraft)) return;
         const before = snapshot(state);
         state.draft = nextDraft;

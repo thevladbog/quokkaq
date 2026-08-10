@@ -56,19 +56,19 @@ function expectIssuePath(input: unknown, expectedPath: Array<string | number>) {
 }
 
 describe('ExperienceTemplateSchema', () => {
-  it('uses a strict action contract for editable drafts while allowing unplaced variant widgets', () => {
+  it('differs from published validation only by allowing incomplete variant placements', () => {
     const editable = validTemplate();
-    editable.pages[0]!.widgets[0]!.actions = [];
     editable.variants.push({ ...editable.variants[0]!, id: 'landscape' });
     editable.pages[0]!.layouts.landscape = { placements: {} };
 
-    expect(ExperienceDraftSchema.safeParse(editable).success).toBe(true);
+    const parsedDraft = ExperienceDraftSchema.safeParse(editable);
+    expect(parsedDraft.success).toBe(true);
+    if (!parsedDraft.success) return;
+    expect(parsedDraft.data.pages[0]!.widgets[0]!.actions).toEqual([]);
+    expect(
+      Object.hasOwn(parsedDraft.data.pages[0]!.widgets[0]!, 'actions')
+    ).toBe(true);
     expect(ExperienceTemplateSchema.safeParse(editable).success).toBe(false);
-
-    const missingActions = structuredClone(editable);
-    delete (missingActions.pages[0]!.widgets[0] as { actions?: unknown })
-      .actions;
-    expect(ExperienceDraftSchema.safeParse(missingActions).success).toBe(false);
 
     const malformedAction = structuredClone(editable);
     malformedAction.pages[0]!.widgets[0]!.actions = [
