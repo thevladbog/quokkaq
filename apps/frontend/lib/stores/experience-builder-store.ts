@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import { immer } from 'zustand/middleware/immer';
+import {
+  ExperienceDraftSchema,
+  ExperienceDraftWidgetSchema,
+  ExperiencePageLayoutSchema
+} from '@quokkaq/shared-types';
 import type {
   ExperiencePage,
   ExperienceTemplate,
@@ -260,7 +265,41 @@ function isSafeWidgetInput(value: unknown): boolean {
   );
 }
 
-function isSafeTemplateDraft(value: unknown): value is ExperienceTemplate {
+function isSafeDraftWidget(value: unknown): value is ExperienceWidget {
+  if (
+    !isPlainOwnRecord(value) ||
+    !isSupportedJsonLike(value) ||
+    !isSafeRecordID(value.id) ||
+    !isPlainOwnRecord(value.config)
+  ) {
+    return false;
+  }
+  try {
+    return ExperienceDraftWidgetSchema.safeParse(value).success;
+  } catch {
+    return false;
+  }
+}
+
+function isSafePageLayout(
+  value: unknown
+): value is ExperiencePage['layouts'][string] {
+  if (
+    !isPlainOwnRecord(value) ||
+    !isSupportedJsonLike(value) ||
+    !isPlainOwnRecord(value.placements) ||
+    Object.keys(value.placements).some((id) => !isSafeRecordID(id))
+  ) {
+    return false;
+  }
+  try {
+    return ExperiencePageLayoutSchema.safeParse(value).success;
+  } catch {
+    return false;
+  }
+}
+
+function hasSafeDraftRecordShape(value: unknown): value is ExperienceTemplate {
   if (!isPlainOwnRecord(value) || !isSupportedJsonLike(value)) return false;
   if (
     !isSafeRecordID(value.id) ||
@@ -284,7 +323,6 @@ function isSafeTemplateDraft(value: unknown): value is ExperienceTemplate {
     ) {
       return false;
     }
-    const widgetIDs = new Set<string>();
     for (const widget of page.widgets) {
       if (
         !isPlainOwnRecord(widget) ||
@@ -293,23 +331,29 @@ function isSafeTemplateDraft(value: unknown): value is ExperienceTemplate {
       ) {
         return false;
       }
-      widgetIDs.add(widget.id);
     }
     for (const [variantID, layout] of Object.entries(page.layouts)) {
       if (
         !isSafeRecordID(variantID) ||
         !variantIDs.has(variantID) ||
-        !isPlainOwnRecord(layout) ||
-        !isPlainOwnRecord(layout.placements)
+        !isSafePageLayout(layout)
       ) {
-        return false;
-      }
-      if (Object.keys(layout.placements).some((id) => !isSafeRecordID(id))) {
         return false;
       }
     }
   }
   return true;
+}
+
+function isSafeTemplateDraft(value: unknown): value is ExperienceTemplate {
+  try {
+    return (
+      hasSafeDraftRecordShape(value) &&
+      ExperienceDraftSchema.safeParse(value).success
+    );
+  } catch {
+    return false;
+  }
 }
 
 function defaultIdFactory(prefix: 'page' | 'widget'): string {
@@ -536,6 +580,7 @@ function defaultDraft(): ExperienceTemplate {
 }
 
 export function getUnreachablePageIds(template: ExperienceTemplate): string[] {
+  if (!isSafeTemplateDraft(template)) return [];
   const pagesById = new Map(template.pages.map((page) => [page.id, page]));
   const pending = [
     template.startPageId,
@@ -825,8 +870,7 @@ function createExperienceBuilderState(
           idFactory
         );
         if (!widgetId) return;
-        const before = snapshot(state);
-        page.widgets.push({
+        const nextWidget: unknown = {
           id: widgetId,
           type,
           config: clone(input.config ?? {}),
@@ -835,13 +879,25 @@ function createExperienceBuilderState(
             ? {}
             : { access: clone(input.access) }),
           actions: clone(input.actions ?? [])
-        });
-        layout.placements[widgetId] = {
+        };
+        const nextLayout = copyGridLayout(layout);
+        nextLayout.placements[widgetId] = {
           col: cell.col,
           row: cell.row,
           colSpan: 1,
           rowSpan: 1
         };
+        if (!isSafeDraftWidget(nextWidget) || !isSafePageLayout(nextLayout)) {
+          return;
+        }
+        const nextDraft = clone(state.draft);
+        const nextPage = pageById(nextDraft, pageId);
+        if (!nextPage) return;
+        nextPage.widgets.push(nextWidget);
+        nextPage.layouts[state.activeVariantId] = nextLayout;
+        if (!isSafeTemplateDraft(nextDraft)) return;
+        const before = snapshot(state);
+        state.draft = nextDraft;
         state.selection = { kind: 'widget', pageId, widgetId };
         if (commitEdit(state, before)) result = widgetId;
       });
@@ -852,23 +908,33 @@ function createExperienceBuilderState(
       let changed = false;
       set((state) => {
         if (!isSafeWidgetInput(updates)) return;
-        const widget = pageById(state.draft, pageId)?.widgets.find(
-          (candidate) => candidate.id === widgetId
-        );
-        if (!widget) return;
-        const before = snapshot(state);
-        if (updates.type !== undefined) widget.type = updates.type;
-        if (updates.config !== undefined) widget.config = clone(updates.config);
+        const page = pageById(state.draft, pageId);
+        const widgetIndex =
+          page?.widgets.findIndex((candidate) => candidate.id === widgetId) ??
+          -1;
+        if (!page || widgetIndex < 0) return;
+        const nextWidget = clone(page.widgets[widgetIndex]!);
+        if (updates.type !== undefined) nextWidget.type = updates.type;
+        if (updates.config !== undefined)
+          nextWidget.config = clone(updates.config);
         if (updates.tone !== undefined) {
-          if (updates.tone === null) delete widget.tone;
-          else widget.tone = updates.tone;
+          if (updates.tone === null) delete nextWidget.tone;
+          else nextWidget.tone = updates.tone;
         }
         if (updates.access !== undefined) {
-          if (updates.access === null) delete widget.access;
-          else widget.access = clone(updates.access);
+          if (updates.access === null) delete nextWidget.access;
+          else nextWidget.access = clone(updates.access);
         }
         if (updates.actions !== undefined)
-          widget.actions = clone(updates.actions);
+          nextWidget.actions = clone(updates.actions);
+        if (!isSafeDraftWidget(nextWidget)) return;
+        const nextDraft = clone(state.draft);
+        const nextPage = pageById(nextDraft, pageId);
+        if (!nextPage) return;
+        nextPage.widgets[widgetIndex] = nextWidget;
+        if (!isSafeTemplateDraft(nextDraft)) return;
+        const before = snapshot(state);
+        state.draft = nextDraft;
         changed = commitEdit(state, before);
       });
       return changed;
@@ -910,7 +976,14 @@ function createExperienceBuilderState(
           !page ||
           !variant ||
           !layout ||
-          !page.widgets.some((widget) => widget.id === widgetId) ||
+          !page.widgets.some((widget) => widget.id === widgetId)
+        ) {
+          return;
+        }
+        const nextLayout = copyGridLayout(layout);
+        nextLayout.placements[widgetId] = clone(placement);
+        if (
+          !isSafePageLayout(nextLayout) ||
           !canPlacePlacement(
             variant.grid.columns,
             variant.grid.rows,
@@ -921,8 +994,13 @@ function createExperienceBuilderState(
         ) {
           return;
         }
+        const nextDraft = clone(state.draft);
+        const nextPage = pageById(nextDraft, pageId);
+        if (!nextPage) return;
+        nextPage.layouts[state.activeVariantId] = nextLayout;
+        if (!isSafeTemplateDraft(nextDraft)) return;
         const before = snapshot(state);
-        layout.placements[widgetId] = clone(placement);
+        state.draft = nextDraft;
         changed = commitEdit(state, before);
       });
       return changed;
@@ -944,20 +1022,20 @@ function createExperienceBuilderState(
     setTypographyScale: (pageId, scale) => {
       let changed = false;
       set((state) => {
-        const layout = ownPageLayout(
-          pageById(state.draft, pageId),
-          state.activeVariantId
-        );
-        if (
-          !layout ||
-          (scale !== undefined &&
-            (!Number.isFinite(scale) || scale < 0.75 || scale > 2))
-        ) {
-          return;
-        }
+        const page = pageById(state.draft, pageId);
+        const layout = ownPageLayout(page, state.activeVariantId);
+        if (!page || !layout) return;
+        const nextLayout = copyGridLayout(layout);
+        if (scale === undefined) delete nextLayout.typographyScale;
+        else nextLayout.typographyScale = scale;
+        if (!isSafePageLayout(nextLayout)) return;
+        const nextDraft = clone(state.draft);
+        const nextPage = pageById(nextDraft, pageId);
+        if (!nextPage) return;
+        nextPage.layouts[state.activeVariantId] = nextLayout;
+        if (!isSafeTemplateDraft(nextDraft)) return;
         const before = snapshot(state);
-        if (scale === undefined) delete layout.typographyScale;
-        else layout.typographyScale = scale;
+        state.draft = nextDraft;
         changed = commitEdit(state, before);
       });
       return changed;
@@ -982,20 +1060,23 @@ function createExperienceBuilderState(
         const targetVariant = state.draft.variants.find(
           (variant) => variant.id === toVariantId
         );
+        const copiedLayout = copyGridLayout(
+          ownPageLayout(page, fromVariantId)!
+        );
         if (
           !targetVariant ||
-          !layoutFitsVariant(
-            page,
-            ownPageLayout(page, fromVariantId)!,
-            targetVariant.grid
-          )
+          !isSafePageLayout(copiedLayout) ||
+          !layoutFitsVariant(page, copiedLayout, targetVariant.grid)
         ) {
           return;
         }
+        const nextDraft = clone(state.draft);
+        const nextPage = pageById(nextDraft, pageId);
+        if (!nextPage) return;
+        nextPage.layouts[toVariantId] = copiedLayout;
+        if (!isSafeTemplateDraft(nextDraft)) return;
         const before = snapshot(state);
-        page.layouts[toVariantId] = copyGridLayout(
-          ownPageLayout(page, fromVariantId)!
-        );
+        state.draft = nextDraft;
         changed = commitEdit(state, before);
       });
       return changed;

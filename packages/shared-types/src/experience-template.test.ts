@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EXPERIENCE_TEMPLATE_LIMITS,
+  ExperienceDraftSchema,
   ExperiencePageSchema,
   ExperienceTemplateSchema,
   ExperienceWidgetSchema
@@ -55,6 +56,29 @@ function expectIssuePath(input: unknown, expectedPath: Array<string | number>) {
 }
 
 describe('ExperienceTemplateSchema', () => {
+  it('uses a strict action contract for editable drafts while allowing unplaced variant widgets', () => {
+    const editable = validTemplate();
+    editable.pages[0]!.widgets[0]!.actions = [];
+    editable.variants.push({ ...editable.variants[0]!, id: 'landscape' });
+    editable.pages[0]!.layouts.landscape = { placements: {} };
+
+    expect(ExperienceDraftSchema.safeParse(editable).success).toBe(true);
+    expect(ExperienceTemplateSchema.safeParse(editable).success).toBe(false);
+
+    const missingActions = structuredClone(editable);
+    delete (missingActions.pages[0]!.widgets[0] as { actions?: unknown })
+      .actions;
+    expect(ExperienceDraftSchema.safeParse(missingActions).success).toBe(false);
+
+    const malformedAction = structuredClone(editable);
+    malformedAction.pages[0]!.widgets[0]!.actions = [
+      { type: 'navigate', toPageId: '' }
+    ];
+    expect(ExperienceDraftSchema.safeParse(malformedAction).success).toBe(
+      false
+    );
+  });
+
   it('separates role-based surfaces from concrete device profiles', () => {
     const valid = validTemplate();
 

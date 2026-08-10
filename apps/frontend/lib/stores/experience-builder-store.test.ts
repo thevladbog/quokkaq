@@ -112,6 +112,240 @@ describe('experience builder store', () => {
     expect(builder.getState().isDirty).toBe(false);
   });
 
+  it('rejects malformed drafts atomically before actions, layouts, or access can reach store state', () => {
+    const malformedDrafts: Array<{
+      name: string;
+      create: () => ExperienceTemplate;
+    }> = [
+      {
+        name: 'an object instead of widget actions',
+        create: () => {
+          const incoming = draft();
+          incoming.pages[0]!.widgets[0]!.actions = {} as never;
+          return incoming;
+        }
+      },
+      {
+        name: 'missing widget actions',
+        create: () => {
+          const incoming = draft();
+          delete (
+            incoming.pages[0]!.widgets[0] as unknown as {
+              actions?: unknown;
+            }
+          ).actions;
+          return incoming;
+        }
+      },
+      {
+        name: 'a malformed action payload',
+        create: () => {
+          const incoming = draft();
+          incoming.pages[0]!.widgets[0]!.actions = [
+            { type: 'set-session', key: 'selectedServiceId' } as never
+          ];
+          return incoming;
+        }
+      },
+      {
+        name: 'an invalid navigate target',
+        create: () => {
+          const incoming = draft();
+          incoming.pages[0]!.widgets[0]!.actions = [
+            { type: 'navigate', toPageId: '' } as never
+          ];
+          return incoming;
+        }
+      },
+      {
+        name: 'a missing navigate target page',
+        create: () => {
+          const incoming = draft();
+          incoming.pages[0]!.widgets[0]!.actions = [
+            { type: 'navigate', toPageId: 'missing-page' } as never
+          ];
+          return incoming;
+        }
+      },
+      {
+        name: 'a malformed access condition',
+        create: () => {
+          const incoming = draft();
+          incoming.pages[0]!.widgets[0]!.access = {
+            when: {
+              kind: 'rule',
+              field: 'identity.isAuthenticated',
+              operator: 'eq',
+              value: true
+            },
+            whenFalse: 'lock'
+          } as never;
+          return incoming;
+        }
+      },
+      {
+        name: 'an empty placement',
+        create: () => {
+          const incoming = draft();
+          incoming.pages[0]!.layouts.portrait!.placements.picker = {} as never;
+          return incoming;
+        }
+      },
+      ...[
+        ['NaN', 'col', Number.NaN],
+        ['infinite', 'row', Number.POSITIVE_INFINITY],
+        ['fractional', 'colSpan', 1.5],
+        ['zero', 'rowSpan', 0],
+        ['negative', 'col', -1]
+      ].map(([name, field, value]) => ({
+        name: `a ${name} placement ${field}`,
+        create: () => {
+          const incoming = draft();
+          incoming.pages[0]!.layouts.portrait!.placements.picker = {
+            ...incoming.pages[0]!.layouts.portrait!.placements.picker!,
+            [field]: value
+          } as never;
+          return incoming;
+        }
+      })),
+      {
+        name: 'a malformed typography scale',
+        create: () => {
+          const incoming = draft();
+          incoming.pages[0]!.layouts.portrait!.typographyScale =
+            Number.POSITIVE_INFINITY;
+          return incoming;
+        }
+      },
+      {
+        name: 'an invalid variant grid',
+        create: () => {
+          const incoming = draft();
+          incoming.variants[0]!.grid.columns = Number.NaN;
+          return incoming;
+        }
+      },
+      {
+        name: 'a malformed page access policy',
+        create: () => {
+          const incoming = draft();
+          incoming.pages[0]!.access = {
+            when: {
+              kind: 'rule',
+              field: 'live.queueLength',
+              operator: 'contains',
+              value: 'unexpected'
+            },
+            whenFalse: 'hide'
+          } as never;
+          return incoming;
+        }
+      }
+    ];
+
+    for (const malformed of malformedDrafts) {
+      const builder = store();
+      builder.getState().setActivePage('details');
+      builder.getState().setActiveVariant('landscape');
+      builder.getState().renamePage('details', 'Unsaved details');
+      const before = structuredClone({
+        draft: builder.getState().draft,
+        activePageId: builder.getState().activePageId,
+        activeVariantId: builder.getState().activeVariantId,
+        selection: builder.getState().selection,
+        history: builder.getState().history,
+        redoStack: builder.getState().redoStack,
+        lastSavedDraft: builder.getState().lastSavedDraft,
+        isDirty: builder.getState().isDirty
+      });
+
+      expect(
+        builder.getState().loadDraft(malformed.create()),
+        malformed.name
+      ).toBe(false);
+      expect({
+        draft: builder.getState().draft,
+        activePageId: builder.getState().activePageId,
+        activeVariantId: builder.getState().activeVariantId,
+        selection: builder.getState().selection,
+        history: builder.getState().history,
+        redoStack: builder.getState().redoStack,
+        lastSavedDraft: builder.getState().lastSavedDraft,
+        isDirty: builder.getState().isDirty
+      }).toEqual(before);
+      expect(() =>
+        getUnreachablePageIds(builder.getState().draft)
+      ).not.toThrow();
+      expect(() => builder.getState().duplicatePage('services')).not.toThrow();
+    }
+  });
+
+  it('accepts a valid draft with an explicitly unplaced inactive variant widget', () => {
+    const builder = store();
+    const editable = draft();
+    editable.pages[0]!.widgets.push({
+      id: 'notice',
+      type: 'rich-info',
+      config: {},
+      actions: []
+    });
+    editable.pages[0]!.layouts.portrait!.placements.notice = {
+      col: 3,
+      row: 3,
+      colSpan: 1,
+      rowSpan: 1
+    };
+
+    expect(builder.getState().loadDraft(editable)).toBe(true);
+    expect(
+      builder.getState().draft.pages[0]!.layouts.landscape!.placements.notice
+    ).toBeUndefined();
+  });
+
+  it('rejects malformed widget action and access changes before they mutate shared state', () => {
+    const builder = store();
+    const before = structuredClone({
+      draft: builder.getState().draft,
+      history: builder.getState().history,
+      redoStack: builder.getState().redoStack,
+      selection: builder.getState().selection,
+      isDirty: builder.getState().isDirty
+    });
+
+    expect(
+      builder.getState().addWidget('services', 'media', {
+        actions: [{} as never]
+      })
+    ).toBeNull();
+    expect(
+      builder.getState().addWidget('services', 'media', {
+        actions: [{ type: 'navigate', toPageId: 'missing-page' } as never]
+      })
+    ).toBeNull();
+    expect(
+      builder.getState().updateWidgetShared('services', 'picker', {
+        actions: [{ type: 'navigate', toPageId: '' } as never]
+      })
+    ).toBe(false);
+    expect(
+      builder.getState().updateWidgetShared('services', 'picker', {
+        actions: [{ type: 'navigate', toPageId: 'missing-page' } as never]
+      })
+    ).toBe(false);
+    expect(
+      builder.getState().updateWidgetShared('services', 'picker', {
+        access: { when: {}, whenFalse: 'lock' } as never
+      })
+    ).toBe(false);
+    expect({
+      draft: builder.getState().draft,
+      history: builder.getState().history,
+      redoStack: builder.getState().redoStack,
+      selection: builder.getState().selection,
+      isDirty: builder.getState().isDirty
+    }).toEqual(before);
+  });
+
   it('rejects unsafe ids and inherited records without mutating the store', () => {
     const builder = store();
     const initial = builder.getState().draft;
