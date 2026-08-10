@@ -1,0 +1,571 @@
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen
+} from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ExperienceTemplate } from '@quokkaq/shared-types';
+
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key: string, values?: Record<string, unknown>) =>
+    String(values?.default ?? key)
+}));
+
+import {
+  ExperienceRenderer,
+  type ExperienceRuntimeAdapters,
+  type ExperienceRuntimeContext,
+  type ExperienceRuntimeSession
+} from './experience-renderer';
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
+
+function variant(surface: ExperienceTemplate['surface']) {
+  return {
+    id: 'display',
+    profile: {
+      id: 'profile',
+      name: 'Test display',
+      width: surface === 'queue-display' ? 1920 : 820,
+      height: surface === 'queue-display' ? 1080 : 1180,
+      interactionMode:
+        surface === 'queue-display'
+          ? ('non-touch' as const)
+          : ('touch' as const),
+      viewingDistance:
+        surface === 'queue-display' ? ('far' as const) : ('near' as const),
+      safeArea: { top: 36, right: 48, bottom: 36, left: 48 }
+    },
+    grid: { columns: 12, rows: 8 }
+  };
+}
+
+function navigationTemplate(): ExperienceTemplate {
+  return {
+    schemaVersion: 1,
+    id: 'runtime-navigation',
+    surface: 'ticket-station',
+    startPageId: 'home',
+    variants: [variant('ticket-station')],
+    pages: [
+      {
+        id: 'home',
+        name: 'Home',
+        widgets: [
+          {
+            id: 'continue',
+            type: 'rich-info',
+            config: { label: 'Continue' },
+            actions: [
+              {
+                type: 'set-session',
+                key: 'selectedServiceId',
+                value: { source: 'literal', value: 'service-7' }
+              },
+              { type: 'submit-ticket' },
+              { type: 'navigate', toPageId: 'details' }
+            ]
+          }
+        ],
+        layouts: {
+          display: {
+            placements: {
+              continue: { col: 1, row: 1, colSpan: 4, rowSpan: 2 }
+            }
+          }
+        }
+      },
+      {
+        id: 'details',
+        name: 'Details',
+        widgets: [
+          {
+            id: 'details-copy',
+            type: 'rich-info',
+            config: { label: 'Details content' },
+            actions: []
+          }
+        ],
+        layouts: {
+          display: {
+            placements: {
+              'details-copy': { col: 1, row: 1, colSpan: 4, rowSpan: 2 }
+            }
+          }
+        }
+      }
+    ]
+  };
+}
+
+const baseContext: ExperienceRuntimeContext = {
+  identity: { isAuthenticated: false, isEmployee: false, groups: [] },
+  live: { queueLength: 4, isOpen: true, isConnected: true },
+  operational: {
+    connected: true,
+    open: true,
+    activeCounters: 2,
+    queueLength: 4
+  }
+};
+
+describe('ExperienceRenderer session and navigation', () => {
+  it('executes actions in order and supports back, home, and reset with a fresh ephemeral session', async () => {
+    const sessions: ExperienceRuntimeSession[] = [
+      { id: 'session-1', values: {} },
+      { id: 'session-2', values: {} }
+    ];
+    const createSession = vi.fn(() => sessions.shift()!);
+    const submit = vi.fn(async (session: ExperienceRuntimeSession) => {
+      expect(session.values.selectedServiceId).toBe('service-7');
+    });
+    const adapters: ExperienceRuntimeAdapters = {
+      createSession,
+      submitTicket: submit
+    };
+
+    render(
+      <ExperienceRenderer
+        template={navigationTemplate()}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={adapters}
+      />
+    );
+
+    expect(screen.getByTestId('experience-runtime')).toHaveAttribute(
+      'data-session-id',
+      'session-1'
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    });
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Details content')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Home' }));
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset session' }));
+    expect(screen.getByTestId('experience-runtime')).toHaveAttribute(
+      'data-session-id',
+      'session-2'
+    );
+    expect(createSession).toHaveBeenCalledTimes(2);
+  });
+
+  it('resets page and session on timeout without persisting runtime values', () => {
+    vi.useFakeTimers();
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    let sessionNumber = 0;
+    const template = navigationTemplate();
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        initialPageId='details'
+        runtimeContext={baseContext}
+        adapters={{
+          createSession: () => ({
+            id: `session-${++sessionNumber}`,
+            values: { activeLocale: 'ru' }
+          })
+        }}
+        sessionTimeoutMs={1_000}
+      />
+    );
+
+    expect(screen.getByText('Details content')).toBeVisible();
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
+    expect(screen.getByTestId('experience-runtime')).toHaveAttribute(
+      'data-session-id',
+      'session-2'
+    );
+    expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown action before applying later actions', async () => {
+    const template = navigationTemplate();
+    template.pages[0]!.widgets[0]!.actions = [
+      { type: 'future-action' } as never,
+      { type: 'navigate', toPageId: 'details' }
+    ];
+    const onRuntimeError = vi.fn();
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{ onRuntimeError }}
+      />
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    });
+
+    expect(onRuntimeError).toHaveBeenCalledWith({
+      code: 'unknown-action',
+      widgetId: 'continue'
+    });
+    expect(screen.queryByText('Details content')).toBeNull();
+  });
+
+  it('hides inaccessible widgets and keeps locked widgets visible and inert', () => {
+    const template = navigationTemplate();
+    template.pages[0]!.widgets = [
+      {
+        ...template.pages[0]!.widgets[0]!,
+        id: 'hidden',
+        config: { label: 'Hidden employee action' },
+        access: {
+          when: {
+            kind: 'rule',
+            field: 'identity.isEmployee',
+            operator: 'is-true'
+          },
+          whenFalse: 'hide'
+        }
+      },
+      {
+        ...template.pages[0]!.widgets[0]!,
+        id: 'locked',
+        config: { label: 'Employee action' },
+        access: {
+          when: {
+            kind: 'rule',
+            field: 'identity.isEmployee',
+            operator: 'is-true'
+          },
+          whenFalse: 'lock'
+        }
+      }
+    ];
+    template.pages[0]!.layouts.display!.placements = {
+      hidden: { col: 1, row: 1, colSpan: 4, rowSpan: 2 },
+      locked: { col: 5, row: 1, colSpan: 4, rowSpan: 2 }
+    };
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{}}
+      />
+    );
+
+    expect(screen.queryByText('Hidden employee action')).toBeNull();
+    const locked = screen.getByRole('button', { name: 'Employee action' });
+    expect(locked).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(locked);
+    expect(screen.queryByText('Details content')).toBeNull();
+  });
+});
+
+describe('ExperienceRenderer registry and operational overrides', () => {
+  it('diagnoses unknown or unsupported widgets in preview and rejects them in deployed mode', () => {
+    const template = navigationTemplate();
+    template.surface = 'queue-display';
+    template.pages[0]!.widgets[0]!.type = 'service-picker';
+
+    const { rerender } = render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{}}
+        mode='preview'
+      />
+    );
+    expect(
+      screen.getByText('Widget is not available on this surface')
+    ).toBeVisible();
+
+    rerender(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{}}
+        mode='deployed'
+      />
+    );
+    expect(screen.getByTestId('experience-runtime-rejected')).toBeVisible();
+    expect(screen.queryByText('Continue')).toBeNull();
+  });
+
+  it('distinguishes an unknown widget from a known widget unsupported by the surface', () => {
+    const template = navigationTemplate();
+    template.pages[0]!.widgets[0]!.type = 'future-widget' as never;
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{}}
+        mode='preview'
+      />
+    );
+
+    expect(screen.getByText('Unknown widget type')).toBeVisible();
+    expect(
+      screen.queryByText('Widget is not available on this surface')
+    ).toBeNull();
+  });
+
+  it('aligns runtime capability checks with a validated visitor-mobile display widget', () => {
+    const template = navigationTemplate();
+    template.surface = 'visitor-mobile';
+    template.pages[0]!.widgets[0]!.type = 'eta-display';
+    template.pages[0]!.widgets[0]!.config = {};
+    template.pages[0]!.widgets[0]!.actions = [];
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{}}
+        mode='preview'
+      />
+    );
+
+    expect(screen.getByText('eta-display')).toBeVisible();
+    expect(
+      screen.queryByText('Widget is not available on this surface')
+    ).toBeNull();
+  });
+
+  it('keeps media failure visible without replacing a normal tenant page', () => {
+    render(
+      <ExperienceRenderer
+        template={navigationTemplate()}
+        variantId='display'
+        runtimeContext={{
+          ...baseContext,
+          operational: {
+            connected: true,
+            open: true,
+            activeCounters: 2,
+            queueLength: 4,
+            mediaFailed: true
+          }
+        }}
+        adapters={{}}
+      />
+    );
+
+    expect(screen.getByText('Media is temporarily unavailable')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
+  });
+
+  it.each([
+    ['emergency', { emergency: true }, 'Attention'],
+    [
+      'temporarily-unavailable',
+      { temporarilyUnavailable: true },
+      'Temporarily unavailable'
+    ],
+    ['stale-offline', { connected: false }, 'Data is temporarily not updating'],
+    ['closed', { open: false }, 'This location is closed'],
+    [
+      'no-active-counters',
+      { activeCounters: 0 },
+      'No service counters are active'
+    ],
+    ['empty', { queueLength: 0 }, 'The queue is currently empty']
+  ] as const)(
+    'renders distinguishable %s system state over tenant conditions',
+    (_state, override, copy) => {
+      const template = navigationTemplate();
+      template.pages[0]!.access = {
+        when: {
+          kind: 'rule',
+          field: 'identity.isEmployee',
+          operator: 'is-true'
+        },
+        whenFalse: 'hide'
+      };
+
+      render(
+        <ExperienceRenderer
+          template={template}
+          variantId='display'
+          runtimeContext={{
+            ...baseContext,
+            operational: {
+              connected: true,
+              open: true,
+              activeCounters: 2,
+              queueLength: 4,
+              ...override
+            }
+          }}
+          adapters={{}}
+        />
+      );
+
+      expect(screen.getByText(copy)).toBeVisible();
+      expect(screen.queryByText('Continue')).toBeNull();
+      expect(screen.queryByRole('navigation')).toBeNull();
+    }
+  );
+});
+
+describe('queue display preview', () => {
+  it('keeps the primary call dominant, bounds recent calls, honors safe area and reduced motion, and announces audio', () => {
+    const template: ExperienceTemplate = {
+      schemaVersion: 1,
+      id: 'queue-display-preview',
+      surface: 'queue-display',
+      startPageId: 'queue',
+      variants: [variant('queue-display')],
+      pages: [
+        {
+          id: 'queue',
+          name: 'Queue',
+          widgets: [
+            {
+              id: 'calls',
+              type: 'called-tickets',
+              config: {},
+              actions: []
+            }
+          ],
+          layouts: {
+            display: {
+              placements: {
+                calls: { col: 1, row: 1, colSpan: 12, rowSpan: 8 }
+              }
+            }
+          }
+        }
+      ]
+    };
+    const audioCall = vi.fn();
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={{
+          ...baseContext,
+          prefersReducedMotion: true,
+          display: {
+            unitName: 'Presnensky office',
+            nowLabel: '14:32',
+            primaryCall: {
+              id: 'call-primary',
+              queueNumber: 'A-039',
+              counterName: 'A very long service window name that must truncate'
+            },
+            recentCalls: [
+              { id: 'c1', queueNumber: 'A-038', counterName: 'Window 01' },
+              { id: 'c2', queueNumber: 'B-112', counterName: 'Window 05' },
+              { id: 'c3', queueNumber: 'A-040', counterName: 'Next' },
+              { id: 'c4', queueNumber: 'C-200', counterName: 'Hidden overflow' }
+            ]
+          }
+        }}
+        adapters={{ audioCall }}
+        mode='preview'
+      />
+    );
+
+    const surface = screen.getByTestId('experience-runtime-surface');
+    expect(surface).toHaveStyle({ padding: '36px 48px' });
+    expect(screen.getByTestId('primary-called-ticket')).toHaveTextContent(
+      'A-039'
+    );
+    expect(screen.getByTestId('primary-called-ticket')).toHaveAttribute(
+      'data-motion',
+      'reduced'
+    );
+    expect(screen.getAllByTestId('recent-called-ticket')).toHaveLength(3);
+    expect(screen.queryByText('C-200')).toBeNull();
+    expect(screen.getByText(/very long service window/i)).toHaveClass(
+      'truncate'
+    );
+    expect(audioCall).toHaveBeenCalledWith({
+      id: 'call-primary',
+      queueNumber: 'A-039',
+      counterName: 'A very long service window name that must truncate'
+    });
+  });
+
+  it('announces a call once per call id across ordinary rerenders', () => {
+    const template: ExperienceTemplate = {
+      schemaVersion: 1,
+      id: 'audio-deduplication',
+      surface: 'queue-display',
+      startPageId: 'queue',
+      variants: [variant('queue-display')],
+      pages: [
+        {
+          id: 'queue',
+          name: 'Queue',
+          widgets: [
+            { id: 'calls', type: 'called-tickets', config: {}, actions: [] }
+          ],
+          layouts: {
+            display: {
+              placements: {
+                calls: { col: 1, row: 1, colSpan: 12, rowSpan: 8 }
+              }
+            }
+          }
+        }
+      ]
+    };
+    const audioCall = vi.fn();
+    const adapters = { audioCall };
+    const context = (id: string): ExperienceRuntimeContext => ({
+      ...baseContext,
+      display: {
+        unitName: 'Office',
+        nowLabel: '14:32',
+        primaryCall: { id, queueNumber: 'A-039', counterName: 'Window 03' }
+      }
+    });
+    const { rerender } = render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={context('call-1')}
+        adapters={adapters}
+      />
+    );
+
+    rerender(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={context('call-1')}
+        adapters={adapters}
+      />
+    );
+    expect(audioCall).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={context('call-2')}
+        adapters={adapters}
+      />
+    );
+    expect(audioCall).toHaveBeenCalledTimes(2);
+  });
+});
