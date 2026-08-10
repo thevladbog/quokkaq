@@ -8,6 +8,7 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   EXPERIENCE_TEMPLATE_LIMITS,
+  validateExperienceForPublish,
   type ExperienceTemplate
 } from '@quokkaq/shared-types';
 import { ApiHttpError } from '@/lib/api-errors';
@@ -240,6 +241,222 @@ describe('PublishExperienceDialog', () => {
     );
     expect(alert).not.toHaveTextContent('variant.unplaced_widget');
     expect(alert).not.toHaveTextContent('4111 1111 1111 1111');
+  });
+
+  it('keeps actual overlap and overflow locations useful without exposing record ids', () => {
+    const variantId = 'variant-card-4111111111111111';
+    const widgetId = 'widget-account-token-sensitive';
+    const overflowWidgetId = 'widget-phone-2025550198';
+    const overlapDraft: ExperienceTemplate = {
+      ...validDraft,
+      variants: [
+        {
+          ...validDraft.variants[0],
+          id: variantId,
+          profile: { ...validDraft.variants[0].profile, id: variantId }
+        }
+      ],
+      pages: [
+        {
+          ...validDraft.pages[0],
+          widgets: [
+            { ...validDraft.pages[0].widgets[0], id: 'anchor' },
+            { ...validDraft.pages[0].widgets[0], id: widgetId },
+            { ...validDraft.pages[0].widgets[0], id: overflowWidgetId }
+          ],
+          layouts: {
+            [variantId]: {
+              placements: {
+                anchor: { col: 1, row: 1, colSpan: 6, rowSpan: 6 },
+                [widgetId]: { col: 1, row: 1, colSpan: 6, rowSpan: 6 },
+                [overflowWidgetId]: {
+                  col: 12,
+                  row: 1,
+                  colSpan: 2,
+                  rowSpan: 1
+                }
+              }
+            }
+          }
+        }
+      ]
+    };
+    const validationReport = validateExperienceForPublish(overlapDraft);
+    const overlapIssue = validationReport.errors.find(
+      (issue) => issue.code === 'variant.placement_overlap'
+    );
+    const overflowIssue = validationReport.errors.find(
+      (issue) => issue.code === 'variant.placement_overflow'
+    );
+
+    expect(overlapIssue?.path).toEqual([
+      'pages',
+      0,
+      'layouts',
+      variantId,
+      'placements',
+      widgetId
+    ]);
+    expect(overflowIssue?.path).toEqual([
+      'pages',
+      0,
+      'layouts',
+      variantId,
+      'placements',
+      overflowWidgetId
+    ]);
+
+    render(
+      <PublishExperienceDialog
+        open
+        onOpenChange={vi.fn()}
+        draft={overlapDraft}
+        validationReport={validationReport}
+        onPublish={vi.fn()}
+      />
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(/two widget placements overlap/i);
+    expect(alert).toHaveTextContent(/widget extends beyond the layout grid/i);
+    expect(alert).toHaveTextContent(
+      /location: pages\[0\]\.layouts\.\[variant\]\.placements\.\[widget\]/i
+    );
+    expect(alert).not.toHaveTextContent(variantId);
+    expect(alert).not.toHaveTextContent(widgetId);
+    expect(alert).not.toHaveTextContent(overflowWidgetId);
+  });
+
+  it('keeps real presentation placement array indexes in structural paths', () => {
+    const stationDraft: ExperienceTemplate = {
+      ...validDraft,
+      surface: 'ticket-station',
+      pages: [
+        {
+          ...validDraft.pages[0],
+          widgets: [
+            {
+              id: 'catalog',
+              type: 'service-picker',
+              config: {
+                presentation: {
+                  mode: 'manual',
+                  grid: { rows: 1, columns: 1 },
+                  coordinateBase: 'one-based',
+                  placements: [
+                    {
+                      serviceId: 'service-sensitive-id',
+                      row: 2,
+                      col: 1,
+                      rowSpan: 1,
+                      colSpan: 1
+                    }
+                  ]
+                }
+              },
+              actions: []
+            }
+          ],
+          layouts: {
+            display: {
+              placements: {
+                catalog: { col: 1, row: 1, colSpan: 12, rowSpan: 18 }
+              }
+            }
+          }
+        }
+      ]
+    };
+    const validationReport = validateExperienceForPublish(stationDraft);
+    const scrollIssue = validationReport.errors.find(
+      (issue) => issue.code === 'station.page_scroll_required'
+    );
+
+    expect(scrollIssue?.path).toEqual([
+      'pages',
+      0,
+      'widgets',
+      0,
+      'config',
+      'presentation',
+      'placements',
+      0
+    ]);
+
+    render(
+      <PublishExperienceDialog
+        open
+        onOpenChange={vi.fn()}
+        draft={stationDraft}
+        validationReport={validationReport}
+        onPublish={vi.fn()}
+      />
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(
+      /ticket-station page would require scrolling/i
+    );
+    expect(alert).toHaveTextContent(
+      /location: pages\[0\]\.widgets\[0\]\.config\.presentation\.placements\[0\]/i
+    );
+    expect(alert).not.toHaveTextContent('service-sensitive-id');
+  });
+
+  it('accepts dynamic ids only for allowlisted codes at exact record positions', () => {
+    render(
+      <PublishExperienceDialog
+        open
+        onOpenChange={vi.fn()}
+        draft={validDraft}
+        onPublish={vi.fn()}
+        publishError={{
+          kind: 'invalid-definition',
+          issues: [
+            {
+              code: 'variant.placement_overlap',
+              path: ['pages', 0, 'layouts', 'private-variant', 'placements', 0],
+              message: 'private placement value'
+            },
+            {
+              code: 'private.layout_issue',
+              path: [
+                'pages',
+                0,
+                'layouts',
+                'private-variant',
+                'placements',
+                'private-widget'
+              ],
+              message: 'private issue code value'
+            },
+            {
+              code: 'variant.placement_overlap',
+              path: [
+                'pages',
+                0,
+                'layouts',
+                'private-variant',
+                'typographyScale'
+              ],
+              message: 'private wrong-position value'
+            }
+          ]
+        }}
+      />
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(screen.getAllByText(/^Location: Definition$/i)).toHaveLength(3);
+    expect(alert).not.toHaveTextContent('private-variant');
+    expect(alert).not.toHaveTextContent('private-widget');
+    expect(alert).not.toHaveTextContent('placements[0]');
+    expect(alert).not.toHaveTextContent('private placement value');
+    expect(alert).not.toHaveTextContent('private.layout_issue');
+    expect(alert).not.toHaveTextContent('private issue code value');
+    expect(alert).not.toHaveTextContent('private wrong-position value');
+    expect(alert).not.toHaveTextContent('[variant]');
+    expect(alert).not.toHaveTextContent('[widget]');
   });
 
   it('keeps canonical schema locations useful only within resource bounds', () => {

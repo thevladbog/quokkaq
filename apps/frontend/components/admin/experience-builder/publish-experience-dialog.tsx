@@ -155,120 +155,294 @@ function safeIssueDescription(code: string) {
   )?.[1];
 }
 
-const CANONICAL_ISSUE_PATH_FIELDS = new Set([
-  'definition',
-  'schemaVersion',
-  'id',
-  'templateId',
-  'version',
-  'publishedAt',
-  'surface',
-  'startPageId',
-  'variants',
-  'profile',
-  'name',
-  'width',
-  'height',
-  'interactionMode',
-  'viewingDistance',
-  'safeArea',
-  'top',
-  'right',
-  'bottom',
-  'left',
-  'grid',
-  'columns',
-  'rows',
-  'pages',
-  'widgets',
-  'type',
-  'config',
-  'tone',
-  'access',
-  'when',
-  'whenFalse',
-  'actions',
-  'key',
-  'value',
-  'source',
-  'field',
-  'toPageId',
-  'layouts',
-  'placements',
-  'col',
-  'row',
-  'colSpan',
-  'rowSpan',
-  'typographyScale',
-  'flowPages',
-  'serviceCatalogPageId',
-  'serviceInfoPageId',
-  'serviceFormPageId',
-  'identityPageId',
-  'appointmentPageId',
-  'confirmationPageId',
-  'successPageId',
-  'theme',
-  'preset',
-  'tokens',
-  'header',
-  'serviceGrid',
-  'legacyRouting',
-  'presentation',
-  'pagination',
-  'catalog',
-  'pageSize',
-  'itemCount'
-]);
+type SafePathGrammar = {
+  readonly fields?: Readonly<Record<string, SafePathGrammar>>;
+  readonly index?: {
+    readonly max: number;
+    readonly next: SafePathGrammar;
+  };
+};
 
-const CANONICAL_ISSUE_PATH_INDEX_LIMITS = {
-  variants: EXPERIENCE_TEMPLATE_LIMITS.maxVariants - 1,
-  pages: EXPERIENCE_TEMPLATE_LIMITS.maxPages - 1,
-  widgets: EXPERIENCE_TEMPLATE_LIMITS.maxWidgetsPerPage - 1,
-  actions: EXPERIENCE_TEMPLATE_LIMITS.maxActionsPerWidget - 1,
-  placements: EXPERIENCE_TEMPLATE_LIMITS.maxWidgetsPerPage - 1
-} as const;
+const SAFE_PATH_LEAF: SafePathGrammar = {};
+const SAFE_CONDITION_PATH: SafePathGrammar = {
+  fields: { when: SAFE_PATH_LEAF, whenFalse: SAFE_PATH_LEAF }
+};
+const SAFE_ACTION_VALUE_PATH: SafePathGrammar = {
+  fields: {
+    source: SAFE_PATH_LEAF,
+    value: SAFE_PATH_LEAF,
+    field: SAFE_PATH_LEAF
+  }
+};
+const SAFE_ACTION_PATH: SafePathGrammar = {
+  fields: {
+    type: SAFE_PATH_LEAF,
+    key: SAFE_PATH_LEAF,
+    value: SAFE_ACTION_VALUE_PATH,
+    toPageId: SAFE_PATH_LEAF
+  }
+};
+const SAFE_GRID_PATH: SafePathGrammar = {
+  fields: { columns: SAFE_PATH_LEAF, rows: SAFE_PATH_LEAF }
+};
+const SAFE_PRESENTATION_PLACEMENT_PATH: SafePathGrammar = {
+  fields: {
+    serviceId: SAFE_PATH_LEAF,
+    row: SAFE_PATH_LEAF,
+    col: SAFE_PATH_LEAF,
+    rowSpan: SAFE_PATH_LEAF,
+    colSpan: SAFE_PATH_LEAF
+  }
+};
+const SAFE_WIDGET_CONFIG_PATH: SafePathGrammar = {
+  fields: {
+    legacyRouting: SAFE_PATH_LEAF,
+    presentation: {
+      fields: {
+        mode: SAFE_PATH_LEAF,
+        grid: SAFE_GRID_PATH,
+        coordinateBase: SAFE_PATH_LEAF,
+        placements: {
+          index: {
+            max: EXPERIENCE_TEMPLATE_LIMITS.maxWidgetsPerPage - 1,
+            next: SAFE_PRESENTATION_PLACEMENT_PATH
+          }
+        }
+      }
+    },
+    pagination: {
+      fields: {
+        enabled: SAFE_PATH_LEAF,
+        pageSize: SAFE_PATH_LEAF,
+        threshold: SAFE_PATH_LEAF
+      }
+    },
+    catalog: {
+      fields: {
+        navigation: SAFE_PATH_LEAF,
+        rootCategoryIds: SAFE_PATH_LEAF,
+        itemCount: SAFE_PATH_LEAF
+      }
+    }
+  }
+};
+const SAFE_WIDGET_PATH: SafePathGrammar = {
+  fields: {
+    id: SAFE_PATH_LEAF,
+    type: SAFE_PATH_LEAF,
+    config: SAFE_WIDGET_CONFIG_PATH,
+    tone: SAFE_PATH_LEAF,
+    access: SAFE_CONDITION_PATH,
+    actions: {
+      index: {
+        max: EXPERIENCE_TEMPLATE_LIMITS.maxActionsPerWidget - 1,
+        next: SAFE_ACTION_PATH
+      }
+    }
+  }
+};
+const SAFE_PAGE_PATH: SafePathGrammar = {
+  fields: {
+    id: SAFE_PATH_LEAF,
+    name: SAFE_PATH_LEAF,
+    widgets: {
+      index: {
+        max: EXPERIENCE_TEMPLATE_LIMITS.maxWidgetsPerPage - 1,
+        next: SAFE_WIDGET_PATH
+      }
+    },
+    access: SAFE_CONDITION_PATH,
+    layouts: SAFE_PATH_LEAF
+  }
+};
+const SAFE_PROFILE_PATH: SafePathGrammar = {
+  fields: {
+    id: SAFE_PATH_LEAF,
+    name: SAFE_PATH_LEAF,
+    width: SAFE_PATH_LEAF,
+    height: SAFE_PATH_LEAF,
+    interactionMode: SAFE_PATH_LEAF,
+    viewingDistance: SAFE_PATH_LEAF,
+    safeArea: {
+      fields: {
+        top: SAFE_PATH_LEAF,
+        right: SAFE_PATH_LEAF,
+        bottom: SAFE_PATH_LEAF,
+        left: SAFE_PATH_LEAF
+      }
+    }
+  }
+};
+const SAFE_VARIANT_PATH: SafePathGrammar = {
+  fields: {
+    id: SAFE_PATH_LEAF,
+    profile: SAFE_PROFILE_PATH,
+    grid: SAFE_GRID_PATH
+  }
+};
+const SAFE_ISSUE_PATH_GRAMMAR: SafePathGrammar = {
+  fields: {
+    definition: { fields: { id: SAFE_PATH_LEAF } },
+    schemaVersion: SAFE_PATH_LEAF,
+    id: SAFE_PATH_LEAF,
+    templateId: SAFE_PATH_LEAF,
+    version: SAFE_PATH_LEAF,
+    publishedAt: SAFE_PATH_LEAF,
+    surface: SAFE_PATH_LEAF,
+    startPageId: SAFE_PATH_LEAF,
+    variants: {
+      index: {
+        max: EXPERIENCE_TEMPLATE_LIMITS.maxVariants - 1,
+        next: SAFE_VARIANT_PATH
+      }
+    },
+    pages: {
+      index: {
+        max: EXPERIENCE_TEMPLATE_LIMITS.maxPages - 1,
+        next: SAFE_PAGE_PATH
+      }
+    },
+    flowPages: {
+      fields: {
+        serviceCatalogPageId: SAFE_PATH_LEAF,
+        serviceInfoPageId: SAFE_PATH_LEAF,
+        serviceFormPageId: SAFE_PATH_LEAF,
+        identityPageId: SAFE_PATH_LEAF,
+        appointmentPageId: SAFE_PATH_LEAF,
+        confirmationPageId: SAFE_PATH_LEAF,
+        successPageId: SAFE_PATH_LEAF
+      }
+    },
+    theme: {
+      fields: {
+        preset: SAFE_PATH_LEAF,
+        tokens: {
+          fields: {
+            header: SAFE_PATH_LEAF,
+            surface: SAFE_PATH_LEAF,
+            serviceGrid: SAFE_PATH_LEAF
+          }
+        }
+      }
+    }
+  }
+};
 
-function safeIssuePathIndexLimit(field?: string) {
-  if (!field) return undefined;
-  return Object.entries(CANONICAL_ISSUE_PATH_INDEX_LIMITS).find(
-    ([collection]) => collection === field
+const SAFE_DYNAMIC_LAYOUT_ISSUE_KINDS = {
+  'variant.unplaced_widget': 'layout-or-placement',
+  'variant.placement_overflow': 'placement',
+  'variant.placement_overlap': 'placement',
+  'variant.typography_scaled': 'typography',
+  'touch.target_too_small': 'placement',
+  'display.primary_text_small': 'typography'
+} as const satisfies Record<
+  string,
+  'layout-or-placement' | 'placement' | 'typography'
+>;
+
+function safeDynamicLayoutIssueKind(code: string) {
+  return Object.entries(SAFE_DYNAMIC_LAYOUT_ISSUE_KINDS).find(
+    ([safeCode]) => safeCode === code
   )?.[1];
+}
+
+function isSafeIssueIndex(value: unknown, max: number): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isSafeInteger(value) &&
+    value >= 0 &&
+    value <= max
+  );
+}
+
+function safeStructuralIssuePath(
+  path: DisplayIssue['path']
+): string | undefined {
+  if (path.length === 0 || path.length > 12) return undefined;
+
+  const parts: string[] = [];
+  let grammar = SAFE_ISSUE_PATH_GRAMMAR;
+  for (const segment of path) {
+    if (typeof segment === 'number') {
+      if (!grammar.index || !isSafeIssueIndex(segment, grammar.index.max)) {
+        return undefined;
+      }
+      parts.push(`[${segment}]`);
+      grammar = grammar.index.next;
+      continue;
+    }
+
+    if (
+      typeof segment !== 'string' ||
+      !grammar.fields ||
+      !Object.hasOwn(grammar.fields, segment)
+    ) {
+      return undefined;
+    }
+    const nextGrammar = grammar.fields[segment];
+    if (!nextGrammar) return undefined;
+    parts.push(parts.length === 0 ? segment : `.${segment}`);
+    grammar = nextGrammar;
+  }
+
+  return parts.join('');
+}
+
+function safeDynamicLayoutIssuePath(
+  issue: DisplayIssue,
+  t: Translate
+): string | undefined {
+  if (issue.path.length < 4 || issue.path.length > 6) return undefined;
+  const kind = safeDynamicLayoutIssueKind(issue.code);
+  if (!kind) return undefined;
+
+  const [pages, pageIndex, layouts, variantId, ...tail] = issue.path;
+  if (
+    pages !== 'pages' ||
+    !isSafeIssueIndex(pageIndex, EXPERIENCE_TEMPLATE_LIMITS.maxPages - 1) ||
+    layouts !== 'layouts' ||
+    typeof variantId !== 'string' ||
+    variantId.length === 0
+  ) {
+    return undefined;
+  }
+
+  const variant = t('publish.locationPlaceholders.variant', {
+    default: '[variant]'
+  });
+  const base = `pages[${pageIndex}].layouts.${variant}`;
+  if (kind === 'layout-or-placement' && tail.length === 0) return base;
+  if (kind === 'typography') {
+    return tail.length === 1 && tail[0] === 'typographyScale'
+      ? `${base}.typographyScale`
+      : undefined;
+  }
+  if (
+    tail.length !== 2 ||
+    tail[0] !== 'placements' ||
+    typeof tail[1] !== 'string' ||
+    tail[1].length === 0
+  ) {
+    return undefined;
+  }
+
+  const widget = t('publish.locationPlaceholders.widget', {
+    default: '[widget]'
+  });
+  return `${base}.placements.${widget}`;
 }
 
 type SafeIssueLocation =
   | { kind: 'definition' }
   | { kind: 'path'; path: string };
 
-function safeIssueLocation(path: DisplayIssue['path']): SafeIssueLocation {
-  if (path.length === 0 || path.length > 12) return { kind: 'definition' };
-
-  const parts: string[] = [];
-  let previousField: string | undefined;
-  for (const segment of path) {
-    if (typeof segment === 'string') {
-      if (!CANONICAL_ISSUE_PATH_FIELDS.has(segment)) {
-        return { kind: 'definition' };
-      }
-      parts.push(parts.length === 0 ? segment : `.${segment}`);
-      previousField = segment;
-      continue;
-    }
-
-    const indexLimit = safeIssuePathIndexLimit(previousField);
-    if (
-      !Number.isSafeInteger(segment) ||
-      segment < 0 ||
-      indexLimit === undefined ||
-      segment > indexLimit
-    ) {
-      return { kind: 'definition' };
-    }
-    parts.push(`[${segment}]`);
-    previousField = undefined;
-  }
-
-  return { kind: 'path', path: parts.join('') };
+function safeIssueLocation(
+  issue: DisplayIssue,
+  t: Translate
+): SafeIssueLocation {
+  const path =
+    safeDynamicLayoutIssuePath(issue, t) ?? safeStructuralIssuePath(issue.path);
+  return path ? { kind: 'path', path } : { kind: 'definition' };
 }
 
 function ExperienceIssueList({
@@ -287,7 +461,7 @@ function ExperienceIssueList({
           : t('publish.issues.unknown', {
               default: 'The definition contains an issue that must be resolved.'
             });
-        const location = safeIssueLocation(issue.path);
+        const location = safeIssueLocation(issue, t);
         const path =
           location.kind === 'path'
             ? location.path

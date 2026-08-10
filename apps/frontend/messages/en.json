@@ -375,6 +375,10 @@
           "restoreFailed": "Restoring failed. Try again.",
           "issueLocation": "Location: {path}",
           "definitionLocation": "Definition",
+          "locationPlaceholders": {
+            "variant": "[variant]",
+            "widget": "[widget]"
+          },
           "issues": {
             "schemaInvalid": "The experience definition is invalid.",
             "startPageMissing": "The start page does not exist.",

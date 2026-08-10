@@ -375,6 +375,10 @@
           "restoreFailed": "Не удалось восстановить версию. Попробуйте ещё раз.",
           "issueLocation": "Расположение: {path}",
           "definitionLocation": "Определение",
+          "locationPlaceholders": {
+            "variant": "[вариант]",
+            "widget": "[виджет]"
+          },
           "issues": {
             "schemaInvalid": "Определение сценария имеет неверный формат.",
             "startPageMissing": "Стартовая страница не существует.",
