@@ -16,6 +16,32 @@ import {
 
 afterEach(cleanup);
 
+const serviceBehaviorBounds = {
+  maxDepth: 8,
+  maxGroupChildren: 20
+} as const;
+
+function conditionAtDepth(depth: number): ConditionNode {
+  let node: ConditionNode = ruleForConditionField('identity.isAuthenticated');
+  for (let level = 1; level < depth; level += 1) {
+    node = { kind: 'group', combinator: 'and', children: [node] };
+  }
+  return node;
+}
+
+function policyWithChildren(count: number): AccessPolicy {
+  return {
+    when: {
+      kind: 'group',
+      combinator: 'and',
+      children: Array.from({ length: count }, () =>
+        ruleForConditionField('identity.isAuthenticated')
+      )
+    },
+    whenFalse: 'hide'
+  };
+}
+
 describe('condition builder', () => {
   it('changes operators and values to the canonical type for the selected field', () => {
     expect(ruleForConditionField('live.queueLength')).toEqual({
@@ -192,6 +218,84 @@ describe('condition builder', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       /unsupported saved field/i
     );
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('keeps the generic builder limited by the canonical 100-node budget only', () => {
+    const onChange = vi.fn();
+    const atNodeLimit = policyWithChildren(99);
+    const aboveNodeLimit = policyWithChildren(100);
+    const aboveServiceChildLimit = policyWithChildren(21);
+    const { rerender } = render(
+      <ConditionBuilder value={atNodeLimit} onChange={onChange} />
+    );
+
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    rerender(
+      <ConditionBuilder value={aboveServiceChildLimit} onChange={onChange} />
+    );
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    rerender(<ConditionBuilder value={aboveNodeLimit} onChange={onChange} />);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('accepts 20 direct Service behavior children and preserves 21 read-only', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <ConditionBuilder
+        value={policyWithChildren(20)}
+        onChange={onChange}
+        semanticBounds={serviceBehaviorBounds}
+      />
+    );
+
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(
+      screen.getAllByRole('button', { name: /add rule/i }).at(-1)
+    ).toBeDisabled();
+
+    rerender(
+      <ConditionBuilder
+        value={policyWithChildren(21)}
+        onChange={onChange}
+        semanticBounds={serviceBehaviorBounds}
+      />
+    );
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('accepts Service behavior depth 8 and preserves depth 9 read-only', () => {
+    const onChange = vi.fn();
+    const policyAtDepth = {
+      when: conditionAtDepth(8),
+      whenFalse: 'hide' as const
+    };
+    const policyAboveDepth = {
+      when: conditionAtDepth(9),
+      whenFalse: 'hide' as const
+    };
+    const { rerender } = render(
+      <ConditionBuilder
+        value={policyAtDepth}
+        onChange={onChange}
+        semanticBounds={serviceBehaviorBounds}
+      />
+    );
+
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    rerender(
+      <ConditionBuilder
+        value={policyAboveDepth}
+        onChange={onChange}
+        semanticBounds={serviceBehaviorBounds}
+      />
+    );
+    expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
   });
 

@@ -7,7 +7,7 @@ import type {
 } from '@quokkaq/shared-types';
 import { Maximize2, Shield, Shrink, X } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
@@ -18,12 +18,15 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 import { ConditionPreviewScenarios } from './condition-preview-scenarios';
 
 export type ExperiencePreviewRenderProps = {
   draft: ExperienceTemplate;
   variant: ExperienceLayoutVariant;
   scale: 'fit' | '100';
+  /** Physical device pixels are multiplied by this factor inside the viewport. */
+  scaleFactor: number;
   showSafeArea: boolean;
   /** Synthetic-only condition context reserved for Task 12's runtime renderer. */
   scenarioContext: ConditionContext;
@@ -42,6 +45,7 @@ function defaultPreview({
   draft,
   variant,
   scale,
+  scaleFactor,
   showSafeArea
 }: ExperiencePreviewRenderProps) {
   const page =
@@ -50,11 +54,13 @@ function defaultPreview({
   const safe = variant.profile.safeArea;
   return (
     <div
-      className='border-border bg-background relative mx-auto overflow-hidden rounded-[1.5rem] border-2 shadow-sm'
+      className='border-border bg-background relative mx-auto shrink-0 overflow-hidden rounded-[1.5rem] border-2 shadow-sm'
       data-testid='experience-preview-surface'
       data-scale={scale}
+      data-scale-factor={scaleFactor}
       style={{
-        width: scale === '100' ? variant.profile.width : 'min(100%, 530px)',
+        width: Math.round(variant.profile.width * scaleFactor),
+        height: Math.round(variant.profile.height * scaleFactor),
         aspectRatio: `${variant.profile.width}/${variant.profile.height}`
       }}
     >
@@ -102,7 +108,7 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   );
 }
 
-function definitionsEqual(left: unknown, right: unknown): boolean {
+export function definitionsEqual(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true;
   if (
     left === null ||
@@ -141,6 +147,37 @@ function definitionsMatch(
   return published !== null && definitionsEqual(draft, published);
 }
 
+type PreviewViewportSize = { width: number; height: number };
+const PREVIEW_FRAME_MARGIN_PX = 40;
+
+export function fitPreviewScale(
+  device: PreviewViewportSize,
+  viewport: PreviewViewportSize
+): number {
+  if (
+    !Number.isFinite(device.width) ||
+    !Number.isFinite(device.height) ||
+    !Number.isFinite(viewport.width) ||
+    !Number.isFinite(viewport.height) ||
+    device.width <= 0 ||
+    device.height <= 0 ||
+    viewport.width <= 0 ||
+    viewport.height <= 0
+  ) {
+    return 1;
+  }
+  const availableWidth = Math.max(1, viewport.width - PREVIEW_FRAME_MARGIN_PX);
+  const availableHeight = Math.max(
+    1,
+    viewport.height - PREVIEW_FRAME_MARGIN_PX
+  );
+  return Math.min(
+    1,
+    availableWidth / device.width,
+    availableHeight / device.height
+  );
+}
+
 export function ExperiencePreviewDialog({
   open,
   onOpenChange,
@@ -152,6 +189,13 @@ export function ExperiencePreviewDialog({
   const t = useTranslations('experience.builder.task11');
   const [scale, setScale] = useState<'fit' | '100'>('fit');
   const [showSafeArea, setShowSafeArea] = useState(true);
+  const [viewportSize, setViewportSize] = useState<PreviewViewportSize>({
+    width: 0,
+    height: 0
+  });
+  const [viewportElement, setViewportElement] = useState<HTMLDivElement | null>(
+    null
+  );
   const [scenarioContext, setScenarioContext] = useState<ConditionContext>({
     identity: { isAuthenticated: false, isEmployee: false, groups: [] },
     live: { queueLength: 0, isOpen: true, isConnected: true },
@@ -163,6 +207,35 @@ export function ExperiencePreviewDialog({
       draft.variants[0]!,
     [draft.variants, activeVariantId]
   );
+  useEffect(() => {
+    if (!open) return;
+    const viewport = viewportElement;
+    if (!viewport) return;
+
+    const updateSize = (size: PreviewViewportSize) => {
+      setViewportSize((current) =>
+        current.width === size.width && current.height === size.height
+          ? current
+          : size
+      );
+    };
+    const bounds = viewport.getBoundingClientRect();
+    updateSize({ width: bounds.width, height: bounds.height });
+
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      updateSize({
+        width: entry.contentRect.width,
+        height: entry.contentRect.height
+      });
+    });
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [open, viewportElement]);
+
+  const scaleFactor =
+    scale === '100' ? 1 : fitPreviewScale(variant.profile, viewportSize);
   const isDraftPreview = !definitionsMatch(draft, publishedDefinition);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -177,7 +250,7 @@ export function ExperiencePreviewDialog({
           </DialogDescription>
         </DialogHeader>
         <div className='grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_260px]'>
-          <div className='bg-muted/30 min-w-0 overflow-auto rounded-lg p-5'>
+          <div className='bg-muted/30 min-w-0 rounded-lg p-5'>
             {isDraftPreview ? (
               <div className='mb-4 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-950 dark:bg-amber-950/30 dark:text-amber-100'>
                 <Shield className='size-4' aria-hidden />
@@ -192,13 +265,25 @@ export function ExperiencePreviewDialog({
                 })}
               </div>
             )}
-            {renderPreview({
-              draft,
-              variant,
-              scale,
-              showSafeArea,
-              scenarioContext
-            })}
+            <div
+              ref={setViewportElement}
+              data-testid='experience-preview-viewport'
+              className={cn(
+                'flex h-[min(62dvh,680px)] min-h-[320px] min-w-0',
+                scale === 'fit'
+                  ? 'items-center justify-center overflow-hidden'
+                  : 'items-start justify-start overflow-auto'
+              )}
+            >
+              {renderPreview({
+                draft,
+                variant,
+                scale,
+                scaleFactor,
+                showSafeArea,
+                scenarioContext
+              })}
+            </div>
           </div>
           <aside
             className='space-y-4'

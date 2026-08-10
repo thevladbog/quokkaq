@@ -7,8 +7,10 @@ import {
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const intlState = vi.hoisted(() => ({ locale: 'en' }));
+
 vi.mock('next-intl', () => ({
-  useLocale: () => 'en',
+  useLocale: () => intlState.locale,
   useTranslations: () => (key: string, values?: Record<string, unknown>) =>
     String(values?.default ?? key)
 }));
@@ -16,7 +18,10 @@ vi.mock('next-intl', () => ({
 import { ServiceBehaviorEditor } from './service-behavior-editor';
 import { ApiHttpError } from '@/lib/api-errors';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  intlState.locale = 'en';
+});
 
 describe('ServiceBehaviorEditor', () => {
   it('maps localized information, fields, access and route into a separate behavior save', async () => {
@@ -265,5 +270,161 @@ describe('ServiceBehaviorEditor', () => {
 
     expect(screen.getByLabelText(/information/i)).toHaveValue('Second service');
     expect(screen.getByLabelText(/route mode/i)).toHaveValue('identity');
+  });
+
+  it('clears only the active information locale while preserving English and acknowledgement', async () => {
+    intlState.locale = 'ru';
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ServiceBehaviorEditor
+        serviceId='service-1'
+        value={{
+          version: 1,
+          information: {
+            body: { en: 'Bring your ID', ru: 'Возьмите паспорт' },
+            requireAcknowledgement: true
+          },
+          fields: [],
+          route: { mode: 'auto' }
+        }}
+        onSave={onSave}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/information/i), {
+      target: { value: '' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save behavior/i }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave).toHaveBeenCalledWith(
+      'service-1',
+      expect.objectContaining({
+        information: {
+          body: { en: 'Bring your ID' },
+          requireAcknowledgement: true
+        }
+      })
+    );
+  });
+
+  it('deletes empty active-locale field and option labels while preserving valid fallbacks', async () => {
+    intlState.locale = 'ru';
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ServiceBehaviorEditor
+        serviceId='service-1'
+        value={{
+          version: 1,
+          fields: [
+            {
+              key: 'department',
+              label: { en: 'Department', ru: 'Отдел' },
+              type: 'select',
+              required: false,
+              options: [
+                {
+                  key: 'sales',
+                  label: { en: 'Sales', ru: 'Продажи' }
+                }
+              ]
+            }
+          ],
+          dataRetentionDays: 7,
+          route: { mode: 'auto' }
+        }}
+        onSave={onSave}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/^label$/i), {
+      target: { value: '' }
+    });
+    fireEvent.change(screen.getByLabelText(/option label/i), {
+      target: { value: '' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save behavior/i }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave).toHaveBeenCalledWith(
+      'service-1',
+      expect.objectContaining({
+        fields: [
+          expect.objectContaining({
+            label: { en: 'Department' },
+            options: [expect.objectContaining({ label: { en: 'Sales' } })]
+          })
+        ]
+      })
+    );
+  });
+
+  it('removes optional information after clearing its only locale', async () => {
+    intlState.locale = 'ru';
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ServiceBehaviorEditor
+        serviceId='service-1'
+        value={{
+          version: 1,
+          information: {
+            body: { ru: 'Прочитайте перед продолжением' },
+            requireAcknowledgement: true
+          },
+          fields: [],
+          route: { mode: 'auto' }
+        }}
+        onSave={onSave}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/information/i), {
+      target: { value: '' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save behavior/i }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0]?.[1]).not.toHaveProperty('information');
+  });
+
+  it('preserves an out-of-bounds saved access policy read-only during unrelated edits', async () => {
+    const onSave = vi.fn();
+    const access = {
+      when: {
+        kind: 'group' as const,
+        combinator: 'and' as const,
+        children: Array.from({ length: 21 }, () => ({
+          kind: 'rule' as const,
+          field: 'live.isOpen' as const,
+          operator: 'is-true' as const
+        }))
+      },
+      whenFalse: 'hide' as const
+    };
+    render(
+      <ServiceBehaviorEditor
+        serviceId='service-1'
+        value={
+          {
+            version: 1,
+            information: { body: { en: 'Existing' } },
+            fields: [],
+            route: { mode: 'auto' },
+            access
+          } as never
+        }
+        onSave={onSave}
+      />
+    );
+
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/information/i), {
+      target: { value: 'Unrelated edit' }
+    });
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /save behavior/i }));
+
+    expect(await screen.findByText('Check this value.')).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
   });
 });

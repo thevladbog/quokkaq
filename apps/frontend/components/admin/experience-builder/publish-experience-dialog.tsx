@@ -50,6 +50,133 @@ export type ExperienceOperationResult =
   | ParsedExperienceTemplateVersion;
 type PendingAction = 'publish' | 'restore' | null;
 
+type DisplayIssue = {
+  code: string;
+  path: readonly (string | number)[];
+};
+
+type Translate = (
+  key: string,
+  values?: Record<string, string | number | Date>
+) => string;
+
+const SAFE_ISSUE_DESCRIPTIONS = {
+  'schema.invalid': ['schemaInvalid', 'The experience definition is invalid.'],
+  'page.start_missing': ['startPageMissing', 'The start page does not exist.'],
+  'page.unreachable': ['pageUnreachable', 'This page cannot be reached.'],
+  'page.unreferenced': [
+    'pageUnreferenced',
+    'This page is not referenced by the experience flow.'
+  ],
+  'action.target_missing': [
+    'actionTargetMissing',
+    'A navigation target page does not exist.'
+  ],
+  'widget.unsupported_for_surface': [
+    'widgetUnsupported',
+    'A widget is not supported on this surface.'
+  ],
+  'variant.unplaced_widget': [
+    'widgetUnplaced',
+    'A widget is not placed in this layout variant.'
+  ],
+  'variant.placement_overflow': [
+    'placementOverflow',
+    'A widget extends beyond the layout grid.'
+  ],
+  'variant.placement_overlap': [
+    'placementOverlap',
+    'Two widget placements overlap.'
+  ],
+  'variant.typography_scaled': [
+    'typographyScaled',
+    'Typography has been scaled for this variant.'
+  ],
+  'flow.required_page_missing': [
+    'requiredPageMissing',
+    'A required flow page is missing.'
+  ],
+  'condition.invalid': [
+    'conditionInvalid',
+    'A visibility condition is invalid.'
+  ],
+  'touch.target_too_small': [
+    'touchTargetTooSmall',
+    'A touch target is too small for this device.'
+  ],
+  'station.page_scroll_required': [
+    'stationScrollRequired',
+    'This ticket-station page would require scrolling.'
+  ],
+  'display.primary_text_small': [
+    'displayTextSmall',
+    'Primary display text may be too small at viewing distance.'
+  ],
+  'theme.legacy_contrast_unknown': [
+    'legacyContrastUnknown',
+    'Contrast could not be verified for the legacy theme.'
+  ],
+  'response.invalid': [
+    'responseInvalid',
+    'The server response contains an invalid experience definition.'
+  ]
+} as const satisfies Record<string, readonly [string, string]>;
+
+function safeIssuePath(path: DisplayIssue['path']): string {
+  if (path.length === 0) return 'definition';
+  return path
+    .slice(0, 12)
+    .map((segment, index) => {
+      if (typeof segment === 'number' && Number.isSafeInteger(segment)) {
+        return `[${segment}]`;
+      }
+      const safeSegment =
+        typeof segment === 'string' &&
+        /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(segment)
+          ? segment
+          : '?';
+      return index === 0 ? safeSegment : `.${safeSegment}`;
+    })
+    .join('');
+}
+
+function ExperienceIssueList({
+  issues,
+  t
+}: {
+  issues: readonly DisplayIssue[];
+  t: Translate;
+}) {
+  return (
+    <ul className='mt-2 list-disc space-y-2 pl-5 text-xs'>
+      {issues.map((issue, index) => {
+        const known =
+          SAFE_ISSUE_DESCRIPTIONS[
+            issue.code as keyof typeof SAFE_ISSUE_DESCRIPTIONS
+          ];
+        const description = known
+          ? t(`publish.issues.${known[0]}`, { default: known[1] })
+          : t('publish.issues.unknown', {
+              default: 'The definition contains an issue that must be resolved.'
+            });
+        const path = safeIssuePath(issue.path);
+        return (
+          <li key={`${issue.code}-${path}-${index}`}>
+            <p>{description}</p>
+            <p className='text-muted-foreground mt-0.5'>
+              {t('publish.issueLocation', {
+                path,
+                default: `Location: ${path}`
+              })}
+              {known ? ` · ${issue.code}` : null}
+            </p>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export type PublishExperienceDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -127,13 +254,7 @@ export function ExperienceOperationFeedback({
           default: 'The server returned a definition that cannot be used.'
         })}
       </p>
-      <ul className='mt-2 list-disc space-y-1 pl-5 text-xs'>
-        {error.issues.map((issue, index) => (
-          <li key={`${issue.code}-${issue.path.join('.')}-${index}`}>
-            {issue.code}
-          </li>
-        ))}
-      </ul>
+      <ExperienceIssueList issues={error.issues} t={t} />
     </section>
   );
 }
@@ -276,13 +397,7 @@ export function PublishExperienceDialog({
                 default: 'Cannot publish until errors are resolved'
               })}
             </div>
-            <ul className='mt-2 list-disc space-y-1 pl-5 text-xs'>
-              {report.errors.map((issue, index) => (
-                <li key={`${issue.code}-${issue.path.join('.')}-${index}`}>
-                  {issue.code}
-                </li>
-              ))}
-            </ul>
+            <ExperienceIssueList issues={report.errors} t={t} />
           </section>
         ) : (
           <section
@@ -303,13 +418,7 @@ export function PublishExperienceDialog({
             <p className='font-medium'>
               {t('publish.warnings', { default: 'Warnings' })}
             </p>
-            <ul className='mt-2 list-disc space-y-1 pl-5 text-xs'>
-              {report.warnings.map((issue, index) => (
-                <li key={`${issue.code}-${issue.path.join('.')}-${index}`}>
-                  {issue.code}
-                </li>
-              ))}
-            </ul>
+            <ExperienceIssueList issues={report.warnings} t={t} />
           </section>
         ) : null}
         <DeviceAssignmentTable devices={devices} />

@@ -19,6 +19,7 @@ import { ConditionPreviewScenarios } from './condition-preview-scenarios';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import type { SharedWidgetUpdate } from '@/lib/stores/experience-builder-store';
 
 type ExperiencePlacement = {
   col: number;
@@ -27,9 +28,7 @@ type ExperiencePlacement = {
   rowSpan: number;
 };
 
-type SharedChanges = Partial<
-  Pick<ExperienceWidget, 'config' | 'actions' | 'access'>
->;
+type SharedChanges = Pick<SharedWidgetUpdate, 'config' | 'actions' | 'access'>;
 
 export type ExperienceInspectorProps = {
   pageId: string;
@@ -223,7 +222,7 @@ export function ExperienceInspector({
         <ConditionBuilder
           value={widget.access}
           allowLock
-          onChange={(access) => onSharedChange?.({ access })}
+          onChange={(access) => onSharedChange?.({ access: access ?? null })}
           disabled={!canEdit}
         />
         <ConditionPreviewScenarios policy={widget.access} />

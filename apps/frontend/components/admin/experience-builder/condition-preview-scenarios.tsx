@@ -84,6 +84,39 @@ export const CONDITION_PREVIEW_SCENARIOS: readonly ConditionPreviewScenario[] =
     }
   ];
 
+function firstPolicyGroupLiteral(policy: AccessPolicy | undefined): string {
+  if (!policy) return 'employees';
+  const pending = [policy.when];
+  while (pending.length > 0) {
+    const node = pending.shift()!;
+    if (node.kind === 'rule' && node.field === 'identity.groups') {
+      return node.value;
+    }
+    if (node.kind === 'group') pending.push(...node.children);
+  }
+  return 'employees';
+}
+
+export function conditionPreviewScenariosForPolicy(
+  policy: AccessPolicy | undefined
+): readonly ConditionPreviewScenario[] {
+  const safeGroup = firstPolicyGroupLiteral(policy);
+  return CONDITION_PREVIEW_SCENARIOS.map((scenario) =>
+    scenario.id === 'employee-group'
+      ? {
+          ...scenario,
+          context: {
+            ...scenario.context,
+            identity: {
+              ...scenario.context.identity,
+              groups: [safeGroup]
+            }
+          }
+        }
+      : scenario
+  );
+}
+
 const safeRootKeys = new Set(['identity', 'live', 'session']);
 const safeIdentityKeys = new Set(['isAuthenticated', 'isEmployee', 'groups']);
 const safeLiveKeys = new Set(['queueLength', 'isOpen', 'isConnected']);
@@ -104,7 +137,8 @@ function hasOnlyKeys(
 }
 
 export function isSafePreviewContext(
-  value: unknown
+  value: unknown,
+  policy?: AccessPolicy
 ): value is ConditionContext {
   if (!hasOnlyKeys(value, safeRootKeys)) return false;
   const context = value as Record<string, unknown>;
@@ -118,7 +152,9 @@ export function isSafePreviewContext(
         typeof identity.isEmployee !== 'boolean') ||
       (identity.groups !== undefined &&
         (!Array.isArray(identity.groups) ||
-          identity.groups.some((group) => group !== 'employees')))
+          identity.groups.some(
+            (group) => group !== firstPolicyGroupLiteral(policy)
+          )))
     ) {
       return false;
     }
@@ -166,14 +202,18 @@ export function ConditionPreviewScenarios({
   const [customEmployee, setCustomEmployee] = useState(false);
   const [customOnline, setCustomOnline] = useState(true);
   const [isCustom, setIsCustom] = useState(false);
+  const scenarios = useMemo(
+    () => conditionPreviewScenariosForPolicy(policy),
+    [policy]
+  );
+  const safeGroup = firstPolicyGroupLiteral(policy);
   const scenario =
-    CONDITION_PREVIEW_SCENARIOS.find((item) => item.id === scenarioId) ??
-    CONDITION_PREVIEW_SCENARIOS[0]!;
+    scenarios.find((item) => item.id === scenarioId) ?? scenarios[0]!;
   const customContext: ConditionContext = {
     identity: {
       isAuthenticated: customEmployee,
       isEmployee: customEmployee,
-      groups: customEmployee ? ['employees'] : []
+      groups: customEmployee ? [safeGroup] : []
     },
     live: {
       queueLength: customQueueLength,
@@ -217,7 +257,7 @@ export function ConditionPreviewScenarios({
         <legend className='sr-only'>
           {t('scenario.choose', { default: 'Choose a scenario' })}
         </legend>
-        {CONDITION_PREVIEW_SCENARIOS.map((item) => (
+        {scenarios.map((item) => (
           <button
             key={item.id}
             type='button'
@@ -275,7 +315,7 @@ export function ConditionPreviewScenarios({
                   identity: {
                     isAuthenticated: employee,
                     isEmployee: employee,
-                    groups: employee ? ['employees'] : []
+                    groups: employee ? [safeGroup] : []
                   }
                 };
                 setIsCustom(true);

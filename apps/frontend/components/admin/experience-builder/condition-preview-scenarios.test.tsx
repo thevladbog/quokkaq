@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AccessPolicy } from '@quokkaq/shared-types';
 
 vi.mock('next-intl', () => ({
@@ -12,6 +12,8 @@ import {
   ConditionPreviewScenarios,
   isSafePreviewContext
 } from './condition-preview-scenarios';
+
+afterEach(cleanup);
 
 describe('condition preview scenarios', () => {
   it('contains only synthetic safe context fields', () => {
@@ -63,5 +65,59 @@ describe('condition preview scenarios', () => {
     render(<ConditionPreviewScenarios policy={policy} />);
 
     expect(screen.getByRole('status')).toHaveTextContent(/shown locked/i);
+  });
+
+  it('derives the employee-group scenario from the current policy without accepting arbitrary groups', () => {
+    const policy: AccessPolicy = {
+      when: {
+        kind: 'rule',
+        field: 'identity.groups',
+        operator: 'contains',
+        value: 'managers'
+      },
+      whenFalse: 'hide'
+    };
+    const onContextChange = vi.fn();
+    render(
+      <ConditionPreviewScenarios
+        policy={policy}
+        onContextChange={onContextChange}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /employee in selected group/i })
+    );
+
+    expect(onContextChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ groups: ['managers'] })
+      })
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(/^shown$/i);
+    expect(
+      isSafePreviewContext(
+        {
+          identity: {
+            isAuthenticated: true,
+            isEmployee: true,
+            groups: ['managers']
+          }
+        },
+        policy
+      )
+    ).toBe(true);
+    expect(
+      isSafePreviewContext(
+        {
+          identity: {
+            isAuthenticated: true,
+            isEmployee: true,
+            groups: ['payroll-admins']
+          }
+        },
+        policy
+      )
+    ).toBe(false);
   });
 });

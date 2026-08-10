@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -441,6 +442,56 @@ describe('ExperienceBuilderShell', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'response.invalid'
     );
+    expect(useExperienceBuilderStore.getState().isDirty).toBe(true);
+  });
+
+  it('keeps edits made while a draft save is pending dirty', async () => {
+    useExperienceBuilderStore.getState().loadDraft(workspaceDraft());
+    useExperienceBuilderStore
+      .getState()
+      .updateWidgetShared('services', 'picker', {
+        config: { title: 'Submitted title' }
+      });
+
+    let finishSave: (() => void) | undefined;
+    const onSaveDraft = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSave = resolve;
+        })
+    );
+    render(<ExperienceBuilderShell onSaveDraft={onSaveDraft} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+    expect(onSaveDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pages: [
+          expect.objectContaining({
+            widgets: [
+              expect.objectContaining({ config: { title: 'Submitted title' } })
+            ]
+          }),
+          expect.anything()
+        ]
+      })
+    );
+
+    act(() => {
+      useExperienceBuilderStore
+        .getState()
+        .updateWidgetShared('services', 'picker', {
+          config: { title: 'Edited while saving' }
+        });
+    });
+    await act(async () => {
+      finishSave?.();
+      await Promise.resolve();
+    });
+
+    expect(
+      useExperienceBuilderStore.getState().draft.pages[0]?.widgets[0]?.config
+        .title
+    ).toBe('Edited while saving');
     expect(useExperienceBuilderStore.getState().isDirty).toBe(true);
   });
 

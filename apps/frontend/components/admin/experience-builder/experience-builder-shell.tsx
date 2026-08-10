@@ -38,6 +38,7 @@ import {
 } from './unplaced-widgets-tray';
 import { ExperienceInspector } from './experience-inspector';
 import {
+  definitionsEqual,
   ExperiencePreviewDialog,
   type ExperiencePreviewDialogProps
 } from './experience-preview-dialog';
@@ -291,15 +292,23 @@ export function ExperienceBuilderShell({
   };
   const saveDraft = async () => {
     if (!canEdit || !onSaveDraft || savePending) return;
+    const submittedDraft = structuredClone(draft);
     setSaveError(null);
     setSavePending(true);
     try {
-      const result = await onSaveDraft(draft);
+      const result = await onSaveDraft(submittedDraft);
       if (result?.kind === 'invalid-definition') {
         setSaveError({ kind: 'invalid-definition', issues: result.issues });
         return;
       }
-      markSaved();
+      if (
+        definitionsEqual(
+          useExperienceBuilderStore.getState().draft,
+          submittedDraft
+        )
+      ) {
+        markSaved();
+      }
     } catch (error) {
       setSaveError(
         isApiHttpError(error)
@@ -546,7 +555,7 @@ export function ExperienceBuilderShell({
         publishedDefinition={publishedDefinition}
         renderPreview={
           renderPreview ??
-          (({ variant: previewVariant, scale, showSafeArea }) => (
+          (({ variant: previewVariant, scaleFactor, showSafeArea }) => (
             <ExperienceCanvas
               page={
                 draft.pages.find(
@@ -555,7 +564,7 @@ export function ExperienceBuilderShell({
               }
               variant={previewVariant}
               canEdit={false}
-              zoom={scale === '100' ? 1 / 0.48 : 1}
+              zoom={scaleFactor / 0.48}
               showSafeArea={showSafeArea}
               editorState={{}}
               onSelectWidget={() => undefined}

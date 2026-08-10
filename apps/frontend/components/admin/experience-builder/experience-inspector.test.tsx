@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 import type {
   ExperienceLayoutVariant,
+  ExperienceTemplate,
   ExperienceWidget
 } from '@quokkaq/shared-types';
 
@@ -12,6 +13,7 @@ vi.mock('next-intl', () => ({
 }));
 
 import { ExperienceInspector } from './experience-inspector';
+import { createExperienceBuilderStore } from '@/lib/stores/experience-builder-store';
 
 afterEach(cleanup);
 
@@ -125,9 +127,18 @@ describe('ExperienceInspector', () => {
           widget={current}
           variant={variant}
           placement={{ col: 1, row: 1, colSpan: 4, rowSpan: 3 }}
-          onSharedChange={(changes) =>
-            setCurrent((previous) => ({ ...previous, ...changes }))
-          }
+          onSharedChange={(changes) => {
+            const { access, ...otherChanges } = changes;
+            setCurrent((previous) => {
+              const next: ExperienceWidget = {
+                ...previous,
+                ...otherChanges
+              };
+              if (access === null) delete next.access;
+              else if (access !== undefined) next.access = access;
+              return next;
+            });
+          }}
         />
       );
     }
@@ -143,5 +154,61 @@ describe('ExperienceInspector', () => {
     expect(screen.getByLabelText(/widget title/i)).toHaveValue(
       'Employee services'
     );
+  });
+
+  it('persists a cleared access policy through the store and undo/redo history', () => {
+    const access = {
+      when: {
+        kind: 'rule' as const,
+        field: 'identity.isAuthenticated' as const,
+        operator: 'is-true' as const
+      },
+      whenFalse: 'lock' as const
+    };
+    const draft: ExperienceTemplate = {
+      schemaVersion: 1,
+      id: 'access-history',
+      surface: 'ticket-station',
+      startPageId: 'services-page',
+      variants: [variant],
+      pages: [
+        {
+          id: 'services-page',
+          name: 'Services',
+          widgets: [{ ...widget, access }],
+          layouts: {
+            portrait: {
+              placements: {
+                services: { col: 1, row: 1, colSpan: 4, rowSpan: 3 }
+              }
+            }
+          }
+        }
+      ]
+    };
+    const store = createExperienceBuilderStore(draft);
+
+    render(
+      <ExperienceInspector
+        pageId='services-page'
+        widget={store.getState().draft.pages[0]!.widgets[0]}
+        variant={variant}
+        placement={{ col: 1, row: 1, colSpan: 4, rowSpan: 3 }}
+        onSharedChange={(changes) =>
+          store
+            .getState()
+            .updateWidgetShared('services-page', 'services', changes)
+        }
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /clear access rule/i }));
+    expect(store.getState().draft.pages[0]!.widgets[0]!.access).toBeUndefined();
+
+    expect(store.getState().undo()).toBe(true);
+    expect(store.getState().draft.pages[0]!.widgets[0]!.access).toEqual(access);
+
+    expect(store.getState().redo()).toBe(true);
+    expect(store.getState().draft.pages[0]!.widgets[0]!.access).toBeUndefined();
   });
 });

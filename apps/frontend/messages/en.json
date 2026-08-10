@@ -357,7 +357,28 @@
           "operationFailed": "The operation could not be completed.",
           "invalidResponse": "The server returned a definition that cannot be used.",
           "publishFailed": "Publishing failed. Try again.",
-          "restoreFailed": "Restoring failed. Try again."
+          "restoreFailed": "Restoring failed. Try again.",
+          "issueLocation": "Location: {path}",
+          "issues": {
+            "schemaInvalid": "The experience definition is invalid.",
+            "startPageMissing": "The start page does not exist.",
+            "pageUnreachable": "This page cannot be reached.",
+            "pageUnreferenced": "This page is not referenced by the experience flow.",
+            "actionTargetMissing": "A navigation target page does not exist.",
+            "widgetUnsupported": "A widget is not supported on this surface.",
+            "widgetUnplaced": "A widget is not placed in this layout variant.",
+            "placementOverflow": "A widget extends beyond the layout grid.",
+            "placementOverlap": "Two widget placements overlap.",
+            "typographyScaled": "Typography has been scaled for this variant.",
+            "requiredPageMissing": "A required flow page is missing.",
+            "conditionInvalid": "A visibility condition is invalid.",
+            "touchTargetTooSmall": "A touch target is too small for this device.",
+            "stationScrollRequired": "This ticket-station page would require scrolling.",
+            "displayTextSmall": "Primary display text may be too small at viewing distance.",
+            "legacyContrastUnknown": "Contrast could not be verified for the legacy theme.",
+            "responseInvalid": "The server response contains an invalid experience definition.",
+            "unknown": "The definition contains an issue that must be resolved."
+          }
         },
         "service": {
           "title": "Service behavior",

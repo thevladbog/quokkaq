@@ -66,6 +66,8 @@ describe('PublishExperienceDialog', () => {
       />
     );
     expect(screen.getByText(/cannot publish/i)).toBeInTheDocument();
+    expect(screen.getByText(/start page does not exist/i)).toBeInTheDocument();
+    expect(screen.getByText(/location: startPageId/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^publish$/i })).toBeDisabled();
     expect(onPublish).not.toHaveBeenCalled();
   });
@@ -137,8 +139,9 @@ describe('PublishExperienceDialog', () => {
     expect(screen.getByText('v7')).toBeInTheDocument();
     expect(screen.getByText(/^no$/i)).toBeInTheDocument();
     expect(
-      screen.getByText('theme.legacy_contrast_unknown')
+      screen.getByText(/contrast could not be verified/i)
     ).toBeInTheDocument();
+    expect(screen.getByText(/location: theme/i)).toBeInTheDocument();
     expect(
       screen.getByRole('row', { name: /hall ipad.*lobby display.*v6/i })
     ).toBeInTheDocument();
@@ -175,6 +178,34 @@ describe('PublishExperienceDialog', () => {
       'variant.unplaced_widget'
     );
     expect(onPublish).toHaveBeenCalledTimes(1);
+  });
+
+  it('describes invalid-definition issues safely without rendering raw values', () => {
+    render(
+      <PublishExperienceDialog
+        open
+        onOpenChange={vi.fn()}
+        draft={validDraft}
+        onPublish={vi.fn()}
+        publishError={{
+          kind: 'invalid-definition',
+          issues: [
+            {
+              code: 'variant.unplaced_widget',
+              path: ['pages', 0, 'layouts', 'display', 'placements'],
+              message: 'secret visitor value: 4111 1111 1111 1111'
+            }
+          ]
+        }}
+      />
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(/widget is not placed/i);
+    expect(alert).toHaveTextContent(
+      /location: pages\[0\]\.layouts\.display\.placements/i
+    );
+    expect(alert).not.toHaveTextContent('4111 1111 1111 1111');
   });
 
   it('keeps restore separate from saving and publishing', () => {

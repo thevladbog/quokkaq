@@ -17,16 +17,23 @@ import { Label } from '@/components/ui/label';
 
 type ConditionPath = readonly number[];
 
+export type ConditionSemanticBounds = {
+  maxDepth: number;
+  maxGroupChildren: number;
+};
+
+/** Mirrors the additional resource bounds enforced by ServiceBehaviorSchema. */
+export const SERVICE_BEHAVIOR_CONDITION_BOUNDS: ConditionSemanticBounds = {
+  maxDepth: 8,
+  maxGroupChildren: 20
+};
+
 type FieldDefinition = {
   label: string;
   labelKey: string;
   operators: readonly ConditionRule['operator'][];
   value: 'none' | 'text' | 'number';
 };
-
-/** Mirrors the persisted service-behavior bounds so a builder cannot create an unsaveable tree. */
-export const MAX_CONDITION_GROUP_DEPTH = 8;
-export const MAX_CONDITION_GROUP_CHILDREN = 20;
 
 export const CONDITION_FIELD_DEFINITIONS: Record<
   ConditionField,
@@ -176,7 +183,8 @@ export function replaceConditionAtPath(
 export function appendConditionChild(
   node: ConditionNode,
   groupPath: ConditionPath,
-  kind: 'rule' | 'group'
+  kind: 'rule' | 'group',
+  semanticBounds?: ConditionSemanticBounds
 ): ConditionNode {
   const next = cloneNode(node);
   const group = nodeAtPath(next, groupPath);
@@ -185,8 +193,9 @@ export function appendConditionChild(
     group?.kind !== 'group' ||
     countConditionNodes(next) + addedNodeCount >
       MAX_ACCESS_POLICY_CONDITION_NODES ||
-    group.children.length >= MAX_CONDITION_GROUP_CHILDREN ||
-    (kind === 'group' && groupPath.length + 1 >= MAX_CONDITION_GROUP_DEPTH)
+    (semanticBounds !== undefined &&
+      (group.children.length >= semanticBounds.maxGroupChildren ||
+        groupPath.length + 1 + addedNodeCount > semanticBounds.maxDepth))
   ) {
     return node;
   }
@@ -230,6 +239,26 @@ function countConditionNodes(node: ConditionNode): number {
     if (current.kind === 'group') pending.push(...current.children);
   }
   return count;
+}
+
+export function isConditionWithinSemanticBounds(
+  node: ConditionNode,
+  bounds: ConditionSemanticBounds
+): boolean {
+  const pending: Array<{ node: ConditionNode; depth: number }> = [
+    { node, depth: 1 }
+  ];
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    if (current.depth > bounds.maxDepth) return false;
+    if (current.node.kind === 'group') {
+      if (current.node.children.length > bounds.maxGroupChildren) return false;
+      for (const child of current.node.children) {
+        pending.push({ node: child, depth: current.depth + 1 });
+      }
+    }
+  }
+  return true;
 }
 
 function isAccessPolicy(value: unknown): value is AccessPolicy {
@@ -302,6 +331,7 @@ type ConditionTreeProps = {
   path: ConditionPath;
   disabled: boolean;
   rootNodeCount: number;
+  semanticBounds?: ConditionSemanticBounds;
   onReplace: (path: ConditionPath, node: ConditionNode) => void;
   onRemove: (path: ConditionPath) => void;
   onAdd: (path: ConditionPath, kind: 'rule' | 'group') => void;
@@ -312,6 +342,7 @@ function ConditionTree({
   path,
   disabled,
   rootNodeCount,
+  semanticBounds,
   onReplace,
   onRemove,
   onAdd
@@ -321,8 +352,14 @@ function ConditionTree({
     const depth = path.length + 1;
     const canAddRule =
       rootNodeCount < MAX_ACCESS_POLICY_CONDITION_NODES &&
-      node.children.length < MAX_CONDITION_GROUP_CHILDREN;
-    const canAddGroup = canAddRule && depth < MAX_CONDITION_GROUP_DEPTH;
+      (semanticBounds === undefined ||
+        (node.children.length < semanticBounds.maxGroupChildren &&
+          depth + 1 <= semanticBounds.maxDepth));
+    const canAddGroup =
+      rootNodeCount + 1 < MAX_ACCESS_POLICY_CONDITION_NODES &&
+      (semanticBounds === undefined ||
+        (node.children.length < semanticBounds.maxGroupChildren &&
+          depth + 2 <= semanticBounds.maxDepth));
     return (
       <fieldset className='bg-muted/20 space-y-3 rounded-md border p-3'>
         <legend className='sr-only'>
@@ -379,6 +416,7 @@ function ConditionTree({
               path={[...path, index]}
               disabled={disabled}
               rootNodeCount={rootNodeCount}
+              semanticBounds={semanticBounds}
               onReplace={onReplace}
               onRemove={onRemove}
               onAdd={onAdd}
@@ -528,16 +566,22 @@ export type ConditionBuilderProps = {
   onChange: (value: AccessPolicy | undefined) => void;
   disabled?: boolean;
   allowLock?: boolean;
+  semanticBounds?: ConditionSemanticBounds;
 };
 
 export function ConditionBuilder({
   value,
   onChange,
   disabled = false,
-  allowLock = true
+  allowLock = true,
+  semanticBounds
 }: ConditionBuilderProps) {
   const t = useTranslations('experience.builder.task11');
-  const valid = value === undefined || isAccessPolicy(value);
+  const valid =
+    value === undefined ||
+    (isAccessPolicy(value) &&
+      (semanticBounds === undefined ||
+        isConditionWithinSemanticBounds(value.when, semanticBounds)));
   if (!valid) {
     const whenFalse =
       value !== null && typeof value === 'object'
@@ -580,11 +624,14 @@ export function ConditionBuilder({
   const rootNodeCount = countConditionNodes(policy.when);
   const canWrapTopLevelRule =
     policy.when.kind === 'rule' &&
-    rootNodeCount + 1 <= MAX_ACCESS_POLICY_CONDITION_NODES;
+    rootNodeCount + 1 <= MAX_ACCESS_POLICY_CONDITION_NODES &&
+    (semanticBounds === undefined ||
+      (semanticBounds.maxGroupChildren >= 2 && semanticBounds.maxDepth >= 2));
   const canWrapTopLevelRuleInGroup =
     policy.when.kind === 'rule' &&
     rootNodeCount + 2 <= MAX_ACCESS_POLICY_CONDITION_NODES &&
-    MAX_CONDITION_GROUP_DEPTH >= 2;
+    (semanticBounds === undefined ||
+      (semanticBounds.maxGroupChildren >= 2 && semanticBounds.maxDepth >= 3));
 
   const wrapTopLevelRule = (kind: 'rule' | 'group') => {
     if (policy.when.kind !== 'rule') return;
@@ -631,6 +678,7 @@ export function ConditionBuilder({
         path={[]}
         disabled={disabled}
         rootNodeCount={rootNodeCount}
+        semanticBounds={semanticBounds}
         onReplace={(path, node) =>
           commit(replaceConditionAtPath(policy.when, path, node))
         }
@@ -639,7 +687,7 @@ export function ConditionBuilder({
           if (next) commit(next);
         }}
         onAdd={(path, kind) =>
-          commit(appendConditionChild(policy.when, path, kind))
+          commit(appendConditionChild(policy.when, path, kind, semanticBounds))
         }
       />
       {policy.when.kind === 'rule' ? (

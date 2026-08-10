@@ -8,7 +8,10 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 
-import { ConditionBuilder } from '@/components/admin/experience-builder/condition-builder';
+import {
+  ConditionBuilder,
+  SERVICE_BEHAVIOR_CONDITION_BOUNDS
+} from '@/components/admin/experience-builder/condition-builder';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -48,6 +51,17 @@ function cloneBehavior(value: ServiceBehavior | null): ServiceBehavior {
   return value === null
     ? defaultBehavior()
     : (JSON.parse(JSON.stringify(value)) as ServiceBehavior);
+}
+
+function setLocalizedValue(
+  values: Record<string, string>,
+  locale: string,
+  value: string
+): Record<string, string> {
+  const next = { ...values };
+  if (value.trim() === '') delete next[locale];
+  else next[locale] = value;
+  return next;
 }
 
 function errorMessages(error: unknown, fallback: string): FieldErrors {
@@ -150,22 +164,27 @@ export function ServiceBehaviorEditor({
     setSaving(false);
   }, [serviceId, value]);
 
-  const activeInformation =
-    behavior.information?.body[locale] ?? behavior.information?.body.en ?? '';
+  const activeInformation = behavior.information?.body[locale] ?? '';
   const canEdit = !disabled && !saving;
   const fieldLimitReached = behavior.fields.length >= MAX_FIELDS;
 
   const setInformation = (text: string) => {
-    setBehavior((current) => ({
-      ...current,
-      information:
-        text.trim() === ''
-          ? undefined
-          : {
-              ...current.information,
-              body: { ...(current.information?.body ?? {}), [locale]: text }
-            }
-    }));
+    setBehavior((current) => {
+      const body = setLocalizedValue(
+        current.information?.body ?? {},
+        locale,
+        text
+      );
+      if (Object.keys(body).length === 0) {
+        const next = { ...current };
+        delete next.information;
+        return next;
+      }
+      return {
+        ...current,
+        information: { ...current.information, body }
+      };
+    });
   };
 
   const updateField = (
@@ -360,15 +379,16 @@ export function ServiceBehaviorEditor({
                     aria-label={t('service.fieldLabel', { default: 'Label' })}
                     aria-invalid={Boolean(labelError)}
                     className='min-h-11'
-                    value={field.label[locale] ?? field.label.en ?? ''}
+                    value={field.label[locale] ?? ''}
                     disabled={!canEdit}
                     onChange={(event) =>
                       updateField(index, (candidate) => ({
                         ...candidate,
-                        label: {
-                          ...candidate.label,
-                          [locale]: event.target.value
-                        }
+                        label: setLocalizedValue(
+                          candidate.label,
+                          locale,
+                          event.target.value
+                        )
                       }))
                     }
                   />
@@ -506,9 +526,7 @@ export function ServiceBehaviorEditor({
                             })}
                             aria-invalid={Boolean(optionLabelError)}
                             className='min-h-11'
-                            value={
-                              option.label[locale] ?? option.label.en ?? ''
-                            }
+                            value={option.label[locale] ?? ''}
                             disabled={!canEdit}
                             onChange={(event) =>
                               updateField(index, (candidate) =>
@@ -520,10 +538,11 @@ export function ServiceBehaviorEditor({
                                           itemIndex === optionIndex
                                             ? {
                                                 ...item,
-                                                label: {
-                                                  ...item.label,
-                                                  [locale]: event.target.value
-                                                }
+                                                label: setLocalizedValue(
+                                                  item.label,
+                                                  locale,
+                                                  event.target.value
+                                                )
                                               }
                                             : item
                                       )
@@ -733,10 +752,21 @@ export function ServiceBehaviorEditor({
         <ConditionBuilder
           value={behavior.access}
           disabled={!canEdit}
+          semanticBounds={SERVICE_BEHAVIOR_CONDITION_BOUNDS}
           onChange={(access) =>
-            setBehavior((current) => ({ ...current, access }))
+            setBehavior((current) => {
+              const next = { ...current };
+              if (access === undefined) delete next.access;
+              else next.access = access;
+              return next;
+            })
           }
         />
+        {fieldError(errors, 'access.when', 'access') ? (
+          <p className='text-destructive text-xs'>
+            {fieldError(errors, 'access.when', 'access')}
+          </p>
+        ) : null}
       </div>
 
       {errors.form ? (
