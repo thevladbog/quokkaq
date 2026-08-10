@@ -882,7 +882,7 @@ function createExperienceBuilderState(
           ...(input.access === undefined
             ? {}
             : { access: clone(input.access) }),
-          actions: clone(input.actions ?? [])
+          ...(hasOwn(input, 'actions') ? { actions: clone(input.actions) } : {})
         };
         const nextLayout = copyGridLayout(layout);
         nextLayout.placements[widgetId] = {

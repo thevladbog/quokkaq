@@ -141,7 +141,7 @@ describe('experience builder store', () => {
     expect(builder.getState().isDirty).toBe(false);
   });
 
-  it('normalizes omitted widget actions at store ingress', () => {
+  it('normalizes absent actions at draft ingress and absent or undefined actions when adding widgets', () => {
     const builder = store();
     const incoming = draft();
     delete (incoming.pages[0]!.widgets[0] as { actions?: unknown }).actions;
@@ -151,14 +151,41 @@ describe('experience builder store', () => {
     expect(loadedWidget.actions).toEqual([]);
     expect(Object.hasOwn(loadedWidget, 'actions')).toBe(true);
 
-    const widgetId = builder.getState().addWidget('services', 'media', {
-      actions: undefined
-    });
-    const addedWidget = builder
+    const absentActionsWidgetId = builder
       .getState()
-      .draft.pages[0]!.widgets.find((widget) => widget.id === widgetId)!;
-    expect(addedWidget.actions).toEqual([]);
-    expect(Object.hasOwn(addedWidget, 'actions')).toBe(true);
+      .addWidget('services', 'media');
+    const absentActionsWidget = builder
+      .getState()
+      .draft.pages[0]!.widgets.find(
+        (widget) => widget.id === absentActionsWidgetId
+      )!;
+    expect(absentActionsWidget.actions).toEqual([]);
+    expect(Object.hasOwn(absentActionsWidget, 'actions')).toBe(true);
+
+    const undefinedActionsWidgetId = builder
+      .getState()
+      .addWidget('services', 'media', {
+        actions: undefined
+      });
+    const undefinedActionsWidget = builder
+      .getState()
+      .draft.pages[0]!.widgets.find(
+        (widget) => widget.id === undefinedActionsWidgetId
+      )!;
+    expect(undefinedActionsWidget.actions).toEqual([]);
+    expect(Object.hasOwn(undefinedActionsWidget, 'actions')).toBe(true);
+
+    for (const actions of [null, {}]) {
+      const invalidBuilder = storeWithHistoryAndRedo();
+      const before = fullStateSnapshot(invalidBuilder);
+
+      expect(
+        invalidBuilder.getState().addWidget('services', 'media', {
+          actions: actions as never
+        })
+      ).toBeNull();
+      expect(fullStateSnapshot(invalidBuilder)).toEqual(before);
+    }
   });
 
   it('rejects malformed drafts atomically before actions, layouts, or access can reach store state', () => {
