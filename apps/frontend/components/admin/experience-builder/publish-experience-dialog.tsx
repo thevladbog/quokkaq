@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  EXPERIENCE_TEMPLATE_LIMITS,
   validateExperienceForPublish,
   type ExperienceTemplate,
   type ExperienceValidationReport
@@ -148,22 +149,126 @@ function safeOperationErrorDescription(code?: string) {
   )?.[1];
 }
 
-function safeIssuePath(path: DisplayIssue['path']): string {
-  if (path.length === 0) return 'definition';
-  return path
-    .slice(0, 12)
-    .map((segment, index) => {
-      if (typeof segment === 'number' && Number.isSafeInteger(segment)) {
-        return `[${segment}]`;
+function safeIssueDescription(code: string) {
+  return Object.entries(SAFE_ISSUE_DESCRIPTIONS).find(
+    ([safeCode]) => safeCode === code
+  )?.[1];
+}
+
+const CANONICAL_ISSUE_PATH_FIELDS = new Set([
+  'definition',
+  'schemaVersion',
+  'id',
+  'templateId',
+  'version',
+  'publishedAt',
+  'surface',
+  'startPageId',
+  'variants',
+  'profile',
+  'name',
+  'width',
+  'height',
+  'interactionMode',
+  'viewingDistance',
+  'safeArea',
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'grid',
+  'columns',
+  'rows',
+  'pages',
+  'widgets',
+  'type',
+  'config',
+  'tone',
+  'access',
+  'when',
+  'whenFalse',
+  'actions',
+  'key',
+  'value',
+  'source',
+  'field',
+  'toPageId',
+  'layouts',
+  'placements',
+  'col',
+  'row',
+  'colSpan',
+  'rowSpan',
+  'typographyScale',
+  'flowPages',
+  'serviceCatalogPageId',
+  'serviceInfoPageId',
+  'serviceFormPageId',
+  'identityPageId',
+  'appointmentPageId',
+  'confirmationPageId',
+  'successPageId',
+  'theme',
+  'preset',
+  'tokens',
+  'header',
+  'serviceGrid',
+  'legacyRouting',
+  'presentation',
+  'pagination',
+  'catalog',
+  'pageSize',
+  'itemCount'
+]);
+
+const CANONICAL_ISSUE_PATH_INDEX_LIMITS = {
+  variants: EXPERIENCE_TEMPLATE_LIMITS.maxVariants - 1,
+  pages: EXPERIENCE_TEMPLATE_LIMITS.maxPages - 1,
+  widgets: EXPERIENCE_TEMPLATE_LIMITS.maxWidgetsPerPage - 1,
+  actions: EXPERIENCE_TEMPLATE_LIMITS.maxActionsPerWidget - 1,
+  placements: EXPERIENCE_TEMPLATE_LIMITS.maxWidgetsPerPage - 1
+} as const;
+
+function safeIssuePathIndexLimit(field?: string) {
+  if (!field) return undefined;
+  return Object.entries(CANONICAL_ISSUE_PATH_INDEX_LIMITS).find(
+    ([collection]) => collection === field
+  )?.[1];
+}
+
+type SafeIssueLocation =
+  | { kind: 'definition' }
+  | { kind: 'path'; path: string };
+
+function safeIssueLocation(path: DisplayIssue['path']): SafeIssueLocation {
+  if (path.length === 0 || path.length > 12) return { kind: 'definition' };
+
+  const parts: string[] = [];
+  let previousField: string | undefined;
+  for (const segment of path) {
+    if (typeof segment === 'string') {
+      if (!CANONICAL_ISSUE_PATH_FIELDS.has(segment)) {
+        return { kind: 'definition' };
       }
-      const safeSegment =
-        typeof segment === 'string' &&
-        /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(segment)
-          ? segment
-          : '?';
-      return index === 0 ? safeSegment : `.${safeSegment}`;
-    })
-    .join('');
+      parts.push(parts.length === 0 ? segment : `.${segment}`);
+      previousField = segment;
+      continue;
+    }
+
+    const indexLimit = safeIssuePathIndexLimit(previousField);
+    if (
+      !Number.isSafeInteger(segment) ||
+      segment < 0 ||
+      indexLimit === undefined ||
+      segment > indexLimit
+    ) {
+      return { kind: 'definition' };
+    }
+    parts.push(`[${segment}]`);
+    previousField = undefined;
+  }
+
+  return { kind: 'path', path: parts.join('') };
 }
 
 function ExperienceIssueList({
@@ -176,25 +281,25 @@ function ExperienceIssueList({
   return (
     <ul className='mt-2 list-disc space-y-2 pl-5 text-xs'>
       {issues.map((issue, index) => {
-        const known =
-          SAFE_ISSUE_DESCRIPTIONS[
-            issue.code as keyof typeof SAFE_ISSUE_DESCRIPTIONS
-          ];
+        const known = safeIssueDescription(issue.code);
         const description = known
           ? t(`publish.issues.${known[0]}`, { default: known[1] })
           : t('publish.issues.unknown', {
               default: 'The definition contains an issue that must be resolved.'
             });
-        const path = safeIssuePath(issue.path);
+        const location = safeIssueLocation(issue.path);
+        const path =
+          location.kind === 'path'
+            ? location.path
+            : t('publish.definitionLocation', { default: 'Definition' });
         return (
-          <li key={`${issue.code}-${path}-${index}`}>
+          <li key={index}>
             <p>{description}</p>
             <p className='text-muted-foreground mt-0.5'>
               {t('publish.issueLocation', {
                 path,
                 default: `Location: ${path}`
               })}
-              {known ? ` · ${issue.code}` : null}
             </p>
           </li>
         );

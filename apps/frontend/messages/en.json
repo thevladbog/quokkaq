@@ -374,6 +374,7 @@
           "publishFailed": "Publishing failed. Try again.",
           "restoreFailed": "Restoring failed. Try again.",
           "issueLocation": "Location: {path}",
+          "definitionLocation": "Definition",
           "issues": {
             "schemaInvalid": "The experience definition is invalid.",
             "startPageMissing": "The start page does not exist.",

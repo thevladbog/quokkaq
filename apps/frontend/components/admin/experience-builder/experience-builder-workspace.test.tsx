@@ -440,9 +440,13 @@ describe('ExperienceBuilderShell', () => {
     render(<ExperienceBuilderShell onSaveDraft={onSaveDraft} />);
     fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'response.invalid'
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(
+      /server response contains an invalid experience definition/i
     );
+    expect(alert).toHaveTextContent(/location: definition/i);
+    expect(alert).not.toHaveTextContent('response.invalid');
+    expect(alert).not.toHaveTextContent('not rendered verbatim');
     expect(useExperienceBuilderStore.getState().isDirty).toBe(true);
   });
 

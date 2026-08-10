@@ -6,7 +6,10 @@ import {
   waitFor
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ExperienceTemplate } from '@quokkaq/shared-types';
+import {
+  EXPERIENCE_TEMPLATE_LIMITS,
+  type ExperienceTemplate
+} from '@quokkaq/shared-types';
 import { ApiHttpError } from '@/lib/api-errors';
 
 vi.mock('next-intl', () => ({
@@ -176,9 +179,9 @@ describe('PublishExperienceDialog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'variant.unplaced_widget'
-    );
+    const resultAlert = await screen.findByRole('alert');
+    expect(resultAlert).toHaveTextContent(/widget is not placed/i);
+    expect(resultAlert).not.toHaveTextContent('variant.unplaced_widget');
     expect(onPublish).toHaveBeenCalledTimes(1);
   });
 
@@ -222,7 +225,7 @@ describe('PublishExperienceDialog', () => {
           issues: [
             {
               code: 'variant.unplaced_widget',
-              path: ['pages', 0, 'layouts', 'display', 'placements'],
+              path: ['pages', 0, 'widgets', 1, 'access', 'when'],
               message: 'secret visitor value: 4111 1111 1111 1111'
             }
           ]
@@ -233,9 +236,139 @@ describe('PublishExperienceDialog', () => {
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent(/widget is not placed/i);
     expect(alert).toHaveTextContent(
-      /location: pages\[0\]\.layouts\.display\.placements/i
+      /location: pages\[0\]\.widgets\[1\]\.access\.when/i
     );
+    expect(alert).not.toHaveTextContent('variant.unplaced_widget');
     expect(alert).not.toHaveTextContent('4111 1111 1111 1111');
+  });
+
+  it('keeps canonical schema locations useful only within resource bounds', () => {
+    const { maxVariants, maxPages, maxWidgetsPerPage, maxActionsPerWidget } =
+      EXPERIENCE_TEMPLATE_LIMITS;
+    render(
+      <PublishExperienceDialog
+        open
+        onOpenChange={vi.fn()}
+        draft={validDraft}
+        onPublish={vi.fn()}
+        publishError={{
+          kind: 'invalid-definition',
+          issues: [
+            {
+              code: 'response.invalid',
+              path: ['definition', 'id'],
+              message: 'sensitive response detail'
+            },
+            {
+              code: 'response.invalid',
+              path: ['templateId'],
+              message: 'sensitive response detail'
+            },
+            {
+              code: 'response.invalid',
+              path: ['version'],
+              message: 'sensitive response detail'
+            },
+            {
+              code: 'response.invalid',
+              path: ['publishedAt'],
+              message: 'sensitive response detail'
+            },
+            {
+              code: 'schema.invalid',
+              path: [
+                'variants',
+                maxVariants - 1,
+                'profile',
+                'safeArea',
+                'left'
+              ],
+              message: 'sensitive response detail'
+            },
+            {
+              code: 'schema.invalid',
+              path: [
+                'pages',
+                maxPages - 1,
+                'widgets',
+                maxWidgetsPerPage - 1,
+                'actions',
+                maxActionsPerWidget - 1,
+                'toPageId'
+              ],
+              message: 'sensitive response detail'
+            },
+            {
+              code: 'schema.invalid',
+              path: ['pages', maxPages, 'widgets', 0],
+              message: 'sensitive response detail'
+            }
+          ]
+        }}
+      />
+    );
+
+    expect(screen.getByText(/location: definition\.id/i)).toBeInTheDocument();
+    expect(screen.getByText(/location: templateId/i)).toBeInTheDocument();
+    expect(screen.getByText(/location: version/i)).toBeInTheDocument();
+    expect(screen.getByText(/location: publishedAt/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/location: variants\[7\]\.profile\.safeArea\.left/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /location: pages\[99\]\.widgets\[199\]\.actions\[19\]\.toPageId/i
+      )
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/^Location: Definition$/i)).toHaveLength(1);
+    expect(screen.queryByText(/pages\[100\]/i)).toBeNull();
+    expect(screen.queryByText(/sensitive response detail/i)).toBeNull();
+  });
+
+  it('collapses mixed unsafe issue paths without leaking backend issue data', () => {
+    const adversarialIssue = {
+      code: 'private.card_validation.4111111111111111',
+      path: [
+        'pages',
+        0,
+        'cardNumber4111111111111111',
+        'widgets',
+        7,
+        'phone2025550198'
+      ],
+      message:
+        'secret visitor value: card 4111 1111 1111 1111, phone +1 202 555 0198',
+      value: 'account-token-sk_live_sensitive'
+    };
+    const numericSecretIssue = {
+      code: 'schema.invalid',
+      path: ['pages', 4111111111111111, 'widgets', 0],
+      message: 'private account index'
+    };
+    render(
+      <PublishExperienceDialog
+        open
+        onOpenChange={vi.fn()}
+        draft={validDraft}
+        onPublish={vi.fn()}
+        publishError={{
+          kind: 'invalid-definition',
+          issues: [adversarialIssue, numericSecretIssue]
+        }}
+      />
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(/definition contains an issue/i);
+    expect(alert).toHaveTextContent(/location: definition/i);
+    expect(alert).not.toHaveTextContent('private.card_validation');
+    expect(alert).not.toHaveTextContent('4111111111111111');
+    expect(alert).not.toHaveTextContent('4111 1111 1111 1111');
+    expect(alert).not.toHaveTextContent('2025550198');
+    expect(alert).not.toHaveTextContent('+1 202 555 0198');
+    expect(alert).not.toHaveTextContent('account-token-sk_live_sensitive');
+    expect(alert).not.toHaveTextContent('widgets[7]');
+    expect(alert).not.toHaveTextContent('pages[0]');
   });
 
   it('keeps restore separate from saving and publishing', () => {
