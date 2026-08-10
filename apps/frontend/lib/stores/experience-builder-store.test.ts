@@ -112,6 +112,42 @@ describe('experience builder store', () => {
     expect(builder.getState().isDirty).toBe(false);
   });
 
+  it('rejects unsafe ids and inherited records without mutating the store', () => {
+    const builder = store();
+    const initial = builder.getState().draft;
+    const inheritedLayouts = Object.create({
+      portrait: { placements: {} },
+      landscape: { placements: {} }
+    });
+    const unsafeDraft = draft();
+    unsafeDraft.pages[0]!.layouts = inheritedLayouts;
+    const unsafePageDraft = draft();
+    unsafePageDraft.pages[0]!.id = 'constructor';
+    const unsafeIdFactoryBuilder = createExperienceBuilderStore(draft(), {
+      idFactory: () => 'prototype'
+    });
+
+    for (const id of ['__proto__', 'constructor', 'prototype']) {
+      expect(builder.getState().addPage({ id })).toBeNull();
+    }
+    expect(builder.getState().addPage(Object.create({ id: 'inherited' }))).toBe(
+      null
+    );
+    expect(
+      builder.getState().addWidget('services', 'media', {
+        config: Object.create({ inherited: true })
+      })
+    ).toBeNull();
+    expect(builder.getState().loadDraft(unsafeDraft)).toBe(false);
+    expect(builder.getState().loadDraft(unsafePageDraft)).toBe(false);
+    expect(builder.getState().setActiveVariant('constructor')).toBe(false);
+    expect(
+      unsafeIdFactoryBuilder.getState().addWidget('services', 'media')
+    ).toBeNull();
+    expect(builder.getState().draft).toEqual(initial);
+    expect(builder.getState().history).toHaveLength(0);
+  });
+
   it('keeps page targets stable through reorder and retargets only duplicate self-links', () => {
     const builder = store();
     const duplicateId = builder.getState().duplicatePage('services');
@@ -278,6 +314,57 @@ describe('experience builder store', () => {
       builder.getState().updateWidgetShared('services', 'picker', {})
     ).toBe(false);
     expect(builder.getState().history).toHaveLength(0);
+    expect(builder.getState().isDirty).toBe(false);
+  });
+
+  it('accepts an explicit undefined optional widget config as the legacy API does', () => {
+    const builder = store();
+
+    expect(
+      builder.getState().addWidget('services', 'media', { config: undefined })
+    ).toBe('widget-1');
+  });
+
+  it('uses structural equality for reordered records while preserving undefined and optional-key semantics', () => {
+    const builder = store();
+    const savedConfig = {
+      alpha: 1,
+      nested: { first: true, second: false },
+      labels: ['one', 'two'],
+      optional: undefined
+    };
+    builder
+      .getState()
+      .updateWidgetShared('services', 'picker', { config: savedConfig });
+    builder.getState().markSaved();
+    const historyAtSave = builder.getState().history.length;
+
+    expect(
+      builder.getState().updateWidgetShared('services', 'picker', {
+        config: {
+          labels: ['one', 'two'],
+          optional: undefined,
+          nested: { second: false, first: true },
+          alpha: 1
+        }
+      })
+    ).toBe(false);
+    expect(builder.getState().history).toHaveLength(historyAtSave);
+    expect(builder.getState().isDirty).toBe(false);
+    expect(
+      Object.hasOwn(
+        builder.getState().draft.pages[0]!.widgets[0]!.config,
+        'optional'
+      )
+    ).toBe(true);
+
+    expect(
+      builder
+        .getState()
+        .updateWidgetShared('services', 'picker', { config: {} })
+    ).toBe(true);
+    expect(builder.getState().isDirty).toBe(true);
+    expect(builder.getState().undo()).toBe(true);
     expect(builder.getState().isDirty).toBe(false);
   });
 

@@ -103,4 +103,111 @@ describe('screen grid editor', () => {
       rows: 3
     });
   });
+
+  it('expands a full finite grid one row at a time and rejects invalid grid caps', () => {
+    const fullGrid = [
+      { id: 'a', placement: { col: 1, row: 1, colSpan: 1, rowSpan: 1 } },
+      { id: 'b', placement: { col: 2, row: 1, colSpan: 1, rowSpan: 1 } },
+      { id: 'c', placement: { col: 1, row: 2, colSpan: 1, rowSpan: 1 } },
+      { id: 'd', placement: { col: 2, row: 2, colSpan: 1, rowSpan: 1 } }
+    ];
+    const original = { col: 1, row: 1, colSpan: 1, rowSpan: 1 };
+
+    expect(findDuplicatePlacement(2, 2, fullGrid, original, 4)).toEqual({
+      placement: { col: 1, row: 3, colSpan: 1, rowSpan: 1 },
+      rows: 3
+    });
+    for (const [columns, rows, maxRows] of [
+      [0, 2, 4],
+      [-1, 2, 4],
+      [Number.NaN, 2, 4],
+      [Number.POSITIVE_INFINITY, 2, 4],
+      [2, 0, 4],
+      [2, Number.NaN, 4],
+      [2, 2, 0],
+      [2, 2, -1],
+      [2, 2, Number.NaN],
+      [2, 2, Number.POSITIVE_INFINITY],
+      [2, 4, 2]
+    ]) {
+      expect(
+        findDuplicatePlacement(columns, rows, fullGrid, original, maxRows)
+      ).toBeNull();
+    }
+    expect(
+      findDuplicatePlacement(
+        2,
+        2,
+        fullGrid,
+        { col: Number.NaN, row: 1, colSpan: 1, rowSpan: 1 },
+        4
+      )
+    ).toBeNull();
+  });
+
+  it('requires the supplied item and current placement to match an own authoritative item', () => {
+    const stale = { col: 2, row: 2, colSpan: 1, rowSpan: 1 };
+    const first = items[0]!.placement;
+    const inherited = Object.create({
+      id: 'inherited',
+      placement: { col: 3, row: 3, colSpan: 1, rowSpan: 1 }
+    });
+    const inheritedPlacement = {
+      id: 'inherited-placement',
+      placement: Object.create({ col: 3, row: 3, colSpan: 1, rowSpan: 1 })
+    };
+    const protectedItems = [...items, inherited] as typeof items;
+
+    expect(movePlacement(4, 3, items, 'missing', first, 0, 1)).toBeNull();
+    expect(movePlacement(4, 3, items, 'first', stale, 0, 1)).toBeNull();
+    expect(movePlacement(4, 3, items, 'second', first, -1, 0)).toBeNull();
+    expect(resizePlacement(4, 3, items, 'missing', first, 1, 1)).toBeNull();
+    expect(
+      movePlacement(
+        4,
+        3,
+        protectedItems,
+        'inherited',
+        { col: 3, row: 3, colSpan: 1, rowSpan: 1 },
+        0,
+        -1
+      )
+    ).toBeNull();
+    expect(
+      movePlacement(
+        4,
+        3,
+        [...items, inheritedPlacement] as typeof items,
+        'inherited-placement',
+        { col: 3, row: 3, colSpan: 1, rowSpan: 1 },
+        0,
+        -1
+      )
+    ).toBeNull();
+    expect(movePlacement(4, 3, items, 'first', first, 0, 1)).toEqual({
+      col: 1,
+      row: 2,
+      colSpan: 2,
+      rowSpan: 2
+    });
+  });
+
+  it('rejects duplicate authoritative ids so skipId cannot bypass a collision', () => {
+    const duplicateIds = [
+      { id: 'same', placement: { col: 1, row: 1, colSpan: 1, rowSpan: 1 } },
+      { id: 'same', placement: { col: 3, row: 1, colSpan: 1, rowSpan: 1 } }
+    ];
+
+    expect(
+      movePlacement(
+        4,
+        2,
+        duplicateIds,
+        'same',
+        { col: 1, row: 1, colSpan: 1, rowSpan: 1 },
+        2,
+        0
+      )
+    ).toBeNull();
+  });
 });

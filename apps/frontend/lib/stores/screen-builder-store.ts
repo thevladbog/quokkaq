@@ -383,14 +383,20 @@ export const useScreenBuilderStore = create<BuilderState>()(
             s.template.portrait.widgets,
             copyPortrait.placement,
             48
-          );
+          ) ?? {
+            placement: { ...copyPortrait.placement },
+            rows: s.template.portrait.rows
+          };
           const duplicateLandscape = findDuplicatePlacement(
             s.template.landscape.columns,
             s.template.landscape.rows,
             s.template.landscape.widgets,
             copyLandscape.placement,
             48
-          );
+          ) ?? {
+            placement: { ...copyLandscape.placement },
+            rows: s.template.landscape.rows
+          };
           s.template.portrait.rows = duplicatePortrait.rows;
           s.template.landscape.rows = duplicateLandscape.rows;
           np.placement = duplicatePortrait.placement;

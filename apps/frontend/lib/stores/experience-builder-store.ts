@@ -58,7 +58,7 @@ type DraftState = {
 };
 
 export type ExperienceBuilderState = DraftState & {
-  loadDraft: (draft: ExperienceTemplate) => void;
+  loadDraft: (draft: ExperienceTemplate) => boolean;
   addPage: (input?: AddPageInput) => string | null;
   renamePage: (pageId: string, name: string) => boolean;
   duplicatePage: (pageId: string) => string | null;
@@ -97,12 +97,219 @@ export type ExperienceBuilderState = DraftState & {
   redo: () => boolean;
 };
 
-function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+const UNSAFE_RECORD_IDS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function hasOwn(value: object, key: PropertyKey): boolean {
+  try {
+    return Object.prototype.hasOwnProperty.call(value, key);
+  } catch {
+    return false;
+  }
 }
 
-function equalJson(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+function isPlainOwnRecord(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  try {
+    return Object.getPrototypeOf(value) === Object.prototype;
+  } catch {
+    return false;
+  }
+}
+
+function isSafeRecordID(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.trim() !== '' &&
+    !UNSAFE_RECORD_IDS.has(value)
+  );
+}
+
+function isSupportedJsonLike(
+  value: unknown,
+  ancestors = new Set<object>()
+): boolean {
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === 'string' ||
+    typeof value === 'boolean'
+  ) {
+    return true;
+  }
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value !== 'object' || ancestors.has(value)) return false;
+
+  if (Array.isArray(value)) {
+    if (Object.getPrototypeOf(value) !== Array.prototype) return false;
+    ancestors.add(value);
+    const valid = Object.keys(value).every((key) => {
+      const index = Number(key);
+      if (!Number.isInteger(index) || index < 0 || String(index) !== key) {
+        return false;
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      return (
+        descriptor !== undefined &&
+        'value' in descriptor &&
+        isSupportedJsonLike(descriptor.value, ancestors)
+      );
+    });
+    ancestors.delete(value);
+    return valid;
+  }
+
+  if (!isPlainOwnRecord(value)) return false;
+  ancestors.add(value);
+  const valid = Object.keys(value).every((key) => {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return (
+      descriptor !== undefined &&
+      'value' in descriptor &&
+      isSupportedJsonLike(descriptor.value, ancestors)
+    );
+  });
+  ancestors.delete(value);
+  return valid;
+}
+
+function cloneJsonLike(value: unknown): unknown {
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    const copy = new Array(value.length);
+    for (const key of Object.keys(value)) {
+      Object.defineProperty(copy, key, {
+        value: cloneJsonLike(value[Number(key)]),
+        enumerable: true,
+        writable: true,
+        configurable: true
+      });
+    }
+    return copy;
+  }
+  const copy: Record<string, unknown> = {};
+  for (const key of Object.keys(value as Record<string, unknown>)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
+    Object.defineProperty(copy, key, {
+      value: cloneJsonLike(descriptor.value),
+      enumerable: true,
+      writable: true,
+      configurable: true
+    });
+  }
+  return copy;
+}
+
+function clone<T>(value: T): T {
+  return cloneJsonLike(value) as T;
+}
+
+function equalJsonLike(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (
+    left === null ||
+    right === null ||
+    typeof left !== 'object' ||
+    typeof right !== 'object'
+  ) {
+    return false;
+  }
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (
+      !Array.isArray(left) ||
+      !Array.isArray(right) ||
+      left.length !== right.length
+    ) {
+      return false;
+    }
+    for (let index = 0; index < left.length; index++) {
+      const leftHas = hasOwn(left, index);
+      const rightHas = hasOwn(right, index);
+      if (leftHas !== rightHas) return false;
+      if (leftHas && !equalJsonLike(left[index], right[index])) return false;
+    }
+    return true;
+  }
+  if (!isPlainOwnRecord(left) || !isPlainOwnRecord(right)) return false;
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (let index = 0; index < leftKeys.length; index++) {
+    const key = leftKeys[index]!;
+    if (key !== rightKeys[index] || !hasOwn(right, key)) return false;
+    if (!equalJsonLike(left[key], right[key])) return false;
+  }
+  return true;
+}
+
+function isSafeWidgetInput(value: unknown): boolean {
+  if (!isPlainOwnRecord(value) || !isSupportedJsonLike(value)) return false;
+  return (
+    !hasOwn(value, 'config') ||
+    value.config === undefined ||
+    isPlainOwnRecord(value.config)
+  );
+}
+
+function isSafeTemplateDraft(value: unknown): value is ExperienceTemplate {
+  if (!isPlainOwnRecord(value) || !isSupportedJsonLike(value)) return false;
+  if (
+    !isSafeRecordID(value.id) ||
+    !isSafeRecordID(value.startPageId) ||
+    !Array.isArray(value.variants) ||
+    !Array.isArray(value.pages)
+  ) {
+    return false;
+  }
+  const variantIDs = new Set<string>();
+  for (const variant of value.variants) {
+    if (!isPlainOwnRecord(variant) || !isSafeRecordID(variant.id)) return false;
+    variantIDs.add(variant.id);
+  }
+  for (const page of value.pages) {
+    if (
+      !isPlainOwnRecord(page) ||
+      !isSafeRecordID(page.id) ||
+      !Array.isArray(page.widgets) ||
+      !isPlainOwnRecord(page.layouts)
+    ) {
+      return false;
+    }
+    const widgetIDs = new Set<string>();
+    for (const widget of page.widgets) {
+      if (
+        !isPlainOwnRecord(widget) ||
+        !isSafeRecordID(widget.id) ||
+        !isPlainOwnRecord(widget.config)
+      ) {
+        return false;
+      }
+      widgetIDs.add(widget.id);
+    }
+    for (const [variantID, layout] of Object.entries(page.layouts)) {
+      if (
+        !isSafeRecordID(variantID) ||
+        !variantIDs.has(variantID) ||
+        !isPlainOwnRecord(layout) ||
+        !isPlainOwnRecord(layout.placements)
+      ) {
+        return false;
+      }
+      if (Object.keys(layout.placements).some((id) => !isSafeRecordID(id))) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 function defaultIdFactory(prefix: 'page' | 'widget'): string {
@@ -116,12 +323,14 @@ function defaultIdFactory(prefix: 'page' | 'widget'): string {
 }
 
 function collectPageIds(template: ExperienceTemplate): Set<string> {
-  return new Set(template.pages.map((page) => page.id));
+  return new Set(template.pages.map((page) => page.id).filter(isSafeRecordID));
 }
 
 function collectWidgetIds(template: ExperienceTemplate): Set<string> {
   return new Set(
-    template.pages.flatMap((page) => page.widgets.map((widget) => widget.id))
+    template.pages.flatMap((page) =>
+      page.widgets.map((widget) => widget.id).filter(isSafeRecordID)
+    )
   );
 }
 
@@ -131,8 +340,13 @@ function uniqueId(
   factory: (prefix: 'page' | 'widget') => string
 ): string | null {
   for (let attempt = 0; attempt < 100; attempt++) {
-    const candidate = factory(prefix).trim();
-    if (candidate !== '' && !reserved.has(candidate)) return candidate;
+    let candidate: string;
+    try {
+      candidate = factory(prefix).trim();
+    } catch {
+      return null;
+    }
+    if (isSafeRecordID(candidate) && !reserved.has(candidate)) return candidate;
   }
   return null;
 }
@@ -141,7 +355,10 @@ function pageById(
   template: ExperienceTemplate,
   pageId: string
 ): ExperiencePage | undefined {
-  return template.pages.find((page) => page.id === pageId);
+  if (!isSafeRecordID(pageId)) return undefined;
+  return template.pages.find(
+    (page) => isSafeRecordID(page.id) && page.id === pageId
+  );
 }
 
 function activeVariantExists(state: DraftState): boolean {
@@ -171,7 +388,7 @@ function restoreSnapshot(
 }
 
 function refreshDirty(state: DraftState): void {
-  state.isDirty = !equalJson(state.draft, state.lastSavedDraft);
+  state.isDirty = !equalJsonLike(state.draft, state.lastSavedDraft);
 }
 
 function commitEdit(
@@ -179,7 +396,7 @@ function commitEdit(
   before: ExperienceBuilderSnapshot
 ): boolean {
   const after = snapshot(state);
-  if (equalJson(before, after)) return false;
+  if (equalJsonLike(before, after)) return false;
   state.history.push(before);
   if (state.history.length > HISTORY_CAP) state.history.shift();
   state.redoStack = [];
@@ -235,12 +452,24 @@ function isPageReferencedElsewhere(
 }
 
 function layoutItems(page: ExperiencePage, variantId: string): GridItem[] {
-  const layout = page.layouts[variantId];
+  const layout = ownPageLayout(page, variantId);
   if (!layout) return [];
   return page.widgets.flatMap((widget) => {
-    const placement = layout.placements[widget.id];
+    const placement = hasOwn(layout.placements, widget.id)
+      ? layout.placements[widget.id]
+      : undefined;
     return placement === undefined ? [] : [{ id: widget.id, placement }];
   });
+}
+
+function ownPageLayout(
+  page: ExperiencePage | undefined,
+  variantId: string
+): ExperiencePage['layouts'][string] | undefined {
+  if (!page || !isSafeRecordID(variantId) || !hasOwn(page.layouts, variantId)) {
+    return undefined;
+  }
+  return page.layouts[variantId];
 }
 
 function layoutFitsVariant(
@@ -341,7 +570,9 @@ function createExperienceBuilderState(
   options: ExperienceBuilderOptions = {}
 ) {
   const idFactory = options.idFactory ?? defaultIdFactory;
-  const initial = clone(initialDraft);
+  const initial = clone(
+    isSafeTemplateDraft(initialDraft) ? initialDraft : defaultDraft()
+  );
   const initialPageId = initial.pages[0]?.id ?? '';
   const initialVariantId = initial.variants[0]?.id ?? '';
 
@@ -356,6 +587,8 @@ function createExperienceBuilderState(
     isDirty: false,
 
     loadDraft: (draft) => {
+      if (!isSafeTemplateDraft(draft)) return false;
+      let changed = false;
       set((state) => {
         const next = clone(draft);
         state.draft = next;
@@ -366,15 +599,34 @@ function createExperienceBuilderState(
         state.redoStack = [];
         state.lastSavedDraft = clone(next);
         state.isDirty = false;
+        changed = true;
       });
+      return changed;
     },
 
     addPage: (input = {}) => {
       let result: string | null = null;
       set((state) => {
+        if (!isPlainOwnRecord(input) || !isSupportedJsonLike(input)) return;
         const before = snapshot(state);
         const reserved = collectPageIds(state.draft);
-        const requestedId = input.id?.trim();
+        const rawRequestedId = hasOwn(input, 'id') ? input.id : undefined;
+        if (
+          rawRequestedId !== undefined &&
+          typeof rawRequestedId !== 'string'
+        ) {
+          return;
+        }
+        const rawName = hasOwn(input, 'name') ? input.name : undefined;
+        if (rawName !== undefined && typeof rawName !== 'string') return;
+        const requestedId = rawRequestedId?.trim();
+        if (
+          requestedId !== undefined &&
+          requestedId !== '' &&
+          !isSafeRecordID(requestedId)
+        ) {
+          return;
+        }
         const pageId =
           requestedId !== undefined &&
           requestedId !== '' &&
@@ -385,7 +637,7 @@ function createExperienceBuilderState(
         const pageNumber = state.draft.pages.length + 1;
         state.draft.pages.push({
           id: pageId,
-          name: input.name?.trim() || `Page ${pageNumber}`,
+          name: rawName?.trim() || `Page ${pageNumber}`,
           widgets: [],
           layouts: Object.fromEntries(
             state.draft.variants.map((variant) => [
@@ -455,7 +707,7 @@ function createExperienceBuilderState(
           })),
           layouts: Object.fromEntries(
             state.draft.variants.map((variant) => {
-              const sourceLayout = source.layouts[variant.id] ?? {
+              const sourceLayout = ownPageLayout(source, variant.id) ?? {
                 placements: {}
               };
               const copiedLayout = copyGridLayout(sourceLayout);
@@ -554,11 +806,12 @@ function createExperienceBuilderState(
     addWidget: (pageId, type, input = {}) => {
       let result: string | null = null;
       set((state) => {
+        if (!isSafeWidgetInput(input)) return;
         const page = pageById(state.draft, pageId);
         const variant = state.draft.variants.find(
           (candidate) => candidate.id === state.activeVariantId
         );
-        const layout = page?.layouts[state.activeVariantId];
+        const layout = ownPageLayout(page, state.activeVariantId);
         if (!page || !variant || !layout || !activeVariantExists(state)) return;
         const cell = firstFreeCell(
           variant.grid.columns,
@@ -598,6 +851,7 @@ function createExperienceBuilderState(
     updateWidgetShared: (pageId, widgetId, updates) => {
       let changed = false;
       set((state) => {
+        if (!isSafeWidgetInput(updates)) return;
         const widget = pageById(state.draft, pageId)?.widgets.find(
           (candidate) => candidate.id === widgetId
         );
@@ -651,7 +905,7 @@ function createExperienceBuilderState(
         const variant = state.draft.variants.find(
           (candidate) => candidate.id === state.activeVariantId
         );
-        const layout = page?.layouts[state.activeVariantId];
+        const layout = ownPageLayout(page, state.activeVariantId);
         if (
           !page ||
           !variant ||
@@ -678,9 +932,8 @@ function createExperienceBuilderState(
       let changed = false;
       set((state) => {
         const page = pageById(state.draft, pageId);
-        const layout = page?.layouts[state.activeVariantId];
-        if (!page || !layout || layout.placements[widgetId] === undefined)
-          return;
+        const layout = ownPageLayout(page, state.activeVariantId);
+        if (!page || !layout || !hasOwn(layout.placements, widgetId)) return;
         const before = snapshot(state);
         delete layout.placements[widgetId];
         changed = commitEdit(state, before);
@@ -691,9 +944,10 @@ function createExperienceBuilderState(
     setTypographyScale: (pageId, scale) => {
       let changed = false;
       set((state) => {
-        const layout = pageById(state.draft, pageId)?.layouts[
+        const layout = ownPageLayout(
+          pageById(state.draft, pageId),
           state.activeVariantId
-        ];
+        );
         if (
           !layout ||
           (scale !== undefined &&
@@ -720,8 +974,8 @@ function createExperienceBuilderState(
             (variant) => variant.id === fromVariantId
           ) ||
           !state.draft.variants.some((variant) => variant.id === toVariantId) ||
-          !page.layouts[fromVariantId] ||
-          !page.layouts[toVariantId]
+          !ownPageLayout(page, fromVariantId) ||
+          !ownPageLayout(page, toVariantId)
         ) {
           return;
         }
@@ -732,7 +986,7 @@ function createExperienceBuilderState(
           !targetVariant ||
           !layoutFitsVariant(
             page,
-            page.layouts[fromVariantId]!,
+            ownPageLayout(page, fromVariantId)!,
             targetVariant.grid
           )
         ) {
@@ -740,7 +994,7 @@ function createExperienceBuilderState(
         }
         const before = snapshot(state);
         page.layouts[toVariantId] = copyGridLayout(
-          page.layouts[fromVariantId]!
+          ownPageLayout(page, fromVariantId)!
         );
         changed = commitEdit(state, before);
       });
@@ -763,6 +1017,7 @@ function createExperienceBuilderState(
       let changed = false;
       set((state) => {
         if (
+          !isSafeRecordID(variantId) ||
           !state.draft.variants.some((variant) => variant.id === variantId) ||
           state.activeVariantId === variantId
         ) {
@@ -780,7 +1035,7 @@ function createExperienceBuilderState(
         const before = clone(state.selection);
         state.selection = clone(selection);
         if (!isSelectionValid(state)) state.selection = { kind: 'none' };
-        changed = !equalJson(before, state.selection);
+        changed = !equalJsonLike(before, state.selection);
       });
       return changed;
     },
