@@ -44,11 +44,11 @@
     ]
   },
   "devDependencies": {
-    "@nx/js": "22.6.5",
-    "@nx/workspace": "22.6.5",
+    "@nx/js": "22.7.1",
+    "@nx/workspace": "22.7.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "nx": "22.6.5",
+    "nx": "22.7.1",
     "sherif": "^1.11.1"
   }
 }
