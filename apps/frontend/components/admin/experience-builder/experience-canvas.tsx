@@ -28,6 +28,7 @@ type CanvasItem = BuilderCanvasGridItem & {
   title: string;
   locked: boolean;
   hidden: boolean;
+  stackIndex: number;
 };
 
 export const EXPERIENCE_TRAY_DRAG_PREFIX = 'experience-tray-widget:';
@@ -78,7 +79,9 @@ function ExperienceCanvasCell({
       type='button'
       tabIndex={canPlace ? 0 : -1}
       aria-label={ariaLabel}
-      onClick={() => onPlace?.(col, row)}
+      onClick={() => {
+        if (canPlace) onPlace?.(col, row);
+      }}
       className={cn(
         'border-border/70 bg-muted/30 z-0 block h-full min-h-0 w-full min-w-0 border outline-none',
         canPlace &&
@@ -94,13 +97,23 @@ export function validCanvasItems(
   page: ExperiencePage,
   variant: ExperienceLayoutVariant,
   editorState: ExperienceEditorLayerState,
-  translate?: Parameters<typeof experienceWidgetTitle>[1]
+  translate?: Parameters<typeof experienceWidgetTitle>[1],
+  orderedWidgetIds?: readonly string[]
 ): CanvasItem[] {
   const layout = page.layouts[variant.id];
   if (!layout) return [];
   const placed: GridItem[] = [];
   const valid: CanvasItem[] = [];
-  for (const widget of page.widgets) {
+  const knownIds = new Set(orderedWidgetIds ?? []);
+  const widgets = [
+    ...(orderedWidgetIds ?? [])
+      .map((widgetId) => page.widgets.find((widget) => widget.id === widgetId))
+      .filter((widget): widget is ExperiencePage['widgets'][number] =>
+        Boolean(widget)
+      ),
+    ...page.widgets.filter((widget) => !knownIds.has(widget.id))
+  ];
+  for (const widget of widgets) {
     const placement = layout.placements[widget.id];
     if (
       !placement ||
@@ -120,10 +133,14 @@ export function validCanvasItems(
       placement,
       title: experienceWidgetTitle(widget, translate),
       locked: Boolean(metadata.locked),
-      hidden: Boolean(metadata.hidden)
+      hidden: Boolean(metadata.hidden),
+      stackIndex: 0
     });
   }
-  return valid;
+  return valid.map((item, index) => ({
+    ...item,
+    stackIndex: valid.length - index
+  }));
 }
 
 export type ExperienceCanvasProps = {
@@ -133,6 +150,7 @@ export type ExperienceCanvasProps = {
   canEdit: boolean;
   zoom: number;
   editorState: ExperienceEditorLayerState;
+  orderedWidgetIds?: readonly string[];
   pendingPlacement?: { id: string; title: string };
   onSelectWidget: (widgetId: string) => void;
   onPlacementChange: (widgetId: string, placement: GridPlacement) => void;
@@ -146,23 +164,31 @@ export function ExperienceCanvas({
   canEdit,
   zoom,
   editorState,
+  orderedWidgetIds,
   pendingPlacement,
   onSelectWidget,
   onPlacementChange,
   onPlacePendingAt
 }: ExperienceCanvasProps) {
   const t = useTranslations('experience.builder');
-  const items = validCanvasItems(page, variant, editorState, (entry) =>
-    t(entry.labelKey, { default: entry.label })
+  const items = validCanvasItems(
+    page,
+    variant,
+    editorState,
+    (entry) => t(entry.labelKey, { default: entry.label }),
+    orderedWidgetIds
   );
+  const visibleItems = items.filter((item) => !item.hidden);
+  const canPlacePending = Boolean(pendingPlacement) && canEdit;
   return (
     <BuilderCanvasGrid
       face={variant.id}
       grid={variant.grid}
-      items={items}
+      items={visibleItems}
       selectionId={selectedWidgetId}
       canEdit={canEdit}
       zoom={zoom}
+      minimumInteractiveCellSize={canPlacePending ? 44 : undefined}
       safeArea={variant.profile.safeArea}
       deviceSize={{
         width: variant.profile.width,
@@ -171,12 +197,12 @@ export function ExperienceCanvas({
       ariaLabel={t('canvas.label', { default: 'Experience layout canvas' })}
       containerClassName='min-h-[430px] flex-1 rounded-xl border border-border/70 bg-muted/35 p-5'
       onSelect={onSelectWidget}
-      onPlacementChange={onPlacementChange}
+      onPlacementChange={canEdit ? onPlacementChange : undefined}
       renderCell={({ col, row }) => (
         <ExperienceCanvasCell
           col={col}
           row={row}
-          canPlace={Boolean(pendingPlacement) && canEdit}
+          canPlace={canPlacePending}
           ariaLabel={
             pendingPlacement
               ? t('canvas.placeInCell', {
@@ -192,7 +218,7 @@ export function ExperienceCanvas({
                 })
           }
           onPlace={
-            pendingPlacement
+            canPlacePending && pendingPlacement
               ? (targetCol, targetRow) =>
                   onPlacePendingAt?.(pendingPlacement.id, targetCol, targetRow)
               : undefined
@@ -202,17 +228,24 @@ export function ExperienceCanvas({
       renderItem={({ item, selected, onSelect, onPlacementChange }) => (
         <button
           key={item.id}
+          data-testid='experience-canvas-widget'
+          data-widget-id={item.id}
           type='button'
           onClick={onSelect}
           onKeyDown={(event) => {
-            if (!canEdit || !selected || !onPlacementChange) return;
-            const deltas = {
-              ArrowLeft: { col: -1, row: 0 },
-              ArrowRight: { col: 1, row: 0 },
-              ArrowUp: { col: 0, row: -1 },
-              ArrowDown: { col: 0, row: 1 }
-            } as const;
-            const delta = deltas[event.key as keyof typeof deltas];
+            if (!canEdit || item.locked || !selected || !onPlacementChange) {
+              return;
+            }
+            const delta =
+              event.key === 'ArrowLeft'
+                ? { col: -1, row: 0 }
+                : event.key === 'ArrowRight'
+                  ? { col: 1, row: 0 }
+                  : event.key === 'ArrowUp'
+                    ? { col: 0, row: -1 }
+                    : event.key === 'ArrowDown'
+                      ? { col: 0, row: 1 }
+                      : undefined;
             if (!delta) return;
             event.preventDefault();
             onPlacementChange({
@@ -222,21 +255,21 @@ export function ExperienceCanvas({
             });
           }}
           className={cn(
-            'bg-card relative z-10 flex min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-md border p-2 text-left shadow-sm outline-none',
+            'bg-card relative flex min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-md border p-2 text-left shadow-sm outline-none',
             'focus-visible:ring-ring focus-visible:ring-2',
             selected
               ? 'border-primary ring-primary/40 ring-2'
               : 'border-border hover:border-primary/50',
-            item.hidden && 'hidden',
             item.locked && 'cursor-not-allowed'
           )}
           style={{
             gridColumn: `${item.placement.col} / span ${item.placement.colSpan}`,
-            gridRow: `${item.placement.row} / span ${item.placement.rowSpan}`
+            gridRow: `${item.placement.row} / span ${item.placement.rowSpan}`,
+            zIndex: item.stackIndex
           }}
           aria-pressed={selected}
           aria-label={item.title}
-          disabled={item.locked && !selected}
+          aria-disabled={item.locked || !canEdit}
         >
           <span className='truncate text-[11px] font-semibold'>
             {item.title}

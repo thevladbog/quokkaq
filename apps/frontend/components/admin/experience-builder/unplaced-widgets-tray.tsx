@@ -91,8 +91,11 @@ function UnplacedWidgetControl({
       disabled={!canEdit}
       {...attributes}
       {...listeners}
-      onClick={() => onPreparePlacement(widget)}
+      onClick={() => {
+        if (canEdit) onPreparePlacement(widget);
+      }}
       onKeyDown={(event) => {
+        if (!canEdit) return;
         if (event.key === 'Enter') {
           event.preventDefault();
           onPreparePlacement(widget);
@@ -164,7 +167,9 @@ export function UnplacedWidgetsTray({
               className='border-input bg-background focus-visible:ring-ring h-11 rounded-md border px-2 text-xs outline-none focus-visible:ring-2'
               defaultValue=''
               onChange={(event) => {
-                if (event.target.value !== '') onCopyLayout(event.target.value);
+                if (canEdit && event.target.value !== '') {
+                  onCopyLayout(event.target.value);
+                }
                 event.currentTarget.value = '';
               }}
               disabled={!canEdit}

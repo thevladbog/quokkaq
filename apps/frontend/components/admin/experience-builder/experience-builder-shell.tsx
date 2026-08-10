@@ -175,6 +175,7 @@ export function ExperienceBuilderShell({
   const selectWidget = (widgetId: string) =>
     setSelection({ kind: 'widget', pageId: page.id, widgetId });
   const toggleMetadata = (widgetId: string, field: 'locked' | 'hidden') => {
+    if (!canEdit) return;
     const key = editorLayerKey(page.id, widgetId);
     setEditorState((current) => ({
       ...current,
@@ -182,6 +183,7 @@ export function ExperienceBuilderShell({
     }));
   };
   const moveLayer = (widgetId: string, direction: -1 | 1) => {
+    if (!canEdit) return;
     const order = stableWidgetOrder(page.id, page.widgets, layerOrder);
     const index = order.indexOf(widgetId);
     const nextIndex = index + direction;
@@ -194,6 +196,7 @@ export function ExperienceBuilderShell({
     ? unplaced.find((widget) => widget.id === pendingPlacementWidgetId)
     : undefined;
   const placeWidgetAt = (widgetId: string, col: number, row: number) => {
+    if (!canEdit) return;
     if (
       setPlacement(page.id, widgetId, {
         col,
@@ -206,6 +209,7 @@ export function ExperienceBuilderShell({
     }
   };
   const onDragEnd = (event: DragEndEvent) => {
+    if (!canEdit) return;
     const activeId = String(event.active.id);
     const target = event.over
       ? parseExperienceDropTarget(String(event.over.id))
@@ -215,6 +219,7 @@ export function ExperienceBuilderShell({
     placeWidgetAt(widgetId, target.col, target.row);
   };
   const requestRename = (pageId: string) => {
+    if (!canEdit) return;
     const current = draft.pages.find((candidate) => candidate.id === pageId);
     if (!current || typeof window === 'undefined') return;
     const next = window.prompt(
@@ -264,12 +269,22 @@ export function ExperienceBuilderShell({
           canRedo={redoStack.length > 0}
           canEdit={canEdit}
           onVariantChange={setActiveVariant}
-          onZoomChange={setZoom}
-          onUndo={undo}
-          onRedo={redo}
+          onZoomChange={(nextZoom) => {
+            if (canEdit) setZoom(nextZoom);
+          }}
+          onUndo={() => {
+            if (canEdit) undo();
+          }}
+          onRedo={() => {
+            if (canEdit) redo();
+          }}
           onPreview={() => onPreview?.(draft)}
-          onSaveDraft={() => onSaveDraft?.(draft)}
-          onPublish={() => onPublish?.(draft)}
+          onSaveDraft={() => {
+            if (canEdit) onSaveDraft?.(draft);
+          }}
+          onPublish={() => {
+            if (canEdit) onPublish?.(draft);
+          }}
         />
         <div className='grid min-h-0 flex-1 grid-cols-[248px_minmax(480px,1fr)_264px]'>
           <ExperienceSidePanel
@@ -280,22 +295,31 @@ export function ExperienceBuilderShell({
             layerOrder={currentLayerOrder}
             activeTab={activeTab}
             editorState={editorState}
+            canEdit={canEdit}
             onTabChange={setActiveTab}
             onSelectPage={selectPage}
             onAddPage={() => {
+              if (!canEdit) return;
               addPage();
               setActiveTab('pages');
             }}
-            onDuplicatePage={duplicatePage}
+            onDuplicatePage={(pageId) => {
+              if (canEdit) duplicatePage(pageId);
+            }}
             onRenamePage={requestRename}
-            onDeletePage={deletePage}
+            onDeletePage={(pageId) => {
+              if (canEdit) deletePage(pageId);
+            }}
             onMovePage={(pageId, direction) => {
+              if (!canEdit) return;
               const index = draft.pages.findIndex(
                 (candidate) => candidate.id === pageId
               );
               reorderPage(pageId, index + direction);
             }}
-            onAddWidget={(type) => addWidget(page.id, type)}
+            onAddWidget={(type) => {
+              if (canEdit) addWidget(page.id, type);
+            }}
             onSelectWidget={selectWidget}
             onMoveLayer={moveLayer}
             onToggleLayerLock={(widgetId) => toggleMetadata(widgetId, 'locked')}
@@ -342,15 +366,16 @@ export function ExperienceBuilderShell({
                 canEdit={canEdit}
                 zoom={zoom}
                 editorState={editorState}
+                orderedWidgetIds={currentLayerOrder}
                 pendingPlacement={
                   pendingWidget
                     ? { id: pendingWidget.id, title: pendingWidget.title }
                     : undefined
                 }
                 onSelectWidget={selectWidget}
-                onPlacementChange={(widgetId, placement) =>
-                  setPlacement(page.id, widgetId, placement)
-                }
+                onPlacementChange={(widgetId, placement) => {
+                  if (canEdit) setPlacement(page.id, widgetId, placement);
+                }}
                 onPlacePendingAt={placeWidgetAt}
               />
               <UnplacedWidgetsTray
@@ -359,12 +384,14 @@ export function ExperienceBuilderShell({
                 variants={draft.variants}
                 canEdit={canEdit}
                 pendingWidgetId={pendingWidget?.id}
-                onPreparePlacement={(widget) =>
-                  setPendingPlacementWidgetId(widget.id)
-                }
-                onCopyLayout={(sourceVariantId) =>
-                  copyLayout(page.id, sourceVariantId, variant.id)
-                }
+                onPreparePlacement={(widget) => {
+                  if (canEdit) setPendingPlacementWidgetId(widget.id);
+                }}
+                onCopyLayout={(sourceVariantId) => {
+                  if (canEdit) {
+                    copyLayout(page.id, sourceVariantId, variant.id);
+                  }
+                }}
               />
             </div>
           </section>

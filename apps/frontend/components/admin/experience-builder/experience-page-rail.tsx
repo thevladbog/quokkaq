@@ -84,6 +84,7 @@ const STATUS_ICON = {
 export type ExperiencePageRailProps = {
   template: ExperienceTemplate;
   activePageId: string;
+  canEdit: boolean;
   onSelect: (pageId: string) => void;
   onAdd: () => void;
   onDuplicate: (pageId: string) => void;
@@ -95,6 +96,7 @@ export type ExperiencePageRailProps = {
 export function ExperiencePageRail({
   template,
   activePageId,
+  canEdit,
   onSelect,
   onAdd,
   onDuplicate,
@@ -126,7 +128,7 @@ export function ExperiencePageRail({
                 <Button
                   type='button'
                   variant='ghost'
-                  className='h-auto min-h-10 min-w-0 flex-1 justify-start px-2 text-left'
+                  className='h-auto min-h-11 min-w-0 flex-1 justify-start px-2 text-left'
                   aria-pressed={selected}
                   aria-label={page.name}
                   onClick={() => onSelect(page.id)}
@@ -152,35 +154,52 @@ export function ExperiencePageRail({
                         name: page.name,
                         default: `Open ${page.name} actions`
                       })}
+                      disabled={!canEdit}
                     >
                       <Ellipsis />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align='end'>
-                    <DropdownMenuItem onSelect={() => onDuplicate(page.id)}>
+                    <DropdownMenuItem
+                      disabled={!canEdit}
+                      onSelect={() => {
+                        if (canEdit) onDuplicate(page.id);
+                      }}
+                    >
                       <Copy /> {t('pages.duplicate', { default: 'Duplicate' })}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => onRename(page.id)}>
+                    <DropdownMenuItem
+                      disabled={!canEdit}
+                      onSelect={() => {
+                        if (canEdit) onRename(page.id);
+                      }}
+                    >
                       {t('pages.rename', { default: 'Rename' })}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      disabled={index === 0}
-                      onSelect={() => onMove(page.id, -1)}
+                      disabled={!canEdit || index === 0}
+                      onSelect={() => {
+                        if (canEdit) onMove(page.id, -1);
+                      }}
                     >
                       {t('pages.moveUp', { default: 'Move up' })}
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      disabled={index === template.pages.length - 1}
-                      onSelect={() => onMove(page.id, 1)}
+                      disabled={!canEdit || index === template.pages.length - 1}
+                      onSelect={() => {
+                        if (canEdit) onMove(page.id, 1);
+                      }}
                     >
                       {t('pages.moveDown', { default: 'Move down' })}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       variant='destructive'
-                      disabled={page.id === template.startPageId}
-                      onSelect={() => onDelete(page.id)}
+                      disabled={!canEdit || page.id === template.startPageId}
+                      onSelect={() => {
+                        if (canEdit) onDelete(page.id);
+                      }}
                     >
                       <Trash2 /> {t('pages.delete', { default: 'Delete' })}
                     </DropdownMenuItem>
@@ -209,7 +228,10 @@ export function ExperiencePageRail({
                     name: page.name,
                     default: `Move ${page.name} up`
                   })}
-                  onClick={() => onMove(page.id, -1)}
+                  disabled={!canEdit || index === 0}
+                  onClick={() => {
+                    if (canEdit) onMove(page.id, -1);
+                  }}
                 />
               </div>
             </article>
@@ -221,7 +243,10 @@ export function ExperiencePageRail({
           type='button'
           variant='outline'
           className='min-h-11 w-full'
-          onClick={onAdd}
+          disabled={!canEdit}
+          onClick={() => {
+            if (canEdit) onAdd();
+          }}
         >
           <Plus /> {t('pages.add', { default: 'Add page' })}
         </Button>

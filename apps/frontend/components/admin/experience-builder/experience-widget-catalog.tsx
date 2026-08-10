@@ -5,7 +5,7 @@ import type {
   ExperienceWidget
 } from '@quokkaq/shared-types';
 import { Image, Info, Keyboard, ListTree, Plus, Ticket } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 
 type CatalogGroup = 'queue' | 'information' | 'media' | 'navigation' | 'input';
 
-type CatalogEntry = {
+export type ExperienceCatalogEntry = {
   type: ExperienceWidget['type'];
   group: CatalogGroup;
   surfaces: readonly ExperienceSurface[];
@@ -24,7 +24,7 @@ type CatalogEntry = {
   description: string;
 };
 
-export const EXPERIENCE_WIDGET_CATALOG: readonly CatalogEntry[] = [
+export const EXPERIENCE_WIDGET_CATALOG: readonly ExperienceCatalogEntry[] = [
   {
     type: 'service-picker',
     group: 'queue',
@@ -150,7 +150,7 @@ const GROUPS: readonly {
 
 export function experienceWidgetTitle(
   widget: ExperienceWidget,
-  translate?: (entry: CatalogEntry) => string
+  translate?: (entry: ExperienceCatalogEntry) => string
 ): string {
   const configured = widget.config.title;
   if (typeof configured === 'string' && configured.trim() !== '') {
@@ -162,30 +162,55 @@ export function experienceWidgetTitle(
   return entry ? (translate?.(entry) ?? entry.label) : widget.type;
 }
 
+export type ExperienceCatalogTranslation = (
+  key: string,
+  values?: { default?: string }
+) => string;
+
+export function searchCatalogEntries(
+  surface: ExperienceSurface,
+  query: string,
+  translate: ExperienceCatalogTranslation
+): ExperienceCatalogEntry[] {
+  const normalized = query.trim().toLocaleLowerCase();
+  return EXPERIENCE_WIDGET_CATALOG.filter((entry) => {
+    if (!entry.surfaces.includes(surface)) return false;
+    if (normalized === '') return true;
+    const label = translate(entry.labelKey, { default: entry.label });
+    const description = translate(entry.descriptionKey, {
+      default: entry.description
+    });
+    return `${label} ${description}`.toLocaleLowerCase().includes(normalized);
+  });
+}
+
 export type ExperienceWidgetCatalogProps = {
   surface: ExperienceSurface;
+  canEdit?: boolean;
   disabled?: boolean;
   onAdd: (type: ExperienceWidget['type']) => void;
 };
 
 export function ExperienceWidgetCatalog({
   surface,
+  canEdit = true,
   disabled = false,
   onAdd
 }: ExperienceWidgetCatalogProps) {
   const t = useTranslations('experience.builder');
   const [query, setQuery] = useState('');
-  const entries = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    return EXPERIENCE_WIDGET_CATALOG.filter(
-      (entry) =>
-        entry.surfaces.includes(surface) &&
-        (normalized === '' ||
-          `${entry.label} ${entry.description}`
-            .toLowerCase()
-            .includes(normalized))
-    );
-  }, [query, surface]);
+  const mutationDisabled = disabled || !canEdit;
+  const translateCatalogEntry = useCallback<ExperienceCatalogTranslation>(
+    (key, values) =>
+      values?.default === undefined
+        ? t(key)
+        : t(key, { default: values.default }),
+    [t]
+  );
+  const entries = useMemo(
+    () => searchCatalogEntries(surface, query, translateCatalogEntry),
+    [query, surface, translateCatalogEntry]
+  );
 
   return (
     <section
@@ -201,7 +226,7 @@ export function ExperienceWidgetCatalog({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={t('catalog.search', { default: 'Search widgets' })}
-          className='h-10'
+          className='min-h-11'
         />
       </div>
       <div className='min-h-0 space-y-5 overflow-y-auto p-3'>
@@ -227,11 +252,13 @@ export function ExperienceWidgetCatalog({
                       key={entry.type}
                       type='button'
                       variant='ghost'
-                      disabled={disabled}
-                      onClick={() => onAdd(entry.type)}
+                      disabled={mutationDisabled}
+                      onClick={() => {
+                        if (!mutationDisabled) onAdd(entry.type);
+                      }}
                       className={cn(
                         'h-auto min-h-12 w-full justify-start px-2.5 py-2 text-left',
-                        disabled && 'cursor-not-allowed'
+                        mutationDisabled && 'cursor-not-allowed'
                       )}
                     >
                       <Plus className='size-4 shrink-0' aria-hidden />

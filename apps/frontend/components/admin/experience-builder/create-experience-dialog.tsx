@@ -104,6 +104,18 @@ function gridFor(profile: DeviceProfile): { columns: number; rows: number } {
     : { columns: 18, rows: 12 };
 }
 
+function canonicalDeviceProfile(profile: DeviceProfile): DeviceProfile {
+  return {
+    id: profile.id,
+    name: profile.name,
+    width: profile.width,
+    height: profile.height,
+    interactionMode: profile.interactionMode,
+    viewingDistance: profile.viewingDistance,
+    safeArea: { ...profile.safeArea }
+  };
+}
+
 function isExactProfile(
   profile: DeviceProfile,
   surface: ExperienceSurface
@@ -140,7 +152,7 @@ export function createExperienceDraft(
 
   const variants = profiles.map((profile, index) => ({
     id: index === 0 ? variantId(profile) : `${variantId(profile)}-${index + 1}`,
-    profile: structuredClone(profile),
+    profile: canonicalDeviceProfile(profile),
     grid: gridFor(profile)
   }));
   const firstVariant = variants[0];

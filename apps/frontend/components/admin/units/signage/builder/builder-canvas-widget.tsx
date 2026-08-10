@@ -5,7 +5,6 @@ import { CSS } from '@dnd-kit/utilities';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { ScreenCellGridWidget } from '@quokkaq/shared-types';
-import { useScreenBuilderStore } from '@/lib/stores/screen-builder-store';
 import { cn } from '@/lib/utils';
 import { canvasWidgetId } from './screen-dnd-ids';
 import { clientPointToGridCell } from './builder-canvas-grid-utils';
@@ -17,25 +16,24 @@ type Props = {
   widget: ScreenCellGridWidget;
   selected: boolean;
   canEdit: boolean;
-  editOrientation: 'portrait' | 'landscape';
   gridElRef: React.RefObject<HTMLDivElement | null>;
   columns: number;
   rows: number;
   onSelect: () => void;
+  onPlacementChange?: (placement: ScreenCellGridWidget['placement']) => void;
 };
 
 export function BuilderCanvasWidget({
   widget,
   selected,
   canEdit,
-  editOrientation,
   gridElRef,
   columns,
   rows,
-  onSelect
+  onSelect,
+  onPlacementChange
 }: Props) {
   const t = useTranslations('admin.screenBuilder');
-  const setWidgetPlacement = useScreenBuilderStore((s) => s.setWidgetPlacement);
 
   const placementKey = `${widget.placement.col}-${widget.placement.row}-${widget.placement.colSpan}-${widget.placement.rowSpan}`;
   const [resizeSpan, setResizeSpan] = useState<{
@@ -94,14 +92,14 @@ export function BuilderCanvasWidget({
       e.preventDefault();
       e.stopPropagation();
       resizingActiveRef.current = true;
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      e.currentTarget.setPointerCapture(e.pointerId);
     },
     [canEdit, selected]
   );
 
   const onResizePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!resizingActiveRef.current) return;
+      if (!canEdit || !resizingActiveRef.current) return;
       const grid = gridElRef.current;
       if (!grid) return;
       const rect = grid.getBoundingClientRect();
@@ -137,14 +135,15 @@ export function BuilderCanvasWidget({
       }
       setResizeSpan({ colSpan: nextColSpan, rowSpan: nextRowSpan });
     },
-    [columns, gridElRef, rows, widget.placement]
+    [canEdit, columns, gridElRef, rows, widget.placement]
   );
 
   const onResizePointerUp = useCallback(
     (e: React.PointerEvent) => {
+      if (!canEdit) return;
       resizingActiveRef.current = false;
       try {
-        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+        e.currentTarget.releasePointerCapture(e.pointerId);
       } catch {
         /* ignore */
       }
@@ -155,18 +154,14 @@ export function BuilderCanvasWidget({
         (span.colSpan !== widget.placement.colSpan ||
           span.rowSpan !== widget.placement.rowSpan)
       ) {
-        setWidgetPlacement(
-          widget.id,
-          {
-            ...widget.placement,
-            colSpan: span.colSpan,
-            rowSpan: span.rowSpan
-          },
-          editOrientation
-        );
+        onPlacementChange?.({
+          ...widget.placement,
+          colSpan: span.colSpan,
+          rowSpan: span.rowSpan
+        });
       }
     },
-    [editOrientation, setWidgetPlacement, widget.id, widget.placement]
+    [canEdit, onPlacementChange, widget.placement]
   );
 
   return (

@@ -81,6 +81,7 @@ export function ExperienceToolbar({
             size='icon-sm'
             className='min-h-11 min-w-11'
             aria-label={t('toolbar.zoomOut', { default: 'Zoom out' })}
+            disabled={!canEdit}
             onClick={() => onZoomChange(Math.max(0.5, zoom - 0.1))}
           >
             <ZoomOut />
@@ -97,6 +98,7 @@ export function ExperienceToolbar({
             size='icon-sm'
             className='min-h-11 min-w-11'
             aria-label={t('toolbar.zoomIn', { default: 'Zoom in' })}
+            disabled={!canEdit}
             onClick={() => onZoomChange(Math.min(1.25, zoom + 0.1))}
           >
             <ZoomIn />

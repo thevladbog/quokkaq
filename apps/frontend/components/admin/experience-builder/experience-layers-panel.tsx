@@ -30,6 +30,7 @@ export type ExperienceLayersPanelProps = {
   selectedWidgetId?: string;
   orderedWidgetIds?: readonly string[];
   editorState: ExperienceEditorLayerState;
+  canEdit: boolean;
   onSelect: (widgetId: string) => void;
   onMove: (widgetId: string, direction: -1 | 1) => void;
   onToggleLock: (widgetId: string) => void;
@@ -41,6 +42,7 @@ export function ExperienceLayersPanel({
   selectedWidgetId,
   orderedWidgetIds,
   editorState,
+  canEdit,
   onSelect,
   onMove,
   onToggleLock,
@@ -92,7 +94,7 @@ export function ExperienceLayersPanel({
                 <Button
                   type='button'
                   variant='ghost'
-                  className='h-auto min-h-9 min-w-0 flex-1 justify-start px-1.5 text-left'
+                  className='h-auto min-h-11 min-w-0 flex-1 justify-start px-1.5 text-left'
                   onClick={() => onSelect(widget.id)}
                   aria-pressed={selected}
                   aria-label={`Select ${title}`}
@@ -109,8 +111,10 @@ export function ExperienceLayersPanel({
                       title,
                       default: `Move ${title} up`
                     })}
-                    disabled={index === 0}
-                    onClick={() => onMove(widget.id, -1)}
+                    disabled={!canEdit || index === 0}
+                    onClick={() => {
+                      if (canEdit) onMove(widget.id, -1);
+                    }}
                   >
                     <ChevronUp />
                   </Button>
@@ -123,8 +127,10 @@ export function ExperienceLayersPanel({
                       title,
                       default: `Move ${title} down`
                     })}
-                    disabled={index === widgets.length - 1}
-                    onClick={() => onMove(widget.id, 1)}
+                    disabled={!canEdit || index === widgets.length - 1}
+                    onClick={() => {
+                      if (canEdit) onMove(widget.id, 1);
+                    }}
                   >
                     <ChevronDown />
                   </Button>
@@ -142,7 +148,10 @@ export function ExperienceLayersPanel({
                         : t('layers.lock', { title, default: `Lock ${title}` })
                     }
                     aria-pressed={Boolean(metadata.locked)}
-                    onClick={() => onToggleLock(widget.id)}
+                    disabled={!canEdit}
+                    onClick={() => {
+                      if (canEdit) onToggleLock(widget.id);
+                    }}
                   >
                     {metadata.locked ? <Lock /> : <LockKeyholeOpen />}
                   </Button>
@@ -157,7 +166,10 @@ export function ExperienceLayersPanel({
                         : t('layers.hide', { title, default: `Hide ${title}` })
                     }
                     aria-pressed={Boolean(metadata.hidden)}
-                    onClick={() => onToggleHidden(widget.id)}
+                    disabled={!canEdit}
+                    onClick={() => {
+                      if (canEdit) onToggleHidden(widget.id);
+                    }}
                   >
                     {metadata.hidden ? <EyeOff /> : <Eye />}
                   </Button>

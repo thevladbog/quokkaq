@@ -16,15 +16,31 @@ import {
 } from './experience-layers-panel';
 import { ExperiencePageRail } from './experience-page-rail';
 
+export type ExperienceBuilderTab = 'pages' | 'add' | 'layers';
+
+export function parseExperienceBuilderTab(
+  value: string
+): ExperienceBuilderTab | null {
+  switch (value) {
+    case 'pages':
+    case 'add':
+    case 'layers':
+      return value;
+    default:
+      return null;
+  }
+}
+
 export type ExperienceSidePanelProps = {
   template: ExperienceTemplate;
   page: ExperiencePage;
   activePageId: string;
   selectedWidgetId?: string;
   layerOrder?: readonly string[];
-  activeTab: 'pages' | 'add' | 'layers';
+  activeTab: ExperienceBuilderTab;
   editorState: ExperienceEditorLayerState;
-  onTabChange: (tab: 'pages' | 'add' | 'layers') => void;
+  canEdit: boolean;
+  onTabChange: (tab: ExperienceBuilderTab) => void;
   onSelectPage: (pageId: string) => void;
   onAddPage: () => void;
   onDuplicatePage: (pageId: string) => void;
@@ -47,9 +63,10 @@ export function ExperienceSidePanel(props: ExperienceSidePanelProps) {
     >
       <Tabs
         value={props.activeTab}
-        onValueChange={(value) =>
-          props.onTabChange(value as 'pages' | 'add' | 'layers')
-        }
+        onValueChange={(value) => {
+          const tab = parseExperienceBuilderTab(value);
+          if (tab) props.onTabChange(tab);
+        }}
         className='min-h-0 flex-1 gap-0'
       >
         <TabsList className='rounded-none border-b bg-transparent p-1'>
@@ -82,6 +99,7 @@ export function ExperienceSidePanel(props: ExperienceSidePanelProps) {
           <ExperiencePageRail
             template={props.template}
             activePageId={props.activePageId}
+            canEdit={props.canEdit}
             onSelect={props.onSelectPage}
             onAdd={props.onAddPage}
             onDuplicate={props.onDuplicatePage}
@@ -93,6 +111,7 @@ export function ExperienceSidePanel(props: ExperienceSidePanelProps) {
         <TabsContent value='add' className='mt-0 min-h-0 flex-1'>
           <ExperienceWidgetCatalog
             surface={props.template.surface}
+            canEdit={props.canEdit}
             onAdd={props.onAddWidget}
           />
         </TabsContent>
@@ -102,6 +121,7 @@ export function ExperienceSidePanel(props: ExperienceSidePanelProps) {
             selectedWidgetId={props.selectedWidgetId}
             orderedWidgetIds={props.layerOrder}
             editorState={props.editorState}
+            canEdit={props.canEdit}
             onSelect={props.onSelectWidget}
             onMove={props.onMoveLayer}
             onToggleLock={props.onToggleLayerLock}

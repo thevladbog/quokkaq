@@ -15,6 +15,8 @@ import {
 } from './create-experience-dialog';
 import { validCanvasItems } from './experience-canvas';
 import { ExperienceBuilderShell } from './experience-builder-shell';
+import { parseExperienceBuilderTab } from './experience-side-panel';
+import { searchCatalogEntries } from './experience-widget-catalog';
 import { collectUnplacedWidgets } from './unplaced-widgets-tray';
 import { useExperienceBuilderStore } from '@/lib/stores/experience-builder-store';
 
@@ -63,6 +65,23 @@ describe('CreateExperienceDialog', () => {
         EXPERIENCE_PROFILE_PRESETS[0]!
       ])
     ).toThrow(/unique/i);
+  });
+
+  it('copies only canonical DeviceProfile fields into a draft variant', () => {
+    const draft = createExperienceDraft('ticket-station', [
+      EXPERIENCE_PROFILE_PRESETS[0]!
+    ]);
+
+    expect(Object.keys(draft.variants[0]!.profile).sort()).toEqual([
+      'height',
+      'id',
+      'interactionMode',
+      'name',
+      'safeArea',
+      'viewingDistance',
+      'width'
+    ]);
+    expect(draft.variants[0]!.profile).not.toHaveProperty('supportedSurfaces');
   });
 });
 
@@ -173,6 +192,9 @@ describe('ExperienceBuilderShell', () => {
       { type: 'navigate', toPageId: 'details' }
     ]);
     expect(screen.getByText(/hidden in editor/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Choose service' })
+    ).not.toBeInTheDocument();
   });
 
   it('reorders layers in editor metadata without changing the shared widget list', () => {
@@ -198,6 +220,11 @@ describe('ExperienceBuilderShell', () => {
         .getState()
         .draft.pages[0]?.widgets.map((widget) => widget.id)
     ).toEqual(['picker', expect.any(String)]);
+    expect(
+      screen
+        .getAllByTestId('experience-canvas-widget')
+        .map((node) => node.getAttribute('data-widget-id'))
+    ).toEqual([expect.stringMatching(/^widget-/), 'picker']);
   });
 
   it('renders shared widget changes in both variants while retaining separate placements', () => {
@@ -247,6 +274,59 @@ describe('ExperienceBuilderShell', () => {
       useExperienceBuilderStore.getState().draft.pages[0]?.layouts.portrait
         .placements.picker
     ).toEqual({ col: 2, row: 1, colSpan: 6, rowSpan: 4 });
+  });
+
+  it('does not move a selected locked widget with the keyboard', () => {
+    useExperienceBuilderStore.getState().loadDraft(workspaceDraft());
+    render(<ExperienceBuilderShell />);
+
+    fireEvent.click(screen.getByRole('tab', { name: /layers/i }));
+    fireEvent.click(
+      screen.getByRole('button', { name: /select choose service/i })
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: /lock choose service/i })
+    );
+    const picker = screen.getByRole('button', { name: 'Choose service' });
+    fireEvent.keyDown(picker, { key: 'ArrowRight' });
+
+    expect(
+      useExperienceBuilderStore.getState().draft.pages[0]?.layouts.portrait
+        .placements.picker
+    ).toEqual({ col: 1, row: 1, colSpan: 6, rowSpan: 4 });
+  });
+
+  it('keeps all mutation controls read-only-safe when canEdit is false', () => {
+    useExperienceBuilderStore.getState().loadDraft(workspaceDraft());
+    const before = JSON.stringify(useExperienceBuilderStore.getState().draft);
+    const onPreview = vi.fn();
+    render(<ExperienceBuilderShell canEdit={false} onPreview={onPreview} />);
+
+    expect(screen.getByRole('button', { name: /zoom in/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /add page/i })).toBeDisabled();
+    expect(screen.getByLabelText(/open services actions/i)).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: /preview/i }));
+    expect(onPreview).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('tab', { name: /layers/i }));
+    expect(
+      screen.getByRole('button', { name: /lock choose service/i })
+    ).toBeDisabled();
+    fireEvent.click(screen.getByRole('tab', { name: /add/i }));
+    expect(
+      screen.getByRole('button', { name: /service picker/i })
+    ).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/layout variant/i), {
+      target: { value: 'landscape' }
+    });
+    expect(screen.getByLabelText(/copy layout from/i)).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: /place choose service/i })
+    ).toBeDisabled();
+    expect(JSON.stringify(useExperienceBuilderStore.getState().draft)).toBe(
+      before
+    );
   });
 
   it('shows an incomplete landscape tray and lets pointer and keyboard users place a widget in a chosen cell', () => {
@@ -309,5 +389,32 @@ describe('ExperienceBuilderShell', () => {
       expect.objectContaining({ id: 'picker', reason: 'overflowing' })
     ]);
     expect(validCanvasItems(page, landscape, {})).toEqual([]);
+  });
+});
+
+describe('Experience widget catalog search', () => {
+  it('matches translated labels and descriptions instead of English catalog literals', () => {
+    const ru = (key: string, values?: { default?: string }) => {
+      const translated: Record<string, string> = {
+        'catalog.widgets.servicePicker.label': 'Выбор услуги',
+        'catalog.widgets.servicePicker.description': 'Категории и услуги'
+      };
+      return translated[key] ?? values?.default ?? key;
+    };
+
+    expect(
+      searchCatalogEntries('ticket-station', 'Категории', ru).map(
+        (entry) => entry.type
+      )
+    ).toContain('service-picker');
+  });
+});
+
+describe('Experience builder panel tabs', () => {
+  it('accepts only declared builder tabs without a type assertion', () => {
+    expect(parseExperienceBuilderTab('pages')).toBe('pages');
+    expect(parseExperienceBuilderTab('layers')).toBe('layers');
+    expect(parseExperienceBuilderTab('add')).toBe('add');
+    expect(parseExperienceBuilderTab('unexpected')).toBeNull();
   });
 });
