@@ -2,8 +2,10 @@
 
 import { useDroppable } from '@dnd-kit/core';
 import {
+  createContext,
   Fragment,
   useCallback,
+  useContext,
   useMemo,
   useState,
   type CSSProperties,
@@ -34,6 +36,22 @@ type SafeArea = { top: number; right: number; bottom: number; left: number };
 type DeviceSize = { width: number; height: number };
 
 const DEVICE_FRAME_SCALE = 0.48;
+const BuilderCanvasExternalScrollContext = createContext(false);
+
+/** Lets a containing preview viewport own scrolling without changing editor canvases. */
+export function BuilderCanvasExternalScrollBoundary({
+  children,
+  enabled = true
+}: {
+  children: ReactNode;
+  enabled?: boolean;
+}) {
+  return (
+    <BuilderCanvasExternalScrollContext value={enabled}>
+      {children}
+    </BuilderCanvasExternalScrollContext>
+  );
+}
 
 /**
  * CSS percentage insets are resolved against the corresponding dimension of an
@@ -148,6 +166,7 @@ export function BuilderCanvasGrid<TItem extends BuilderCanvasGridItem>({
   renderCell,
   renderItem
 }: BuilderCanvasGridProps<TItem>) {
+  const usesExternalScroll = useContext(BuilderCanvasExternalScrollContext);
   const { setNodeRef } = useDroppable({
     id: droppableId ?? `builder-grid-${face}`,
     disabled: !droppableId
@@ -214,7 +233,8 @@ export function BuilderCanvasGrid<TItem extends BuilderCanvasGridItem>({
   return (
     <div
       className={cn(
-        'bg-muted/30 min-h-0 w-full min-w-0 overflow-auto',
+        'bg-muted/30 min-h-0 w-full min-w-0',
+        usesExternalScroll ? 'overflow-visible' : 'overflow-auto',
         containerClassName ?? 'p-2'
       )}
       aria-label={ariaLabel}

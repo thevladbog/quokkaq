@@ -252,6 +252,14 @@
           "locked": "Show locked",
           "invalidField": "Unsupported saved field",
           "invalidHint": "This saved condition is from a newer or incompatible version. It is retained unchanged until repaired.",
+          "invalidMaxDepth": "Saved condition exceeds the maximum depth of {limit}.",
+          "invalidMaxDepthHint": "Service behavior conditions support at most {limit} levels. The saved policy is retained unchanged until repaired.",
+          "invalidMaxGroupChildren": "Saved condition exceeds the maximum group size of {limit}.",
+          "invalidMaxGroupChildrenHint": "Each Service behavior condition group supports at most {limit} direct children. The saved policy is retained unchanged until repaired.",
+          "invalidMaxNodes": "Saved condition exceeds the maximum of {limit} nodes.",
+          "invalidMaxNodesHint": "Access conditions support at most {limit} nodes. The saved policy is retained unchanged until repaired.",
+          "invalidSchema": "Saved condition is invalid.",
+          "invalidSchemaHint": "The saved policy does not match the supported condition format. It is retained unchanged until repaired.",
           "fields": {
             "authenticated": "Authenticated",
             "employee": "Employee",
@@ -327,6 +335,7 @@
           "scale": "Scale",
           "fit": "Fit to window",
           "full": "100% scale",
+          "viewport": "Device preview canvas",
           "safeArea": "Safe area overlay",
           "close": "Close preview"
         },
@@ -355,6 +364,12 @@
           "confirm": "Publish",
           "publishing": "Publishing…",
           "operationFailed": "The operation could not be completed.",
+          "operationErrors": {
+            "versionConflict": "A newer experience version already exists. Refresh and try again.",
+            "permissionDenied": "You no longer have permission to complete this operation.",
+            "notFound": "This experience or version no longer exists.",
+            "invalidDefinition": "The experience definition was rejected. Review validation errors and try again."
+          },
           "invalidResponse": "The server returned a definition that cannot be used.",
           "publishFailed": "Publishing failed. Try again.",
           "restoreFailed": "Restoring failed. Try again.",

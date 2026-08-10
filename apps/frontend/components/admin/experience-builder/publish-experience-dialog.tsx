@@ -122,6 +122,32 @@ const SAFE_ISSUE_DESCRIPTIONS = {
   ]
 } as const satisfies Record<string, readonly [string, string]>;
 
+const SAFE_OPERATION_ERROR_DESCRIPTIONS = {
+  'experience.version_conflict': [
+    'versionConflict',
+    'A newer experience version already exists. Refresh and try again.'
+  ],
+  'experience.permission_denied': [
+    'permissionDenied',
+    'You no longer have permission to complete this operation.'
+  ],
+  'experience.not_found': [
+    'notFound',
+    'This experience or version no longer exists.'
+  ],
+  'experience.invalid_definition': [
+    'invalidDefinition',
+    'The experience definition was rejected. Review validation errors and try again.'
+  ]
+} as const satisfies Record<string, readonly [string, string]>;
+
+function safeOperationErrorDescription(code?: string) {
+  if (!code) return undefined;
+  return Object.entries(SAFE_OPERATION_ERROR_DESCRIPTIONS).find(
+    ([safeCode]) => safeCode === code
+  )?.[1];
+}
+
 function safeIssuePath(path: DisplayIssue['path']): string {
   if (path.length === 0) return 'definition';
   return path
@@ -188,7 +214,7 @@ export type PublishExperienceDialogProps = {
   versions?: readonly ExperienceVersionHistoryItem[];
   /** Calculated by the builder before confirmation opens. */
   validationReport?: ExperienceValidationReport;
-  /** API/parser feedback supplied by the builder host is rendered verbatim as safe UI text. */
+  /** API/parser feedback supplied by the builder host is mapped to safe UI text. */
   publishError?: ExperienceOperationError | null;
   restoreError?: ExperienceOperationError | null;
   onPublish?: (
@@ -207,18 +233,15 @@ function operationErrorFromResult(
   return { kind: 'invalid-definition', issues: result.issues };
 }
 
-function operationErrorFromThrown(
-  error: unknown,
-  fallbackMessage: string
-): ExperienceOperationError {
+function operationErrorFromThrown(error: unknown): ExperienceOperationError {
   if (isApiHttpError(error)) {
     return {
       kind: 'api-error',
-      message: error.message,
+      message: '',
       ...(error.code === undefined ? {} : { code: error.code })
     };
   }
-  return { kind: 'api-error', message: fallbackMessage };
+  return { kind: 'api-error', message: '' };
 }
 
 export function ExperienceOperationFeedback({
@@ -228,18 +251,21 @@ export function ExperienceOperationFeedback({
 }) {
   const t = useTranslations('experience.builder.task11');
   if (error.kind === 'api-error') {
+    const known = safeOperationErrorDescription(error.code);
     return (
       <section
         role='alert'
         className='border-destructive/40 bg-destructive/5 text-destructive rounded-md border p-3 text-sm'
       >
         <p className='font-semibold'>
-          {t('publish.operationFailed', {
-            default: 'The operation could not be completed.'
-          })}
+          {known
+            ? t(`publish.operationErrors.${known[0]}`, {
+                default: known[1]
+              })
+            : t('publish.operationFailed', {
+                default: 'The operation could not be completed.'
+              })}
         </p>
-        <p className='mt-1'>{error.message}</p>
-        {error.code ? <p className='mt-1 text-xs'>({error.code})</p> : null}
       </section>
     );
   }
@@ -301,14 +327,7 @@ export function PublishExperienceDialog({
     try {
       setOperationError(operationErrorFromResult(await onPublish(draft)));
     } catch (error) {
-      setOperationError(
-        operationErrorFromThrown(
-          error,
-          t('publish.publishFailed', {
-            default: 'Publishing failed. Try again.'
-          })
-        )
-      );
+      setOperationError(operationErrorFromThrown(error));
     } finally {
       setPendingAction(null);
     }
@@ -323,14 +342,7 @@ export function PublishExperienceDialog({
         operationErrorFromResult(await onRestoreVersion(versionId))
       );
     } catch (error) {
-      setOperationError(
-        operationErrorFromThrown(
-          error,
-          t('publish.restoreFailed', {
-            default: 'Restoring failed. Try again.'
-          })
-        )
-      );
+      setOperationError(operationErrorFromThrown(error));
     } finally {
       setPendingAction(null);
     }

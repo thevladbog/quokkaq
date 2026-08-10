@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ExperienceTemplate } from '@quokkaq/shared-types';
+import { ApiHttpError } from '@/lib/api-errors';
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string, values?: Record<string, unknown>) =>
@@ -148,7 +149,7 @@ describe('PublishExperienceDialog', () => {
     expect(screen.queryByRole('button', { name: /assign/i })).toBeNull();
   });
 
-  it('preserves parsed-definition and API errors without offering an assignment action', async () => {
+  it('maps an allowlisted API error to safe copy without rendering backend values', async () => {
     const onPublish = vi.fn().mockResolvedValue({
       kind: 'invalid-definition',
       issues: [{ code: 'variant.unplaced_widget', path: ['pages', 0] }]
@@ -162,14 +163,15 @@ describe('PublishExperienceDialog', () => {
         publishError={{
           kind: 'api-error',
           code: 'experience.version_conflict',
-          message: 'A newer version was published.'
+          message: 'secret account=4111 1111 1111 1111'
         }}
       />
     );
 
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'A newer version was published.'
-    );
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(/newer experience version already exists/i);
+    expect(alert).not.toHaveTextContent('4111 1111 1111 1111');
+    expect(alert).not.toHaveTextContent('experience.version_conflict');
     expect(screen.queryByRole('button', { name: /assign/i })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
@@ -178,6 +180,34 @@ describe('PublishExperienceDialog', () => {
       'variant.unplaced_widget'
     );
     expect(onPublish).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses generic safe copy for unknown thrown API errors', async () => {
+    const onPublish = vi
+      .fn()
+      .mockRejectedValue(
+        new ApiHttpError(
+          'secret visitor phone +1 202 555 0198',
+          500,
+          'private.account.+12025550198',
+          '{"phone":"+1 202 555 0198"}'
+        )
+      );
+    render(
+      <PublishExperienceDialog
+        open
+        onOpenChange={vi.fn()}
+        draft={validDraft}
+        onPublish={onPublish}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/operation could not be completed/i);
+    expect(alert).not.toHaveTextContent('+1 202 555 0198');
+    expect(alert).not.toHaveTextContent('private.account');
   });
 
   it('describes invalid-definition issues safely without rendering raw values', () => {

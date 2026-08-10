@@ -268,6 +268,11 @@ export function ExperiencePreviewDialog({
             <div
               ref={setViewportElement}
               data-testid='experience-preview-viewport'
+              role='region'
+              tabIndex={scale === '100' ? 0 : undefined}
+              aria-label={t('preview.viewport', {
+                default: 'Device preview canvas'
+              })}
               className={cn(
                 'flex h-[min(62dvh,680px)] min-h-[320px] min-w-0',
                 scale === 'fit'

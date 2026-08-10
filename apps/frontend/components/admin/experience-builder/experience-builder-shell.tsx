@@ -18,6 +18,7 @@ import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
+import { BuilderCanvasExternalScrollBoundary } from '@/components/admin/units/signage/builder/builder-canvas';
 import { isApiHttpError } from '@/lib/api-errors';
 import type { ExperienceDefinitionParseResult } from '@/lib/experience/experience-api';
 import { useExperienceBuilderStore } from '@/lib/stores/experience-builder-store';
@@ -555,21 +556,23 @@ export function ExperienceBuilderShell({
         publishedDefinition={publishedDefinition}
         renderPreview={
           renderPreview ??
-          (({ variant: previewVariant, scaleFactor, showSafeArea }) => (
-            <ExperienceCanvas
-              page={
-                draft.pages.find(
-                  (candidate) => candidate.id === draft.startPageId
-                ) ?? draft.pages[0]!
-              }
-              variant={previewVariant}
-              canEdit={false}
-              zoom={scaleFactor / 0.48}
-              showSafeArea={showSafeArea}
-              editorState={{}}
-              onSelectWidget={() => undefined}
-              onPlacementChange={() => undefined}
-            />
+          (({ variant: previewVariant, scale, scaleFactor, showSafeArea }) => (
+            <BuilderCanvasExternalScrollBoundary enabled={scale === '100'}>
+              <ExperienceCanvas
+                page={
+                  draft.pages.find(
+                    (candidate) => candidate.id === draft.startPageId
+                  ) ?? draft.pages[0]!
+                }
+                variant={previewVariant}
+                canEdit={false}
+                zoom={scaleFactor / 0.48}
+                showSafeArea={showSafeArea}
+                editorState={{}}
+                onSelectWidget={() => undefined}
+                onPlacementChange={() => undefined}
+              />
+            </BuilderCanvasExternalScrollBoundary>
           ))
         }
       />

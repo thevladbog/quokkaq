@@ -245,28 +245,44 @@ export function isConditionWithinSemanticBounds(
   node: ConditionNode,
   bounds: ConditionSemanticBounds
 ): boolean {
+  return firstSemanticBoundsViolation(node, bounds) === null;
+}
+
+type InvalidSavedPolicyReason =
+  | { kind: 'unsupported-field'; field: string }
+  | { kind: 'max-depth'; limit: number }
+  | { kind: 'max-group-children'; limit: number }
+  | { kind: 'max-nodes'; limit: number }
+  | { kind: 'invalid-schema' };
+
+function firstSemanticBoundsViolation(
+  node: ConditionNode,
+  bounds: ConditionSemanticBounds
+): Extract<
+  InvalidSavedPolicyReason,
+  { kind: 'max-depth' | 'max-group-children' }
+> | null {
   const pending: Array<{ node: ConditionNode; depth: number }> = [
     { node, depth: 1 }
   ];
   while (pending.length > 0) {
     const current = pending.pop()!;
-    if (current.depth > bounds.maxDepth) return false;
+    if (current.depth > bounds.maxDepth) {
+      return { kind: 'max-depth', limit: bounds.maxDepth };
+    }
     if (current.node.kind === 'group') {
-      if (current.node.children.length > bounds.maxGroupChildren) return false;
+      if (current.node.children.length > bounds.maxGroupChildren) {
+        return {
+          kind: 'max-group-children',
+          limit: bounds.maxGroupChildren
+        };
+      }
       for (const child of current.node.children) {
         pending.push({ node: child, depth: current.depth + 1 });
       }
     }
   }
-  return true;
-}
-
-function isAccessPolicy(value: unknown): value is AccessPolicy {
-  try {
-    return AccessPolicySchema.safeParse(value).success;
-  } catch {
-    return false;
-  }
+  return null;
 }
 
 function firstUnsupportedSavedField(value: unknown): string | null {
@@ -312,6 +328,65 @@ function firstUnsupportedSavedField(value: unknown): string | null {
     }
   } catch {
     return null;
+  }
+  return null;
+}
+
+function savedConditionExceedsNodeLimit(value: unknown): boolean {
+  try {
+    if (value === null || typeof value !== 'object') return false;
+    const pending: unknown[] = [(value as { when?: unknown }).when];
+    const visited = new Set<object>();
+
+    while (pending.length > 0) {
+      const current = pending.pop();
+      if (
+        current === null ||
+        typeof current !== 'object' ||
+        Array.isArray(current) ||
+        visited.has(current)
+      ) {
+        return false;
+      }
+      visited.add(current);
+      if (visited.size > MAX_ACCESS_POLICY_CONDITION_NODES) return true;
+
+      const node = current as { kind?: unknown; children?: unknown };
+      if (node.kind === 'group') {
+        if (!Array.isArray(node.children)) return false;
+        pending.push(...node.children);
+      } else if (node.kind !== 'rule') {
+        return false;
+      }
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function classifyInvalidSavedPolicy(
+  value: unknown,
+  semanticBounds?: ConditionSemanticBounds
+): InvalidSavedPolicyReason | null {
+  const unsupportedField = firstUnsupportedSavedField(value);
+  if (unsupportedField) {
+    return { kind: 'unsupported-field', field: unsupportedField };
+  }
+
+  let parsed: ReturnType<typeof AccessPolicySchema.safeParse>;
+  try {
+    parsed = AccessPolicySchema.safeParse(value);
+  } catch {
+    return { kind: 'invalid-schema' };
+  }
+  if (!parsed.success) {
+    return savedConditionExceedsNodeLimit(value)
+      ? { kind: 'max-nodes', limit: MAX_ACCESS_POLICY_CONDITION_NODES }
+      : { kind: 'invalid-schema' };
+  }
+  if (semanticBounds) {
+    return firstSemanticBoundsViolation(parsed.data.when, semanticBounds);
   }
   return null;
 }
@@ -577,34 +652,77 @@ export function ConditionBuilder({
   semanticBounds
 }: ConditionBuilderProps) {
   const t = useTranslations('experience.builder.task11');
-  const valid =
-    value === undefined ||
-    (isAccessPolicy(value) &&
-      (semanticBounds === undefined ||
-        isConditionWithinSemanticBounds(value.when, semanticBounds)));
-  if (!valid) {
+  const invalidReason =
+    value === undefined
+      ? null
+      : classifyInvalidSavedPolicy(value, semanticBounds);
+  if (invalidReason) {
     const whenFalse =
       value !== null && typeof value === 'object'
         ? (value as { whenFalse?: unknown }).whenFalse
         : undefined;
-    const unsupportedField = firstUnsupportedSavedField(value);
+    let issueTitle: string;
+    let issueHint: string;
+    switch (invalidReason.kind) {
+      case 'unsupported-field':
+        issueTitle = t('condition.invalidField', {
+          default: 'Unsupported saved field'
+        });
+        issueHint = t('condition.invalidHint', {
+          default:
+            'This saved condition is from a newer or incompatible version. It is retained unchanged until repaired.'
+        });
+        break;
+      case 'max-depth':
+        issueTitle = t('condition.invalidMaxDepth', {
+          default: `Saved condition exceeds the maximum depth of ${invalidReason.limit}.`,
+          limit: invalidReason.limit
+        });
+        issueHint = t('condition.invalidMaxDepthHint', {
+          default: `Service behavior conditions support at most ${invalidReason.limit} levels. The saved policy is retained unchanged until repaired.`,
+          limit: invalidReason.limit
+        });
+        break;
+      case 'max-group-children':
+        issueTitle = t('condition.invalidMaxGroupChildren', {
+          default: `Saved condition exceeds the maximum group size of ${invalidReason.limit}.`,
+          limit: invalidReason.limit
+        });
+        issueHint = t('condition.invalidMaxGroupChildrenHint', {
+          default: `Each Service behavior condition group supports at most ${invalidReason.limit} direct children. The saved policy is retained unchanged until repaired.`,
+          limit: invalidReason.limit
+        });
+        break;
+      case 'max-nodes':
+        issueTitle = t('condition.invalidMaxNodes', {
+          default: `Saved condition exceeds the maximum of ${invalidReason.limit} nodes.`,
+          limit: invalidReason.limit
+        });
+        issueHint = t('condition.invalidMaxNodesHint', {
+          default: `Access conditions support at most ${invalidReason.limit} nodes. The saved policy is retained unchanged until repaired.`,
+          limit: invalidReason.limit
+        });
+        break;
+      case 'invalid-schema':
+        issueTitle = t('condition.invalidSchema', {
+          default: 'Saved condition is invalid.'
+        });
+        issueHint = t('condition.invalidSchemaHint', {
+          default:
+            'The saved policy does not match the supported condition format. It is retained unchanged until repaired.'
+        });
+        break;
+    }
     return (
       <div
         role='alert'
         className='rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-100'
       >
-        <p className='font-medium'>
-          {t('condition.invalidField', { default: 'Unsupported saved field' })}
-        </p>
-        <p className='mt-1 text-xs'>
-          {t('condition.invalidHint', {
-            default:
-              'This saved condition is from a newer or incompatible version. It is retained unchanged until repaired.'
-          })}
-        </p>
-        {unsupportedField ? (
+        <p className='font-medium'>{issueTitle}</p>
+        <p className='mt-1 text-xs'>{issueHint}</p>
+        {invalidReason.kind === 'unsupported-field' ? (
           <code className='bg-background mt-2 inline-flex rounded px-2 py-1 text-xs'>
-            {unsupportedField}
+            {invalidReason.field}
           </code>
         ) : null}
         <span className='bg-background mt-2 inline-flex rounded px-2 py-1 text-xs'>

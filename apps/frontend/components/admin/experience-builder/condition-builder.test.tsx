@@ -184,7 +184,7 @@ describe('condition builder', () => {
     );
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      /unsupported saved field/i
+      /saved condition is invalid/i
     );
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -211,12 +211,12 @@ describe('condition builder', () => {
       <ConditionBuilder value={extended} onChange={onChange} />
     );
     expect(screen.getByRole('alert')).toHaveTextContent(
-      /unsupported saved field/i
+      /saved condition is invalid/i
     );
 
     rerender(<ConditionBuilder value={unbounded} onChange={onChange} />);
     expect(screen.getByRole('alert')).toHaveTextContent(
-      /unsupported saved field/i
+      /maximum of 100 nodes/i
     );
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -244,6 +244,8 @@ describe('condition builder', () => {
 
   it('accepts 20 direct Service behavior children and preserves 21 read-only', () => {
     const onChange = vi.fn();
+    const policyAboveLimit = policyWithChildren(21);
+    const serializedPolicy = JSON.stringify(policyAboveLimit);
     const { rerender } = render(
       <ConditionBuilder
         value={policyWithChildren(20)}
@@ -259,12 +261,18 @@ describe('condition builder', () => {
 
     rerender(
       <ConditionBuilder
-        value={policyWithChildren(21)}
+        value={policyAboveLimit}
         onChange={onChange}
         semanticBounds={serviceBehaviorBounds}
       />
     );
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /maximum group size of 20/i
+    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent(
+      /unsupported saved field/i
+    );
+    expect(JSON.stringify(policyAboveLimit)).toBe(serializedPolicy);
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -278,6 +286,7 @@ describe('condition builder', () => {
       when: conditionAtDepth(9),
       whenFalse: 'hide' as const
     };
+    const serializedPolicy = JSON.stringify(policyAboveDepth);
     const { rerender } = render(
       <ConditionBuilder
         value={policyAtDepth}
@@ -295,7 +304,11 @@ describe('condition builder', () => {
         semanticBounds={serviceBehaviorBounds}
       />
     );
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(/maximum depth of 8/i);
+    expect(screen.getByRole('alert')).not.toHaveTextContent(
+      /unsupported saved field/i
+    );
+    expect(JSON.stringify(policyAboveDepth)).toBe(serializedPolicy);
     expect(onChange).not.toHaveBeenCalled();
   });
 

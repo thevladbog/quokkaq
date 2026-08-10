@@ -5,6 +5,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
   waitFor
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -529,6 +530,38 @@ describe('ExperienceBuilderShell', () => {
         })
       })
     );
+  });
+
+  it('uses one focusable scroll region for the real 100% device preview', () => {
+    useExperienceBuilderStore.getState().loadDraft(workspaceDraft());
+    render(<ExperienceBuilderShell />);
+
+    fireEvent.click(screen.getByRole('button', { name: /preview/i }));
+    fireEvent.click(screen.getByRole('button', { name: /100% scale/i }));
+
+    const viewport = screen.getByRole('region', {
+      name: /device preview canvas/i
+    });
+    expect(viewport).toHaveAttribute('tabindex', '0');
+    expect(viewport).toHaveClass('overflow-auto');
+
+    const canvas = within(viewport).getByTestId('builder-canvas-zoom-surface');
+    expect(canvas).toHaveClass('overflow-visible');
+    expect(canvas).not.toHaveClass('overflow-auto');
+    expect(
+      within(viewport).getByTestId('builder-canvas-device-frame')
+    ).toHaveAttribute('data-effective-scale', '1');
+
+    const scrollOwners = [viewport, ...viewport.querySelectorAll('*')].filter(
+      (element) => element.classList.contains('overflow-auto')
+    );
+    expect(scrollOwners).toEqual([viewport]);
+
+    fireEvent.click(screen.getByRole('button', { name: /fit to window/i }));
+    expect(viewport).toHaveClass('overflow-hidden');
+    expect(viewport).not.toHaveAttribute('tabindex');
+    expect(canvas).toHaveClass('overflow-auto');
+    expect(canvas).not.toHaveClass('overflow-visible');
   });
 
   it('shows an incomplete landscape tray and lets pointer and keyboard users place a widget in a chosen cell', () => {
