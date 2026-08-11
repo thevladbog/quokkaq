@@ -1224,6 +1224,44 @@ describe('queue display preview', () => {
     expect(audioCall).toHaveBeenCalledTimes(1);
   });
 
+  it('deduplicates fallback audio across a remount with a new adapter wrapper', async () => {
+    const announce = vi.fn();
+    const template = queueDisplayTemplate(1920, 1080, 2);
+    const context: ExperienceRuntimeContext = {
+      ...baseContext,
+      display: {
+        unitName: 'Office',
+        nowLabel: '14:32',
+        primaryCall: {
+          id: 'call-wrapper-remount',
+          queueNumber: 'A-042',
+          counterName: 'Window 06'
+        }
+      }
+    };
+    const first = render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={context}
+        adapters={{ audioCall: (call) => announce(call) }}
+      />
+    );
+    expect(announce).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={context}
+        adapters={{ audioCall: (call) => announce(call) }}
+      />
+    );
+
+    expect(announce).toHaveBeenCalledTimes(1);
+  });
+
   it('retries a rejected audio announcement after remount without permanently marking the call', async () => {
     const audioCall = vi
       .fn()
@@ -1322,7 +1360,7 @@ describe('queue display preview', () => {
             unitName: 'Office',
             nowLabel: '14:32',
             primaryCall: {
-              id: 'call-1',
+              id: 'call-audio-error',
               queueNumber: 'A-039',
               counterName: 'Window 03'
             }

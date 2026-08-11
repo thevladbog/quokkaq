@@ -96,43 +96,46 @@ export type ExperienceAudioAnnouncer = {
   ) => Promise<ExperienceAudioAnnouncementResult>;
 };
 
+function audioAnnouncementKey(call: QueueDisplayCall): string {
+  // QueueDisplayCall has no tenant or display identity, so this is the most
+  // specific stable key available without relying on adapter wrapper identity.
+  return JSON.stringify([call.id, call.queueNumber, call.counterName]);
+}
+
 export function createExperienceAudioAnnouncer(): ExperienceAudioAnnouncer {
   const announcedCallIds = new Set<string>();
   const inFlightCallIds = new Set<string>();
   return {
     async announce(call, audioCall) {
-      if (announcedCallIds.has(call.id) || inFlightCallIds.has(call.id)) {
+      const callKey = audioAnnouncementKey(call);
+      if (announcedCallIds.has(callKey) || inFlightCallIds.has(callKey)) {
         return 'duplicate';
       }
-      inFlightCallIds.add(call.id);
+      inFlightCallIds.add(callKey);
       try {
         await audioCall(call);
-        announcedCallIds.add(call.id);
+        announcedCallIds.add(callKey);
         return 'announced';
       } catch {
         return 'failed';
       } finally {
-        inFlightCallIds.delete(call.id);
+        inFlightCallIds.delete(callKey);
       }
     }
   };
 }
 
-const defaultAudioAnnouncers = new WeakMap<
-  NonNullable<ExperienceRuntimeAdapters['audioCall']>,
-  ExperienceAudioAnnouncer
->();
+const defaultAudioAnnouncers = new Map<string, ExperienceAudioAnnouncer>();
 
 function audioAnnouncerFor(
+  templateId: string,
   adapters: ExperienceRuntimeAdapters
 ): ExperienceAudioAnnouncer {
   if (adapters.audioAnnouncer) return adapters.audioAnnouncer;
-  const audioCall = adapters.audioCall;
-  if (!audioCall) return createExperienceAudioAnnouncer();
-  const existing = defaultAudioAnnouncers.get(audioCall);
+  const existing = defaultAudioAnnouncers.get(templateId);
   if (existing) return existing;
   const created = createExperienceAudioAnnouncer();
-  defaultAudioAnnouncers.set(audioCall, created);
+  defaultAudioAnnouncers.set(templateId, created);
   return created;
 }
 
@@ -275,7 +278,7 @@ export function ExperienceRenderer({
   const liveSnapshot = normalizeExperienceLiveSnapshot(runtimeContext);
   const operational = resolveOperationalState(liveSnapshot);
   const reportRuntimeError = adapters.onRuntimeError;
-  const audioAnnouncer = audioAnnouncerFor(adapters);
+  const audioAnnouncer = audioAnnouncerFor(template.id, adapters);
 
   useEffect(() => {
     const primaryCall = runtimeContext.display?.primaryCall;
