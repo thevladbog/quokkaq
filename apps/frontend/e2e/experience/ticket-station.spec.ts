@@ -25,4 +25,14 @@ test.describe('ticket-station browser acceptance', () => {
       .poll(() => page.evaluate(() => document.documentElement.scrollHeight))
       .toBeLessThanOrEqual(1180);
   });
+
+  test('renders the configured employee identity widget', async ({ page }) => {
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await installTicketStationApiFixtures(page, 'identity');
+    await page.goto('/en/kiosk/kiosk-unit');
+
+    await expect(
+      page.getByText('Present your access badge to the reader.')
+    ).toBeVisible();
+  });
 });

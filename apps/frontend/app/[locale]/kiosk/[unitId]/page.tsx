@@ -1351,24 +1351,61 @@ export default function UnitKioskPage() {
         if (!service) {
           throw new Error('Experience selected service is unavailable');
         }
+        const identity = session.values.identity;
+        const kioskIdentifiedUserId =
+          identity && typeof identity === 'object' && !Array.isArray(identity)
+            ? (identity as { userId?: unknown }).userId
+            : undefined;
         const documentsData = session.values.documentsData;
         const ticket =
-          documentsData && typeof documentsData === 'object'
+          typeof kioskIdentifiedUserId === 'string' && kioskIdentifiedUserId
             ? await createTicketMutation.mutateAsync({
                 unitId: kioskApiUnitId,
                 serviceId: service.id,
-                documentsData: documentsData as Record<string, unknown>
+                kioskIdentifiedUserId
               })
-            : await createTicketMutation.mutateAsync({
-                unitId: kioskApiUnitId,
-                serviceId: service.id
-              });
+            : documentsData && typeof documentsData === 'object'
+              ? await createTicketMutation.mutateAsync({
+                  unitId: kioskApiUnitId,
+                  serviceId: service.id,
+                  documentsData: documentsData as Record<string, unknown>
+                })
+              : await createTicketMutation.mutateAsync({
+                  unitId: kioskApiUnitId,
+                  serviceId: service.id
+                });
         openTicketSuccessFlow(ticket, service);
-      }
+      },
+      ticketStation:
+        kioskApiUnitId && unitServicesTree
+          ? {
+              identification: {
+                unitId: kioskApiUnitId,
+                locale: locale === 'ru' ? 'ru' : 'en',
+                employeeService: unitServicesTree.find((candidate) => {
+                  const mode = getServiceIdentificationMode(candidate);
+                  return mode === 'badge' || mode === 'login';
+                }) ?? {
+                  id: 'experience-employee-identification',
+                  unitId: kioskApiUnitId,
+                  name: 'Employee identification',
+                  identificationMode: 'badge',
+                  isLeaf: true
+                },
+                resolveEmployee: (userId: string) => ({
+                  userId,
+                  isAuthenticated: true,
+                  isEmployee: true,
+                  groups: []
+                })
+              }
+            }
+          : undefined
     }),
     [
       createTicketMutation,
       kioskApiUnitId,
+      locale,
       openTicketSuccessFlow,
       unitServicesTree
     ]

@@ -334,7 +334,42 @@ export const ticketStationTemplate: ExperienceTemplate = {
   ]
 };
 
-export async function installTicketStationApiFixtures(page: Page) {
+export const ticketStationIdentityTemplate: ExperienceTemplate = {
+  ...ticketStationTemplate,
+  id: 'e2e-ticket-station-identity-experience',
+  startPageId: 'identity',
+  pages: [
+    ...ticketStationTemplate.pages,
+    {
+      id: 'identity',
+      name: 'Employee identity',
+      widgets: [
+        {
+          id: 'employee-identify',
+          type: 'identify',
+          config: {
+            service: {
+              identificationMode: 'badge'
+            }
+          },
+          actions: []
+        }
+      ],
+      layouts: {
+        portrait: {
+          placements: {
+            'employee-identify': { col: 1, row: 1, colSpan: 12, rowSpan: 18 }
+          }
+        }
+      }
+    }
+  ]
+};
+
+export async function installTicketStationApiFixtures(
+  page: Page,
+  mode: 'picker' | 'identity' = 'picker'
+) {
   await page.addInitScript(() => {
     localStorage.setItem(
       'quokkaq_ticket_station_token:kiosk-unit',
@@ -413,16 +448,20 @@ export async function installTicketStationApiFixtures(page: Page) {
     await route.fulfill({ status: 204 });
   });
   await page.route('**/terminal/experience', async (route) => {
+    const template =
+      mode === 'identity'
+        ? ticketStationIdentityTemplate
+        : ticketStationTemplate;
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         mode: 'experience',
-        templateId: ticketStationTemplate.id,
+        templateId: template.id,
         versionId: 'e2e-station-version-1',
         version: 1,
         variantId: 'portrait',
-        definition: ticketStationTemplate,
+        definition: template,
         publishedAt: '2026-01-01T00:00:00Z'
       })
     });

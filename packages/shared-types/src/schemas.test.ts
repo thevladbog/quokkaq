@@ -469,6 +469,15 @@ describe('createTicketRequestSchema (documentsData)', () => {
     });
     expect(r.success).toBe(false);
   });
+
+  it('accepts behavior form data with kiosk employee identity', () => {
+    const r = createTicketRequestSchema.safeParse({
+      serviceId: 's1',
+      kioskIdentifiedUserId: '550e8400-e29b-41d4-a716-446655440000',
+      documentsData: { reason: 'access request' }
+    });
+    expect(r.success).toBe(true);
+  });
 });
 
 describe('ServiceModelSchema (kiosk identification)', () => {
