@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"quokkaq-go-backend/internal/billingperiod"
+	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/pkg/tenantslug"
 	"quokkaq-go-backend/internal/repository"
@@ -109,12 +110,12 @@ func NewAuthService(
 	}, nil
 }
 
-func jwtSecretBytes() []byte {
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "default_secret_please_change"
+func jwtSecretBytes() ([]byte, error) {
+	secret, err := config.JWTSecret()
+	if err != nil {
+		return nil, err
 	}
-	return []byte(secret)
+	return []byte(secret), nil
 }
 
 func (s *authService) Login(email, password, tenantSlug string) (*TokenPair, error) {
@@ -161,7 +162,11 @@ func (s *authService) generateAccessToken(user *models.User) (string, error) {
 		"exp":   time.Now().Add(24 * time.Hour).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecretBytes())
+	secret, err := jwtSecretBytes()
+	if err != nil {
+		return "", err
+	}
+	return token.SignedString(secret)
 }
 
 func (s *authService) generateRefreshToken(userID string) (string, error) {
@@ -171,7 +176,11 @@ func (s *authService) generateRefreshToken(userID string) (string, error) {
 		"exp": time.Now().Add(30 * 24 * time.Hour).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecretBytes())
+	secret, err := jwtSecretBytes()
+	if err != nil {
+		return "", err
+	}
+	return token.SignedString(secret)
 }
 
 func (s *authService) generateTokenPair(user *models.User) (*TokenPair, error) {
@@ -198,11 +207,15 @@ func (s *authService) IssueTokenPairForUserID(userID string) (*TokenPair, error)
 }
 
 func (s *authService) Refresh(refreshToken string) (*TokenPair, error) {
+	secret, err := jwtSecretBytes()
+	if err != nil {
+		return nil, errors.New("authentication is not configured")
+	}
 	tok, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, jwt.ErrSignatureInvalid
 		}
-		return jwtSecretBytes(), nil
+		return secret, nil
 	})
 	if err != nil || !tok.Valid {
 		return nil, errors.New("invalid refresh token")

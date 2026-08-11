@@ -23,6 +23,7 @@ func testCalDAVPlainInput() string {
 
 func setupCalendarIntegrationServiceTestDB(t *testing.T) func() {
 	t.Helper()
+	t.Setenv("JWT_SECRET", "calendar-integration-test-secret-012345")
 	db, err := gorm.Open(glebarezsqlite.Open(":memory:"), &gorm.Config{
 		DisableForeignKeyConstraintWhenMigrating: true,
 	})

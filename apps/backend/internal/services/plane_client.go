@@ -13,11 +13,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"quokkaq-go-backend/internal/logger"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"quokkaq-go-backend/internal/config"
+	"quokkaq-go-backend/internal/logger"
 )
 
 // PlaneHTTPError is returned when Plane responds with a non-2xx HTTP status (work items, project list).
@@ -92,7 +94,7 @@ func newPlaneHTTPClientFromEnv() *http.Client {
 		return &http.Client{Timeout: timeout}
 	}
 	t := base.Clone()
-	if skipVerify {
+	if skipVerify && config.AllowsInsecureDevTLS() {
 		// Explicit opt-in for private Plane hosts (corporate CA / self-signed). Prefer installing the CA on the API server.
 		t.TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true, // #nosec G402 -- gated by PLANE_TLS_INSECURE_SKIP_VERIFY (dev/private CA only)

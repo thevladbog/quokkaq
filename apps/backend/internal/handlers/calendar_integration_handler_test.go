@@ -303,6 +303,7 @@ func TestCalendarIntegrationHandler_GooglePickListCalendars_ServiceUnavailableNo
 }
 
 func TestCalendarIntegrationHandler_GooglePickComplete_OK(t *testing.T) {
+	t.Setenv("JWT_SECRET", "calendar-handler-test-secret-012345")
 	defer setupCalendarHandlerTestSQLite(t)()
 	setupPickTestRedis(t)
 	if err := database.DB.Create(&models.Unit{

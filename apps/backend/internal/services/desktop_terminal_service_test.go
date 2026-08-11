@@ -77,7 +77,7 @@ func (r *bootstrapRevocationRaceRepository) Update(terminal *models.DesktopTermi
 }
 
 func TestDesktopTerminalService_BootstrapDoesNotRestoreConcurrentRevocation(t *testing.T) {
-	t.Setenv("JWT_SECRET", "bootstrap-stale-row-test")
+	t.Setenv("JWT_SECRET", "bootstrap-stale-row-test-secret-012345")
 	pairingCode := "23456789AB"
 	hash, err := bcrypt.GenerateFromPassword([]byte(pairingCode), bcrypt.MinCost)
 	if err != nil {

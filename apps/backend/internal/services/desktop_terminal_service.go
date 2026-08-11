@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 
@@ -77,15 +78,11 @@ func NewDesktopTerminalService(
 	return &desktopTerminalService{repo: repo, unitRepo: unitRepo, counterRepo: counterRepo, experienceRepo: experienceRepo}
 }
 
-func (s *desktopTerminalService) codePepper() string {
+func (s *desktopTerminalService) codePepper() (string, error) {
 	if p := os.Getenv("TERMINAL_CODE_PEPPER"); p != "" {
-		return p
+		return p, nil
 	}
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		return "default_secret_please_change"
-	}
-	return secret
+	return config.JWTSecret()
 }
 
 func pairingCodeDigest(pepper, code string) string {
@@ -215,6 +212,10 @@ func (s *desktopTerminalService) Create(name *string, unitID, defaultLocale stri
 	if err := validateLocale(defaultLocale); err != nil {
 		return nil, "", err
 	}
+	pepper, err := s.codePepper()
+	if err != nil {
+		return nil, "", err
+	}
 
 	effectiveUnit, cPtr, outKind, err := s.resolveCounterBinding(unitID, contextUnitID, counterID, kind)
 	if err != nil {
@@ -228,7 +229,7 @@ func (s *desktopTerminalService) Create(name *string, unitID, defaultLocale stri
 		if err != nil {
 			return nil, "", err
 		}
-		digest := pairingCodeDigest(s.codePepper(), code)
+		digest := pairingCodeDigest(pepper, code)
 		hash, err := bcrypt.GenerateFromPassword([]byte(strings.TrimSpace(code)), bcrypt.DefaultCost)
 		if err != nil {
 			return nil, "", err
@@ -337,7 +338,11 @@ func (s *desktopTerminalService) Revoke(id string) error {
 }
 
 func (s *desktopTerminalService) Bootstrap(pairingCode string) (token, unitID, defaultLocale, appBaseURL string, kioskFullscreen bool, counterID *string, terminalKind string, err error) {
-	digest := pairingCodeDigest(s.codePepper(), pairingCode)
+	pepper, err := s.codePepper()
+	if err != nil {
+		return "", "", "", "", false, nil, "", err
+	}
+	digest := pairingCodeDigest(pepper, pairingCode)
 	t, e := s.repo.FindByPairingCodeDigest(digest)
 	if e != nil || t.RevokedAt != nil {
 		return "", "", "", "", false, nil, "", ErrInvalidTerminalCode
@@ -348,9 +353,9 @@ func (s *desktopTerminalService) Bootstrap(pairingCode string) (token, unitID, d
 
 	tk := models.EffectiveTerminalKind(t)
 
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "default_secret_please_change"
+	secret, e := config.JWTSecret()
+	if e != nil {
+		return "", "", "", "", false, nil, "", e
 	}
 	exp := time.Now().Add(time.Hour * 24 * desktopTerminalJWTDays)
 	claims := jwt.MapClaims{

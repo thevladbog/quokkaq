@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"os"
 	"strings"
 
+	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/pkg/authcookie"
 	"quokkaq-go-backend/internal/repository"
@@ -51,9 +51,9 @@ func ContextFromJWTAccessToken(base context.Context, tokenString string) (contex
 	if tokenString == "" {
 		return base, jwt.ErrTokenMalformed
 	}
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "default_secret_please_change"
+	secret, err := config.JWTSecret()
+	if err != nil {
+		return base, err
 	}
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {

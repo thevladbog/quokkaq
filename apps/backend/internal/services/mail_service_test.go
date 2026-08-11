@@ -6,6 +6,7 @@ import (
 )
 
 func TestNewMailService_InsecureSkipVerifyWhenEnvTrue(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("SMTP_HOST", "127.0.0.1")
 	t.Setenv("SMTP_PORT", "587")
 	t.Setenv("SMTP_USER", "u")
