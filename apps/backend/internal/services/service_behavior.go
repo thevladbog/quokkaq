@@ -432,9 +432,12 @@ func serviceBehaviorInt(raw json.RawMessage) (int, bool) {
 		return 0, false
 	}
 	if matches[1] == "-" {
+		if value == math.MinInt64 {
+			return 0, false
+		}
 		value = -value
 	}
-	if int64(int(value)) != value {
+	if strconv.IntSize == 32 && (value < math.MinInt32 || value > math.MaxInt32) {
 		return 0, false
 	}
 	return int(value), true
