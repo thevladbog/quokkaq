@@ -129,6 +129,13 @@ export function ExperienceInspector({
     widget.type === 'service-picker' ||
     widget.type === 'ticket-form' ||
     widget.type === 'identify';
+  const mediaConfig =
+    widget.type === 'media' &&
+    widget.config !== null &&
+    typeof widget.config === 'object' &&
+    !Array.isArray(widget.config)
+      ? (widget.config as Record<string, unknown>)
+      : undefined;
   const updatePlacement = (field: keyof ExperiencePlacement, raw: string) => {
     const value = Number(raw);
     if (!Number.isInteger(value) || value < 1) return;
@@ -215,6 +222,65 @@ export function ExperienceInspector({
           </div>
         )}
       </Section>
+      {mediaConfig ? (
+        <Section
+          title={t('inspector.media', { default: 'Media' })}
+          shared={t('inspector.shared', { default: 'Shared across variants' })}
+        >
+          <Label
+            className='text-xs'
+            htmlFor={`experience-media-src-${widget.id}`}
+          >
+            {t('inspector.mediaSource', { default: 'Image URL' })}
+            <Input
+              id={`experience-media-src-${widget.id}`}
+              aria-label={t('inspector.mediaSource', { default: 'Image URL' })}
+              className='mt-1 min-h-11'
+              type='url'
+              disabled={!canEdit}
+              value={typeof mediaConfig.src === 'string' ? mediaConfig.src : ''}
+              onChange={(event) =>
+                onSharedChange?.({
+                  config: { ...mediaConfig, src: event.target.value }
+                })
+              }
+            />
+          </Label>
+          <Label className='text-xs'>
+            {t('inspector.mediaAlt', { default: 'Alternative text' })}
+            <Input
+              aria-label={t('inspector.mediaAlt', {
+                default: 'Alternative text'
+              })}
+              className='mt-1 min-h-11'
+              disabled={!canEdit}
+              value={typeof mediaConfig.alt === 'string' ? mediaConfig.alt : ''}
+              onChange={(event) =>
+                onSharedChange?.({
+                  config: { ...mediaConfig, alt: event.target.value }
+                })
+              }
+            />
+          </Label>
+          <Label className='text-xs'>
+            {t('inspector.mediaFit', { default: 'Image fit' })}
+            <select
+              aria-label={t('inspector.mediaFit', { default: 'Image fit' })}
+              className='border-input bg-background mt-1 min-h-11 w-full rounded-md border px-3 text-sm'
+              disabled={!canEdit}
+              value={mediaConfig.fit === 'cover' ? 'cover' : 'contain'}
+              onChange={(event) =>
+                onSharedChange?.({
+                  config: { ...mediaConfig, fit: event.target.value }
+                })
+              }
+            >
+              <option value='contain'>Contain</option>
+              <option value='cover'>Cover</option>
+            </select>
+          </Label>
+        </Section>
+      ) : null}
       <Section
         title={t('inspector.access', { default: 'Visibility and access' })}
         shared={t('inspector.shared', { default: 'Shared across variants' })}
