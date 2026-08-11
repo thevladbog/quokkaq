@@ -36,7 +36,10 @@ export function IdentifyWidget({
     'identificationMode' | 'kioskIdentificationConfig' | 'kioskDocumentSettings'
   >;
   adapter: IdentificationAdapter;
-  onIdentified: (identity: RuntimeIdentity) => void;
+  onIdentified: (
+    identity: RuntimeIdentity,
+    data?: Record<string, unknown>
+  ) => void;
   onBack: () => void;
 }) {
   const mode = service.identificationMode ?? 'none';
@@ -57,8 +60,11 @@ export function IdentifyWidget({
         sessionKey={1}
         isPending={false}
         onSkip={onBack}
-        onConfirm={() =>
-          onIdentified({ isAuthenticated: true, isEmployee: false, groups: [] })
+        onConfirm={(phone) =>
+          onIdentified(
+            { isAuthenticated: true, isEmployee: false, groups: [] },
+            { phone }
+          )
         }
       />
     );
@@ -74,11 +80,10 @@ export function IdentifyWidget({
         unitId={adapter.unitId}
         onConfirm={(data: Record<string, unknown>) => {
           adapter.onDocumentData?.(data);
-          onIdentified({
-            isAuthenticated: true,
-            isEmployee: false,
-            groups: []
-          });
+          onIdentified(
+            { isAuthenticated: true, isEmployee: false, groups: [] },
+            data
+          );
         }}
         onSkip={onBack}
       />
@@ -92,11 +97,10 @@ export function IdentifyWidget({
         preferNative
         onUseText={(text) => {
           adapter.onDocumentData?.({ document: text });
-          onIdentified({
-            isAuthenticated: true,
-            isEmployee: false,
-            groups: []
-          });
+          onIdentified(
+            { isAuthenticated: true, isEmployee: false, groups: [] },
+            { document: text }
+          );
         }}
       />
     );

@@ -27,9 +27,7 @@ import {
 
 export type ExperienceRuntimeSession = {
   id: string;
-  values: Partial<
-    Record<'selectedServiceId' | 'selectedCategoryId' | 'activeLocale', string>
-  >;
+  values: Record<string, unknown>;
 };
 
 export type ExperienceLiveSnapshot = NonNullable<ConditionContext['live']> &
@@ -68,18 +66,23 @@ export type ExperienceRuntimeError =
 
 export type ExperienceActivationEvent = Partial<
   Record<'serviceId' | 'categoryId' | 'locale', string>
->;
+> & { session?: Record<string, unknown> };
 
 type ExperienceRuntimeAdapterName =
   | 'submitTicket'
   | 'printTicket'
   | 'audioCall';
 
+export type ExperienceTicketStationAdapters = {
+  identification?: import('./widgets/identify-widget').IdentificationAdapter;
+};
+
 export type ExperienceRuntimeAdapters = {
   createSession?: () => ExperienceRuntimeSession;
   submitTicket?: (session: ExperienceRuntimeSession) => void | Promise<void>;
   printTicket?: (session: ExperienceRuntimeSession) => void | Promise<void>;
   audioCall?: (ticket: QueueDisplayCall) => void | Promise<void>;
+  ticketStation?: ExperienceTicketStationAdapters;
   audioAnnouncer?: ExperienceAudioAnnouncer;
   onRuntimeError?: (error: ExperienceRuntimeError) => void;
 };
@@ -319,12 +322,18 @@ export function ExperienceRenderer({
 
   const conditionContext = useMemo<ConditionContext>(
     () => ({
-      identity: runtimeContext.identity,
+      identity:
+        runtime.session.values.identity &&
+        typeof runtime.session.values.identity === 'object'
+          ? (runtime.session.values.identity as ConditionContext['identity'])
+          : runtimeContext.identity,
       live: liveSnapshot,
       session: {
         ...runtimeContext.session,
         selectedServiceId:
-          runtime.session.values.selectedServiceId ??
+          (typeof runtime.session.values.selectedServiceId === 'string'
+            ? runtime.session.values.selectedServiceId
+            : undefined) ??
           runtimeContext.session?.selectedServiceId ??
           null
       }
@@ -333,7 +342,8 @@ export function ExperienceRenderer({
       runtimeContext.identity,
       runtimeContext.session,
       liveSnapshot,
-      runtime.session.values.selectedServiceId
+      runtime.session.values.selectedServiceId,
+      runtime.session.values.identity
     ]
   );
 
@@ -456,7 +466,10 @@ export function ExperienceRenderer({
     let working: RuntimeState = {
       session: {
         ...runtimeRef.current.session,
-        values: { ...runtimeRef.current.session.values }
+        values: {
+          ...runtimeRef.current.session.values,
+          ...(event.session ?? {})
+        }
       },
       pageId: runtimeRef.current.pageId,
       history: [...runtimeRef.current.history]
@@ -601,6 +614,8 @@ export function ExperienceRenderer({
             profile={variant.profile}
             locked={!matches && widget.access?.whenFalse === 'lock'}
             onActivate={(event) => void activateWidget(widget, event)}
+            session={runtime.session}
+            ticketStation={adapters.ticketStation}
           />
         );
       }}

@@ -16,7 +16,9 @@ import { useTranslations } from 'next-intl';
 
 import type {
   ExperienceActivationEvent,
-  ExperienceRuntimeContext
+  ExperienceRuntimeContext,
+  ExperienceRuntimeSession,
+  ExperienceTicketStationAdapters
 } from './experience-renderer';
 import { cn } from '@/lib/utils';
 import { ServicePickerWidget } from './widgets/service-picker-widget';
@@ -24,6 +26,7 @@ import { RichInfoWidget } from './widgets/rich-info-widget';
 import { LanguageSwitchWidget } from './widgets/language-switch-widget';
 import { TicketFormWidget } from './widgets/ticket-form-widget';
 import { TicketSuccessWidget } from './widgets/ticket-success-widget';
+import { IdentifyWidget } from './widgets/identify-widget';
 
 export function isKnownExperienceWidget(
   type: unknown
@@ -251,7 +254,8 @@ export function ExperienceWidgetRegistry({
   context,
   profile,
   locked,
-  onActivate
+  onActivate,
+  ticketStation
 }: {
   widget: ExperienceWidget;
   surface: ExperienceSurface;
@@ -259,6 +263,8 @@ export function ExperienceWidgetRegistry({
   profile: DeviceProfile;
   locked: boolean;
   onActivate: (event: ExperienceActivationEvent) => void;
+  session: ExperienceRuntimeSession;
+  ticketStation?: ExperienceTicketStationAdapters;
 }) {
   const label = String(
     widget.config.label ?? widget.config.title ?? widget.type
@@ -315,7 +321,34 @@ export function ExperienceWidgetRegistry({
         <TicketFormWidget
           fields={fields as never}
           locale='en'
-          onSubmit={() => onActivate({})}
+          onSubmit={(value) =>
+            onActivate({ session: { documentsData: value.documentsData } })
+          }
+        />
+      );
+    }
+  }
+  if (widget.type === 'identify') {
+    const service = widget.config.service;
+    if (
+      service &&
+      typeof service === 'object' &&
+      !Array.isArray(service) &&
+      ticketStation?.identification
+    ) {
+      return (
+        <IdentifyWidget
+          service={service as never}
+          adapter={ticketStation.identification}
+          onIdentified={(identity, data) =>
+            onActivate({
+              session: {
+                identity,
+                ...(data ? { documentsData: data } : {})
+              }
+            })
+          }
+          onBack={() => onActivate({})}
         />
       );
     }

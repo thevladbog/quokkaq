@@ -448,6 +448,39 @@ type FlowValidation = {
   legacyRoutes: Array<{ pageId: string; routing: LegacyRouting }>;
 };
 
+function addCatalogServiceRequirements(
+  candidate: unknown,
+  required: Set<FlowPageKey>
+) {
+  if (!isPlainOwnRecord(candidate)) return;
+  const behavior = isPlainOwnRecord(candidate.behavior)
+    ? candidate.behavior
+    : undefined;
+  if (behavior?.information !== undefined) required.add('serviceInfoPageId');
+  if (Array.isArray(behavior?.fields) && behavior.fields.length > 0) {
+    required.add('serviceFormPageId');
+  }
+  const explicitMode = KioskIdentificationModeSchema.safeParse(
+    candidate.identificationMode
+  );
+  const identityMode = explicitMode.success
+    ? explicitMode.data
+    : candidate.offerIdentification === true
+      ? 'phone'
+      : 'none';
+  if (identityMode !== 'none') required.add('identityPageId');
+  const route = behavior?.route;
+  if (isPlainOwnRecord(route) && route.mode === 'page-slot') {
+    const slot = route.slot;
+    if (slot === 'service-info') required.add('serviceInfoPageId');
+    if (slot === 'service-form') required.add('serviceFormPageId');
+    if (slot === 'identity') required.add('identityPageId');
+    if (slot === 'confirmation') required.add('confirmationPageId');
+  }
+  required.add('confirmationPageId');
+  required.add('successPageId');
+}
+
 function validateFlowPages(
   template: ExperienceTemplate,
   errors: IssueCollector
@@ -459,6 +492,15 @@ function validateFlowPages(
     for (const [widgetIndex, currentWidget] of currentPage.widgets.entries()) {
       if (currentWidget.type === 'service-picker') {
         required.add('serviceCatalogPageId');
+        const config = currentWidget.config;
+        if (isPlainOwnRecord(config) && isPlainOwnRecord(config.catalog)) {
+          const services = config.catalog.services;
+          if (Array.isArray(services)) {
+            for (const service of services) {
+              addCatalogServiceRequirements(service, required);
+            }
+          }
+        }
       }
       const requiredSlot = requiredFlowPageForWidget(currentWidget);
       if (requiredSlot !== undefined) {
