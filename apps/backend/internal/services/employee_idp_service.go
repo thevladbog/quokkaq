@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/pkg/kioskidentity"
 	"quokkaq-go-backend/internal/pkg/ssocrypto"
 	"quokkaq-go-backend/internal/repository"
 
@@ -73,10 +74,102 @@ type EmployeeIdpResolveRequest struct {
 
 // EmployeeIdpResolveResponse is safe for the browser (no upstream body).
 type EmployeeIdpResolveResponse struct {
-	MatchStatus string `json:"matchStatus"` // "matched" | "no_user" | "ambiguous"
-	UserID      string `json:"userId,omitempty"`
-	Email       string `json:"email,omitempty"`
-	DisplayName string `json:"displayName,omitempty"`
+	MatchStatus   string   `json:"matchStatus"` // "matched" | "no_user" | "ambiguous"
+	UserID        string   `json:"userId,omitempty"`
+	Email         string   `json:"email,omitempty"`
+	DisplayName   string   `json:"displayName,omitempty"`
+	Groups        []string `json:"groups,omitempty"`
+	IdentityToken string   `json:"identityToken,omitempty"`
+}
+
+// EmployeeIdpSettingsPatch contains the mutable, non-secret IdP settings and
+// encrypted secret updates accepted by the unit settings endpoint.
+type EmployeeIdpSettingsPatch struct {
+	Enabled                 *bool
+	HTTPMethod              *string
+	UpstreamURL             *string
+	RequestBodyTemplate     *string
+	ResponseEmailPath       *string
+	ResponseDisplayNamePath *string
+	ResponseGroupsPath      *string
+	HeaderTemplatesJSON     *string
+	TimeoutMS               *int
+	SecretValues            map[string]string
+	SecretNamesToDelete     []string
+}
+
+// UpdateSettings persists a unit's Employee IdP configuration and returns its
+// safe persisted view together with the stored secret names.
+func (s *EmployeeIdpService) UpdateSettings(unitID string, req EmployeeIdpSettingsPatch) (*models.UnitEmployeeIdpSetting, []string, error) {
+	row, err := s.idpRepo.GetSettingByUnitID(unitID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, err
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		row = &models.UnitEmployeeIdpSetting{UnitID: unitID, HTTPMethod: "POST", HeaderTemplatesJSON: "[]", TimeoutMS: 10000}
+	}
+	if req.Enabled != nil {
+		row.Enabled = *req.Enabled
+	}
+	if req.HTTPMethod != nil {
+		row.HTTPMethod = *req.HTTPMethod
+	}
+	if req.UpstreamURL != nil {
+		row.UpstreamURL = *req.UpstreamURL
+	}
+	if req.RequestBodyTemplate != nil {
+		row.RequestBodyTemplate = *req.RequestBodyTemplate
+	}
+	if req.ResponseEmailPath != nil {
+		row.ResponseEmailPath = *req.ResponseEmailPath
+	}
+	if req.ResponseDisplayNamePath != nil {
+		row.ResponseDisplayNamePath = *req.ResponseDisplayNamePath
+	}
+	if req.ResponseGroupsPath != nil {
+		row.ResponseGroupsPath = *req.ResponseGroupsPath
+	}
+	if req.HeaderTemplatesJSON != nil {
+		row.HeaderTemplatesJSON = *req.HeaderTemplatesJSON
+	}
+	if req.TimeoutMS != nil {
+		row.TimeoutMS = *req.TimeoutMS
+	}
+	if err := s.idpRepo.SaveSetting(row); err != nil {
+		return nil, nil, err
+	}
+	for _, name := range req.SecretNamesToDelete {
+		if name = strings.TrimSpace(name); name != "" {
+			if err := s.idpRepo.DeleteSecret(unitID, name); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+	for name, plain := range req.SecretValues {
+		if strings.TrimSpace(name) == "" {
+			continue
+		}
+		enc, err := ssocrypto.EncryptAES256GCM([]byte(plain))
+		if err != nil {
+			return nil, nil, err
+		}
+		if err := s.idpRepo.UpsertSecret(&models.UnitEmployeeIdpSecret{UnitID: unitID, Name: name, Ciphertext: enc}); err != nil {
+			return nil, nil, err
+		}
+	}
+	row, err = s.idpRepo.GetSettingByUnitID(unitID)
+	if err != nil {
+		return nil, nil, err
+	}
+	secrets, err := s.idpRepo.ListSecrets(unitID)
+	if err != nil {
+		return nil, nil, err
+	}
+	names := make([]string, 0, len(secrets))
+	for i := range secrets {
+		names = append(names, secrets[i].Name)
+	}
+	return row, names, nil
 }
 
 // ResolveKiosk looks up a user; kind badge uses .Raw, login uses .Login in templates.
@@ -112,7 +205,7 @@ func (s *EmployeeIdpService) ResolveKiosk(ctx context.Context, unitID string, bo
 		return nil, ErrEmployeeIdpDisabled
 	}
 
-	email, disp, err := s.callUpstream(ctx, set, kind, raw)
+	email, disp, groups, err := s.callUpstream(ctx, set, kind, raw)
 	if err != nil {
 		return nil, err
 	}
@@ -140,11 +233,21 @@ func (s *EmployeeIdpService) ResolveKiosk(ctx context.Context, unitID string, bo
 	if strings.TrimSpace(disp) != "" {
 		name = disp
 	}
+	identityToken := ""
+	if len(groups) > 0 {
+		var tokenErr error
+		identityToken, tokenErr = kioskidentity.Sign(unitID, u.ID, groups)
+		if tokenErr != nil {
+			return nil, tokenErr
+		}
+	}
 	return &EmployeeIdpResolveResponse{
-		MatchStatus: "matched",
-		UserID:      u.ID,
-		Email:       stringFromPtr(u.Email),
-		DisplayName: name,
+		MatchStatus:   "matched",
+		UserID:        u.ID,
+		Email:         stringFromPtr(u.Email),
+		DisplayName:   name,
+		Groups:        groups,
+		IdentityToken: identityToken,
 	}, nil
 }
 
@@ -155,27 +258,27 @@ func stringFromPtr(p *string) string {
 	return *p
 }
 
-func (s *EmployeeIdpService) callUpstream(ctx context.Context, set *models.UnitEmployeeIdpSetting, kind, raw string) (email, displayName string, err error) {
+func (s *EmployeeIdpService) callUpstream(ctx context.Context, set *models.UnitEmployeeIdpSetting, kind, raw string) (email, displayName string, groups []string, err error) {
 	u, err := urlParseAllowed(set.UpstreamURL)
 	if err != nil {
-		return "", "", fmt.Errorf("%w: %v", ErrEmployeeIdpBadUpstream, err)
+		return "", "", nil, fmt.Errorf("%w: %v", ErrEmployeeIdpBadUpstream, err)
 	}
 	if u.Scheme != "https" {
-		return "", "", ErrEmployeeIdpBadUpstream
+		return "", "", nil, ErrEmployeeIdpBadUpstream
 	}
 	if employeeIdpForbiddenUpstreamHost(u.Hostname()) {
-		return "", "", ErrEmployeeIdpBadUpstream
+		return "", "", nil, ErrEmployeeIdpBadUpstream
 	}
 
 	secrets, err := s.idpRepo.ListSecrets(set.UnitID)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	secretMap := make(map[string]string)
 	for i := range secrets {
 		plain, decErr := ssocrypto.DecryptAES256GCM(secrets[i].Ciphertext)
 		if decErr != nil {
-			return "", "", decErr
+			return "", "", nil, decErr
 		}
 		secretMap[secrets[i].Name] = string(plain)
 	}
@@ -195,11 +298,11 @@ func (s *EmployeeIdpService) callUpstream(ctx context.Context, set *models.UnitE
 	if method != http.MethodGet {
 		tmpl, err := template.New("idp").Parse(strings.TrimSpace(set.RequestBodyTemplate))
 		if err != nil {
-			return "", "", err
+			return "", "", nil, err
 		}
 		var bodyBuf bytes.Buffer
 		if err := tmpl.Execute(&bodyBuf, tplData); err != nil {
-			return "", "", err
+			return "", "", nil, err
 		}
 		bodyStr = strings.TrimSpace(bodyBuf.String())
 		if bodyStr == "" {
@@ -212,10 +315,10 @@ func (s *EmployeeIdpService) callUpstream(ctx context.Context, set *models.UnitE
 	}
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), bodyReader)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	if err := applyHeaderTemplates(req, set.HeaderTemplatesJSON, secretMap); err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	if req.Header.Get("Content-Type") == "" && method != http.MethodGet {
 		req.Header.Set("Content-Type", "application/json")
@@ -230,7 +333,7 @@ func (s *EmployeeIdpService) callUpstream(ctx context.Context, set *models.UnitE
 
 	res, err := s.httpClient.Do(req)
 	if err != nil {
-		return "", "", fmt.Errorf("%w: %v", ErrEmployeeIdpUpstream, err)
+		return "", "", nil, fmt.Errorf("%w: %v", ErrEmployeeIdpUpstream, err)
 	}
 	defer func() {
 		if cErr := res.Body.Close(); cErr != nil && err == nil {
@@ -239,15 +342,52 @@ func (s *EmployeeIdpService) callUpstream(ctx context.Context, set *models.UnitE
 	}()
 	b, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
 	if res.StatusCode < 200 || res.StatusCode > 299 {
-		return "", "", fmt.Errorf("%w: status %d", ErrEmployeeIdpUpstream, res.StatusCode)
+		return "", "", nil, fmt.Errorf("%w: status %d", ErrEmployeeIdpUpstream, res.StatusCode)
 	}
 	gs := gjson.ParseBytes(b)
 	email = strings.TrimSpace(gs.Get(set.ResponseEmailPath).String())
 	displayName = strings.TrimSpace(gs.Get(set.ResponseDisplayNamePath).String())
+	groups = extractEmployeeGroups(gs.Get(set.ResponseGroupsPath))
 	if set.ResponseEmailPath == "" {
-		return "", displayName, ErrEmployeeIdpMap
+		return "", displayName, nil, ErrEmployeeIdpMap
 	}
-	return email, displayName, nil
+	return email, displayName, groups, nil
+}
+
+const (
+	maxEmployeeGroups     = 64
+	maxEmployeeGroupBytes = 128
+)
+
+func extractEmployeeGroups(result gjson.Result) []string {
+	if !result.Exists() {
+		return nil
+	}
+	values := make([]string, 0, maxEmployeeGroups)
+	if result.IsArray() {
+		for _, item := range result.Array() {
+			values = append(values, item.String())
+		}
+	} else {
+		values = append(values, result.String())
+	}
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || len(value) > maxEmployeeGroupBytes {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+		if len(out) == maxEmployeeGroups {
+			break
+		}
+	}
+	return out
 }
 
 type headerKV struct {

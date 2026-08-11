@@ -814,6 +814,8 @@ components:
                     type: string
                 responseEmailPath:
                     type: string
+                responseGroupsPath:
+                    type: string
                 secretNamesToDelete:
                     items:
                         type: string
@@ -2244,6 +2246,8 @@ components:
                 responseDisplayNamePath:
                     type: string
                 responseEmailPath:
+                    type: string
+                responseGroupsPath:
                     type: string
                 secretNames:
                     items:
@@ -4428,6 +4432,12 @@ components:
                 displayName:
                     type: string
                 email:
+                    type: string
+                groups:
+                    items:
+                        type: string
+                    type: array
+                identityToken:
                     type: string
                 matchStatus:
                     description: '"matched" | "no_user" | "ambiguous"'

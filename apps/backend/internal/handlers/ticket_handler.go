@@ -18,6 +18,7 @@ import (
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/phoneutil"
+	"quokkaq-go-backend/internal/pkg/kioskidentity"
 	"quokkaq-go-backend/internal/publicqueuewidget"
 	"quokkaq-go-backend/internal/rbac"
 	"quokkaq-go-backend/internal/repository"
@@ -409,6 +410,7 @@ type CreateTicketRequest struct {
 	VisitorLocale *string `json:"visitorLocale,omitempty"`
 	// KioskIdentifiedUserID: optional; resolved user id after employee IdP (badge/login) for this unit's company.
 	KioskIdentifiedUserID *string `json:"kioskIdentifiedUserId,omitempty"`
+	KioskIdentityToken    string  `json:"kioskIdentityToken,omitempty"`
 	// DocumentsData: optional key/value (document scan or custom identification). Allowed only for services with identificationMode document or custom; expiry is set server-side from service kiosk settings.
 	DocumentsData *json.RawMessage `json:"documentsData,omitempty" swaggertype:"object"`
 }
@@ -474,6 +476,7 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var kioskIdentifiedUser *string
+	var kioskIdentityGroups []string
 	if req.KioskIdentifiedUserID != nil {
 		x := strings.TrimSpace(*req.KioskIdentifiedUserID)
 		if x != "" {
@@ -496,6 +499,14 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			kioskIdentifiedUser = &x
+			if strings.TrimSpace(req.KioskIdentityToken) != "" {
+				groups, verr := kioskidentity.Verify(req.KioskIdentityToken, unitID, x)
+				if verr != nil {
+					http.Error(w, "invalid kiosk identity token", http.StatusBadRequest)
+					return
+				}
+				kioskIdentityGroups = groups
+			}
 		}
 	}
 
@@ -519,7 +530,21 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actor := getActorFromRequest(r)
-	ticket, err := h.service.CreateTicket(unitID, serviceID, staffClientID, visitorPhone, visitorLocale, req.DocumentsData, actor, kioskIdentifiedUser)
+	var ticketCreateService interface {
+		CreateTicketWithKioskGroups(string, string, *string, *string, *string, *json.RawMessage, *string, *string, []string) (*models.Ticket, error)
+	}
+	if extended, ok := h.service.(interface {
+		CreateTicketWithKioskGroups(string, string, *string, *string, *string, *json.RawMessage, *string, *string, []string) (*models.Ticket, error)
+	}); ok {
+		ticketCreateService = extended
+	}
+	var ticket *models.Ticket
+	var err error
+	if ticketCreateService != nil {
+		ticket, err = ticketCreateService.CreateTicketWithKioskGroups(unitID, serviceID, staffClientID, visitorPhone, visitorLocale, req.DocumentsData, actor, kioskIdentifiedUser, kioskIdentityGroups)
+	} else {
+		ticket, err = h.service.CreateTicket(unitID, serviceID, staffClientID, visitorPhone, visitorLocale, req.DocumentsData, actor, kioskIdentifiedUser)
+	}
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrTicketQuotaExhausted):

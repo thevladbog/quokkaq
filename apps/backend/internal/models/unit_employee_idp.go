@@ -18,6 +18,7 @@ type UnitEmployeeIdpSetting struct {
 	// JSON paths (dot notation) for extracting fields from upstream JSON response, e.g. "data.email"
 	ResponseEmailPath       string `gorm:"type:text;column:response_email_path" json:"responseEmailPath"`
 	ResponseDisplayNamePath string `gorm:"type:text;column:response_display_name_path" json:"responseDisplayNamePath,omitempty"`
+	ResponseGroupsPath      string `gorm:"type:text;column:response_groups_path" json:"responseGroupsPath,omitempty"`
 	// HeaderTemplates is JSON: [{"name":"X-Api-Key","value":"${secret:apiKey}"},...]
 	HeaderTemplatesJSON string `gorm:"type:jsonb;not null;default:'[]';column:header_templates_json" json:"headerTemplatesJson"`
 	TimeoutMS           int    `gorm:"not null;default:10000;column:timeout_ms" json:"timeoutMs"`

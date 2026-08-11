@@ -5,7 +5,10 @@ import (
 	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
+
+	"github.com/tidwall/gjson"
 	"time"
 
 	"quokkaq-go-backend/internal/repository"
@@ -15,6 +18,14 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+func TestExtractEmployeeGroups(t *testing.T) {
+	got := extractEmployeeGroups(gjson.Parse(`{"groups":["staff"," staff ","","staff","ops"]}`).Get("groups"))
+	want := []string{"staff", "ops"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("groups = %#v, want %#v", got, want)
+	}
+}
 
 // employeeIdpTestSchema is SQLite DDL compatible with GORM models used by EmployeeIdpService + repositories (no Postgres-only defaults).
 const employeeIdpTestSchema = `
@@ -85,6 +96,7 @@ CREATE TABLE unit_employee_idp_settings (
   request_body_template text,
   response_email_path text,
   response_display_name_path text,
+  response_groups_path text,
   header_templates_json text NOT NULL DEFAULT '[]',
   timeout_ms integer NOT NULL DEFAULT 10000
 );
@@ -174,6 +186,7 @@ VALUES (?, ?, 1, 'POST', 'https://127.0.0.1/x', '{"x":1}', 'email', '[]', 5000)
 }
 
 func TestEmployeeIdp_ResolveKiosk_matched(t *testing.T) {
+	t.Setenv("JWT_SECRET", "employee-idp-test-secret-0123456789")
 	restoreH := employeeIdpForbiddenUpstreamHost
 	employeeIdpForbiddenUpstreamHost = func(h string) bool { return false }
 	t.Cleanup(func() { employeeIdpForbiddenUpstreamHost = restoreH })
@@ -188,7 +201,7 @@ func TestEmployeeIdp_ResolveKiosk_matched(t *testing.T) {
 	_ = database.DB.Exec(`INSERT INTO user_units (id, user_id, unit_id, permissions) VALUES (?, ?, ?, '[]')`, uuID, uidA, unitID).Error
 
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"data":{"user":{"email":"jane@idp.test","name":"Jane I"}}}`))
+		_, _ = w.Write([]byte(`{"data":{"user":{"email":"jane@idp.test","name":"Jane I","groups":["employees","ops"]}}}`))
 	}))
 	t.Cleanup(srv.Close)
 
@@ -202,8 +215,8 @@ func TestEmployeeIdp_ResolveKiosk_matched(t *testing.T) {
 	}
 	setID := uuid.NewString()
 	_ = database.DB.Exec(`
-INSERT INTO unit_employee_idp_settings (id, unit_id, enabled, http_method, upstream_url, request_body_template, response_email_path, response_display_name_path, header_templates_json, timeout_ms)
-VALUES (?, ?, 1, 'POST', ?, '{"x":1}', 'data.user.email', 'data.user.name', '[]', 5000)
+INSERT INTO unit_employee_idp_settings (id, unit_id, enabled, http_method, upstream_url, request_body_template, response_email_path, response_display_name_path, response_groups_path, header_templates_json, timeout_ms)
+VALUES (?, ?, 1, 'POST', ?, '{"x":1}', 'data.user.email', 'data.user.name', 'data.user.groups', '[]', 5000)
 `, setID, unitID, srv.URL+"/resolve").Error
 
 	res, err := s.ResolveKiosk(context.Background(), unitID, EmployeeIdpResolveRequest{Kind: "badge", Raw: "b1"})
@@ -212,6 +225,9 @@ VALUES (?, ?, 1, 'POST', ?, '{"x":1}', 'data.user.email', 'data.user.name', '[]'
 	}
 	if res.MatchStatus != "matched" || res.UserID != uidA {
 		t.Fatalf("got %#v", res)
+	}
+	if !reflect.DeepEqual(res.Groups, []string{"employees", "ops"}) {
+		t.Fatalf("groups = %#v", res.Groups)
 	}
 }
 

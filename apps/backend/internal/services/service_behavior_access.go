@@ -16,6 +16,10 @@ var ErrKioskServiceAccessContextUnavailable = errors.New("kiosk service access c
 // behavior JSON. ServiceBehavior intentionally preserves raw JSON and does not
 // populate its exported fields during database unmarshalling.
 func EvaluateKioskServiceBehaviorAccess(behavior *models.ServiceBehavior, employee bool) (bool, error) {
+	return EvaluateKioskServiceBehaviorAccessWithGroups(behavior, employee, nil)
+}
+
+func EvaluateKioskServiceBehaviorAccessWithGroups(behavior *models.ServiceBehavior, employee bool, groups []string) (bool, error) {
 	if behavior == nil {
 		return true, nil
 	}
@@ -25,7 +29,7 @@ func EvaluateKioskServiceBehaviorAccess(behavior *models.ServiceBehavior, employ
 	if err := json.Unmarshal(behavior.RawJSON(), &envelope); err != nil {
 		return false, ErrKioskServiceAccessContextUnavailable
 	}
-	return EvaluateKioskServiceAccessForIdentity(envelope.Access, employee)
+	return evaluateKioskServiceAccessForIdentity(envelope.Access, employee, groups)
 }
 
 // EvaluateKioskServiceAccess evaluates the identity facts that are established
@@ -39,13 +43,17 @@ func EvaluateKioskServiceAccess(policy *models.ServiceBehaviorAccessPolicy) (boo
 // supplied identity state. A resolved employee is authenticated and employee;
 // an anonymous kiosk request has neither fact.
 func EvaluateKioskServiceAccessForIdentity(policy *models.ServiceBehaviorAccessPolicy, employee bool) (bool, error) {
+	return evaluateKioskServiceAccessForIdentity(policy, employee, nil)
+}
+
+func evaluateKioskServiceAccessForIdentity(policy *models.ServiceBehaviorAccessPolicy, employee bool, groups []string) (bool, error) {
 	if policy == nil {
 		return true, nil
 	}
-	return evaluateKioskServiceCondition(policy.When, employee)
+	return evaluateKioskServiceCondition(policy.When, employee, groups)
 }
 
-func evaluateKioskServiceCondition(condition models.ServiceBehaviorCondition, employee bool) (bool, error) {
+func evaluateKioskServiceCondition(condition models.ServiceBehaviorCondition, employee bool, groups []string) (bool, error) {
 	switch condition.Kind {
 	case "rule":
 		switch condition.Field {
@@ -58,7 +66,29 @@ func evaluateKioskServiceCondition(condition models.ServiceBehaviorCondition, em
 			default:
 				return false, ErrKioskServiceAccessContextUnavailable
 			}
-		case "identity.groups", "live.queueLength", "live.isOpen", "live.isConnected", "session.selectedServiceId":
+		case "identity.groups":
+			if groups == nil {
+				return false, ErrKioskServiceAccessContextUnavailable
+			}
+			if condition.Operator != "contains" && condition.Operator != "not-contains" {
+				return false, ErrKioskServiceAccessContextUnavailable
+			}
+			expected, ok := condition.Value.(string)
+			if !ok {
+				return false, ErrKioskServiceAccessContextUnavailable
+			}
+			found := false
+			for _, group := range groups {
+				if group == expected {
+					found = true
+					break
+				}
+			}
+			if condition.Operator == "not-contains" {
+				return !found, nil
+			}
+			return found, nil
+		case "live.queueLength", "live.isOpen", "live.isConnected", "session.selectedServiceId":
 			return false, ErrKioskServiceAccessContextUnavailable
 		default:
 			return false, ErrKioskServiceAccessContextUnavailable
@@ -69,7 +99,7 @@ func evaluateKioskServiceCondition(condition models.ServiceBehaviorCondition, em
 		}
 		if condition.Combinator == "and" {
 			for _, child := range condition.Children {
-				allowed, err := evaluateKioskServiceCondition(child, employee)
+				allowed, err := evaluateKioskServiceCondition(child, employee, groups)
 				if err != nil {
 					return false, err
 				}
@@ -81,7 +111,7 @@ func evaluateKioskServiceCondition(condition models.ServiceBehaviorCondition, em
 		}
 		if condition.Combinator == "or" {
 			for _, child := range condition.Children {
-				allowed, err := evaluateKioskServiceCondition(child, employee)
+				allowed, err := evaluateKioskServiceCondition(child, employee, groups)
 				if err != nil {
 					return false, err
 				}

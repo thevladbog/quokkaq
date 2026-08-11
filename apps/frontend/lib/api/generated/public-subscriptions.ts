@@ -1043,6 +1043,7 @@ export interface HandlersPatchUnitEmployeeIdpRequest {
   requestBodyTemplate?: string;
   responseDisplayNamePath?: string;
   responseEmailPath?: string;
+  responseGroupsPath?: string;
   secretNamesToDelete?: string[];
   /** Secrets: name -> plaintext; stored encrypted. Omitted names unchanged. */
   secretValues?: HandlersPatchUnitEmployeeIdpRequestSecretValues;
@@ -2303,6 +2304,7 @@ export interface HandlersUnitEmployeeIdpSettingsDTO {
   requestBodyTemplate?: string;
   responseDisplayNamePath?: string;
   responseEmailPath?: string;
+  responseGroupsPath?: string;
   secretNames?: string[];
   timeoutMs?: number;
   unitId?: string;
@@ -3034,6 +3036,8 @@ export interface ServicesEmployeeIdpResolveRequest {
 export interface ServicesEmployeeIdpResolveResponse {
   displayName?: string;
   email?: string;
+  groups?: string[];
+  identityToken?: string;
   /** "matched" | "no_user" | "ambiguous" */
   matchStatus?: string;
   userId?: string;

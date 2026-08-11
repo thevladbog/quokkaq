@@ -1503,6 +1503,7 @@ export const createTicketRequestSchema = z
     visitorPhone: z.string().optional(),
     visitorLocale: kioskVisitorLocaleSchema.optional(),
     kioskIdentifiedUserId: z.string().uuid().optional(),
+    kioskIdentityToken: z.string().min(1).optional(),
     /** JSON object: document or custom identification only; size enforced on server. */
     documentsData: z.record(z.string(), z.unknown()).optional()
   })
@@ -1565,6 +1566,7 @@ export const createTicketRequestSchema = z
       visitorPhone?: string;
       visitorLocale?: z.infer<typeof kioskVisitorLocaleSchema>;
       kioskIdentifiedUserId?: string;
+      kioskIdentityToken?: string;
       documentsData?: Record<string, unknown>;
     } = { serviceId };
     if (cid) {
@@ -1576,6 +1578,9 @@ export const createTicketRequestSchema = z
     }
     if (kid) {
       out.kioskIdentifiedUserId = kid;
+    }
+    if (data.kioskIdentityToken) {
+      out.kioskIdentityToken = data.kioskIdentityToken;
     }
     if (data.documentsData && Object.keys(data.documentsData).length > 0) {
       out.documentsData = data.documentsData;
@@ -1621,6 +1626,7 @@ export type CreateTicketInUnitMutationVariables =
       unitId: string;
       serviceId: string;
       kioskIdentifiedUserId: string;
+      kioskIdentityToken?: string;
       clientId?: never;
       visitorPhone?: never;
       visitorLocale?: never;

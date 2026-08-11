@@ -56,6 +56,13 @@ func TestEvaluateKioskServiceAccess(t *testing.T) {
 			},
 			wantErr: ErrKioskServiceAccessContextUnavailable,
 		},
+		{
+			name: "group rule rejects non string value",
+			policy: &models.ServiceBehaviorAccessPolicy{When: models.ServiceBehaviorCondition{
+				Kind: "rule", Field: "identity.groups", Operator: "not-contains", Value: map[string]any{"group": "security"},
+			}},
+			wantErr: ErrKioskServiceAccessContextUnavailable,
+		},
 	}
 
 	for _, tt := range tests {
@@ -68,5 +75,15 @@ func TestEvaluateKioskServiceAccess(t *testing.T) {
 				t.Fatalf("allowed = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestEvaluateKioskServiceAccessWithGroups(t *testing.T) {
+	policy := &models.ServiceBehaviorAccessPolicy{When: models.ServiceBehaviorCondition{
+		Kind: "rule", Field: "identity.groups", Operator: "contains", Value: "security",
+	}}
+	allowed, err := evaluateKioskServiceAccessForIdentity(policy, true, []string{"security"})
+	if err != nil || !allowed {
+		t.Fatalf("allowed = %v, error = %v", allowed, err)
 	}
 }

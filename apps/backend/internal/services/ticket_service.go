@@ -431,7 +431,24 @@ func (s *ticketService) incrementTicketUsage(unitID string) {
 }
 
 func (s *ticketService) CreateTicket(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, documentsData *json.RawMessage, actorUserID *string, kioskIdentifiedUserID *string) (*models.Ticket, error) {
-	return s.CreateTicketWithFunnelOverride(unitID, serviceID, optionalStaffClientID, visitorPhone, visitorLocale, documentsData, actorUserID, nil, kioskIdentifiedUserID)
+	return s.createTicketWithKioskGroups(unitID, serviceID, optionalStaffClientID, visitorPhone, visitorLocale, documentsData, actorUserID, kioskIdentifiedUserID, nil)
+}
+
+func (s *ticketService) CreateTicketWithKioskGroups(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, documentsData *json.RawMessage, actorUserID *string, kioskIdentifiedUserID *string, kioskIdentityGroups []string) (*models.Ticket, error) {
+	return s.createTicketWithKioskGroups(unitID, serviceID, optionalStaffClientID, visitorPhone, visitorLocale, documentsData, actorUserID, kioskIdentifiedUserID, kioskIdentityGroups)
+}
+
+func (s *ticketService) createTicketWithKioskGroups(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, documentsData *json.RawMessage, actorUserID *string, kioskIdentifiedUserID *string, kioskIdentityGroups []string) (*models.Ticket, error) {
+	isCredit, err := s.checkTicketQuota(unitID)
+	if err != nil {
+		return nil, err
+	}
+	ticket, err := s.createTicketInternal(unitID, serviceID, nil, optionalStaffClientID, visitorPhone, visitorLocale, documentsData, actorUserID, isCredit, nil, kioskIdentifiedUserID, kioskIdentityGroups)
+	if err != nil {
+		return nil, err
+	}
+	go s.incrementTicketUsage(unitID)
+	return ticket, nil
 }
 
 func (s *ticketService) CreateTicketWithFunnelOverride(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, documentsData *json.RawMessage, actorUserID *string, funnelSourceOverride *string, kioskIdentifiedUserID *string) (*models.Ticket, error) {
@@ -439,7 +456,7 @@ func (s *ticketService) CreateTicketWithFunnelOverride(unitID, serviceID string,
 	if err != nil {
 		return nil, err
 	}
-	ticket, err := s.createTicketInternal(unitID, serviceID, nil, optionalStaffClientID, visitorPhone, visitorLocale, documentsData, actorUserID, isCredit, funnelSourceOverride, kioskIdentifiedUserID)
+	ticket, err := s.createTicketInternal(unitID, serviceID, nil, optionalStaffClientID, visitorPhone, visitorLocale, documentsData, actorUserID, isCredit, funnelSourceOverride, kioskIdentifiedUserID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -452,7 +469,7 @@ func (s *ticketService) CreateTicketWithPreRegistration(unitID, serviceID, preRe
 	if err != nil {
 		return nil, err
 	}
-	ticket, err := s.createTicketInternal(unitID, serviceID, &preRegID, nil, nil, nil, nil, actorUserID, isCredit, nil, nil)
+	ticket, err := s.createTicketInternal(unitID, serviceID, &preRegID, nil, nil, nil, nil, actorUserID, isCredit, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -460,7 +477,7 @@ func (s *ticketService) CreateTicketWithPreRegistration(unitID, serviceID, preRe
 	return ticket, nil
 }
 
-func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID *string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, documentsData *json.RawMessage, actorUserID *string, isCredit bool, funnelSourceOverride *string, kioskIdentifiedUserID *string) (*models.Ticket, error) {
+func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID *string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, documentsData *json.RawMessage, actorUserID *string, isCredit bool, funnelSourceOverride *string, kioskIdentifiedUserID *string, kioskIdentityGroups []string) (*models.Ticket, error) {
 	var preReg *models.PreRegistration
 	if preRegID != nil {
 		if s.preRegRepo == nil {
@@ -521,7 +538,7 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 		}
 		isKioskStationRequest := actorUserID == nil && funnelSourceOverride == nil
 		if isKioskStationRequest && service.Behavior != nil {
-			allowed, accessErr := EvaluateKioskServiceBehaviorAccess(service.Behavior, kid != nil)
+			allowed, accessErr := EvaluateKioskServiceBehaviorAccessWithGroups(service.Behavior, kid != nil, kioskIdentityGroups)
 			if accessErr != nil {
 				return accessErr
 			}

@@ -92,7 +92,10 @@ import { socketClient, type UnitETASnapshot } from '@/lib/socket';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { isQuotaExceededError } from '@/lib/quota-error';
 import { getServiceIdentificationMode } from '@/lib/kiosk-service-identification';
-import { KioskEmployeeIdFlow } from '@/components/kiosk/kiosk-employee-id-flow';
+import {
+  KioskEmployeeIdFlow,
+  type EmployeeIdentityResolution
+} from '@/components/kiosk/kiosk-employee-id-flow';
 import {
   buildAutolayoutPageSlots,
   clampAutolayoutPageIndex,
@@ -1245,7 +1248,7 @@ export default function UnitKioskPage() {
       service: Service,
       opts?:
         | { visitorPhone: string; visitorLocale: 'en' | 'ru' }
-        | { kioskIdentifiedUserId: string }
+        | { kioskIdentifiedUserId: string; kioskIdentityToken?: string }
         | { documentsData: Record<string, unknown> },
       failTarget?: 'phoneModal' | 'page' | 'employeeModal'
     ) => {
@@ -1257,7 +1260,10 @@ export default function UnitKioskPage() {
           ticket = await createTicketMutation.mutateAsync({
             unitId: kioskApiUnitId!,
             serviceId: service.id,
-            kioskIdentifiedUserId: opts.kioskIdentifiedUserId
+            kioskIdentifiedUserId: opts.kioskIdentifiedUserId,
+            ...(opts.kioskIdentityToken
+              ? { kioskIdentityToken: opts.kioskIdentityToken }
+              : {})
           });
         } else if (opts && 'documentsData' in opts) {
           const { documentsData } = opts;
@@ -1357,6 +1363,10 @@ export default function UnitKioskPage() {
           identity && typeof identity === 'object' && !Array.isArray(identity)
             ? (identity as { userId?: unknown }).userId
             : undefined;
+        const kioskIdentityToken =
+          identity && typeof identity === 'object' && !Array.isArray(identity)
+            ? (identity as { identityToken?: unknown }).identityToken
+            : undefined;
         const documentsData = session.values.documentsData;
         const validDocumentsData =
           documentsData &&
@@ -1370,6 +1380,9 @@ export default function UnitKioskPage() {
                 unitId: kioskApiUnitId,
                 serviceId: service.id,
                 kioskIdentifiedUserId,
+                ...(typeof kioskIdentityToken === 'string' && kioskIdentityToken
+                  ? { kioskIdentityToken }
+                  : {}),
                 ...(validDocumentsData
                   ? { documentsData: validDocumentsData }
                   : {})
@@ -1402,11 +1415,12 @@ export default function UnitKioskPage() {
                   identificationMode: 'badge',
                   isLeaf: true
                 },
-                resolveEmployee: (userId: string) => ({
-                  userId,
+                resolveEmployee: (identity: EmployeeIdentityResolution) => ({
+                  userId: identity.userId,
+                  identityToken: identity.identityToken,
                   isAuthenticated: true,
                   isEmployee: true,
-                  groups: []
+                  groups: identity.groups ?? []
                 })
               }
             }
@@ -2486,14 +2500,19 @@ export default function UnitKioskPage() {
                   setEmployeeIdSubmode('badge');
                   setEmployeeCreateTicketError('');
                 }}
-                onIdentified={(userId) => {
+                onIdentified={(identity) => {
                   const svc = pendingEmployeeService;
-                  if (!svc) {
+                  if (!svc || !identity.userId) {
                     return;
                   }
                   void createTicketForService(
                     svc,
-                    { kioskIdentifiedUserId: userId },
+                    {
+                      kioskIdentifiedUserId: identity.userId,
+                      ...(identity.identityToken
+                        ? { kioskIdentityToken: identity.identityToken }
+                        : {})
+                    },
                     'employeeModal'
                   );
                 }}

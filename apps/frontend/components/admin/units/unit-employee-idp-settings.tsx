@@ -86,6 +86,7 @@ export function UnitEmployeeIdpSettings({ unitId }: Props) {
   const [requestBodyTemplate, setRequestBodyTemplate] = useState(DEFAULT_BODY);
   const [responseEmailPath, setResponseEmailPath] = useState('email');
   const [responseDisplayNamePath, setResponseDisplayNamePath] = useState('');
+  const [responseGroupsPath, setResponseGroupsPath] = useState('');
   const [headerTemplatesJson, setHeaderTemplatesJson] =
     useState(DEFAULT_HEADER);
   const [timeoutMs, setTimeoutMs] = useState(10_000);
@@ -111,6 +112,7 @@ export function UnitEmployeeIdpSettings({ unitId }: Props) {
     );
     setResponseEmailPath(data.responseEmailPath || 'email');
     setResponseDisplayNamePath(data.responseDisplayNamePath || '');
+    setResponseGroupsPath(data.responseGroupsPath || '');
     setHeaderTemplatesJson(
       (data.headerTemplatesJson || '').trim() || DEFAULT_HEADER
     );
@@ -132,6 +134,7 @@ export function UnitEmployeeIdpSettings({ unitId }: Props) {
         requestBodyTemplate: string;
         responseEmailPath: string;
         responseDisplayNamePath: string;
+        responseGroupsPath: string;
         headerTemplatesJson: string;
         timeoutMs: number;
         secretValues?: Record<string, string>;
@@ -143,6 +146,7 @@ export function UnitEmployeeIdpSettings({ unitId }: Props) {
         requestBodyTemplate,
         responseEmailPath: responseEmailPath.trim(),
         responseDisplayNamePath: responseDisplayNamePath.trim(),
+        responseGroupsPath: responseGroupsPath.trim(),
         headerTemplatesJson,
         timeoutMs
       };
@@ -322,6 +326,23 @@ export function UnitEmployeeIdpSettings({ unitId }: Props) {
             onChange={(e) => setResponseDisplayNamePath(e.target.value)}
             className='font-mono text-sm'
           />
+        </div>
+
+        <div className='space-y-2'>
+          <Label htmlFor='idp-groups-path'>
+            {t('groups_path')}{' '}
+            <span className='text-muted-foreground font-normal'>
+              ({t('optional')})
+            </span>
+          </Label>
+          <Input
+            id='idp-groups-path'
+            value={responseGroupsPath}
+            onChange={(e) => setResponseGroupsPath(e.target.value)}
+            placeholder='data.user.groups'
+            className='font-mono text-sm'
+          />
+          <p className='text-muted-foreground text-xs'>{t('groups_help')}</p>
         </div>
 
         <div className='space-y-2'>

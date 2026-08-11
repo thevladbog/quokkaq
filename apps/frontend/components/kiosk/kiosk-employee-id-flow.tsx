@@ -12,8 +12,17 @@ type Props = {
   service: Service;
   mode: 'badge' | 'login';
   onBack: () => void;
-  onIdentified: (userId: string) => void;
+  onIdentified: (identity: EmployeeIdentityResolution) => void;
   onUseKeyboard?: () => void;
+};
+
+export type EmployeeIdentityResolution = {
+  matchStatus: string;
+  userId?: string;
+  email?: string;
+  displayName?: string;
+  groups?: string[];
+  identityToken?: string;
 };
 
 /**
@@ -39,7 +48,7 @@ export function KioskEmployeeIdFlow({
       try {
         const res = await unitsApi.resolveEmployeeIdp(unitId, { kind, raw });
         if (res.matchStatus === 'matched' && res.userId) {
-          onIdentified(res.userId);
+          onIdentified(res);
           return;
         }
         if (res.matchStatus === 'ambiguous') {

@@ -1002,6 +1002,8 @@
         "body_hint": "Go text/template with fields .Raw, .Login, .Kind (badge|login), .Ts (Unix seconds).",
         "email_path": "gjson path to work email in the response",
         "display_name_path": "Path to display name",
+        "groups_path": "Path to employee groups",
+        "groups_help": "Optional JSON array or string path, for example data.user.groups. Groups are passed to service access rules.",
         "optional": "optional",
         "headers_json": "HTTP headers (JSON array)",
         "headers_secret_hint": "Use ${secret:NAME} in a header value; define NAME in stored secrets below.",

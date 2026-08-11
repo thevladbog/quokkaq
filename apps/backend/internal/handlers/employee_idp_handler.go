@@ -5,11 +5,8 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"quokkaq-go-backend/internal/logger"
-	"quokkaq-go-backend/internal/models"
-	"quokkaq-go-backend/internal/pkg/ssocrypto"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 
@@ -81,6 +78,7 @@ type unitEmployeeIdpSettingsDTO struct {
 	RequestBodyTemplate     string   `json:"requestBodyTemplate"`
 	ResponseEmailPath       string   `json:"responseEmailPath"`
 	ResponseDisplayNamePath string   `json:"responseDisplayNamePath"`
+	ResponseGroupsPath      string   `json:"responseGroupsPath"`
 	HeaderTemplatesJSON     string   `json:"headerTemplatesJson"`
 	TimeoutMS               int      `json:"timeoutMs"`
 	SecretNames             []string `json:"secretNames"`
@@ -111,6 +109,7 @@ func (h *EmployeeIdpHandler) GetUnitEmployeeIdp(w http.ResponseWriter, r *http.R
 		RequestBodyTemplate:     row.RequestBodyTemplate,
 		ResponseEmailPath:       row.ResponseEmailPath,
 		ResponseDisplayNamePath: row.ResponseDisplayNamePath,
+		ResponseGroupsPath:      row.ResponseGroupsPath,
 		HeaderTemplatesJSON:     row.HeaderTemplatesJSON,
 		TimeoutMS:               row.TimeoutMS,
 		SecretNames:             names,
@@ -125,6 +124,7 @@ type PatchUnitEmployeeIdpRequest struct {
 	RequestBodyTemplate     *string `json:"requestBodyTemplate,omitempty"`
 	ResponseEmailPath       *string `json:"responseEmailPath,omitempty"`
 	ResponseDisplayNamePath *string `json:"responseDisplayNamePath,omitempty"`
+	ResponseGroupsPath      *string `json:"responseGroupsPath,omitempty"`
 	HeaderTemplatesJSON     *string `json:"headerTemplatesJson,omitempty"`
 	TimeoutMS               *int    `json:"timeoutMs,omitempty"`
 	// Secrets: name -> plaintext; stored encrypted. Omitted names unchanged.
@@ -150,84 +150,23 @@ func (h *EmployeeIdpHandler) PatchUnitEmployeeIdp(w http.ResponseWriter, r *http
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	row, err := h.repo.GetSettingByUnitID(unitID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	row, names, err := h.idp.UpdateSettings(unitID, services.EmployeeIdpSettingsPatch{
+		Enabled: req.Enabled, HTTPMethod: req.HTTPMethod, UpstreamURL: req.UpstreamURL,
+		RequestBodyTemplate: req.RequestBodyTemplate, ResponseEmailPath: req.ResponseEmailPath,
+		ResponseDisplayNamePath: req.ResponseDisplayNamePath, ResponseGroupsPath: req.ResponseGroupsPath,
+		HeaderTemplatesJSON: req.HeaderTemplatesJSON, TimeoutMS: req.TimeoutMS,
+		SecretValues: req.SecretValues, SecretNamesToDelete: req.SecretNamesToDelete,
+	})
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		row = &models.UnitEmployeeIdpSetting{UnitID: unitID, HTTPMethod: "POST", HeaderTemplatesJSON: "[]", TimeoutMS: 10000}
-	}
-	if req.Enabled != nil {
-		row.Enabled = *req.Enabled
-	}
-	if req.HTTPMethod != nil {
-		row.HTTPMethod = *req.HTTPMethod
-	}
-	if req.UpstreamURL != nil {
-		row.UpstreamURL = *req.UpstreamURL
-	}
-	if req.RequestBodyTemplate != nil {
-		row.RequestBodyTemplate = *req.RequestBodyTemplate
-	}
-	if req.ResponseEmailPath != nil {
-		row.ResponseEmailPath = *req.ResponseEmailPath
-	}
-	if req.ResponseDisplayNamePath != nil {
-		row.ResponseDisplayNamePath = *req.ResponseDisplayNamePath
-	}
-	if req.HeaderTemplatesJSON != nil {
-		row.HeaderTemplatesJSON = *req.HeaderTemplatesJSON
-	}
-	if req.TimeoutMS != nil {
-		row.TimeoutMS = *req.TimeoutMS
-	}
-	if err := h.repo.SaveSetting(row); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	for _, name := range req.SecretNamesToDelete {
-		n := strings.TrimSpace(name)
-		if n == "" {
-			continue
-		}
-		if err := h.repo.DeleteSecret(unitID, n); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-	for name, plain := range req.SecretValues {
-		n := name
-		if n == "" {
-			continue
-		}
-		enc, encErr := ssocrypto.EncryptAES256GCM([]byte(plain))
-		if encErr != nil {
-			http.Error(w, encErr.Error(), http.StatusInternalServerError)
-			return
-		}
-		_ = h.repo.UpsertSecret(&models.UnitEmployeeIdpSecret{UnitID: unitID, Name: n, Ciphertext: enc})
-	}
-	row2, err2 := h.repo.GetSettingByUnitID(unitID)
-	if err2 != nil {
-		http.Error(w, err2.Error(), http.StatusInternalServerError)
-		return
-	}
-	secs, _ := h.repo.ListSecrets(unitID)
-	names := make([]string, 0, len(secs))
-	for i := range secs {
-		names = append(names, secs[i].Name)
 	}
 	RespondJSON(w, unitEmployeeIdpSettingsDTO{
-		UnitID:                  row2.UnitID,
-		Enabled:                 row2.Enabled,
-		HTTPMethod:              row2.HTTPMethod,
-		UpstreamURL:             row2.UpstreamURL,
-		RequestBodyTemplate:     row2.RequestBodyTemplate,
-		ResponseEmailPath:       row2.ResponseEmailPath,
-		ResponseDisplayNamePath: row2.ResponseDisplayNamePath,
-		HeaderTemplatesJSON:     row2.HeaderTemplatesJSON,
-		TimeoutMS:               row2.TimeoutMS,
-		SecretNames:             names,
+		UnitID: row.UnitID, Enabled: row.Enabled, HTTPMethod: row.HTTPMethod,
+		UpstreamURL: row.UpstreamURL, RequestBodyTemplate: row.RequestBodyTemplate,
+		ResponseEmailPath: row.ResponseEmailPath, ResponseDisplayNamePath: row.ResponseDisplayNamePath,
+		ResponseGroupsPath:  row.ResponseGroupsPath,
+		HeaderTemplatesJSON: row.HeaderTemplatesJSON, TimeoutMS: row.TimeoutMS,
+		SecretNames: names,
 	})
 }

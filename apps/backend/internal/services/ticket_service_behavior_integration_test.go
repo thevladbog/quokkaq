@@ -122,6 +122,25 @@ func TestTicketServiceBehaviorAccessDoesNotRestrictStaffTicket(t *testing.T) {
 	}
 }
 
+func TestTicketServiceBehaviorAccessAcceptsTrustedKioskGroup(t *testing.T) {
+	service, db := setupTicketBehaviorIntegration(t)
+	groupBehavior := `{"version":1,"fields":[{"key":"room","label":{"en":"Room"},"type":"text","required":true}],"dataRetentionDays":1,"access":{"when":{"kind":"rule","field":"identity.groups","operator":"contains","value":"employees"},"whenFalse":"lock"}}`
+	if err := db.Exec(`UPDATE services SET behavior = ? WHERE id = ?`, groupBehavior, "service-behavior").Error; err != nil {
+		t.Fatal(err)
+	}
+	input := json.RawMessage(`{"form":{"room":"A-101"}}`)
+	creator, ok := service.(interface {
+		CreateTicketWithKioskGroups(string, string, *string, *string, *string, *json.RawMessage, *string, *string, []string) (*models.Ticket, error)
+	})
+	if !ok {
+		t.Fatal("ticket service does not expose trusted kiosk group creation")
+	}
+	userID := "employee-1"
+	if _, err := creator.CreateTicketWithKioskGroups("u1", "service-behavior", nil, nil, nil, &input, nil, &userID, []string{"employees"}); err != nil {
+		t.Fatalf("trusted group ticket creation returned error: %v", err)
+	}
+}
+
 func TestTicketServiceBehaviorFormWithBadgePersistsDocumentsDataAndExpiry(t *testing.T) {
 	service, db := setupTicketBehaviorIntegration(t)
 	kioskUserID := "employee-1"
