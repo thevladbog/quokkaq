@@ -29,6 +29,8 @@ This runbook covers the first composable-experience pilots for ticket stations a
 5. Confirm called-ticket updates continue through the existing WebSocket flow and that the experience renderer shows the same queue state as Legacy.
 6. To roll back, select **Legacy queue display** and save. If the manifest is unavailable, malformed, unpublished, or has the wrong surface, the display must also render Legacy automatically.
 
+The committed Playwright acceptance fixture uses a deterministic public unit and API responses rather than a live tenant or demo database. It covers the assigned experience at 1920×1080 and 1080×1920, plus Legacy fallback for both an explicitly legacy and an invalid manifest. This verifies the browser rendering contract and scroll bounds; it does not replace real-device acceptance.
+
 The unit assignment endpoint is intentionally fail-safe: it accepts only a published `queue-display` template and a variant belonging to that published definition. Do not make a screen depend on a draft definition or copy manifest JSON into device configuration.
 
 ## Acceptance gates
@@ -42,8 +44,8 @@ Automated browser checks are not hardware acceptance. Record each gate as `PASS`
 | Queue display assigned unit: landscape profile | PASS / FAIL / NOT RUN | 16:9 or equivalent viewport; verify manifest and rendered widgets |
 | Queue display unit unassigned | PASS / FAIL / NOT RUN | Select Legacy; verify the pre-existing renderer is shown |
 | Invalid/unavailable manifest fallback | PASS / FAIL / NOT RUN | Simulate non-200 or invalid definition; verify Legacy |
-| Fixed viewport: 820×1180 | PASS / FAIL / NOT RUN | screenshot and scroll/clipping result |
-| Fixed viewport: 1180×820 | PASS / FAIL / NOT RUN | screenshot and scroll/clipping result |
+| Fixed viewport: 1920×1080 | PASS / FAIL / NOT RUN | screenshot and scroll/clipping result |
+| Fixed viewport: 1080×1920 | PASS / FAIL / NOT RUN | screenshot and scroll/clipping result |
 | Fixed viewport: 1080×1920 | PASS / FAIL / NOT RUN | screenshot and scroll/clipping result |
 | iPad Safari / PWA | NOT RUN | Requires a real iPad |
 | Tauri 1080×1920 station | NOT RUN | Requires the packaged desktop app |
