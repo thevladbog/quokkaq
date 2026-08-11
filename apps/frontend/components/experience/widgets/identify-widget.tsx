@@ -2,7 +2,10 @@
 
 import type { ServiceModel } from '@quokkaq/shared-types';
 
-import { KioskEmployeeIdFlow } from '@/components/kiosk/kiosk-employee-id-flow';
+import {
+  KioskEmployeeIdFlow,
+  type EmployeeIdentityResolution
+} from '@/components/kiosk/kiosk-employee-id-flow';
 import { KioskPhoneIdentificationModal } from '@/components/kiosk/kiosk-phone-identification-modal';
 import { KioskCustomIdentificationDialog } from '@/components/kiosk/kiosk-custom-identification-dialog';
 import { KioskIdOcrDialog } from '@/components/kiosk/kiosk-id-ocr-dialog';
@@ -23,7 +26,7 @@ export type IdentificationAdapter = {
   locale: 'en' | 'ru';
   employeeService: Service;
   /** Resolves a user id to safe condition facts; raw credentials never leave the kiosk component. */
-  resolveEmployee: (userId: string) => RuntimeIdentity;
+  resolveEmployee: (identity: EmployeeIdentityResolution) => RuntimeIdentity;
   onDocumentData?: (data: Record<string, unknown>) => void;
   preRegistration?: {
     onSuccess: (ticket: Ticket) => void;
@@ -82,7 +85,9 @@ export function IdentifyWidget({
         service={adapter.employeeService}
         mode={mode}
         onBack={onBack}
-        onIdentified={(userId) => onIdentified(adapter.resolveEmployee(userId))}
+        onIdentified={(identity) =>
+          onIdentified(adapter.resolveEmployee(identity))
+        }
       />
     );
   if (mode === 'phone')

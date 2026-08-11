@@ -641,6 +641,8 @@ export const unitsApi = {
       userId?: string;
       email?: string;
       displayName?: string;
+      groups?: string[];
+      identityToken?: string;
     };
   },
 
@@ -660,6 +662,7 @@ export const unitsApi = {
       requestBodyTemplate: string;
       responseEmailPath: string;
       responseDisplayNamePath: string;
+      responseGroupsPath: string;
       headerTemplatesJson: string;
       timeoutMs: number;
       secretNames: string[];
@@ -675,6 +678,7 @@ export const unitsApi = {
       requestBodyTemplate?: string;
       responseEmailPath?: string;
       responseDisplayNamePath?: string;
+      responseGroupsPath?: string;
       headerTemplatesJson?: string;
       timeoutMs?: number;
       secretValues?: Record<string, string>;
@@ -701,6 +705,7 @@ export const unitsApi = {
       requestBodyTemplate: string;
       responseEmailPath: string;
       responseDisplayNamePath: string;
+      responseGroupsPath: string;
       headerTemplatesJson: string;
       timeoutMs: number;
       secretNames: string[];
@@ -717,6 +722,9 @@ export const unitsApi = {
       body = {
         serviceId: normalized.serviceId,
         kioskIdentifiedUserId: normalized.kioskIdentifiedUserId,
+        ...(normalized.kioskIdentityToken
+          ? { kioskIdentityToken: normalized.kioskIdentityToken }
+          : {}),
         ...(normalized.documentsData
           ? { documentsData: normalized.documentsData }
           : {})

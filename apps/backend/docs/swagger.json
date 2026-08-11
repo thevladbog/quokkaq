@@ -1208,6 +1208,9 @@
                     "responseEmailPath": {
                         "type": "string"
                     },
+                    "responseGroupsPath": {
+                        "type": "string"
+                    },
                     "secretNamesToDelete": {
                         "items": {
                             "type": "string"
@@ -3308,6 +3311,9 @@
                         "type": "string"
                     },
                     "responseEmailPath": {
+                        "type": "string"
+                    },
+                    "responseGroupsPath": {
                         "type": "string"
                     },
                     "secretNames": {
@@ -6502,6 +6508,15 @@
                         "type": "string"
                     },
                     "email": {
+                        "type": "string"
+                    },
+                    "groups": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "identityToken": {
                         "type": "string"
                     },
                     "matchStatus": {

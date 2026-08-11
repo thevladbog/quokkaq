@@ -81,6 +81,7 @@ type unitEmployeeIdpSettingsDTO struct {
 	RequestBodyTemplate     string   `json:"requestBodyTemplate"`
 	ResponseEmailPath       string   `json:"responseEmailPath"`
 	ResponseDisplayNamePath string   `json:"responseDisplayNamePath"`
+	ResponseGroupsPath      string   `json:"responseGroupsPath"`
 	HeaderTemplatesJSON     string   `json:"headerTemplatesJson"`
 	TimeoutMS               int      `json:"timeoutMs"`
 	SecretNames             []string `json:"secretNames"`
@@ -111,6 +112,7 @@ func (h *EmployeeIdpHandler) GetUnitEmployeeIdp(w http.ResponseWriter, r *http.R
 		RequestBodyTemplate:     row.RequestBodyTemplate,
 		ResponseEmailPath:       row.ResponseEmailPath,
 		ResponseDisplayNamePath: row.ResponseDisplayNamePath,
+		ResponseGroupsPath:      row.ResponseGroupsPath,
 		HeaderTemplatesJSON:     row.HeaderTemplatesJSON,
 		TimeoutMS:               row.TimeoutMS,
 		SecretNames:             names,
@@ -125,6 +127,7 @@ type PatchUnitEmployeeIdpRequest struct {
 	RequestBodyTemplate     *string `json:"requestBodyTemplate,omitempty"`
 	ResponseEmailPath       *string `json:"responseEmailPath,omitempty"`
 	ResponseDisplayNamePath *string `json:"responseDisplayNamePath,omitempty"`
+	ResponseGroupsPath      *string `json:"responseGroupsPath,omitempty"`
 	HeaderTemplatesJSON     *string `json:"headerTemplatesJson,omitempty"`
 	TimeoutMS               *int    `json:"timeoutMs,omitempty"`
 	// Secrets: name -> plaintext; stored encrypted. Omitted names unchanged.
@@ -175,6 +178,9 @@ func (h *EmployeeIdpHandler) PatchUnitEmployeeIdp(w http.ResponseWriter, r *http
 	}
 	if req.ResponseDisplayNamePath != nil {
 		row.ResponseDisplayNamePath = *req.ResponseDisplayNamePath
+	}
+	if req.ResponseGroupsPath != nil {
+		row.ResponseGroupsPath = *req.ResponseGroupsPath
 	}
 	if req.HeaderTemplatesJSON != nil {
 		row.HeaderTemplatesJSON = *req.HeaderTemplatesJSON

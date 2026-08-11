@@ -92,7 +92,10 @@ import { socketClient, type UnitETASnapshot } from '@/lib/socket';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { isQuotaExceededError } from '@/lib/quota-error';
 import { getServiceIdentificationMode } from '@/lib/kiosk-service-identification';
-import { KioskEmployeeIdFlow } from '@/components/kiosk/kiosk-employee-id-flow';
+import {
+  KioskEmployeeIdFlow,
+  type EmployeeIdentityResolution
+} from '@/components/kiosk/kiosk-employee-id-flow';
 import {
   buildAutolayoutPageSlots,
   clampAutolayoutPageIndex,
@@ -1402,11 +1405,12 @@ export default function UnitKioskPage() {
                   identificationMode: 'badge',
                   isLeaf: true
                 },
-                resolveEmployee: (userId: string) => ({
-                  userId,
+                resolveEmployee: (identity: EmployeeIdentityResolution) => ({
+                  userId: identity.userId,
+                  identityToken: identity.identityToken,
                   isAuthenticated: true,
                   isEmployee: true,
-                  groups: []
+                  groups: identity.groups ?? []
                 })
               }
             }
@@ -2486,14 +2490,19 @@ export default function UnitKioskPage() {
                   setEmployeeIdSubmode('badge');
                   setEmployeeCreateTicketError('');
                 }}
-                onIdentified={(userId) => {
+                onIdentified={(identity) => {
                   const svc = pendingEmployeeService;
-                  if (!svc) {
+                  if (!svc || !identity.userId) {
                     return;
                   }
                   void createTicketForService(
                     svc,
-                    { kioskIdentifiedUserId: userId },
+                    {
+                      kioskIdentifiedUserId: identity.userId,
+                      ...(identity.identityToken
+                        ? { kioskIdentityToken: identity.identityToken }
+                        : {})
+                    },
                     'employeeModal'
                   );
                 }}

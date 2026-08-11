@@ -1002,6 +1002,8 @@
         "body_hint": "Go text/template: поля .Raw, .Login, .Kind (badge|login), .Ts (Unix).",
         "email_path": "Путь gjson к рабочему email в ответе",
         "display_name_path": "Путь к отображаемому имени",
+        "groups_path": "Путь к группам сотрудника",
+        "groups_help": "Необязательно. Путь к JSON-массиву или строке, например data.user.groups. Группы используются в правилах доступа к услугам.",
         "optional": "необязательно",
         "headers_json": "Заголовки HTTP (JSON-массив)",
         "headers_secret_hint": "В значении заголовка: ${secret:ИМЯ}; задайте ИМЯ в секретах ниже.",
