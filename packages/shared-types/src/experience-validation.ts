@@ -11,6 +11,7 @@ import {
 } from './experience-template';
 import { LegacyAttractCompatibilitySchema } from './experience-runtime';
 import { KioskIdentificationModeSchema } from './kiosk-service-identification';
+import { experienceWidgetSupportsSurface } from './experience-capabilities';
 
 export type ExperienceValidationErrorCode =
   | 'schema.invalid'
@@ -126,30 +127,11 @@ type FlowPageKey =
   | 'serviceCatalogPageId'
   | (typeof FLOW_PAGE_FOR_SLOT)[FlowSlot];
 
-const DISPLAY_BLOCKED_WIDGET_TYPES = new Set([
-  'service-picker',
-  'ticket-form',
-  'identify',
-  'ticket-success'
-]);
-
 const EXPERIENCE_SURFACES = new Set([
   'ticket-station',
   'queue-display',
   'counter-display',
   'visitor-mobile'
-]);
-
-const VISITOR_MOBILE_WIDGET_TYPES = new Set([
-  'service-picker',
-  'rich-info',
-  'ticket-form',
-  'language-switch',
-  'ticket-success',
-  'media',
-  'eta-display',
-  'clock',
-  'join-queue-qr'
 ]);
 
 const INTERACTIVE_WIDGET_TYPES = new Set([
@@ -315,43 +297,6 @@ function mapSchemaIssue(issue: {
   return { code: 'schema.invalid', path };
 }
 
-function widgetSupportsSurface(
-  surface: string,
-  type: string,
-  actions: unknown
-): boolean {
-  if (type === 'custom-html') {
-    return surface === 'queue-display' || surface === 'counter-display';
-  }
-
-  if (surface === 'queue-display' || surface === 'counter-display') {
-    if (DISPLAY_BLOCKED_WIDGET_TYPES.has(type)) return false;
-    return (
-      !Array.isArray(actions) ||
-      actions.every(
-        (action) =>
-          !isPlainOwnRecord(action) ||
-          (action.type !== 'submit-ticket' &&
-            action.type !== 'print-ticket' &&
-            action.type !== 'set-session' &&
-            action.type !== 'reset-session')
-      )
-    );
-  }
-
-  if (surface === 'visitor-mobile') {
-    if (!VISITOR_MOBILE_WIDGET_TYPES.has(type)) return false;
-    return (
-      !Array.isArray(actions) ||
-      actions.every(
-        (action) => !isPlainOwnRecord(action) || action.type !== 'print-ticket'
-      )
-    );
-  }
-
-  return surface === 'ticket-station';
-}
-
 function scanRawCondition(
   access: unknown,
   schema: typeof AccessPolicySchema | typeof PageAccessPolicySchema,
@@ -401,7 +346,11 @@ function scanRawSurfaceAndConditions(
         surface !== undefined &&
         EXPERIENCE_SURFACES.has(surface) &&
         typeof rawWidget.type === 'string' &&
-        !widgetSupportsSurface(surface, rawWidget.type, rawWidget.actions)
+        !experienceWidgetSupportsSurface(
+          surface as ExperienceTemplate['surface'],
+          rawWidget.type,
+          rawWidget.actions
+        )
       ) {
         errors.add('widget.unsupported_for_surface', widgetPath);
       }
@@ -866,7 +815,7 @@ function validateParsedTemplate(
     for (const [widgetIndex, currentWidget] of currentPage.widgets.entries()) {
       if (errors.isFull()) return;
       if (
-        !widgetSupportsSurface(
+        !experienceWidgetSupportsSurface(
           template.surface,
           currentWidget.type,
           currentWidget.actions

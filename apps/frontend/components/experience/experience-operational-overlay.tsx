@@ -7,6 +7,7 @@ import {
   Users,
   WifiOff
 } from 'lucide-react';
+import type { DeviceProfile } from '@quokkaq/shared-types';
 import { useTranslations } from 'next-intl';
 
 import type {
@@ -14,6 +15,7 @@ import type {
   ResolvedOperationalState
 } from '@/lib/experience/operational-state';
 import { cn } from '@/lib/utils';
+import type { QueueDisplayRuntimeData } from './experience-widget-registry';
 
 const statePresentation: Record<
   Exclude<OperationalState, 'normal'>,
@@ -63,9 +65,13 @@ const statePresentation: Record<
 };
 
 export function ExperienceOperationalOverlay({
-  resolved
+  resolved,
+  display,
+  profile
 }: {
   resolved: ResolvedOperationalState;
+  display?: QueueDisplayRuntimeData;
+  profile: DeviceProfile;
 }) {
   const t = useTranslations('experience.runtime.task12');
   if (resolved.state === 'normal') {
@@ -73,7 +79,13 @@ export function ExperienceOperationalOverlay({
       <div
         role='status'
         data-operational-state='media-failure'
-        className='absolute right-6 bottom-6 z-20 rounded-lg border border-amber-400 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950 shadow-sm'
+        data-viewing-distance={profile.viewingDistance}
+        className={cn(
+          'pointer-events-none absolute right-6 bottom-6 z-20 max-w-[min(36rem,80%)] rounded-lg border border-amber-400 bg-amber-50 font-semibold text-amber-950 shadow-sm',
+          profile.viewingDistance === 'far'
+            ? 'px-6 py-5 text-xl'
+            : 'px-4 py-3 text-sm'
+        )}
       >
         {t('mediaFailure', { default: 'Media is temporarily unavailable' })}
       </div>
@@ -86,12 +98,19 @@ export function ExperienceOperationalOverlay({
     <section
       role={resolved.state === 'emergency' ? 'alert' : 'status'}
       aria-live={resolved.state === 'emergency' ? 'assertive' : 'polite'}
+      data-testid='experience-operational-overlay'
       data-operational-state={resolved.state}
       className={cn(
         'absolute inset-0 z-30 flex items-center justify-center border-2 p-12 text-center',
         presentation.tone
       )}
     >
+      <header className='absolute top-0 right-0 left-0 flex items-center justify-between gap-8 p-8 text-left text-xl font-semibold md:p-10 md:text-2xl'>
+        <span className='truncate'>{display?.unitName ?? ''}</span>
+        <time className='shrink-0 font-mono font-bold tabular-nums'>
+          {display?.nowLabel ?? ''}
+        </time>
+      </header>
       <div className='mx-auto flex max-w-3xl flex-col items-center gap-5'>
         <Icon className='size-14' strokeWidth={1.7} aria-hidden />
         <h1 className='text-4xl font-bold tracking-tight md:text-6xl'>
@@ -104,6 +123,15 @@ export function ExperienceOperationalOverlay({
             default: presentation.description
           })}
         </p>
+        {resolved.state === 'stale-offline' &&
+        resolved.staleAgeMinutes !== undefined ? (
+          <p className='max-w-2xl text-lg font-semibold md:text-xl'>
+            {t('states.stale-offline.staleAge', {
+              minutes: resolved.staleAgeMinutes,
+              default: `Last successful update was ${resolved.staleAgeMinutes} minutes ago.`
+            })}
+          </p>
+        ) : null}
       </div>
     </section>
   );

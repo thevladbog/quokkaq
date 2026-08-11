@@ -279,7 +279,9 @@ describe('validateExperienceForPublish', () => {
     ['queue-display', 'service-picker', []],
     ['counter-display', 'identify', []],
     ['visitor-mobile', 'called-tickets', []],
-    ['queue-display', 'rich-info', [{ type: 'submit-ticket' }]]
+    ['queue-display', 'rich-info', [{ type: 'submit-ticket' }]],
+    ['queue-display', 'custom-html', [{ type: 'submit-ticket' }]],
+    ['visitor-mobile', 'media', [{ type: 'print-ticket' }]]
   ] as const)(
     'rejects %s widget/action combinations that are unsupported on the surface',
     (surface, type, actions) => {

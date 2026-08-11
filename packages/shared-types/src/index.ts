@@ -876,6 +876,8 @@ export {
   type ExperienceValidationReport
 } from './experience-validation';
 
+export { experienceWidgetSupportsSurface } from './experience-capabilities';
+
 export {
   KioskIdentificationModeSchema,
   getKioskServiceIdentificationMode,

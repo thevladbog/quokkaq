@@ -6,7 +6,8 @@ import type {
   ExperienceWidget,
   WidgetAction
 } from '@quokkaq/shared-types';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { experienceWidgetSupportsSurface } from '@quokkaq/shared-types';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { evaluateCondition } from '@/lib/experience/condition-evaluator';
@@ -21,8 +22,7 @@ import {
   ExperienceWidgetRegistry,
   isKnownExperienceWidget,
   type QueueDisplayCall,
-  type QueueDisplayRuntimeData,
-  supportsExperienceWidget
+  type QueueDisplayRuntimeData
 } from './experience-widget-registry';
 
 export type ExperienceRuntimeSession = {
@@ -32,8 +32,11 @@ export type ExperienceRuntimeSession = {
   >;
 };
 
-export type ExperienceRuntimeContext = ConditionContext & {
-  operational?: OperationalStateInput;
+export type ExperienceLiveSnapshot = NonNullable<ConditionContext['live']> &
+  OperationalStateInput;
+
+export type ExperienceRuntimeContext = Omit<ConditionContext, 'live'> & {
+  live?: ExperienceLiveSnapshot;
   display?: QueueDisplayRuntimeData;
   prefersReducedMotion?: boolean;
 };
@@ -41,13 +44,32 @@ export type ExperienceRuntimeContext = ConditionContext & {
 export type ExperienceRuntimeError =
   | { code: 'unknown-action'; widgetId: string }
   | { code: 'missing-page'; pageId: string }
-  | { code: 'unsupported-widget'; widgetId: string };
+  | { code: 'unsupported-widget'; widgetId: string }
+  | {
+      code: 'activation-field-missing';
+      widgetId: string;
+      field: keyof ExperienceActivationEvent;
+    }
+  | {
+      code: 'adapter-unavailable' | 'adapter-failed';
+      adapter: ExperienceRuntimeAdapterName;
+      widgetId?: string;
+    };
+
+export type ExperienceActivationEvent = Partial<
+  Record<'serviceId' | 'categoryId' | 'locale', string>
+>;
+
+type ExperienceRuntimeAdapterName =
+  | 'submitTicket'
+  | 'printTicket'
+  | 'audioCall';
 
 export type ExperienceRuntimeAdapters = {
   createSession?: () => ExperienceRuntimeSession;
   submitTicket?: (session: ExperienceRuntimeSession) => void | Promise<void>;
   printTicket?: (session: ExperienceRuntimeSession) => void | Promise<void>;
-  audioCall?: (ticket: QueueDisplayCall) => void;
+  audioCall?: (ticket: QueueDisplayCall) => void | Promise<void>;
   onRuntimeError?: (error: ExperienceRuntimeError) => void;
 };
 
@@ -80,6 +102,15 @@ const knownActionTypes = new Set([
   'reset-session'
 ]);
 
+type SetSessionValue = Extract<WidgetAction, { type: 'set-session' }>['value'];
+
+export function resolveExperienceActivationValue(
+  value: SetSessionValue,
+  event: ExperienceActivationEvent
+): string | undefined {
+  return value.source === 'literal' ? value.value : event[value.field];
+}
+
 function actionsAreKnown(actions: readonly WidgetAction[]): boolean {
   return actions.every(
     (action) =>
@@ -101,32 +132,102 @@ export function ExperienceRenderer({
   const variant = template.variants.find(
     (candidate) => candidate.id === variantId
   );
+  const sessionFactory = adapters.createSession;
   const createSession = useCallback(
-    () => adapters.createSession?.() ?? defaultSession(),
-    [adapters]
+    () => sessionFactory?.() ?? defaultSession(),
+    [sessionFactory]
   );
-  const [session, setSession] =
-    useState<ExperienceRuntimeSession>(createSession);
   const initialId =
     initialPageId && template.pages.some((page) => page.id === initialPageId)
       ? initialPageId
       : template.startPageId;
-  const [pageId, setPageId] = useState(initialId);
-  const [history, setHistory] = useState<string[]>([]);
+  type RuntimeState = {
+    session: ExperienceRuntimeSession;
+    pageId: string;
+    history: string[];
+  };
+  const [runtime, setRuntime] = useState<RuntimeState>(() => ({
+    session: createSession(),
+    pageId: initialId,
+    history: []
+  }));
+  const runtimeRef = useRef(runtime);
+  const mountedRef = useRef(false);
+  const generationRef = useRef(0);
+  const inFlightRef = useRef(false);
+  const lastAnnouncedCallIdRef = useRef<string | null>(null);
+  const [activityEpoch, setActivityEpoch] = useState(0);
+  const commitRuntime = useCallback((next: RuntimeState) => {
+    runtimeRef.current = next;
+    setRuntime(next);
+  }, []);
+  const markActivity = useCallback(() => {
+    setActivityEpoch((current) => current + 1);
+  }, []);
   const reset = useCallback(() => {
-    setSession(createSession());
-    setHistory([]);
-    setPageId(template.startPageId);
-  }, [createSession, template.startPageId]);
+    generationRef.current += 1;
+    inFlightRef.current = false;
+    commitRuntime({
+      session: createSession(),
+      pageId: template.startPageId,
+      history: []
+    });
+    markActivity();
+  }, [commitRuntime, createSession, markActivity, template.startPageId]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      generationRef.current += 1;
+      inFlightRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!sessionTimeoutMs || sessionTimeoutMs <= 0) return;
     const timer = window.setTimeout(reset, sessionTimeoutMs);
     return () => window.clearTimeout(timer);
-  }, [pageId, reset, session.id, sessionTimeoutMs]);
+  }, [activityEpoch, reset, sessionTimeoutMs]);
 
-  const page = template.pages.find((candidate) => candidate.id === pageId);
-  const operational = resolveOperationalState(runtimeContext.operational ?? {});
+  const page = template.pages.find(
+    (candidate) => candidate.id === runtime.pageId
+  );
+  const operational = resolveOperationalState(runtimeContext.live ?? {});
+  const reportRuntimeError = adapters.onRuntimeError;
+
+  useEffect(() => {
+    const primaryCall = runtimeContext.display?.primaryCall;
+    const audioCall = adapters.audioCall;
+    if (
+      !primaryCall ||
+      !audioCall ||
+      operational.state !== 'normal' ||
+      runtimeContext.live?.isConnected === false ||
+      lastAnnouncedCallIdRef.current === primaryCall.id
+    ) {
+      return;
+    }
+    lastAnnouncedCallIdRef.current = primaryCall.id;
+    void (async () => {
+      try {
+        await audioCall(primaryCall);
+      } catch {
+        if (mountedRef.current) {
+          reportRuntimeError?.({
+            code: 'adapter-failed',
+            adapter: 'audioCall'
+          });
+        }
+      }
+    })();
+  }, [
+    adapters.audioCall,
+    operational.state,
+    reportRuntimeError,
+    runtimeContext.display?.primaryCall,
+    runtimeContext.live?.isConnected
+  ]);
 
   const conditionContext = useMemo<ConditionContext>(
     () => ({
@@ -135,7 +236,7 @@ export function ExperienceRenderer({
       session: {
         ...runtimeContext.session,
         selectedServiceId:
-          session.values.selectedServiceId ??
+          runtime.session.values.selectedServiceId ??
           runtimeContext.session?.selectedServiceId ??
           null
       }
@@ -144,7 +245,7 @@ export function ExperienceRenderer({
       runtimeContext.identity,
       runtimeContext.live,
       runtimeContext.session,
-      session.values.selectedServiceId
+      runtime.session.values.selectedServiceId
     ]
   );
 
@@ -166,7 +267,12 @@ export function ExperienceRenderer({
   }
 
   const unsupportedWidget = page.widgets.find(
-    (widget) => !supportsExperienceWidget(template.surface, widget.type)
+    (widget) =>
+      !experienceWidgetSupportsSurface(
+        template.surface,
+        widget.type,
+        widget.actions
+      )
   );
   if (mode === 'deployed' && unsupportedWidget) {
     return (
@@ -186,54 +292,155 @@ export function ExperienceRenderer({
     );
   }
 
-  const navigate = (targetPageId: string) => {
-    if (!template.pages.some((candidate) => candidate.id === targetPageId)) {
-      adapters.onRuntimeError?.({ code: 'missing-page', pageId: targetPageId });
-      return;
-    }
-    setHistory((current) => [...current, pageId]);
-    setPageId(targetPageId);
-  };
-
-  const activateWidget = async (widget: ExperienceWidget) => {
+  const preflightActions = (
+    widget: ExperienceWidget,
+    event: ExperienceActivationEvent
+  ): ExperienceRuntimeError | undefined => {
     if (!actionsAreKnown(widget.actions)) {
-      adapters.onRuntimeError?.({
+      return {
         code: 'unknown-action',
         widgetId: widget.id
-      });
+      };
+    }
+    for (const action of widget.actions) {
+      switch (action.type) {
+        case 'set-session':
+          if (
+            action.value.source === 'event' &&
+            event[action.value.field] === undefined
+          ) {
+            return {
+              code: 'activation-field-missing',
+              widgetId: widget.id,
+              field: action.value.field
+            };
+          }
+          break;
+        case 'navigate': {
+          if (
+            !template.pages.some(
+              (candidate) => candidate.id === action.toPageId
+            )
+          ) {
+            return { code: 'missing-page', pageId: action.toPageId };
+          }
+          break;
+        }
+        case 'submit-ticket':
+          if (!adapters.submitTicket) {
+            return {
+              code: 'adapter-unavailable',
+              adapter: 'submitTicket',
+              widgetId: widget.id
+            };
+          }
+          break;
+        case 'print-ticket':
+          if (!adapters.printTicket) {
+            return {
+              code: 'adapter-unavailable',
+              adapter: 'printTicket',
+              widgetId: widget.id
+            };
+          }
+          break;
+        case 'reset-session':
+          break;
+      }
+    }
+    return undefined;
+  };
+
+  const activateWidget = async (
+    widget: ExperienceWidget,
+    event: ExperienceActivationEvent
+  ) => {
+    if (inFlightRef.current) return;
+    markActivity();
+    const preflightError = preflightActions(widget, event);
+    if (preflightError) {
+      adapters.onRuntimeError?.(preflightError);
       return;
     }
 
-    let workingSession = session;
-    for (const action of widget.actions) {
-      switch (action.type) {
-        case 'set-session': {
-          const value =
-            action.value.source === 'literal'
-              ? action.value.value
-              : String(widget.config[action.value.field] ?? '');
-          workingSession = {
-            ...workingSession,
-            values: { ...workingSession.values, [action.key]: value }
-          };
-          setSession(workingSession);
-          break;
+    inFlightRef.current = true;
+    const generation = generationRef.current;
+    let working: RuntimeState = {
+      session: {
+        ...runtimeRef.current.session,
+        values: { ...runtimeRef.current.session.values }
+      },
+      pageId: runtimeRef.current.pageId,
+      history: [...runtimeRef.current.history]
+    };
+    const isCurrent = () =>
+      mountedRef.current && generationRef.current === generation;
+
+    try {
+      for (const action of widget.actions) {
+        switch (action.type) {
+          case 'set-session': {
+            const value = resolveExperienceActivationValue(action.value, event);
+            if (value === undefined) return;
+            working = {
+              ...working,
+              session: {
+                ...working.session,
+                values: { ...working.session.values, [action.key]: value }
+              }
+            };
+            break;
+          }
+          case 'navigate':
+            working = {
+              ...working,
+              history: [...working.history, working.pageId],
+              pageId: action.toPageId
+            };
+            break;
+          case 'submit-ticket':
+            try {
+              await adapters.submitTicket!(working.session);
+            } catch {
+              if (isCurrent()) {
+                adapters.onRuntimeError?.({
+                  code: 'adapter-failed',
+                  adapter: 'submitTicket',
+                  widgetId: widget.id
+                });
+              }
+              return;
+            }
+            if (!isCurrent()) return;
+            break;
+          case 'print-ticket':
+            try {
+              await adapters.printTicket!(working.session);
+            } catch {
+              if (isCurrent()) {
+                adapters.onRuntimeError?.({
+                  code: 'adapter-failed',
+                  adapter: 'printTicket',
+                  widgetId: widget.id
+                });
+              }
+              return;
+            }
+            if (!isCurrent()) return;
+            break;
+          case 'reset-session':
+            working = {
+              session: createSession(),
+              pageId: template.startPageId,
+              history: []
+            };
+            break;
         }
-        case 'navigate':
-          navigate(action.toPageId);
-          break;
-        case 'submit-ticket':
-          await adapters.submitTicket?.(workingSession);
-          break;
-        case 'print-ticket':
-          await adapters.printTicket?.(workingSession);
-          break;
-        case 'reset-session':
-          workingSession = createSession();
-          setSession(workingSession);
-          setHistory([]);
-          setPageId(template.startPageId);
-          break;
+      }
+      if (isCurrent()) commitRuntime(working);
+    } finally {
+      if (generationRef.current === generation) {
+        inFlightRef.current = false;
       }
     }
   };
@@ -244,31 +451,52 @@ export function ExperienceRenderer({
       layout={layout}
       grid={variant.grid}
       profile={variant.profile}
-      sessionId={session.id}
+      sessionId={runtime.session.id}
       showNavigation={
         variant.profile.interactionMode === 'touch' &&
         operational.state === 'normal'
       }
-      canGoBack={history.length > 0}
+      canGoBack={runtime.history.length > 0}
       onBack={() => {
-        const previous = history.at(-1);
+        markActivity();
+        const current = runtimeRef.current;
+        const previous = current.history.at(-1);
         if (!previous) return;
-        setHistory((current) => current.slice(0, -1));
-        setPageId(previous);
+        commitRuntime({
+          ...current,
+          history: current.history.slice(0, -1),
+          pageId: previous
+        });
       }}
       onHome={() => {
-        setHistory([]);
-        setPageId(template.startPageId);
+        markActivity();
+        commitRuntime({
+          ...runtimeRef.current,
+          history: [],
+          pageId: template.startPageId
+        });
       }}
       onReset={reset}
-      overlay={<ExperienceOperationalOverlay resolved={operational} />}
+      overlay={
+        <ExperienceOperationalOverlay
+          resolved={operational}
+          display={runtimeContext.display}
+          profile={variant.profile}
+        />
+      }
       renderWidget={(widget) => {
         if (operational.state !== 'normal') return null;
         const matches =
           !widget.access ||
           evaluateCondition(widget.access.when, conditionContext);
         if (!matches && widget.access?.whenFalse === 'hide') return null;
-        if (!supportsExperienceWidget(template.surface, widget.type)) {
+        if (
+          !experienceWidgetSupportsSurface(
+            template.surface,
+            widget.type,
+            widget.actions
+          )
+        ) {
           return mode !== 'deployed' ? (
             <ExperienceWidgetDiagnostic
               reason={
@@ -282,9 +510,9 @@ export function ExperienceRenderer({
             widget={widget}
             surface={template.surface}
             context={runtimeContext}
-            adapters={adapters}
+            profile={variant.profile}
             locked={!matches && widget.access?.whenFalse === 'lock'}
-            onActivate={() => void activateWidget(widget)}
+            onActivate={(event) => void activateWidget(widget, event)}
           />
         );
       }}

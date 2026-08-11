@@ -10,9 +10,10 @@ export type OperationalState =
 export type OperationalStateInput = {
   emergency?: boolean;
   temporarilyUnavailable?: boolean;
-  connected?: boolean;
+  isConnected?: boolean;
   stale?: boolean;
-  open?: boolean;
+  staleAgeMinutes?: number;
+  isOpen?: boolean;
   activeCounters?: number;
   queueLength?: number;
   mediaFailed?: boolean;
@@ -21,6 +22,7 @@ export type OperationalStateInput = {
 export type ResolvedOperationalState = {
   state: OperationalState;
   media?: 'failed';
+  staleAgeMinutes?: number;
 };
 
 /**
@@ -32,17 +34,28 @@ export function resolveOperationalState(
   input: OperationalStateInput
 ): ResolvedOperationalState {
   const media = input.mediaFailed ? ('failed' as const) : undefined;
-  const result = (state: OperationalState): ResolvedOperationalState => ({
-    state,
-    ...(media ? { media } : {})
-  });
+  const result = (state: OperationalState): ResolvedOperationalState => {
+    const staleAgeMinutes =
+      state === 'stale-offline' &&
+      typeof input.staleAgeMinutes === 'number' &&
+      Number.isFinite(input.staleAgeMinutes)
+        ? Math.max(0, Math.floor(input.staleAgeMinutes))
+        : undefined;
+    return {
+      state,
+      ...(media ? { media } : {}),
+      ...(staleAgeMinutes !== undefined ? { staleAgeMinutes } : {})
+    };
+  };
 
   if (input.emergency) return result('emergency');
   if (input.temporarilyUnavailable) {
     return result('temporarily-unavailable');
   }
-  if (input.connected === false || input.stale) return result('stale-offline');
-  if (input.open === false) return result('closed');
+  if (input.isConnected === false || input.stale) {
+    return result('stale-offline');
+  }
+  if (input.isOpen === false) return result('closed');
   if (input.activeCounters === 0) return result('no-active-counters');
   if (input.queueLength === 0) return result('empty');
   return result('normal');

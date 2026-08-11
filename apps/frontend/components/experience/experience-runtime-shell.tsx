@@ -95,35 +95,44 @@ export function ExperienceRuntimeShell({
           'relative min-h-0 flex-1 overflow-hidden',
           profile.viewingDistance === 'far' ? 'bg-neutral-50' : 'bg-background'
         )}
-        style={{
-          padding: `${profile.safeArea.top}px ${profile.safeArea.right}px ${profile.safeArea.bottom}px ${profile.safeArea.left}px`
-        }}
       >
         <div
-          className='grid h-full min-h-0 w-full min-w-0 gap-2'
+          data-testid='experience-runtime-safe-area'
+          className='absolute min-h-0 min-w-0 overflow-hidden'
           style={{
-            gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
-            gridTemplateRows: `repeat(${grid.rows}, minmax(0, 1fr))`
+            position: 'absolute',
+            top: profile.safeArea.top,
+            right: profile.safeArea.right,
+            bottom: profile.safeArea.bottom,
+            left: profile.safeArea.left
           }}
         >
-          {page.widgets.map((widget) => {
-            const placement = layout.placements[widget.id];
-            if (!placement) return null;
-            return (
-              <div
-                key={widget.id}
-                className='min-h-0 min-w-0 overflow-hidden'
-                style={{
-                  gridColumn: `${placement.col} / span ${placement.colSpan}`,
-                  gridRow: `${placement.row} / span ${placement.rowSpan}`
-                }}
-              >
-                {renderWidget(widget)}
-              </div>
-            );
-          })}
+          <div
+            className='grid h-full min-h-0 w-full min-w-0 gap-2'
+            style={{
+              gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${grid.rows}, minmax(0, 1fr))`
+            }}
+          >
+            {page.widgets.map((widget) => {
+              const placement = layout.placements[widget.id];
+              if (!placement) return null;
+              return (
+                <div
+                  key={widget.id}
+                  className='min-h-0 min-w-0 overflow-hidden'
+                  style={{
+                    gridColumn: `${placement.col} / span ${placement.colSpan}`,
+                    gridRow: `${placement.row} / span ${placement.rowSpan}`
+                  }}
+                >
+                  {renderWidget(widget)}
+                </div>
+              );
+            })}
+          </div>
+          {overlay}
         </div>
-        {overlay}
       </div>
     </main>
   );

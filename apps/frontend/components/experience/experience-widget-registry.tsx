@@ -1,6 +1,7 @@
 'use client';
 
 import type {
+  DeviceProfile,
   ExperienceSurface,
   ExperienceWidget,
   ScreenWidgetType
@@ -8,53 +9,12 @@ import type {
 import { ScreenWidgetTypeSchema } from '@quokkaq/shared-types';
 import { LockKeyhole, TriangleAlert } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef } from 'react';
 
 import type {
-  ExperienceRuntimeAdapters,
+  ExperienceActivationEvent,
   ExperienceRuntimeContext
 } from './experience-renderer';
-
-const allWidgetTypes = ScreenWidgetTypeSchema.options;
-const without = (blocked: ReadonlySet<ScreenWidgetType>) =>
-  new Set(allWidgetTypes.filter((type) => !blocked.has(type)));
-const displayBlocked = new Set<ScreenWidgetType>([
-  'service-picker',
-  'ticket-form',
-  'identify',
-  'ticket-success'
-]);
-
-/** Mirrors the shared publish validator's surface capability contract. */
-const surfaceCapabilities: Record<
-  ExperienceSurface,
-  ReadonlySet<ScreenWidgetType>
-> = {
-  'queue-display': without(displayBlocked),
-  'counter-display': without(displayBlocked),
-  'ticket-station': without(new Set<ScreenWidgetType>(['custom-html'])),
-  'visitor-mobile': new Set([
-    'service-picker',
-    'rich-info',
-    'ticket-form',
-    'language-switch',
-    'ticket-success',
-    'media',
-    'eta-display',
-    'clock',
-    'join-queue-qr'
-  ])
-};
-
-export function supportsExperienceWidget(
-  surface: ExperienceSurface,
-  type: unknown
-): type is ScreenWidgetType {
-  return (
-    typeof type === 'string' &&
-    surfaceCapabilities[surface].has(type as ScreenWidgetType)
-  );
-}
+import { cn } from '@/lib/utils';
 
 export function isKnownExperienceWidget(
   type: unknown
@@ -77,12 +37,23 @@ export type QueueDisplayRuntimeData = {
 
 export const MAX_QUEUE_DISPLAY_RECENT_CALLS = 3;
 
+function activationEventFromWidget(
+  widget: ExperienceWidget
+): ExperienceActivationEvent {
+  const event: ExperienceActivationEvent = {};
+  for (const field of ['serviceId', 'categoryId', 'locale'] as const) {
+    const value = widget.config[field];
+    if (typeof value === 'string') event[field] = value;
+  }
+  return event;
+}
+
 function QueueDisplayCalls({
   context,
-  adapters
+  profile
 }: {
   context: ExperienceRuntimeContext;
-  adapters: ExperienceRuntimeAdapters;
+  profile: DeviceProfile;
 }) {
   const t = useTranslations('experience.runtime.task12');
   const primary = context.display?.primaryCall;
@@ -90,28 +61,30 @@ function QueueDisplayCalls({
     0,
     MAX_QUEUE_DISPLAY_RECENT_CALLS
   );
-  const lastAnnouncedCallId = useRef<string | null>(null);
-  const audioCall = adapters.audioCall;
-
-  useEffect(() => {
-    if (!primary) {
-      lastAnnouncedCallId.current = null;
-      return;
-    }
-    if (lastAnnouncedCallId.current === primary.id) return;
-    lastAnnouncedCallId.current = primary.id;
-    audioCall?.(primary);
-  }, [audioCall, primary]);
+  const layout = profile.height > profile.width ? 'portrait' : 'landscape';
 
   return (
-    <section className='flex h-full min-h-0 flex-col rounded-2xl border border-emerald-700/60 bg-white p-5 shadow-sm'>
+    <section
+      data-testid='queue-display-calls'
+      data-layout={layout}
+      data-profile-size={`${profile.width}x${profile.height}`}
+      className='flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-emerald-700/60 bg-white p-5 shadow-sm'
+    >
       <header className='flex shrink-0 items-center justify-between gap-6 text-xl font-semibold'>
         <span className='truncate'>{context.display?.unitName ?? ''}</span>
         <time className='font-mono text-2xl font-bold tabular-nums'>
           {context.display?.nowLabel ?? ''}
         </time>
       </header>
-      <div className='mt-6 grid min-h-0 flex-1 grid-cols-[minmax(0,2fr)_minmax(15rem,1fr)] gap-4'>
+      <div
+        data-testid='queue-display-call-hierarchy'
+        className={cn(
+          'mt-6 grid min-h-0 flex-1 gap-4 overflow-hidden',
+          layout === 'portrait'
+            ? 'grid-rows-[minmax(0,2fr)_minmax(0,1fr)]'
+            : 'grid-cols-[minmax(0,2fr)_minmax(15rem,1fr)]'
+        )}
+      >
         <div
           data-testid='primary-called-ticket'
           data-motion={context.prefersReducedMotion ? 'reduced' : 'full'}
@@ -136,7 +109,10 @@ function QueueDisplayCalls({
           )}
         </div>
         <ol
-          className='grid min-h-0 grid-rows-3 gap-3'
+          className={cn(
+            'grid min-h-0 gap-3 overflow-hidden',
+            layout === 'portrait' ? 'grid-cols-3' : 'grid-rows-3'
+          )}
           aria-label={t('queue.recent', { default: 'Next and recent calls' })}
         >
           {recent.map((call) => (
@@ -181,22 +157,22 @@ export function ExperienceWidgetRegistry({
   widget,
   surface,
   context,
-  adapters,
+  profile,
   locked,
   onActivate
 }: {
   widget: ExperienceWidget;
   surface: ExperienceSurface;
   context: ExperienceRuntimeContext;
-  adapters: ExperienceRuntimeAdapters;
+  profile: DeviceProfile;
   locked: boolean;
-  onActivate: () => void;
+  onActivate: (event: ExperienceActivationEvent) => void;
 }) {
   const label = String(
     widget.config.label ?? widget.config.title ?? widget.type
   );
   if (surface === 'queue-display' && widget.type === 'called-tickets') {
-    return <QueueDisplayCalls context={context} adapters={adapters} />;
+    return <QueueDisplayCalls context={context} profile={profile} />;
   }
 
   if (widget.actions.length === 0) {
@@ -211,7 +187,9 @@ export function ExperienceWidgetRegistry({
     <button
       type='button'
       aria-disabled={locked ? 'true' : undefined}
-      onClick={locked ? undefined : onActivate}
+      onClick={
+        locked ? undefined : () => onActivate(activationEventFromWidget(widget))
+      }
       className='bg-card text-card-foreground focus-visible:ring-ring flex h-full min-h-11 w-full items-center justify-center overflow-hidden rounded-xl border p-5 text-center text-lg font-semibold shadow-sm outline-none focus-visible:ring-2 disabled:opacity-50'
     >
       {locked ? <LockKeyhole className='mr-2 size-5' aria-hidden /> : null}

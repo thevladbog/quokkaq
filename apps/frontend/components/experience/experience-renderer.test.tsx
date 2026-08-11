@@ -3,7 +3,8 @@ import {
   cleanup,
   fireEvent,
   render,
-  screen
+  screen,
+  waitFor
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ExperienceTemplate } from '@quokkaq/shared-types';
@@ -15,7 +16,9 @@ vi.mock('next-intl', () => ({
 
 import {
   ExperienceRenderer,
+  resolveExperienceActivationValue,
   type ExperienceRuntimeAdapters,
+  type ExperienceActivationEvent,
   type ExperienceRuntimeContext,
   type ExperienceRuntimeSession
 } from './experience-renderer';
@@ -103,14 +106,106 @@ function navigationTemplate(): ExperienceTemplate {
   };
 }
 
+function addPage(
+  template: ExperienceTemplate,
+  id: string,
+  label: string,
+  actions: ExperienceTemplate['pages'][number]['widgets'][number]['actions'] = []
+) {
+  template.pages.push({
+    id,
+    name: label,
+    widgets: [
+      {
+        id: `${id}-action`,
+        type: 'rich-info',
+        config: { label },
+        actions
+      }
+    ],
+    layouts: {
+      display: {
+        placements: {
+          [`${id}-action`]: { col: 1, row: 1, colSpan: 4, rowSpan: 2 }
+        }
+      }
+    }
+  });
+}
+
+function queueDisplayTemplate(
+  width = 1920,
+  height = 1080,
+  calledWidgetCount = 1
+): ExperienceTemplate {
+  const widgets = Array.from({ length: calledWidgetCount }, (_, index) => ({
+    id: `calls-${index + 1}`,
+    type: 'called-tickets' as const,
+    config: {},
+    actions: []
+  }));
+  return {
+    schemaVersion: 1,
+    id: `queue-display-${width}x${height}`,
+    surface: 'queue-display',
+    startPageId: 'queue',
+    variants: [
+      {
+        ...variant('queue-display'),
+        profile: {
+          ...variant('queue-display').profile,
+          width,
+          height
+        }
+      }
+    ],
+    pages: [
+      {
+        id: 'queue',
+        name: 'Queue',
+        widgets,
+        layouts: {
+          display: {
+            placements: Object.fromEntries(
+              widgets.map((widget, index) => [
+                widget.id,
+                {
+                  col: index === 0 ? 1 : 7,
+                  row: 1,
+                  colSpan: calledWidgetCount === 1 ? 12 : 6,
+                  rowSpan: 8
+                }
+              ])
+            )
+          }
+        }
+      }
+    ]
+  };
+}
+
+function deferred<T = void>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 const baseContext: ExperienceRuntimeContext = {
   identity: { isAuthenticated: false, isEmployee: false, groups: [] },
-  live: { queueLength: 4, isOpen: true, isConnected: true },
-  operational: {
-    connected: true,
-    open: true,
+  live: {
+    queueLength: 4,
+    isOpen: true,
+    isConnected: true,
     activeCounters: 2,
-    queueLength: 4
+    mediaFailed: false
+  },
+  display: {
+    unitName: 'Presnensky office',
+    nowLabel: '14:32'
   }
 };
 
@@ -219,6 +314,319 @@ describe('ExperienceRenderer session and navigation', () => {
       widgetId: 'continue'
     });
     expect(screen.queryByText('Details content')).toBeNull();
+  });
+
+  it('resolves event-sourced values from the typed activation payload', () => {
+    const event: ExperienceActivationEvent = {
+      serviceId: 'service-from-activation',
+      categoryId: 'category-from-activation',
+      locale: 'ru'
+    };
+
+    expect(
+      resolveExperienceActivationValue(
+        { source: 'event', field: 'serviceId' },
+        event
+      )
+    ).toBe('service-from-activation');
+    expect(
+      resolveExperienceActivationValue(
+        { source: 'event', field: 'categoryId' },
+        event
+      )
+    ).toBe('category-from-activation');
+    expect(
+      resolveExperienceActivationValue(
+        { source: 'event', field: 'locale' },
+        event
+      )
+    ).toBe('ru');
+  });
+
+  it('does not mutate or continue when an event-sourced field is missing', async () => {
+    const template = navigationTemplate();
+    template.pages[0]!.widgets[0]!.actions = [
+      {
+        type: 'set-session',
+        key: 'selectedServiceId',
+        value: { source: 'event', field: 'serviceId' }
+      },
+      { type: 'submit-ticket' },
+      { type: 'navigate', toPageId: 'details' }
+    ];
+    const submitTicket = vi.fn();
+    const onRuntimeError = vi.fn();
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{ submitTicket, onRuntimeError }}
+      />
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    });
+
+    expect(onRuntimeError).toHaveBeenCalledWith({
+      code: 'activation-field-missing',
+      widgetId: 'continue',
+      field: 'serviceId'
+    });
+    expect(submitTicket).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
+  });
+
+  it('commits reset then navigate atomically and Back returns to the reset home', async () => {
+    const template = navigationTemplate();
+    template.pages[0]!.widgets[0]!.actions = [
+      { type: 'navigate', toPageId: 'middle' }
+    ];
+    addPage(template, 'middle', 'Reset and continue', [
+      { type: 'reset-session' },
+      { type: 'navigate', toPageId: 'details' }
+    ]);
+    let nextSession = 0;
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{
+          createSession: () => ({ id: `session-${++nextSession}`, values: {} })
+        }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Reset and continue' })
+      );
+    });
+    expect(screen.getByText('Details content')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
+    expect(screen.queryByText('Reset and continue')).toBeNull();
+    expect(screen.getByTestId('experience-runtime')).toHaveAttribute(
+      'data-session-id',
+      'session-2'
+    );
+  });
+
+  it('uses each locally reduced page when two navigations precede Back', async () => {
+    const template = navigationTemplate();
+    template.pages[0]!.widgets[0]!.actions = [
+      { type: 'navigate', toPageId: 'middle' },
+      { type: 'navigate', toPageId: 'details' }
+    ];
+    addPage(template, 'middle', 'Middle page');
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{}}
+      />
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(screen.getByText('Middle page')).toBeVisible();
+  });
+
+  it('preflights missing adapters and never partially applies the chain', async () => {
+    const template = navigationTemplate();
+    const onRuntimeError = vi.fn();
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{ onRuntimeError }}
+      />
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    });
+
+    expect(onRuntimeError).toHaveBeenCalledWith({
+      code: 'adapter-unavailable',
+      adapter: 'submitTicket',
+      widgetId: 'continue'
+    });
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
+  });
+
+  it('contains rejected adapters and does not continue the action chain', async () => {
+    const template = navigationTemplate();
+    const onRuntimeError = vi.fn();
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{
+          submitTicket: () => Promise.reject(new Error('sensitive failure')),
+          onRuntimeError
+        }}
+      />
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    });
+
+    expect(onRuntimeError).toHaveBeenCalledWith({
+      code: 'adapter-failed',
+      adapter: 'submitTicket',
+      widgetId: 'continue'
+    });
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
+  });
+
+  it('cancels a deferred action continuation after an explicit reset', async () => {
+    const template = navigationTemplate();
+    const submission = deferred();
+    let nextSession = 0;
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{
+          createSession: () => ({ id: `session-${++nextSession}`, values: {} }),
+          submitTicket: () => submission.promise
+        }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset session' }));
+    await act(async () => submission.resolve());
+
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
+    expect(screen.getByTestId('experience-runtime')).toHaveAttribute(
+      'data-session-id',
+      'session-2'
+    );
+  });
+
+  it('does not continue or report a deferred adapter after unmount', async () => {
+    const template = navigationTemplate();
+    const submission = deferred();
+    const onRuntimeError = vi.fn();
+    const { unmount } = render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{
+          submitTicket: () => submission.promise,
+          onRuntimeError
+        }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    unmount();
+    await act(async () => submission.reject(new Error('late failure')));
+
+    expect(onRuntimeError).not.toHaveBeenCalled();
+  });
+
+  it('runs an async action chain single-flight on a double click', async () => {
+    const template = navigationTemplate();
+    const submission = deferred();
+    const submitTicket = vi.fn(() => submission.promise);
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{ submitTicket }}
+      />
+    );
+    const trigger = screen.getByRole('button', { name: 'Continue' });
+    fireEvent.click(trigger);
+    fireEvent.click(trigger);
+
+    expect(submitTicket).toHaveBeenCalledTimes(1);
+    await act(async () => submission.resolve());
+  });
+
+  it('does not postpone inactivity timeout when the parent only rerenders', () => {
+    vi.useFakeTimers();
+    let nextSession = 0;
+    const createSession = () => ({
+      id: `session-${++nextSession}`,
+      values: {}
+    });
+    const { rerender } = render(
+      <ExperienceRenderer
+        template={navigationTemplate()}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{ createSession }}
+        sessionTimeoutMs={1_000}
+      />
+    );
+    act(() => vi.advanceTimersByTime(600));
+    rerender(
+      <ExperienceRenderer
+        template={navigationTemplate()}
+        variantId='display'
+        runtimeContext={{ ...baseContext }}
+        adapters={{ createSession }}
+        sessionTimeoutMs={1_000}
+      />
+    );
+    act(() => vi.advanceTimersByTime(400));
+
+    expect(screen.getByTestId('experience-runtime')).toHaveAttribute(
+      'data-session-id',
+      'session-2'
+    );
+    expect(nextSession).toBe(2);
+  });
+
+  it('postpones inactivity timeout after a user navigation action', () => {
+    vi.useFakeTimers();
+    let nextSession = 0;
+    const template = navigationTemplate();
+    template.pages[0]!.widgets[0]!.actions = [
+      { type: 'navigate', toPageId: 'details' }
+    ];
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{
+          createSession: () => ({ id: `session-${++nextSession}`, values: {} })
+        }}
+        sessionTimeoutMs={1_000}
+      />
+    );
+    act(() => vi.advanceTimersByTime(600));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    act(() => vi.advanceTimersByTime(999));
+    expect(screen.getByTestId('experience-runtime')).toHaveAttribute(
+      'data-session-id',
+      'session-1'
+    );
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.getByTestId('experience-runtime')).toHaveAttribute(
+      'data-session-id',
+      'session-2'
+    );
   });
 
   it('hides inaccessible widgets and keeps locked widgets visible and inert', () => {
@@ -348,6 +756,43 @@ describe('ExperienceRenderer registry and operational overrides', () => {
     ).toBeNull();
   });
 
+  it('diagnoses action-forbidden widgets from the same capability contract as publish', () => {
+    const template = queueDisplayTemplate();
+    template.pages[0]!.widgets[0] = {
+      id: 'forbidden-action',
+      type: 'rich-info',
+      config: { label: 'Unsafe submit' },
+      actions: [{ type: 'submit-ticket' }]
+    };
+    template.pages[0]!.layouts.display!.placements = {
+      'forbidden-action': { col: 1, row: 1, colSpan: 12, rowSpan: 8 }
+    };
+
+    const { rerender } = render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{ submitTicket: vi.fn() }}
+        mode='preview'
+      />
+    );
+    expect(
+      screen.getByText('Widget is not available on this surface')
+    ).toBeVisible();
+
+    rerender(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{ submitTicket: vi.fn() }}
+        mode='deployed'
+      />
+    );
+    expect(screen.getByTestId('experience-runtime-rejected')).toBeVisible();
+  });
+
   it('keeps media failure visible without replacing a normal tenant page', () => {
     render(
       <ExperienceRenderer
@@ -355,13 +800,7 @@ describe('ExperienceRenderer registry and operational overrides', () => {
         variantId='display'
         runtimeContext={{
           ...baseContext,
-          operational: {
-            connected: true,
-            open: true,
-            activeCounters: 2,
-            queueLength: 4,
-            mediaFailed: true
-          }
+          live: { ...baseContext.live, mediaFailed: true }
         }}
         adapters={{}}
       />
@@ -371,6 +810,41 @@ describe('ExperienceRenderer registry and operational overrides', () => {
     expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
   });
 
+  it('feeds tenant conditions from the same authoritative live snapshot', () => {
+    const template = navigationTemplate();
+    template.pages[0]!.access = {
+      when: {
+        kind: 'rule',
+        field: 'live.queueLength',
+        operator: 'gte',
+        value: 4
+      },
+      whenFalse: 'hide'
+    };
+    const { rerender } = render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{}}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
+
+    rerender(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={{
+          ...baseContext,
+          live: { ...baseContext.live, queueLength: 2 }
+        }}
+        adapters={{}}
+      />
+    );
+    expect(screen.getByTestId('experience-runtime-rejected')).toBeVisible();
+  });
+
   it.each([
     ['emergency', { emergency: true }, 'Attention'],
     [
@@ -378,8 +852,12 @@ describe('ExperienceRenderer registry and operational overrides', () => {
       { temporarilyUnavailable: true },
       'Temporarily unavailable'
     ],
-    ['stale-offline', { connected: false }, 'Data is temporarily not updating'],
-    ['closed', { open: false }, 'This location is closed'],
+    [
+      'stale-offline',
+      { isConnected: false, staleAgeMinutes: 17 },
+      'Data is temporarily not updating'
+    ],
+    ['closed', { isOpen: false }, 'This location is closed'],
     [
       'no-active-counters',
       { activeCounters: 0 },
@@ -405,11 +883,8 @@ describe('ExperienceRenderer registry and operational overrides', () => {
           variantId='display'
           runtimeContext={{
             ...baseContext,
-            operational: {
-              connected: true,
-              open: true,
-              activeCounters: 2,
-              queueLength: 4,
+            live: {
+              ...baseContext.live,
               ...override
             }
           }}
@@ -418,6 +893,14 @@ describe('ExperienceRenderer registry and operational overrides', () => {
       );
 
       expect(screen.getByText(copy)).toBeVisible();
+      expect(screen.getByText('Presnensky office')).toBeVisible();
+      expect(screen.getByText('14:32')).toBeVisible();
+      if (_state === 'stale-offline') {
+        expect(screen.getByText(/17 minutes ago/i)).toBeVisible();
+      }
+      expect(
+        screen.getByTestId('experience-runtime-safe-area')
+      ).toContainElement(screen.getByTestId('experience-operational-overlay'));
       expect(screen.queryByText('Continue')).toBeNull();
       expect(screen.queryByRole('navigation')).toBeNull();
     }
@@ -485,7 +968,15 @@ describe('queue display preview', () => {
     );
 
     const surface = screen.getByTestId('experience-runtime-surface');
-    expect(surface).toHaveStyle({ padding: '36px 48px' });
+    const safeArea = screen.getByTestId('experience-runtime-safe-area');
+    expect(surface).not.toHaveStyle({ padding: '36px 48px' });
+    expect(safeArea).toHaveStyle({
+      position: 'absolute',
+      top: '36px',
+      right: '48px',
+      bottom: '36px',
+      left: '48px'
+    });
     expect(screen.getByTestId('primary-called-ticket')).toHaveTextContent(
       'A-039'
     );
@@ -503,6 +994,165 @@ describe('queue display preview', () => {
       queueNumber: 'A-039',
       counterName: 'A very long service window name that must truncate'
     });
+  });
+
+  it.each([
+    [1920, 1080, 'landscape', 'grid-cols-[minmax(0,2fr)_minmax(15rem,1fr)]'],
+    [1080, 1920, 'portrait', 'grid-rows-[minmax(0,2fr)_minmax(0,1fr)]']
+  ] as const)(
+    'uses deliberate %s×%s %s hierarchy without overflow semantics',
+    (width, height, layout, layoutClass) => {
+      render(
+        <ExperienceRenderer
+          template={queueDisplayTemplate(width, height)}
+          variantId='display'
+          runtimeContext={{
+            ...baseContext,
+            display: {
+              unitName: 'Office',
+              nowLabel: '14:32',
+              primaryCall: {
+                id: 'primary',
+                queueNumber: 'A-039',
+                counterName: 'A deliberately long counter name to truncate'
+              },
+              recentCalls: [
+                { id: 'r1', queueNumber: 'A-038', counterName: 'Window 1' },
+                { id: 'r2', queueNumber: 'A-037', counterName: 'Window 2' },
+                { id: 'r3', queueNumber: 'A-036', counterName: 'Window 3' },
+                { id: 'r4', queueNumber: 'A-035', counterName: 'Overflow' }
+              ]
+            }
+          }}
+          adapters={{}}
+        />
+      );
+
+      const calls = screen.getByTestId('queue-display-calls');
+      const hierarchy = screen.getByTestId('queue-display-call-hierarchy');
+      const primary = screen.getByTestId('primary-called-ticket');
+      const recent = screen.getByRole('list', {
+        name: 'Next and recent calls'
+      });
+      expect(calls).toHaveAttribute('data-layout', layout);
+      expect(calls).toHaveAttribute('data-profile-size', `${width}x${height}`);
+      expect(calls).toHaveClass('overflow-hidden', 'min-h-0');
+      expect(hierarchy).toHaveClass(layoutClass, 'overflow-hidden', 'min-h-0');
+      expect(primary.compareDocumentPosition(recent)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING
+      );
+      expect(screen.getAllByTestId('recent-called-ticket')).toHaveLength(3);
+      expect(screen.queryByText('Overflow')).toBeNull();
+      expect(screen.getByText(/deliberately long counter/i)).toHaveClass(
+        'truncate'
+      );
+    }
+  );
+
+  it('uses far-view, nonblocking media failure feedback', () => {
+    render(
+      <ExperienceRenderer
+        template={queueDisplayTemplate()}
+        variantId='display'
+        runtimeContext={{
+          ...baseContext,
+          live: { ...baseContext.live, mediaFailed: true }
+        }}
+        adapters={{}}
+      />
+    );
+
+    expect(screen.getByText('Media is temporarily unavailable')).toHaveClass(
+      'pointer-events-none',
+      'text-xl'
+    );
+    expect(
+      screen.getByText('Media is temporarily unavailable')
+    ).toHaveAttribute('data-viewing-distance', 'far');
+  });
+
+  it('deduplicates audio across duplicate widgets and page remounts, then announces a new call', async () => {
+    const template = queueDisplayTemplate(1920, 1080, 2);
+    const audioCall = vi.fn();
+    const adapters = { audioCall };
+    const context = (
+      id: string,
+      live: ExperienceRuntimeContext['live'] = baseContext.live
+    ): ExperienceRuntimeContext => ({
+      ...baseContext,
+      live,
+      display: {
+        unitName: 'Office',
+        nowLabel: '14:32',
+        primaryCall: { id, queueNumber: 'A-039', counterName: 'Window 03' }
+      }
+    });
+    const { rerender } = render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={context('call-1')}
+        adapters={adapters}
+      />
+    );
+    expect(audioCall).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={context('call-2', {
+          ...baseContext.live,
+          isConnected: false
+        })}
+        adapters={adapters}
+      />
+    );
+    expect(audioCall).toHaveBeenCalledTimes(1);
+    rerender(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={context('call-2')}
+        adapters={adapters}
+      />
+    );
+    await waitFor(() => expect(audioCall).toHaveBeenCalledTimes(2));
+  });
+
+  it('contains audio adapter exceptions as a bounded runtime error', async () => {
+    const onRuntimeError = vi.fn();
+    render(
+      <ExperienceRenderer
+        template={queueDisplayTemplate()}
+        variantId='display'
+        runtimeContext={{
+          ...baseContext,
+          display: {
+            unitName: 'Office',
+            nowLabel: '14:32',
+            primaryCall: {
+              id: 'call-1',
+              queueNumber: 'A-039',
+              counterName: 'Window 03'
+            }
+          }
+        }}
+        adapters={{
+          audioCall: () => {
+            throw new Error('speaker details must stay private');
+          },
+          onRuntimeError
+        }}
+      />
+    );
+
+    await waitFor(() =>
+      expect(onRuntimeError).toHaveBeenCalledWith({
+        code: 'adapter-failed',
+        adapter: 'audioCall'
+      })
+    );
   });
 
   it('announces a call once per call id across ordinary rerenders', () => {

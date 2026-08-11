@@ -76,7 +76,8 @@
           },
           "stale-offline": {
             "title": "Data is temporarily not updating",
-            "description": "The last available queue state is no longer current."
+            "description": "The last available queue state is no longer current.",
+            "staleAge": "Last successful update was {minutes} minutes ago."
           },
           "closed": {
             "title": "This location is closed",
