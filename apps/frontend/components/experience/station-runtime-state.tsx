@@ -19,11 +19,13 @@ const labels: Record<StationRuntimeState, string> = {
 export function StationRuntimeStateView({
   state,
   children,
-  onReset
+  onReset,
+  onContinue
 }: {
   state: StationRuntimeState;
   children?: ReactNode;
   onReset?: () => void;
+  onContinue?: () => void;
 }) {
   if (state === 'active') return <>{children}</>;
 
@@ -37,6 +39,15 @@ export function StationRuntimeStateView({
       <h1 className='text-3xl font-bold'>{labels[state]}</h1>
       {state === 'timeout-warning' ? (
         <p className='text-lg'>Tap to continue or start over.</p>
+      ) : null}
+      {onContinue && state === 'timeout-warning' ? (
+        <button
+          type='button'
+          className='bg-primary text-primary-foreground min-h-14 rounded-lg px-6 font-semibold'
+          onClick={onContinue}
+        >
+          Continue
+        </button>
       ) : null}
       {onReset && state !== 'submitting' && state !== 'success-printing' ? (
         <button
