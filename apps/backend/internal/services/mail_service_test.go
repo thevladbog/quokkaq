@@ -6,6 +6,7 @@ import (
 )
 
 func TestNewMailService_InsecureSkipVerifyWhenEnvTrue(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("SMTP_HOST", "127.0.0.1")
 	t.Setenv("SMTP_PORT", "587")
 	t.Setenv("SMTP_USER", "u")
@@ -44,5 +45,24 @@ func TestNewMailService_NoInsecureSkipVerifyWithoutEnv(t *testing.T) {
 	}
 	if ms.dialer.TLSConfig != nil && ms.dialer.TLSConfig.InsecureSkipVerify {
 		t.Fatal("did not expect InsecureSkipVerify without SMTP_TLS_INSECURE_SKIP_VERIFY")
+	}
+}
+
+func TestNewMailService_ProductionNeverSkipsCertificateVerification(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("SMTP_HOST", "127.0.0.1")
+	t.Setenv("SMTP_PORT", "587")
+	t.Setenv("SMTP_USER", "u")
+	t.Setenv("SMTP_PASS", "p")
+	t.Setenv("SMTP_FROM", "f@example.com")
+	t.Setenv("SMTP_SECURE", "false")
+	t.Setenv("SMTP_TLS_INSECURE_SKIP_VERIFY", "true")
+
+	ms, ok := NewMailService().(*mailService)
+	if !ok || ms.dialer == nil {
+		t.Fatal("expected configured mail dialer")
+	}
+	if ms.dialer.TLSConfig != nil && ms.dialer.TLSConfig.InsecureSkipVerify {
+		t.Fatal("production must not disable TLS certificate verification")
 	}
 }

@@ -5,9 +5,11 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"os"
-	"quokkaq-go-backend/internal/logger"
 	"strconv"
 	"strings"
+
+	"quokkaq-go-backend/internal/config"
+	"quokkaq-go-backend/internal/logger"
 
 	"gopkg.in/gomail.v2"
 )
@@ -50,7 +52,7 @@ func NewMailService() MailService {
 	}
 
 	// Only for dev/self-signed SMTP; never enable in production without understanding the risk.
-	if os.Getenv("SMTP_TLS_INSECURE_SKIP_VERIFY") == "true" {
+	if config.AllowsInsecureDevTLS() && os.Getenv("SMTP_TLS_INSECURE_SKIP_VERIFY") == "true" {
 		if d.TLSConfig == nil {
 			d.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 		}

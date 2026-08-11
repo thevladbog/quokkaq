@@ -10,6 +10,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"quokkaq-go-backend/internal/config"
 )
 
 // EncryptAES256GCM encrypts plaintext using AES-256-GCM. Key is derived from SSO_SECRETS_ENCRYPTION_KEY
@@ -63,14 +65,12 @@ func DecryptAES256GCM(encoded string) ([]byte, error) {
 func loadKey() ([]byte, error) {
 	s := strings.TrimSpace(os.Getenv("SSO_SECRETS_ENCRYPTION_KEY"))
 	if s == "" {
-		// Dev fallback: derive from JWT_SECRET so local SSO config works without extra key.
-		s = strings.TrimSpace(os.Getenv("JWT_SECRET"))
-		if s == "" {
-			app := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
-			if app == "production" {
-				return nil, errors.New("SSO_SECRETS_ENCRYPTION_KEY or JWT_SECRET must be set when APP_ENV=production")
-			}
-			s = "default_secret_please_change"
+		// Dev fallback derives from the same explicitly configured JWT secret;
+		// there is intentionally no predictable default.
+		var err error
+		s, err = config.JWTSecret()
+		if err != nil {
+			return nil, errors.New("SSO_SECRETS_ENCRYPTION_KEY or a strong JWT_SECRET must be configured")
 		}
 	}
 	if len(s) == 32 {

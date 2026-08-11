@@ -32,6 +32,8 @@ type DesktopTerminalRepository interface {
 	// read to restore a concurrently revoked terminal.
 	TouchLastSeen(ctx context.Context, terminalID string) error
 	FindByPairingCodeDigest(digest string) (*models.DesktopTerminal, error)
+	// RewritePairingCodeDigest atomically upgrades a legacy digest without saving a stale terminal row.
+	RewritePairingCodeDigest(terminalID, digest string) error
 	Update(t *models.DesktopTerminal) error
 }
 
@@ -216,6 +218,19 @@ func (r *desktopTerminalRepository) FindByPairingCodeDigest(digest string) (*mod
 		return nil, err
 	}
 	return &t, nil
+}
+
+func (r *desktopTerminalRepository) RewritePairingCodeDigest(terminalID, digest string) error {
+	result := r.db.Model(&models.DesktopTerminal{}).
+		Where("id = ? AND revoked_at IS NULL", strings.TrimSpace(terminalID)).
+		Update("pairing_code_digest", digest)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *desktopTerminalRepository) Update(t *models.DesktopTerminal) error {

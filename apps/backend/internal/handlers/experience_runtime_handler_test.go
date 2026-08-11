@@ -229,13 +229,13 @@ func TestExperienceRuntimeHandler_AcknowledgementRequestIsStrictAndTerminalOnly(
 }
 
 func TestRegisterTerminalExperienceRoutes_UsesOnlyTerminalJWTAuthentication(t *testing.T) {
-	t.Setenv("JWT_SECRET", "terminal-runtime-route-test")
+	t.Setenv("JWT_SECRET", "terminal-runtime-route-test-secret-012345")
 	svc := &runtimeManifestService{manifest: &services.TerminalExperienceManifest{Mode: services.TerminalExperienceModeLegacy}}
 	router := chi.NewRouter()
 	RegisterTerminalExperienceRoutes(router, NewExperienceRuntimeHandler(svc))
 
 	claims := jwt.MapClaims{"sub": "terminal-authenticated", "typ": "terminal", "unit_id": "unit-a"}
-	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte("terminal-runtime-route-test"))
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte("terminal-runtime-route-test-secret-012345"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +248,7 @@ func TestRegisterTerminalExperienceRoutes_UsesOnlyTerminalJWTAuthentication(t *t
 	if recorder.Code != http.StatusOK || len(svc.terminalIDs) != 1 || svc.terminalIDs[0] != "terminal-authenticated" {
 		t.Fatalf("status=%d terminalIDs=%v body=%s", recorder.Code, svc.terminalIDs, recorder.Body.String())
 	}
-	secondToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"sub": "terminal-second", "typ": "terminal", "unit_id": "unit-b"}).SignedString([]byte("terminal-runtime-route-test"))
+	secondToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"sub": "terminal-second", "typ": "terminal", "unit_id": "unit-b"}).SignedString([]byte("terminal-runtime-route-test-secret-012345"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +259,7 @@ func TestRegisterTerminalExperienceRoutes_UsesOnlyTerminalJWTAuthentication(t *t
 	if secondRecorder.Code != http.StatusOK || len(svc.terminalIDs) != 2 || svc.terminalIDs[1] != "terminal-second" {
 		t.Fatalf("second status=%d terminalIDs=%v body=%s", secondRecorder.Code, svc.terminalIDs, secondRecorder.Body.String())
 	}
-	userToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"sub": "staff-user", "typ": "access"}).SignedString([]byte("terminal-runtime-route-test"))
+	userToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"sub": "staff-user", "typ": "access"}).SignedString([]byte("terminal-runtime-route-test-secret-012345"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +273,7 @@ func TestRegisterTerminalExperienceRoutes_UsesOnlyTerminalJWTAuthentication(t *t
 }
 
 func TestRegisterTerminalExperienceRoutes_SetsNoStoreBeforeTerminalAuthentication(t *testing.T) {
-	t.Setenv("JWT_SECRET", "terminal-runtime-cache-route-test")
+	t.Setenv("JWT_SECRET", "terminal-runtime-cache-route-test-secret-012345")
 	svc := &runtimeManifestService{manifest: &services.TerminalExperienceManifest{Mode: services.TerminalExperienceModeLegacy}}
 	router := chi.NewRouter()
 	router.Get("/unrelated", func(w http.ResponseWriter, r *http.Request) {
@@ -283,7 +283,7 @@ func TestRegisterTerminalExperienceRoutes_SetsNoStoreBeforeTerminalAuthenticatio
 
 	sign := func(t *testing.T, claims jwt.MapClaims) string {
 		t.Helper()
-		token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte("terminal-runtime-cache-route-test"))
+		token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte("terminal-runtime-cache-route-test-secret-012345"))
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -21,10 +21,9 @@ The application uses JWT (JSON Web Tokens) for authentication. The JWT secret is
 
 ### Security Risk
 
-If `JWT_SECRET` is not set, the code falls back to:
-```go
-secret = "default_secret_please_change"  // ❌ INSECURE!
-```
+If `JWT_SECRET` is missing or shorter than 32 characters, the API refuses to start.
+There is no predictable fallback: this is intentional because a fallback would allow
+anyone who knows the source code to forge authentication and terminal tokens.
 
 **This allows anyone to:**
 - Generate valid tokens
@@ -196,17 +195,14 @@ Before deploying to production:
 - Check token expiry time
 - Clear tokens and re-login
 
-### Fallback to default secret
+### "Security configuration: JWT_SECRET must be configured"
 
-**Symptom:**
-```
-Using default JWT secret - CHANGE THIS IN PRODUCTION!
-```
+Set a random value of at least 32 characters in `.env` or `.env.prod`, then restart
+the backend. Verify the variable is present without printing its value:
 
-**Solution:**
-1. Set `JWT_SECRET` in `.env` or `.env.prod`
-2. Restart application
-3. Verify with `docker compose exec backend env | grep JWT_SECRET`
+```bash
+docker compose exec backend sh -c 'test -n "$JWT_SECRET" && test "${#JWT_SECRET}" -ge 32'
+```
 
 ---
 

@@ -62,6 +62,9 @@ func main() {
 
 func run() error {
 	config.Load()
+	if err := config.ValidateSecurityEnv(); err != nil {
+		return fmt.Errorf("security configuration: %w", err)
+	}
 	logger.Init()
 	if err := database.Connect(); err != nil {
 		return err
