@@ -54,8 +54,6 @@ describe('createStationPrintLifecycle', () => {
     lifecycle.reset();
 
     expect(lifecycle.getState()).toBe('active');
-    await expect(
-      lifecycle.retry()
-    ).resolves.toBe('failed');
+    await expect(lifecycle.retry()).resolves.toBe('failed');
   });
 });

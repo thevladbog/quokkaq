@@ -617,7 +617,8 @@ export function ExperienceRenderer({
             display={runtimeContext.display}
             profile={variant.profile}
           />
-          {operational.state === 'normal' && effectiveStationState !== 'active' ? (
+          {operational.state === 'normal' &&
+          effectiveStationState !== 'active' ? (
             <StationRuntimeStateView
               state={effectiveStationState}
               onContinue={continueSession}

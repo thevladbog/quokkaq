@@ -10,9 +10,7 @@ export type StationPrintTicket = {
   visitorToken?: string;
 };
 
-export type StationPrintAdapter = (
-  ticket: StationPrintTicket
-) => Promise<void>;
+export type StationPrintAdapter = (ticket: StationPrintTicket) => Promise<void>;
 
 export type StationPrintLifecycle = {
   getState: () => StationRuntimeState;
@@ -38,7 +36,9 @@ export function createStationPrintLifecycle({
   let ticket: StationPrintTicket | undefined;
   let inFlight = false;
 
-  const setState = (event: Parameters<typeof transitionStationRuntimeState>[1]) => {
+  const setState = (
+    event: Parameters<typeof transitionStationRuntimeState>[1]
+  ) => {
     const transition = transitionStationRuntimeState(state, event);
     if (!transition.ok) return false;
     state = transition.state;
