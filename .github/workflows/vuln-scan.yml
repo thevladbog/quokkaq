@@ -90,5 +90,5 @@ jobs:
       - name: Run govulncheck
         working-directory: apps/backend
         env:
-          GOTOOLCHAIN: go1.26.2
+          GOTOOLCHAIN: go1.26.5
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
