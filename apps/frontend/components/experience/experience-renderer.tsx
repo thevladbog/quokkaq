@@ -17,6 +17,9 @@ import {
 } from '@/lib/experience/operational-state';
 import { ExperienceOperationalOverlay } from './experience-operational-overlay';
 import { ExperienceRuntimeShell } from './experience-runtime-shell';
+import { StationRuntimeStateView } from './station-runtime-state';
+import type { StationRuntimeState } from '@/lib/experience/station-runtime-state';
+import { useKioskSessionIdle } from '@/hooks/use-kiosk-session-idle';
 import {
   ExperienceWidgetDiagnostic,
   ExperienceWidgetRegistry,
@@ -171,6 +174,12 @@ export type ExperienceRendererProps = {
   adapters: ExperienceRuntimeAdapters;
   initialPageId?: string;
   sessionTimeoutMs?: number;
+  sessionIdle?: {
+    beforeWarningSec: number;
+    countdownSec: number;
+  };
+  stationState?: StationRuntimeState;
+  onStationReset?: () => void;
   mode?: 'editor' | 'preview' | 'deployed';
 };
 
@@ -217,6 +226,9 @@ export function ExperienceRenderer({
   adapters,
   initialPageId,
   sessionTimeoutMs,
+  sessionIdle,
+  stationState = 'active',
+  onStationReset,
   mode = 'deployed'
 }: ExperienceRendererProps) {
   const t = useTranslations('experience.runtime.task12');
@@ -265,6 +277,18 @@ export function ExperienceRenderer({
     markActivity();
   }, [commitRuntime, createSession, markActivity, template.startPageId]);
 
+  const idle = useKioskSessionIdle({
+    enabled: stationState === 'active' && sessionIdle !== undefined,
+    beforeWarningSec: sessionIdle?.beforeWarningSec ?? 0,
+    countdownSec: sessionIdle?.countdownSec ?? 0,
+    onSessionEnd: reset
+  });
+  const { continueSession, showWarning } = idle;
+  const resetStation = useCallback(() => {
+    if (showWarning) continueSession();
+    (onStationReset ?? reset)();
+  }, [continueSession, onStationReset, reset, showWarning]);
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -275,16 +299,19 @@ export function ExperienceRenderer({
   }, []);
 
   useEffect(() => {
-    if (!sessionTimeoutMs || sessionTimeoutMs <= 0) return;
+    if (sessionIdle || !sessionTimeoutMs || sessionTimeoutMs <= 0) return;
     const timer = window.setTimeout(reset, sessionTimeoutMs);
     return () => window.clearTimeout(timer);
-  }, [activityEpoch, reset, sessionTimeoutMs]);
+  }, [activityEpoch, reset, sessionIdle, sessionTimeoutMs]);
 
   const page = template.pages.find(
     (candidate) => candidate.id === runtime.pageId
   );
   const liveSnapshot = normalizeExperienceLiveSnapshot(runtimeContext);
   const operational = resolveOperationalState(liveSnapshot);
+  const effectiveStationState: StationRuntimeState = showWarning
+    ? 'timeout-warning'
+    : stationState;
   const reportRuntimeError = adapters.onRuntimeError;
   const audioAnnouncer = audioAnnouncerFor(template.id, adapters);
 
@@ -584,11 +611,21 @@ export function ExperienceRenderer({
       }}
       onReset={reset}
       overlay={
-        <ExperienceOperationalOverlay
-          resolved={operational}
-          display={runtimeContext.display}
-          profile={variant.profile}
-        />
+        <>
+          <ExperienceOperationalOverlay
+            resolved={operational}
+            display={runtimeContext.display}
+            profile={variant.profile}
+          />
+          {operational.state === 'normal' &&
+          effectiveStationState !== 'active' ? (
+            <StationRuntimeStateView
+              state={effectiveStationState}
+              onContinue={continueSession}
+              onReset={resetStation}
+            />
+          ) : null}
+        </>
       }
       renderWidget={(widget) => {
         if (operational.state !== 'normal') return null;

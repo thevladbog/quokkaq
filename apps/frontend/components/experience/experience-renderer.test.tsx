@@ -4,14 +4,20 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor
+  waitFor,
+  within
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ExperienceTemplate } from '@quokkaq/shared-types';
 
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string, values?: Record<string, unknown>) =>
-    String(values?.default ?? key)
+  useTranslations: () => (key: string, values?: Record<string, unknown>) => {
+    const translations: Record<string, string> = {
+      'stationRuntime.actions.continue': 'Continue',
+      'stationRuntime.actions.startOver': 'Start over'
+    };
+    return String(values?.default ?? translations[key] ?? key);
+  }
 }));
 
 import {
@@ -287,6 +293,53 @@ describe('ExperienceRenderer session and navigation', () => {
       'session-2'
     );
     expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it('shows an idle warning and can continue the current station session', () => {
+    vi.useFakeTimers();
+    render(
+      <ExperienceRenderer
+        template={navigationTemplate()}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{}}
+        sessionIdle={{ beforeWarningSec: 5, countdownSec: 10 }}
+      />
+    );
+
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(screen.getByTestId('station-runtime-state')).toHaveAttribute(
+      'data-state',
+      'timeout-warning'
+    );
+
+    fireEvent.click(
+      within(screen.getByTestId('station-runtime-state')).getByRole('button', {
+        name: 'Continue'
+      })
+    );
+    expect(screen.queryByTestId('station-runtime-state')).toBeNull();
+  });
+
+  it('closes the idle warning before delegating a custom station reset', () => {
+    vi.useFakeTimers();
+    const onStationReset = vi.fn();
+    render(
+      <ExperienceRenderer
+        template={navigationTemplate()}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{}}
+        sessionIdle={{ beforeWarningSec: 5, countdownSec: 10 }}
+        onStationReset={onStationReset}
+      />
+    );
+
+    act(() => vi.advanceTimersByTime(5_000));
+    fireEvent.click(screen.getByRole('button', { name: 'Start over' }));
+
+    expect(onStationReset).toHaveBeenCalledOnce();
+    expect(screen.queryByTestId('station-runtime-state')).toBeNull();
   });
 
   it('rejects an unknown action before applying later actions', async () => {

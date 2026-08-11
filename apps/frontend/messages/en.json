@@ -53,6 +53,24 @@
           "home": "Home",
           "reset": "Reset session"
         },
+        "stationRuntime": {
+          "states": {
+            "attract": "Ready to begin",
+            "active": "",
+            "submitting": "Creating your ticket…",
+            "successPrinting": "Printing your ticket…",
+            "success": "Your ticket is ready",
+            "printFailed": "Ticket created — printing needs attention",
+            "offline": "Connection unavailable",
+            "temporarilyUnavailable": "Temporarily unavailable",
+            "timeoutWarning": "Are you still there?"
+          },
+          "timeoutDescription": "Tap to continue or start over.",
+          "actions": {
+            "continue": "Continue",
+            "startOver": "Start over"
+          }
+        },
         "rejected": "This experience cannot run safely.",
         "pageUnavailable": "This page is not available.",
         "mediaFailure": "Media is temporarily unavailable",
