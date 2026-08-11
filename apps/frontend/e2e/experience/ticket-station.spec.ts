@@ -1,10 +1,28 @@
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-test.describe('ticket-station physical/runtime matrix', () => {
-  test('is reserved for a paired deterministic station fixture', async () => {
-    test.fixme(
-      true,
-      'requires implemented fixture setup and physical/runtime assertions; acceptance is run separately'
+import { installTicketStationApiFixtures } from './support';
+
+test.describe('ticket-station browser acceptance', () => {
+  test('renders the assigned service picker on the kiosk route', async ({
+    page
+  }) => {
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await installTicketStationApiFixtures(page);
+    await page.goto('/en/kiosk/kiosk-unit');
+
+    await expect(page.getByTestId('service-picker')).toBeVisible();
+    await expect(page.getByTestId('service-picker-option')).toContainText(
+      'General service'
     );
+    await expect(page.getByTestId('service-picker')).toHaveAttribute(
+      'data-layout',
+      'portrait'
+    );
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(820);
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollHeight))
+      .toBeLessThanOrEqual(1180);
   });
 });

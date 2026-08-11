@@ -284,7 +284,155 @@ export async function installQueueDisplayApiFixtures(
       });
     }
   );
+  await installQueueDisplayApiFixturesTail(page);
+}
 
+export const ticketStationTemplate: ExperienceTemplate = {
+  schemaVersion: 1,
+  id: 'e2e-ticket-station-experience',
+  surface: 'ticket-station',
+  startPageId: 'start',
+  variants: [
+    {
+      id: 'portrait',
+      profile: {
+        id: 'e2e-station-portrait',
+        name: 'Station portrait',
+        width: 820,
+        height: 1180,
+        interactionMode: 'touch',
+        viewingDistance: 'near',
+        safeArea: { top: 24, right: 24, bottom: 24, left: 24 }
+      },
+      grid: { columns: 12, rows: 18 }
+    }
+  ],
+  pages: [
+    {
+      id: 'start',
+      name: 'Start',
+      widgets: [
+        {
+          id: 'service-picker',
+          type: 'service-picker',
+          config: {
+            catalog: {
+              services: [{ id: 'service-1', label: 'General service' }]
+            }
+          },
+          actions: []
+        }
+      ],
+      layouts: {
+        portrait: {
+          placements: {
+            'service-picker': { col: 1, row: 1, colSpan: 12, rowSpan: 18 }
+          }
+        }
+      }
+    }
+  ]
+};
+
+export async function installTicketStationApiFixtures(page: Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'quokkaq_ticket_station_token:kiosk-unit',
+      'e2e-terminal-token'
+    );
+    localStorage.setItem('quokkaq_ticket_station_locale:kiosk-unit', 'en');
+  });
+
+  await page.route('**/api/system/status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ initialized: true })
+    });
+  });
+  await page.route('**/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'e2e-user',
+        name: 'E2E Admin',
+        email: 'e2e@example.test',
+        isActive: true,
+        roles: ['admin'],
+        unitIds: []
+      })
+    });
+  });
+  await page.route('**/units/kiosk-unit', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'kiosk-unit',
+        name: 'Kiosk station',
+        nameEn: 'Kiosk station',
+        code: 'KIOSK',
+        companyId: 'e2e-company',
+        kind: 'subdivision',
+        timezone: 'Europe/Moscow',
+        config: { kiosk: {} }
+      })
+    });
+  });
+  await page.route('**/units/kiosk-unit/services-tree', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 'service-1',
+          unitId: 'kiosk-unit',
+          name: 'General service',
+          isLeaf: true,
+          identificationMode: 'none'
+        }
+      ])
+    });
+  });
+  await page.route('**/units/kiosk-unit/active-playlist', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ source: 'none' })
+    });
+  });
+  await page.route('**/units/kiosk-unit/materials', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '[]'
+    });
+  });
+  await page.route('**/units/kiosk-unit/kiosk-telemetry', async (route) => {
+    await route.fulfill({ status: 204 });
+  });
+  await page.route('**/terminal/experience', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        mode: 'experience',
+        templateId: ticketStationTemplate.id,
+        versionId: 'e2e-station-version-1',
+        version: 1,
+        variantId: 'portrait',
+        definition: ticketStationTemplate,
+        publishedAt: '2026-01-01T00:00:00Z'
+      })
+    });
+  });
+  await page.route('**/terminal/experience/ack', async (route) => {
+    await route.fulfill({ status: 204 });
+  });
+}
+
+async function installQueueDisplayApiFixturesTail(page: Page) {
   await page.route('**/units/queue-unit', async (route) => {
     await route.fulfill({
       status: 200,
