@@ -39,6 +39,16 @@ export type ExperienceRuntimeContext = Omit<ConditionContext, 'live'> & {
   live?: ExperienceLiveSnapshot;
   display?: QueueDisplayRuntimeData;
   prefersReducedMotion?: boolean;
+  /** @deprecated Use `live`. */
+  operational?: OperationalStateInput;
+  /** @deprecated Use `live.isConnected`. */
+  connected?: boolean;
+  /** @deprecated Use `live.isOpen`. */
+  open?: boolean;
+  /** @deprecated Use `live.isConnected`. */
+  isConnected?: boolean;
+  /** @deprecated Use `live.isOpen`. */
+  isOpen?: boolean;
 };
 
 export type ExperienceRuntimeError =
@@ -70,8 +80,76 @@ export type ExperienceRuntimeAdapters = {
   submitTicket?: (session: ExperienceRuntimeSession) => void | Promise<void>;
   printTicket?: (session: ExperienceRuntimeSession) => void | Promise<void>;
   audioCall?: (ticket: QueueDisplayCall) => void | Promise<void>;
+  audioAnnouncer?: ExperienceAudioAnnouncer;
   onRuntimeError?: (error: ExperienceRuntimeError) => void;
 };
+
+export type ExperienceAudioAnnouncementResult =
+  | 'announced'
+  | 'duplicate'
+  | 'failed';
+
+export type ExperienceAudioAnnouncer = {
+  announce: (
+    call: QueueDisplayCall,
+    audioCall: NonNullable<ExperienceRuntimeAdapters['audioCall']>
+  ) => Promise<ExperienceAudioAnnouncementResult>;
+};
+
+export function createExperienceAudioAnnouncer(): ExperienceAudioAnnouncer {
+  const announcedCallIds = new Set<string>();
+  const inFlightCallIds = new Set<string>();
+  return {
+    async announce(call, audioCall) {
+      if (announcedCallIds.has(call.id) || inFlightCallIds.has(call.id)) {
+        return 'duplicate';
+      }
+      inFlightCallIds.add(call.id);
+      try {
+        await audioCall(call);
+        announcedCallIds.add(call.id);
+        return 'announced';
+      } catch {
+        return 'failed';
+      } finally {
+        inFlightCallIds.delete(call.id);
+      }
+    }
+  };
+}
+
+const defaultAudioAnnouncers = new WeakMap<
+  ExperienceRuntimeAdapters,
+  ExperienceAudioAnnouncer
+>();
+
+function audioAnnouncerFor(
+  adapters: ExperienceRuntimeAdapters
+): ExperienceAudioAnnouncer {
+  if (adapters.audioAnnouncer) return adapters.audioAnnouncer;
+  const existing = defaultAudioAnnouncers.get(adapters);
+  if (existing) return existing;
+  const created = createExperienceAudioAnnouncer();
+  defaultAudioAnnouncers.set(adapters, created);
+  return created;
+}
+
+export function normalizeExperienceLiveSnapshot(
+  context: ExperienceRuntimeContext
+): ExperienceLiveSnapshot {
+  return {
+    ...(context.operational ?? {}),
+    ...(context.connected !== undefined
+      ? { isConnected: context.connected }
+      : {}),
+    ...(context.open !== undefined ? { isOpen: context.open } : {}),
+    ...(context.isConnected !== undefined
+      ? { isConnected: context.isConnected }
+      : {}),
+    ...(context.isOpen !== undefined ? { isOpen: context.isOpen } : {}),
+    ...(context.live ?? {})
+  };
+}
 
 export type ExperienceRendererProps = {
   template: ExperienceTemplate;
@@ -155,7 +233,6 @@ export function ExperienceRenderer({
   const mountedRef = useRef(false);
   const generationRef = useRef(0);
   const inFlightRef = useRef(false);
-  const lastAnnouncedCallIdRef = useRef<string | null>(null);
   const [activityEpoch, setActivityEpoch] = useState(0);
   const commitRuntime = useCallback((next: RuntimeState) => {
     runtimeRef.current = next;
@@ -193,8 +270,10 @@ export function ExperienceRenderer({
   const page = template.pages.find(
     (candidate) => candidate.id === runtime.pageId
   );
-  const operational = resolveOperationalState(runtimeContext.live ?? {});
+  const liveSnapshot = normalizeExperienceLiveSnapshot(runtimeContext);
+  const operational = resolveOperationalState(liveSnapshot);
   const reportRuntimeError = adapters.onRuntimeError;
+  const audioAnnouncer = audioAnnouncerFor(adapters);
 
   useEffect(() => {
     const primaryCall = runtimeContext.display?.primaryCall;
@@ -203,15 +282,18 @@ export function ExperienceRenderer({
       !primaryCall ||
       !audioCall ||
       operational.state !== 'normal' ||
-      runtimeContext.live?.isConnected === false ||
-      lastAnnouncedCallIdRef.current === primaryCall.id
+      liveSnapshot.isConnected === false
     ) {
       return;
     }
-    lastAnnouncedCallIdRef.current = primaryCall.id;
     void (async () => {
       try {
-        await audioCall(primaryCall);
+        const result = await audioAnnouncer.announce(primaryCall, audioCall);
+        if (result !== 'failed' || !mountedRef.current) return;
+        reportRuntimeError?.({
+          code: 'adapter-failed',
+          adapter: 'audioCall'
+        });
       } catch {
         if (mountedRef.current) {
           reportRuntimeError?.({
@@ -223,16 +305,17 @@ export function ExperienceRenderer({
     })();
   }, [
     adapters.audioCall,
+    audioAnnouncer,
+    liveSnapshot.isConnected,
     operational.state,
     reportRuntimeError,
-    runtimeContext.display?.primaryCall,
-    runtimeContext.live?.isConnected
+    runtimeContext.display?.primaryCall
   ]);
 
   const conditionContext = useMemo<ConditionContext>(
     () => ({
       identity: runtimeContext.identity,
-      live: runtimeContext.live,
+      live: liveSnapshot,
       session: {
         ...runtimeContext.session,
         selectedServiceId:
@@ -243,8 +326,8 @@ export function ExperienceRenderer({
     }),
     [
       runtimeContext.identity,
-      runtimeContext.live,
       runtimeContext.session,
+      liveSnapshot,
       runtime.session.values.selectedServiceId
     ]
   );
@@ -356,13 +439,13 @@ export function ExperienceRenderer({
     event: ExperienceActivationEvent
   ) => {
     if (inFlightRef.current) return;
-    markActivity();
     const preflightError = preflightActions(widget, event);
     if (preflightError) {
       adapters.onRuntimeError?.(preflightError);
       return;
     }
 
+    markActivity();
     inFlightRef.current = true;
     const generation = generationRef.current;
     let working: RuntimeState = {

@@ -16,6 +16,7 @@ vi.mock('next-intl', () => ({
 
 import {
   ExperienceRenderer,
+  createExperienceAudioAnnouncer,
   resolveExperienceActivationValue,
   type ExperienceRuntimeAdapters,
   type ExperienceActivationEvent,
@@ -682,6 +683,73 @@ describe('ExperienceRenderer session and navigation', () => {
 });
 
 describe('ExperienceRenderer registry and operational overrides', () => {
+  it('renders configured service and category options and applies the selected service before navigation', async () => {
+    const template = navigationTemplate();
+    const submitTicket = vi.fn();
+    template.pages[0]!.widgets[0] = {
+      id: 'service-picker',
+      type: 'service-picker',
+      config: {
+        catalog: {
+          services: [
+            { id: 'service-7', label: 'Passport services', categoryId: 'docs' },
+            { id: 'service-8', label: 'Visa services', categoryId: 'travel' }
+          ],
+          categories: [{ id: 'docs', label: 'Documents' }]
+        }
+      },
+      actions: [
+        {
+          type: 'set-session',
+          key: 'selectedServiceId',
+          value: { source: 'event', field: 'serviceId' }
+        },
+        {
+          type: 'set-session',
+          key: 'selectedCategoryId',
+          value: { source: 'event', field: 'categoryId' }
+        },
+        { type: 'submit-ticket' },
+        { type: 'navigate', toPageId: 'details' }
+      ]
+    };
+    template.pages[0]!.layouts.display!.placements = {
+      'service-picker': { col: 1, row: 1, colSpan: 8, rowSpan: 4 }
+    };
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{ submitTicket }}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Passport services' })
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Visa services' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Documents' })).toBeVisible();
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Passport services' })
+      );
+    });
+
+    expect(submitTicket).toHaveBeenCalledWith(
+      expect.objectContaining({
+        values: expect.objectContaining({ selectedServiceId: 'service-7' })
+      })
+    );
+    expect(submitTicket).toHaveBeenCalledWith(
+      expect.objectContaining({
+        values: expect.objectContaining({ selectedCategoryId: 'docs' })
+      })
+    );
+    expect(screen.getByText('Details content')).toBeVisible();
+  });
+
   it('diagnoses unknown or unsupported widgets in preview and rejects them in deployed mode', () => {
     const template = navigationTemplate();
     template.surface = 'queue-display';
@@ -1118,6 +1186,114 @@ describe('queue display preview', () => {
       />
     );
     await waitFor(() => expect(audioCall).toHaveBeenCalledTimes(2));
+  });
+
+  it('deduplicates audio across a true remount when the runtime-owned announcer is shared', async () => {
+    const audioCall = vi.fn();
+    const audioAnnouncer = createExperienceAudioAnnouncer();
+    const adapters = { audioCall, audioAnnouncer };
+    const template = queueDisplayTemplate();
+    const context: ExperienceRuntimeContext = {
+      ...baseContext,
+      display: {
+        unitName: 'Office',
+        nowLabel: '14:32',
+        primaryCall: {
+          id: 'call-remount',
+          queueNumber: 'A-040',
+          counterName: 'Window 04'
+        }
+      }
+    };
+    const first = render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={context}
+        adapters={adapters}
+      />
+    );
+    expect(audioCall).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={context}
+        adapters={adapters}
+      />
+    );
+    expect(audioCall).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a failed audio announcement after remount without permanently marking the call', async () => {
+    const audioCall = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('speaker offline'))
+      .mockResolvedValueOnce(undefined);
+    const audioAnnouncer = createExperienceAudioAnnouncer();
+    const onRuntimeError = vi.fn();
+    const adapters = { audioCall, audioAnnouncer, onRuntimeError };
+    const context: ExperienceRuntimeContext = {
+      ...baseContext,
+      display: {
+        unitName: 'Office',
+        nowLabel: '14:32',
+        primaryCall: {
+          id: 'call-retry',
+          queueNumber: 'A-041',
+          counterName: 'Window 05'
+        }
+      }
+    };
+    const first = render(
+      <ExperienceRenderer
+        template={queueDisplayTemplate()}
+        variantId='display'
+        runtimeContext={context}
+        adapters={adapters}
+      />
+    );
+    await waitFor(() =>
+      expect(onRuntimeError).toHaveBeenCalledWith({
+        code: 'adapter-failed',
+        adapter: 'audioCall'
+      })
+    );
+    first.unmount();
+
+    render(
+      <ExperienceRenderer
+        template={queueDisplayTemplate()}
+        variantId='display'
+        runtimeContext={context}
+        adapters={adapters}
+      />
+    );
+    await waitFor(() => expect(audioCall).toHaveBeenCalledTimes(2));
+  });
+
+  it('normalizes deprecated top-level operational aliases while live remains authoritative', () => {
+    const template = queueDisplayTemplate();
+    render(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={{
+          ...baseContext,
+          live: undefined,
+          operational: { isOpen: false },
+          connected: true,
+          open: false
+        }}
+        adapters={{}}
+      />
+    );
+
+    expect(
+      screen.getByTestId('experience-operational-overlay')
+    ).toHaveAttribute('data-operational-state', 'closed');
   });
 
   it('contains audio adapter exceptions as a bounded runtime error', async () => {

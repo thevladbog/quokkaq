@@ -35,6 +35,20 @@ export type QueueDisplayRuntimeData = {
   recentCalls?: QueueDisplayCall[];
 };
 
+type ExperienceServiceOption = {
+  id: string;
+  label: string;
+  categoryId?: string;
+  locale?: string;
+};
+
+type ExperienceCategoryOption = { id: string; label: string };
+
+type ServicePickerOptions = {
+  services: ExperienceServiceOption[];
+  categories: ExperienceCategoryOption[];
+};
+
 export const MAX_QUEUE_DISPLAY_RECENT_CALLS = 3;
 
 function activationEventFromWidget(
@@ -46,6 +60,121 @@ function activationEventFromWidget(
     if (typeof value === 'string') event[field] = value;
   }
   return event;
+}
+
+function nonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function safeServicePickerOptions(
+  widget: ExperienceWidget
+): ServicePickerOptions {
+  const catalog = widget.config.catalog;
+  if (
+    catalog === null ||
+    typeof catalog !== 'object' ||
+    Array.isArray(catalog)
+  ) {
+    return { services: [], categories: [] };
+  }
+  const configured = catalog as Record<string, unknown>;
+  const serviceIds = new Set<string>();
+  const services = Array.isArray(configured.services)
+    ? configured.services.slice(0, 100).flatMap((candidate) => {
+        if (candidate === null || typeof candidate !== 'object') return [];
+        const item = candidate as Record<string, unknown>;
+        const id = nonEmptyString(item.id);
+        const label = nonEmptyString(item.label);
+        if (!id || !label || serviceIds.has(id)) return [];
+        serviceIds.add(id);
+        const categoryId = nonEmptyString(item.categoryId);
+        const locale = nonEmptyString(item.locale);
+        return [
+          {
+            id,
+            label,
+            ...(categoryId ? { categoryId } : {}),
+            ...(locale ? { locale } : {})
+          }
+        ];
+      })
+    : [];
+  const categoryIds = new Set<string>();
+  const categories = Array.isArray(configured.categories)
+    ? configured.categories.slice(0, 100).flatMap((candidate) => {
+        if (candidate === null || typeof candidate !== 'object') return [];
+        const item = candidate as Record<string, unknown>;
+        const id = nonEmptyString(item.id);
+        const label = nonEmptyString(item.label);
+        if (!id || !label || categoryIds.has(id)) return [];
+        categoryIds.add(id);
+        return [{ id, label }];
+      })
+    : [];
+  return { services, categories };
+}
+
+function ServicePicker({
+  widget,
+  locked,
+  onActivate
+}: {
+  widget: ExperienceWidget;
+  locked: boolean;
+  onActivate: (event: ExperienceActivationEvent) => void;
+}) {
+  const { services, categories } = safeServicePickerOptions(widget);
+  const t = useTranslations('experience.runtime.task12');
+  if (services.length === 0 && categories.length === 0) {
+    return (
+      <div
+        data-testid='service-picker-empty'
+        className='bg-card text-card-foreground flex h-full min-h-11 items-center justify-center rounded-xl border p-5 text-center text-lg font-semibold'
+      >
+        {t('servicePicker.empty', { default: 'No services available' })}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      data-testid='service-picker'
+      className='grid h-full min-h-0 grid-cols-1 gap-3 overflow-hidden p-1 sm:grid-cols-2'
+    >
+      {categories.map((option) => (
+        <button
+          key={`category-${option.id}`}
+          type='button'
+          disabled={locked}
+          data-testid='service-picker-category'
+          onClick={() => onActivate({ categoryId: option.id })}
+          className='bg-card text-card-foreground focus-visible:ring-ring flex min-h-14 w-full items-center justify-center overflow-hidden rounded-xl border p-4 text-center text-lg font-semibold shadow-sm outline-none focus-visible:ring-2 disabled:opacity-50'
+        >
+          <span className='truncate'>{option.label}</span>
+        </button>
+      ))}
+      {services.map((option) => (
+        <button
+          key={option.id}
+          type='button'
+          disabled={locked}
+          data-testid='service-picker-option'
+          onClick={() =>
+            onActivate({
+              serviceId: option.id,
+              ...(option.categoryId ? { categoryId: option.categoryId } : {}),
+              ...(option.locale ? { locale: option.locale } : {})
+            })
+          }
+          className='bg-card text-card-foreground focus-visible:ring-ring flex min-h-14 w-full items-center justify-center overflow-hidden rounded-xl border p-4 text-center text-lg font-semibold shadow-sm outline-none focus-visible:ring-2 disabled:opacity-50'
+        >
+          <span className='truncate'>{option.label}</span>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function QueueDisplayCalls({
@@ -171,6 +300,11 @@ export function ExperienceWidgetRegistry({
   const label = String(
     widget.config.label ?? widget.config.title ?? widget.type
   );
+  if (widget.type === 'service-picker') {
+    return (
+      <ServicePicker widget={widget} locked={locked} onActivate={onActivate} />
+    );
+  }
   if (surface === 'queue-display' && widget.type === 'called-tickets') {
     return <QueueDisplayCalls context={context} profile={profile} />;
   }
