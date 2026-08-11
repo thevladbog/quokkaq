@@ -22,6 +22,8 @@ import { cn } from '@/lib/utils';
 import { ServicePickerWidget } from './widgets/service-picker-widget';
 import { RichInfoWidget } from './widgets/rich-info-widget';
 import { LanguageSwitchWidget } from './widgets/language-switch-widget';
+import { TicketFormWidget } from './widgets/ticket-form-widget';
+import { TicketSuccessWidget } from './widgets/ticket-success-widget';
 
 export function isKnownExperienceWidget(
   type: unknown
@@ -305,6 +307,29 @@ export function ExperienceWidgetRegistry({
         onChange={(locale) => onActivate({ locale })}
       />
     );
+  }
+  if (widget.type === 'ticket-form') {
+    const fields = widget.config.fields;
+    if (Array.isArray(fields)) {
+      return (
+        <TicketFormWidget
+          fields={fields as never}
+          locale='en'
+          onSubmit={() => onActivate({})}
+        />
+      );
+    }
+  }
+  if (widget.type === 'ticket-success') {
+    const success = widget.config.success;
+    if (success && typeof success === 'object' && !Array.isArray(success)) {
+      return (
+        <TicketSuccessWidget
+          success={success as never}
+          onReset={() => onActivate({})}
+        />
+      );
+    }
   }
   if (surface === 'queue-display' && widget.type === 'called-tickets') {
     return <QueueDisplayCalls context={context} profile={profile} />;

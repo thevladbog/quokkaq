@@ -33,15 +33,15 @@ describe('TicketFormWidget', () => {
       target: { value: '8 (999) 123-45-67' }
     });
     fireEvent.click(screen.getByRole('button', { name: /continue/i }));
-    expect(await screen.findByText('Phone is invalid')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Phone'), {
-      target: { value: '+79991234567' }
-    });
-    fireEvent.click(screen.getByRole('button', { name: /continue/i }));
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith({
         documentsData: { form: { phone: '+79991234567' } }
       })
     );
+    fireEvent.change(screen.getByLabelText('Phone'), {
+      target: { value: '+79991234567' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
   });
 });

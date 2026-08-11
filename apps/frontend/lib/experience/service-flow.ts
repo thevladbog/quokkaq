@@ -1,4 +1,8 @@
-import type { ExperienceFlowPages, ServiceModel } from '@quokkaq/shared-types';
+import {
+  getKioskServiceIdentificationMode,
+  type ExperienceFlowPages,
+  type ServiceModel
+} from '@quokkaq/shared-types';
 
 export type ServiceFlowSlot = keyof ExperienceFlowPages;
 
@@ -22,11 +26,7 @@ const pageSlotForStage = {
 type ServiceFlowStage = keyof typeof pageSlotForStage;
 
 function needsIdentity(service: ServiceModel) {
-  return (
-    service.offerIdentification === true ||
-    (service.identificationMode !== undefined &&
-      service.identificationMode !== 'none')
-  );
+  return getKioskServiceIdentificationMode(service) !== 'none';
 }
 
 /**
@@ -44,12 +44,24 @@ export function resolveServiceFlow(
         ...(service.behavior?.information ? (['information'] as const) : []),
         ...(service.behavior?.fields.length ? (['fields'] as const) : []),
         ...(needsIdentity(service) ? (['identity'] as const) : []),
+        ...(service.behavior?.route?.mode === 'page-slot'
+          ? ([
+              service.behavior.route.slot === 'service-info'
+                ? 'information'
+                : service.behavior.route.slot === 'service-form'
+                  ? 'fields'
+                  : service.behavior.route.slot
+            ] as const)
+          : []),
         'confirmation',
         'success'
       ];
 
   const pageIds: string[] = [];
+  const seen = new Set<ServiceFlowStage>();
   for (const stage of stages) {
+    if (seen.has(stage)) continue;
+    seen.add(stage);
     const slot = pageSlotForStage[stage];
     const pageId = flowPages?.[slot];
     if (!pageId) {

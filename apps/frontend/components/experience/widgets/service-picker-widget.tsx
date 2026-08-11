@@ -52,18 +52,34 @@ export function ServicePickerWidget({
   onSelectCategory?: (category: ServicePickerCategory) => void;
 }) {
   const [page, setPage] = useState(0);
+  const [activeCategoryId, setActiveCategoryId] = useState<
+    string | undefined
+  >();
   const entries = useMemo(
     () => [
-      ...visibleEntries(categories, conditionContext).map((entry) => ({
-        ...entry,
-        kind: 'category' as const
-      })),
-      ...visibleEntries(services, conditionContext).map((entry) => ({
-        ...entry,
-        kind: 'service' as const
-      }))
+      ...(activeCategoryId
+        ? [{ id: '__back__', label: 'Back', kind: 'back' as const }]
+        : []),
+      ...visibleEntries(categories, conditionContext)
+        .filter(
+          (entry) => !activeCategoryId || entry.categoryId === activeCategoryId
+        )
+        .map((entry) => ({
+          ...entry,
+          kind: 'category' as const
+        })),
+      ...visibleEntries(services, conditionContext)
+        .filter((entry) =>
+          activeCategoryId
+            ? entry.categoryId === activeCategoryId
+            : !entry.categoryId
+        )
+        .map((entry) => ({
+          ...entry,
+          kind: 'service' as const
+        }))
     ],
-    [categories, conditionContext, services]
+    [activeCategoryId, categories, conditionContext, services]
   );
   const pageCount = Math.max(1, Math.ceil(entries.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
@@ -90,6 +106,21 @@ export function ServicePickerWidget({
         {entries
           .slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE)
           .map((entry) => {
+            if (entry.kind === 'back') {
+              return (
+                <button
+                  key='back'
+                  type='button'
+                  className='min-h-14 rounded-xl border px-4 text-lg font-semibold'
+                  onClick={() => {
+                    setActiveCategoryId(undefined);
+                    setPage(0);
+                  }}
+                >
+                  {entry.label}
+                </button>
+              );
+            }
             const entryLocked =
               locked ||
               Boolean(
@@ -116,8 +147,11 @@ export function ServicePickerWidget({
                     ...(entry.locale ? { locale: entry.locale } : {}),
                     ...(entry.access ? { access: entry.access } : {})
                   };
-                  if (entry.kind === 'category') onSelectCategory?.(selection);
-                  else onSelectService(selection);
+                  if (entry.kind === 'category') {
+                    setActiveCategoryId(entry.id);
+                    setPage(0);
+                    onSelectCategory?.(selection);
+                  } else onSelectService(selection);
                 }}
                 className='bg-card text-card-foreground flex min-h-14 items-center justify-center gap-2 overflow-hidden rounded-xl border px-4 text-center text-lg font-semibold disabled:opacity-50'
               >
