@@ -1,6 +1,11 @@
+import { renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { KioskCapabilityAdapter } from './kiosk-capability-adapter';
+import {
+  KioskCapabilityAdapterProvider,
+  useKioskCapabilities,
+  type KioskCapabilityAdapter
+} from './kiosk-capability-adapter';
 
 describe('KioskCapabilityAdapter', () => {
   it('keeps hardware capabilities behind an explicit portable contract', async () => {
@@ -14,5 +19,17 @@ describe('KioskCapabilityAdapter', () => {
       document: 'redacted'
     });
     expect(adapter.printTicket).toHaveBeenCalledOnce();
+  });
+
+  it('provides the adapter without exposing Tauri to generic experience code', () => {
+    const adapter: KioskCapabilityAdapter = { reset: vi.fn() };
+    const { result } = renderHook(() => useKioskCapabilities(), {
+      wrapper: ({ children }) => (
+        <KioskCapabilityAdapterProvider adapter={adapter}>
+          {children}
+        </KioskCapabilityAdapterProvider>
+      )
+    });
+    expect(result.current).toBe(adapter);
   });
 });
