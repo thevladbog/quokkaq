@@ -53,6 +53,24 @@
           "home": "Главная",
           "reset": "Сбросить сессию"
         },
+        "stationRuntime": {
+          "states": {
+            "attract": "Готовы начать",
+            "active": "",
+            "submitting": "Создаём талон…",
+            "successPrinting": "Печатаем талон…",
+            "success": "Ваш талон готов",
+            "printFailed": "Талон создан — печать требует внимания",
+            "offline": "Нет подключения",
+            "temporarilyUnavailable": "Временно недоступно",
+            "timeoutWarning": "Вы ещё здесь?"
+          },
+          "timeoutDescription": "Нажмите «Продолжить» или начните сначала.",
+          "actions": {
+            "continue": "Продолжить",
+            "startOver": "Начать сначала"
+          }
+        },
         "rejected": "Этот сценарий нельзя безопасно запустить.",
         "pageUnavailable": "Эта страница недоступна.",
         "mediaFailure": "Медиа временно недоступно",

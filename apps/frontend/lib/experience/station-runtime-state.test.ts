@@ -24,6 +24,9 @@ describe('station runtime state machine', () => {
     expect(nextStationRuntimeState('print-failed', 'print-succeeded')).toBe(
       'success'
     );
+    expect(nextStationRuntimeState('print-failed', 'print-start')).toBe(
+      'success-printing'
+    );
   });
 
   it('rejects illegal transitions instead of guessing a state', () => {

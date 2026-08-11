@@ -1,6 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => {
+    if (key.endsWith('.actions.continue')) return 'Continue';
+    if (key.endsWith('.actions.startOver')) return 'Start over';
+    return key;
+  }
+}));
+
 import { StationRuntimeStateView } from './station-runtime-state';
 
 describe('StationRuntimeStateView', () => {

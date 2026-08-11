@@ -36,6 +36,7 @@ const transitions: Record<
   },
   active: {
     submit: 'submitting',
+    'ticket-created': 'success',
     reset: 'attract',
     'go-offline': 'offline',
     unavailable: 'temporarily-unavailable',
@@ -61,6 +62,7 @@ const transitions: Record<
     timeout: 'attract'
   },
   'print-failed': {
+    'print-start': 'success-printing',
     'print-succeeded': 'success',
     reset: 'attract',
     timeout: 'attract'

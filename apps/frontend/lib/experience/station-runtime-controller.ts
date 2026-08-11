@@ -35,6 +35,7 @@ export function createStationPrintLifecycle({
   let state: StationRuntimeState = 'success';
   let ticket: StationPrintTicket | undefined;
   let inFlight = false;
+  let generation = 0;
 
   const setState = (
     event: Parameters<typeof transitionStationRuntimeState>[1]
@@ -50,12 +51,15 @@ export function createStationPrintLifecycle({
     if (!ticket) return 'failed' as const;
     if (inFlight) return 'busy' as const;
     inFlight = true;
-    setState(state === 'print-failed' ? 'print-start' : 'print-start');
+    const operationGeneration = generation;
+    setState('print-start');
     try {
       await printTicket(ticket);
+      if (generation !== operationGeneration) return 'busy' as const;
       setState('print-succeeded');
       return 'printed' as const;
     } catch {
+      if (generation !== operationGeneration) return 'busy' as const;
       setState('print-failed');
       return 'failed' as const;
     } finally {
@@ -66,16 +70,18 @@ export function createStationPrintLifecycle({
   return {
     getState: () => state,
     async print(nextTicket) {
-      if (ticket && ticket.id !== nextTicket.id) return 'busy';
+      if (ticket || inFlight) return 'busy';
       ticket = nextTicket;
+      if (state === 'active') setState('ticket-created');
       return run();
     },
     async retry() {
+      if (state !== 'print-failed') return 'busy';
       return run();
     },
     reset() {
+      generation += 1;
       ticket = undefined;
-      inFlight = false;
       state = 'active';
       onStateChange?.(state);
     }

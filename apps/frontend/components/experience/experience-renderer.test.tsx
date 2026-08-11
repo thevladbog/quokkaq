@@ -11,8 +11,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ExperienceTemplate } from '@quokkaq/shared-types';
 
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string, values?: Record<string, unknown>) =>
-    String(values?.default ?? key)
+  useTranslations: () => (key: string, values?: Record<string, unknown>) => {
+    const translations: Record<string, string> = {
+      'stationRuntime.actions.continue': 'Continue',
+      'stationRuntime.actions.startOver': 'Start over'
+    };
+    return String(values?.default ?? translations[key] ?? key);
+  }
 }));
 
 import {

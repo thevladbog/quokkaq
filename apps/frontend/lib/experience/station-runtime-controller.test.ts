@@ -54,6 +54,38 @@ describe('createStationPrintLifecycle', () => {
     lifecycle.reset();
 
     expect(lifecycle.getState()).toBe('active');
-    await expect(lifecycle.retry()).resolves.toBe('failed');
+    await expect(lifecycle.retry()).resolves.toBe('busy');
+  });
+
+  it('does not print a completed ticket twice or retry after success', async () => {
+    const printTicket = vi.fn().mockResolvedValue(undefined);
+    const lifecycle = createStationPrintLifecycle({ printTicket });
+
+    await expect(lifecycle.print(ticket)).resolves.toBe('printed');
+    await expect(lifecycle.print(ticket)).resolves.toBe('busy');
+    await expect(lifecycle.retry()).resolves.toBe('busy');
+    expect(printTicket).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the printer lease and ignores stale completion after reset', async () => {
+    let resolvePrint!: () => void;
+    const states: string[] = [];
+    const printTicket = vi.fn(
+      () => new Promise<void>((resolve) => (resolvePrint = resolve))
+    );
+    const lifecycle = createStationPrintLifecycle({
+      printTicket,
+      onStateChange: (state) => states.push(state)
+    });
+
+    const first = lifecycle.print(ticket);
+    lifecycle.reset();
+    await expect(
+      lifecycle.print({ id: 'ticket-2', queueNumber: 'B-2' })
+    ).resolves.toBe('busy');
+    resolvePrint();
+    await expect(first).resolves.toBe('busy');
+    expect(printTicket).toHaveBeenCalledOnce();
+    expect(states).toEqual(['success-printing', 'active']);
   });
 });

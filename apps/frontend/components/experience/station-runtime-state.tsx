@@ -1,19 +1,21 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 
+import { Button } from '@/components/ui/button';
 import type { StationRuntimeState } from '@/lib/experience/station-runtime-state';
 
-const labels: Record<StationRuntimeState, string> = {
-  attract: 'Ready to begin',
-  active: '',
-  submitting: 'Creating your ticket…',
-  'success-printing': 'Printing your ticket…',
-  success: 'Your ticket is ready',
-  'print-failed': 'Ticket created — printing needs attention',
-  offline: 'Connection unavailable',
-  'temporarily-unavailable': 'Temporarily unavailable',
-  'timeout-warning': 'Are you still there?'
+const labelKeys: Record<StationRuntimeState, string> = {
+  attract: 'stationRuntime.states.attract',
+  active: 'stationRuntime.states.active',
+  submitting: 'stationRuntime.states.submitting',
+  'success-printing': 'stationRuntime.states.successPrinting',
+  success: 'stationRuntime.states.success',
+  'print-failed': 'stationRuntime.states.printFailed',
+  offline: 'stationRuntime.states.offline',
+  'temporarily-unavailable': 'stationRuntime.states.temporarilyUnavailable',
+  'timeout-warning': 'stationRuntime.states.timeoutWarning'
 };
 
 export function StationRuntimeStateView({
@@ -27,6 +29,7 @@ export function StationRuntimeStateView({
   onReset?: () => void;
   onContinue?: () => void;
 }) {
+  const t = useTranslations('experience.runtime.task12');
   if (state === 'active') return <>{children}</>;
 
   return (
@@ -36,27 +39,30 @@ export function StationRuntimeStateView({
       data-state={state}
       className='flex h-full min-h-0 flex-col items-center justify-center gap-5 overflow-hidden p-8 text-center'
     >
-      <h1 className='text-3xl font-bold'>{labels[state]}</h1>
+      <h1 className='text-3xl font-bold'>{t(labelKeys[state])}</h1>
       {state === 'timeout-warning' ? (
-        <p className='text-lg'>Tap to continue or start over.</p>
+        <p className='text-lg'>{t('stationRuntime.timeoutDescription')}</p>
       ) : null}
       {onContinue && state === 'timeout-warning' ? (
-        <button
+        <Button
           type='button'
-          className='bg-primary text-primary-foreground min-h-14 rounded-lg px-6 font-semibold'
+          size='lg'
+          className='min-h-14 font-semibold'
           onClick={onContinue}
         >
-          Continue
-        </button>
+          {t('stationRuntime.actions.continue')}
+        </Button>
       ) : null}
       {onReset && state !== 'submitting' && state !== 'success-printing' ? (
-        <button
+        <Button
           type='button'
-          className='min-h-14 rounded-lg border px-6 font-semibold'
+          variant='outline'
+          size='lg'
+          className='min-h-14 font-semibold'
           onClick={onReset}
         >
-          Start over
-        </button>
+          {t('stationRuntime.actions.startOver')}
+        </Button>
       ) : null}
     </section>
   );
