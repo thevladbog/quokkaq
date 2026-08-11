@@ -540,6 +540,8 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 			errors.Is(err, services.ErrTicketCreateVisitorConflict),
 			errors.Is(err, services.ErrTicketKioskIdentifiedUserConflict),
 			errors.Is(err, services.ErrTicketKioskIdentifiedUserMode),
+			errors.Is(err, services.ErrTicketKioskServiceAccessDenied),
+			errors.Is(err, services.ErrKioskServiceAccessContextUnavailable),
 			errors.Is(err, localeutil.ErrKioskVisitorLocaleInvalid),
 			errors.Is(err, services.ErrVisitorPhoneInvalid):
 			http.Error(w, err.Error(), http.StatusBadRequest)
