@@ -48,6 +48,13 @@
         "cwd": "apps/frontend"
       }
     },
+    "e2e:experience": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright test",
+        "cwd": "apps/frontend"
+      }
+    },
     "format:check": {
       "executor": "nx:run-commands",
       "options": {

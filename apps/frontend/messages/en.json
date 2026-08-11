@@ -113,8 +113,17 @@
       }
     },
     "builder": {
+      "host": {
+        "loading": "Loading experiences…",
+        "label": "Experience templates",
+        "title": "Experiences",
+        "description": "Design reusable screen experiences for devices.",
+        "unknownSurface": "unknown surface",
+        "invalidDefinition": "This experience definition is invalid."
+      },
       "common": { "cancel": "Cancel" },
       "create": {
+        "open": "Create experience",
         "title": "Create experience",
         "description": "Choose the fixed screen role and its real device profiles.",
         "surface": "Experience surface",
