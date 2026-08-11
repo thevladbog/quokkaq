@@ -2638,8 +2638,7 @@ export default function UnitKioskPage() {
             identity: { isAuthenticated: false, isEmployee: false },
             live: {
               isOpen: !serverKioskFrozen,
-              isConnected: browserOnline,
-              queueLength: unitEtaSnapshot?.tickets?.length ?? 0
+              isConnected: browserOnline
             }
           }}
           adapters={experienceRuntimeAdapters}
