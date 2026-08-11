@@ -396,6 +396,11 @@ export interface ModelsUnit {
   config?: ModelsUnitConfig;
   counters?: ModelsCounter[];
   createdAt?: string;
+  /** ExperienceTemplateID and ExperienceVariantID opt a public unit screen
+  into the published queue-display runtime. Both fields are intentionally
+  nullable and must be set or cleared together. */
+  experienceTemplateId?: string;
+  experienceVariantId?: string;
   id?: string;
   kind?: string;
   name?: string;
@@ -1601,6 +1606,11 @@ export interface HandlersTransferRequest {
   toServiceId?: string;
   toServiceZoneId?: string;
   toUserId?: string;
+}
+
+export interface HandlersUnitExperienceAssignmentRequest {
+  templateId?: string;
+  variantId?: string;
 }
 
 export interface HandlersUnitSummaryDTO {
@@ -3386,6 +3396,18 @@ export interface ServicesTenantHintResponse {
   next?: ServicesTenantHintResponseNext;
   ssoAvailable?: boolean;
   tenantSlug?: string;
+}
+
+export type ServicesTerminalExperienceManifestDefinition = { [key: string]: unknown };
+
+export interface ServicesTerminalExperienceManifest {
+  definition?: ServicesTerminalExperienceManifestDefinition;
+  mode?: string;
+  publishedAt?: string;
+  templateId?: string;
+  variantId?: string;
+  version?: number;
+  versionId?: string;
 }
 
 export interface ServicesTicketsByServiceItem {

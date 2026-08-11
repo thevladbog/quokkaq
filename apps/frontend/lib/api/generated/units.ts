@@ -423,6 +423,11 @@ export interface ModelsUnit {
   config?: ModelsUnitConfig;
   counters?: ModelsCounter[];
   createdAt?: string;
+  /** ExperienceTemplateID and ExperienceVariantID opt a public unit screen
+  into the published queue-display runtime. Both fields are intentionally
+  nullable and must be set or cleared together. */
+  experienceTemplateId?: string;
+  experienceVariantId?: string;
   id?: string;
   kind?: string;
   name?: string;
@@ -1628,6 +1633,11 @@ export interface HandlersTransferRequest {
   toServiceId?: string;
   toServiceZoneId?: string;
   toUserId?: string;
+}
+
+export interface HandlersUnitExperienceAssignmentRequest {
+  templateId?: string;
+  variantId?: string;
 }
 
 export interface HandlersUnitSummaryDTO {
@@ -3415,6 +3425,18 @@ export interface ServicesTenantHintResponse {
   tenantSlug?: string;
 }
 
+export type ServicesTerminalExperienceManifestDefinition = { [key: string]: unknown };
+
+export interface ServicesTerminalExperienceManifest {
+  definition?: ServicesTerminalExperienceManifestDefinition;
+  mode?: string;
+  publishedAt?: string;
+  templateId?: string;
+  variantId?: string;
+  version?: number;
+  versionId?: string;
+}
+
 export interface ServicesTicketsByServiceItem {
   count?: number;
   serviceId?: string;
@@ -3547,6 +3569,21 @@ userId?: string;
  */
 serviceId?: string;
 };
+
+export type GetUnitQueueDisplayExperienceParams = {
+/**
+ * Viewport orientation
+ */
+profile?: GetUnitQueueDisplayExperienceProfile;
+};
+
+export type GetUnitQueueDisplayExperienceProfile = typeof GetUnitQueueDisplayExperienceProfile[keyof typeof GetUnitQueueDisplayExperienceProfile];
+
+
+export const GetUnitQueueDisplayExperienceProfile = {
+  portrait: 'portrait',
+  landscape: 'landscape',
+} as const;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -7575,6 +7612,249 @@ export function useListSignageAnnouncementsPublic<TData = Awaited<ReturnType<typ
 
 
 
+
+/**
+ * Returns the current immutable published queue-display experience assigned to a unit, or legacy mode when no usable assignment exists.
+ * @summary Get a unit queue-display experience manifest
+ */
+export type getUnitQueueDisplayExperienceResponse200 = {
+  data: ServicesTerminalExperienceManifest
+  status: 200
+}
+
+export type getUnitQueueDisplayExperienceResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getUnitQueueDisplayExperienceResponseSuccess = (getUnitQueueDisplayExperienceResponse200) & {
+  headers: Headers;
+};
+export type getUnitQueueDisplayExperienceResponseError = (getUnitQueueDisplayExperienceResponse500) & {
+  headers: Headers;
+};
+
+export type getUnitQueueDisplayExperienceResponse = (getUnitQueueDisplayExperienceResponseSuccess | getUnitQueueDisplayExperienceResponseError)
+
+export const getGetUnitQueueDisplayExperienceUrl = (unitId: string,
+    params?: GetUnitQueueDisplayExperienceParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/units/${unitId}/queue-display-experience?${stringifiedParams}` : `/units/${unitId}/queue-display-experience`
+}
+
+export const getUnitQueueDisplayExperience = async (unitId: string,
+    params?: GetUnitQueueDisplayExperienceParams, options?: RequestInit): Promise<getUnitQueueDisplayExperienceResponse> => {
+
+  return orvalMutator<getUnitQueueDisplayExperienceResponse>(getGetUnitQueueDisplayExperienceUrl(unitId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUnitQueueDisplayExperienceQueryKey = (unitId: string,
+    params?: GetUnitQueueDisplayExperienceParams,) => {
+    return [
+    `/units/${unitId}/queue-display-experience`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetUnitQueueDisplayExperienceQueryOptions = <TData = Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>, TError = string>(unitId: string,
+    params?: GetUnitQueueDisplayExperienceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUnitQueueDisplayExperienceQueryKey(unitId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>> = ({ signal }) => getUnitQueueDisplayExperience(unitId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetUnitQueueDisplayExperienceQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>>
+export type GetUnitQueueDisplayExperienceQueryError = string
+
+
+export function useGetUnitQueueDisplayExperience<TData = Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>, TError = string>(
+ unitId: string,
+    params: undefined |  GetUnitQueueDisplayExperienceParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitQueueDisplayExperience<TData = Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>, TError = string>(
+ unitId: string,
+    params?: GetUnitQueueDisplayExperienceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitQueueDisplayExperience<TData = Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>, TError = string>(
+ unitId: string,
+    params?: GetUnitQueueDisplayExperienceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get a unit queue-display experience manifest
+ */
+
+export function useGetUnitQueueDisplayExperience<TData = Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>, TError = string>(
+ unitId: string,
+    params?: GetUnitQueueDisplayExperienceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueDisplayExperience>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetUnitQueueDisplayExperienceQueryOptions(unitId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Assigns a published queue-display template and variant to a public unit screen, or clears the assignment when both values are null.
+ * @summary Assign a queue-display experience to a unit
+ */
+export type patchUnitQueueDisplayExperienceResponse204 = {
+  data: void
+  status: 204
+}
+
+export type patchUnitQueueDisplayExperienceResponse400 = {
+  data: string
+  status: 400
+}
+
+export type patchUnitQueueDisplayExperienceResponse403 = {
+  data: string
+  status: 403
+}
+
+export type patchUnitQueueDisplayExperienceResponse404 = {
+  data: string
+  status: 404
+}
+
+export type patchUnitQueueDisplayExperienceResponse409 = {
+  data: string
+  status: 409
+}
+
+export type patchUnitQueueDisplayExperienceResponseSuccess = (patchUnitQueueDisplayExperienceResponse204) & {
+  headers: Headers;
+};
+export type patchUnitQueueDisplayExperienceResponseError = (patchUnitQueueDisplayExperienceResponse400 | patchUnitQueueDisplayExperienceResponse403 | patchUnitQueueDisplayExperienceResponse404 | patchUnitQueueDisplayExperienceResponse409) & {
+  headers: Headers;
+};
+
+export type patchUnitQueueDisplayExperienceResponse = (patchUnitQueueDisplayExperienceResponseSuccess | patchUnitQueueDisplayExperienceResponseError)
+
+export const getPatchUnitQueueDisplayExperienceUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/queue-display-experience`
+}
+
+export const patchUnitQueueDisplayExperience = async (unitId: string,
+    handlersUnitExperienceAssignmentRequest: HandlersUnitExperienceAssignmentRequest, options?: RequestInit): Promise<patchUnitQueueDisplayExperienceResponse> => {
+
+  return orvalMutator<patchUnitQueueDisplayExperienceResponse>(getPatchUnitQueueDisplayExperienceUrl(unitId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersUnitExperienceAssignmentRequest,)
+  }
+);}
+
+
+
+
+export const getPatchUnitQueueDisplayExperienceMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUnitQueueDisplayExperience>>, TError,{unitId: string;data: HandlersUnitExperienceAssignmentRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchUnitQueueDisplayExperience>>, TError,{unitId: string;data: HandlersUnitExperienceAssignmentRequest}, TContext> => {
+
+const mutationKey = ['patchUnitQueueDisplayExperience'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchUnitQueueDisplayExperience>>, {unitId: string;data: HandlersUnitExperienceAssignmentRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  patchUnitQueueDisplayExperience(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PatchUnitQueueDisplayExperienceMutationResult = NonNullable<Awaited<ReturnType<typeof patchUnitQueueDisplayExperience>>>
+    export type PatchUnitQueueDisplayExperienceMutationBody = HandlersUnitExperienceAssignmentRequest
+    export type PatchUnitQueueDisplayExperienceMutationError = string
+
+    /**
+ * @summary Assign a queue-display experience to a unit
+ */
+export const usePatchUnitQueueDisplayExperience = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUnitQueueDisplayExperience>>, TError,{unitId: string;data: HandlersUnitExperienceAssignmentRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof patchUnitQueueDisplayExperience>>,
+        TError,
+        {unitId: string;data: HandlersUnitExperienceAssignmentRequest},
+        TContext
+      > => {
+      return useMutation(getPatchUnitQueueDisplayExperienceMutationOptions(options), queryClient);
+    }
 
 export type listSignageAnnouncementsResponse200 = {
   data: ModelsScreenAnnouncement[]

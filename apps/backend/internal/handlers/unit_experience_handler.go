@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strings"
 
@@ -34,24 +33,9 @@ func NewUnitExperienceHandler(service unitExperienceService, userRepo repository
 	return &UnitExperienceHandler{service: service, userRepo: userRepo}
 }
 
-type unitExperienceAssignmentRequest struct {
-	TemplateID json.RawMessage `json:"templateId"`
-	VariantID  json.RawMessage `json:"variantId"`
-}
-
-func decodeOptionalAssignmentString(raw json.RawMessage) (*string, error) {
-	if len(raw) == 0 || string(raw) == "null" {
-		return nil, nil
-	}
-	var value string
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return nil, err
-	}
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return nil, errors.New("assignment ids must not be empty")
-	}
-	return &value, nil
+type UnitExperienceAssignmentRequest struct {
+	TemplateID *string `json:"templateId" swaggertype:"string"`
+	VariantID  *string `json:"variantId" swaggertype:"string"`
 }
 
 // PatchUnitQueueDisplayExperience godoc
@@ -62,7 +46,7 @@ func decodeOptionalAssignmentString(raw json.RawMessage) (*string, error) {
 // @Accept       json
 // @Produce      json
 // @Param        unitId path string true "Unit ID"
-// @Param        body body unitExperienceAssignmentRequest true "Queue-display assignment"
+// @Param        body body UnitExperienceAssignmentRequest true "Queue-display assignment"
 // @Success      204
 // @Failure      400 {string} string "Invalid assignment"
 // @Failure      403 {string} string "Forbidden"
@@ -88,29 +72,27 @@ func (h *UnitExperienceHandler) Patch(w http.ResponseWriter, r *http.Request) {
 
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxUnitExperienceAssignmentBodyBytes))
 	decoder.DisallowUnknownFields()
-	var request unitExperienceAssignmentRequest
+	var request UnitExperienceAssignmentRequest
 	if err := decoder.Decode(&request); err != nil {
 		http.Error(w, "invalid assignment", http.StatusBadRequest)
 		return
 	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		http.Error(w, "invalid assignment", http.StatusBadRequest)
-		return
+	var templateID, variantID *string
+	if request.TemplateID != nil {
+		value := strings.TrimSpace(*request.TemplateID)
+		if value == "" {
+			http.Error(w, "invalid templateId", http.StatusBadRequest)
+			return
+		}
+		templateID = &value
 	}
-	if request.TemplateID == nil || request.VariantID == nil {
-		http.Error(w, "templateId and variantId must both be present", http.StatusBadRequest)
-		return
-	}
-	templateID, err := decodeOptionalAssignmentString(request.TemplateID)
-	if err != nil {
-		http.Error(w, "invalid templateId", http.StatusBadRequest)
-		return
-	}
-	variantID, err := decodeOptionalAssignmentString(request.VariantID)
-	if err != nil {
-		http.Error(w, "invalid variantId", http.StatusBadRequest)
-		return
+	if request.VariantID != nil {
+		value := strings.TrimSpace(*request.VariantID)
+		if value == "" {
+			http.Error(w, "invalid variantId", http.StatusBadRequest)
+			return
+		}
+		variantID = &value
 	}
 	if err := h.service.UpdateUnitQueueDisplayExperience(r.Context(), companyID, chi.URLParam(r, "unitId"), repository.UnitExperienceAssignment{TemplateID: templateID, VariantID: variantID}); err != nil {
 		switch {
