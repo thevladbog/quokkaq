@@ -45,7 +45,9 @@ CREATE TABLE units (
 	code TEXT NOT NULL DEFAULT 'u',
 	kind TEXT NOT NULL DEFAULT 'subdivision',
 	name TEXT NOT NULL DEFAULT 'Unit',
-	timezone TEXT NOT NULL DEFAULT 'UTC'
+	timezone TEXT NOT NULL DEFAULT 'UTC',
+	experience_template_id TEXT,
+	experience_variant_id TEXT
 );
 CREATE TABLE user_units (
 	id TEXT PRIMARY KEY,

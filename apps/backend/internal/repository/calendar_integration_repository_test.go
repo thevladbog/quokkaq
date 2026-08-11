@@ -27,6 +27,8 @@ CREATE TABLE units (
 	name text NOT NULL,
 	name_en text,
 	timezone text NOT NULL,
+	experience_template_id text,
+	experience_variant_id text,
 	created_at datetime,
 	updated_at datetime
 );

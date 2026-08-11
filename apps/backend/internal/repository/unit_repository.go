@@ -110,16 +110,18 @@ func (r *unitRepository) Update(unit *models.Unit) error {
 	// Map-based Updates so nil pointers (e.g. name_en, parent_id) are written as SQL NULL.
 	// Save() can omit nil pointer fields on update.
 	res := r.db.Model(&models.Unit{}).Where("id = ?", unit.ID).Updates(map[string]interface{}{
-		"company_id": unit.CompanyID,
-		"parent_id":  unit.ParentID,
-		"code":       unit.Code,
-		"kind":       unit.Kind,
-		"sort_order": unit.SortOrder,
-		"name":       unit.Name,
-		"name_en":    unit.NameEn,
-		"timezone":   unit.Timezone,
-		"config":     unit.Config,
-		"updated_at": time.Now(),
+		"company_id":             unit.CompanyID,
+		"parent_id":              unit.ParentID,
+		"code":                   unit.Code,
+		"kind":                   unit.Kind,
+		"sort_order":             unit.SortOrder,
+		"name":                   unit.Name,
+		"name_en":                unit.NameEn,
+		"timezone":               unit.Timezone,
+		"config":                 unit.Config,
+		"experience_template_id": unit.ExperienceTemplateID,
+		"experience_variant_id":  unit.ExperienceVariantID,
+		"updated_at":             time.Now(),
 	})
 	if res.Error != nil {
 		return res.Error

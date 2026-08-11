@@ -151,7 +151,9 @@ CREATE TABLE users (
 );
 CREATE TABLE units (
 	id text PRIMARY KEY,
-	company_id text NOT NULL
+	company_id text NOT NULL,
+	experience_template_id text,
+	experience_variant_id text
 );
 CREATE TABLE screen_layout_templates (
 	id text PRIMARY KEY,
