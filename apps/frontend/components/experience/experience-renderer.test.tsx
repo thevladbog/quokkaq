@@ -16,7 +16,6 @@ vi.mock('next-intl', () => ({
 
 import {
   ExperienceRenderer,
-  createExperienceAudioAnnouncer,
   resolveExperienceActivationValue,
   type ExperienceRuntimeAdapters,
   type ExperienceActivationEvent,
@@ -1188,11 +1187,9 @@ describe('queue display preview', () => {
     await waitFor(() => expect(audioCall).toHaveBeenCalledTimes(2));
   });
 
-  it('deduplicates audio across a true remount when the runtime-owned announcer is shared', async () => {
+  it('deduplicates audio across duplicate widgets and a true remount without a caller-owned announcer', async () => {
     const audioCall = vi.fn();
-    const audioAnnouncer = createExperienceAudioAnnouncer();
-    const adapters = { audioCall, audioAnnouncer };
-    const template = queueDisplayTemplate();
+    const template = queueDisplayTemplate(1920, 1080, 2);
     const context: ExperienceRuntimeContext = {
       ...baseContext,
       display: {
@@ -1210,7 +1207,7 @@ describe('queue display preview', () => {
         template={template}
         variantId='display'
         runtimeContext={context}
-        adapters={adapters}
+        adapters={{ audioCall }}
       />
     );
     expect(audioCall).toHaveBeenCalledTimes(1);
@@ -1221,20 +1218,18 @@ describe('queue display preview', () => {
         template={template}
         variantId='display'
         runtimeContext={context}
-        adapters={adapters}
+        adapters={{ audioCall }}
       />
     );
     expect(audioCall).toHaveBeenCalledTimes(1);
   });
 
-  it('retries a failed audio announcement after remount without permanently marking the call', async () => {
+  it('retries a rejected audio announcement after remount without permanently marking the call', async () => {
     const audioCall = vi
       .fn()
       .mockRejectedValueOnce(new Error('speaker offline'))
       .mockResolvedValueOnce(undefined);
-    const audioAnnouncer = createExperienceAudioAnnouncer();
     const onRuntimeError = vi.fn();
-    const adapters = { audioCall, audioAnnouncer, onRuntimeError };
     const context: ExperienceRuntimeContext = {
       ...baseContext,
       display: {
@@ -1252,7 +1247,7 @@ describe('queue display preview', () => {
         template={queueDisplayTemplate()}
         variantId='display'
         runtimeContext={context}
-        adapters={adapters}
+        adapters={{ audioCall, onRuntimeError }}
       />
     );
     await waitFor(() =>
@@ -1268,7 +1263,7 @@ describe('queue display preview', () => {
         template={queueDisplayTemplate()}
         variantId='display'
         runtimeContext={context}
-        adapters={adapters}
+        adapters={{ audioCall, onRuntimeError }}
       />
     );
     await waitFor(() => expect(audioCall).toHaveBeenCalledTimes(2));
@@ -1276,7 +1271,7 @@ describe('queue display preview', () => {
 
   it('normalizes deprecated top-level operational aliases while live remains authoritative', () => {
     const template = queueDisplayTemplate();
-    render(
+    const { rerender } = render(
       <ExperienceRenderer
         template={template}
         variantId='display'
@@ -1294,6 +1289,25 @@ describe('queue display preview', () => {
     expect(
       screen.getByTestId('experience-operational-overlay')
     ).toHaveAttribute('data-operational-state', 'closed');
+
+    rerender(
+      <ExperienceRenderer
+        template={template}
+        variantId='display'
+        runtimeContext={{
+          ...baseContext,
+          live: { ...baseContext.live, isOpen: true, isConnected: false },
+          operational: { isOpen: false },
+          connected: true,
+          open: false
+        }}
+        adapters={{}}
+      />
+    );
+
+    expect(
+      screen.getByTestId('experience-operational-overlay')
+    ).toHaveAttribute('data-operational-state', 'stale-offline');
   });
 
   it('contains audio adapter exceptions as a bounded runtime error', async () => {

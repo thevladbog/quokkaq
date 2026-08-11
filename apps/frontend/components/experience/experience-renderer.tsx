@@ -119,7 +119,7 @@ export function createExperienceAudioAnnouncer(): ExperienceAudioAnnouncer {
 }
 
 const defaultAudioAnnouncers = new WeakMap<
-  ExperienceRuntimeAdapters,
+  NonNullable<ExperienceRuntimeAdapters['audioCall']>,
   ExperienceAudioAnnouncer
 >();
 
@@ -127,10 +127,12 @@ function audioAnnouncerFor(
   adapters: ExperienceRuntimeAdapters
 ): ExperienceAudioAnnouncer {
   if (adapters.audioAnnouncer) return adapters.audioAnnouncer;
-  const existing = defaultAudioAnnouncers.get(adapters);
+  const audioCall = adapters.audioCall;
+  if (!audioCall) return createExperienceAudioAnnouncer();
+  const existing = defaultAudioAnnouncers.get(audioCall);
   if (existing) return existing;
   const created = createExperienceAudioAnnouncer();
-  defaultAudioAnnouncers.set(adapters, created);
+  defaultAudioAnnouncers.set(audioCall, created);
   return created;
 }
 
