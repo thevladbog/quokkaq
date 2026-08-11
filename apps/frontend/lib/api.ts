@@ -716,7 +716,10 @@ export const unitsApi = {
     if (normalized.kioskIdentifiedUserId) {
       body = {
         serviceId: normalized.serviceId,
-        kioskIdentifiedUserId: normalized.kioskIdentifiedUserId
+        kioskIdentifiedUserId: normalized.kioskIdentifiedUserId,
+        ...(normalized.documentsData
+          ? { documentsData: normalized.documentsData }
+          : {})
       } as orvalTc.HandlersCreateTicketRequest;
     } else if (normalized.documentsData) {
       body = {

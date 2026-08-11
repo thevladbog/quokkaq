@@ -1516,11 +1516,11 @@ export const createTicketRequestSchema = z
     const hasDocs =
       data.documentsData && Object.keys(data.documentsData).length > 0;
 
-    if (hasKid && (hasClient || hasPhone || hasDocs)) {
+    if (hasKid && (hasClient || hasPhone)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message:
-          'kioskIdentifiedUserId cannot be combined with clientId, visitor phone, or documentsData',
+          'kioskIdentifiedUserId cannot be combined with clientId or visitor phone',
         path: ['kioskIdentifiedUserId']
       });
     }
@@ -1624,7 +1624,7 @@ export type CreateTicketInUnitMutationVariables =
       clientId?: never;
       visitorPhone?: never;
       visitorLocale?: never;
-      documentsData?: never;
+      documentsData?: Record<string, unknown>;
     }
   | {
       unitId: string;
