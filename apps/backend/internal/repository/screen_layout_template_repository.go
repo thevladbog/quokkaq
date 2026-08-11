@@ -27,6 +27,13 @@ var (
 	ErrExperienceTemplateAssigned           = errors.New("experience template is assigned to a terminal")
 )
 
+// UnitExperienceAssignment preserves explicit unassignment semantics for a
+// public queue-display unit.
+type UnitExperienceAssignment struct {
+	TemplateID *string
+	VariantID  *string
+}
+
 // TerminalExperienceAssignment preserves omitted-vs-explicit assignment semantics.
 // When Specified is false, existing assignment and acknowledgement fields are untouched.
 type TerminalExperienceAssignment struct {
@@ -48,6 +55,8 @@ type ScreenLayoutTemplateRepository interface {
 	GetPublishedVersion(ctx context.Context, companyID, templateID string) (*models.ExperienceTemplateVersion, error)
 	ResolveTerminalPublishedVersion(ctx context.Context, companyID, terminalID string) (*models.ExperienceTemplateVersion, string, error)
 	UpdateTerminalWithExperience(ctx context.Context, companyID string, terminal *models.DesktopTerminal, assignment TerminalExperienceAssignment) error
+	ResolveUnitQueueDisplayPublishedVersion(ctx context.Context, unitID, profile string) (*models.ExperienceTemplateVersion, string, error)
+	UpdateUnitWithExperience(ctx context.Context, companyID, unitID string, assignment UnitExperienceAssignment) error
 }
 
 type screenLayoutTemplateRepository struct {
@@ -116,6 +125,13 @@ func (r *screenLayoutTemplateRepository) Delete(id, companyID string) error {
 			return err
 		}
 		if assigned > 0 {
+			return ErrExperienceTemplateAssigned
+		}
+		var assignedToUnit int64
+		if err := tx.Model(&models.Unit{}).Where("experience_template_id = ?", template.ID).Count(&assignedToUnit).Error; err != nil {
+			return err
+		}
+		if assignedToUnit > 0 {
 			return ErrExperienceTemplateAssigned
 		}
 		result := tx.Where("id = ? AND company_id = ?", template.ID, companyID).Delete(&models.ScreenLayoutTemplate{})
@@ -281,6 +297,93 @@ func (r *screenLayoutTemplateRepository) GetPublishedVersion(ctx context.Context
 		return nil, err
 	}
 	return &version, nil
+}
+
+func (r *screenLayoutTemplateRepository) ResolveUnitQueueDisplayPublishedVersion(ctx context.Context, unitID, profile string) (*models.ExperienceTemplateVersion, string, error) {
+	type resolvedRow struct {
+		models.ExperienceTemplateVersion
+		AssignedVariantID string `gorm:"column:assigned_variant_id"`
+		Surface           string `gorm:"column:template_surface"`
+	}
+	var resolved resolvedRow
+	err := r.db.WithContext(ctx).
+		Table("experience_template_versions AS version").
+		Select("version.*, unit.experience_variant_id AS assigned_variant_id, template.surface AS template_surface").
+		Joins("INNER JOIN screen_layout_templates AS template ON template.id = version.template_id AND template.published_version_id = version.id").
+		Joins("INNER JOIN units AS unit ON unit.experience_template_id = template.id").
+		Where("unit.id = ? AND template.surface = ?", unitID, experience.SurfaceQueueDisplay).
+		First(&resolved).Error
+	if err != nil {
+		return nil, "", err
+	}
+	if err := experience.ValidateDefinition(resolved.Definition, experience.SurfaceQueueDisplay); err != nil {
+		return nil, "", ErrExperiencePublishedDefinitionInvalid
+	}
+	variantID, err := experience.ResolveVariant(resolved.Definition, resolved.AssignedVariantID, profile)
+	if err != nil {
+		return nil, "", ErrExperienceVariantNotFound
+	}
+	version := resolved.ExperienceTemplateVersion
+	return &version, variantID, nil
+}
+
+func (r *screenLayoutTemplateRepository) UpdateUnitWithExperience(ctx context.Context, companyID, unitID string, assignment UnitExperienceAssignment) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var unit models.Unit
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND company_id = ?", unitID, companyID).
+			First(&unit).Error; err != nil {
+			return err
+		}
+
+		if (assignment.TemplateID == nil) != (assignment.VariantID == nil) {
+			return ErrExperienceAssignmentIncomplete
+		}
+		if assignment.TemplateID == nil {
+			return tx.Model(&models.Unit{}).Where("id = ?", unit.ID).Updates(map[string]any{
+				"experience_template_id": nil,
+				"experience_variant_id":  nil,
+				"updated_at":             time.Now().UTC(),
+			}).Error
+		}
+
+		templateID := strings.TrimSpace(*assignment.TemplateID)
+		variantID := strings.TrimSpace(*assignment.VariantID)
+		if templateID == "" || variantID == "" {
+			return ErrExperienceAssignmentIncomplete
+		}
+		var template models.ScreenLayoutTemplate
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND company_id = ?", templateID, companyID).
+			First(&template).Error; err != nil {
+			return err
+		}
+		if template.Surface != experience.SurfaceQueueDisplay {
+			return ErrExperienceAssignmentIncompatible
+		}
+		if template.PublishedVersionID == nil || strings.TrimSpace(*template.PublishedVersionID) == "" {
+			return ErrExperienceTemplateUnpublished
+		}
+		var published models.ExperienceTemplateVersion
+		if err := tx.Where("id = ? AND template_id = ?", *template.PublishedVersionID, template.ID).First(&published).Error; err != nil {
+			return ErrExperienceTemplateUnpublished
+		}
+		if err := experience.ValidateDefinition(published.Definition, template.Surface); err != nil {
+			return ErrExperiencePublishedDefinitionInvalid
+		}
+		matched, err := experience.HasVariant(published.Definition, variantID)
+		if err != nil {
+			return ErrExperiencePublishedDefinitionInvalid
+		}
+		if !matched {
+			return ErrExperienceVariantNotFound
+		}
+		return tx.Model(&models.Unit{}).Where("id = ?", unit.ID).Updates(map[string]any{
+			"experience_template_id": templateID,
+			"experience_variant_id":  variantID,
+			"updated_at":             time.Now().UTC(),
+		}).Error
+	})
 }
 
 func (r *screenLayoutTemplateRepository) ResolveTerminalPublishedVersion(ctx context.Context, companyID, terminalID string) (*models.ExperienceTemplateVersion, string, error) {

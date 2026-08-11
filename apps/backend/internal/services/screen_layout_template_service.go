@@ -224,6 +224,33 @@ func (s *ScreenLayoutTemplateService) GetPublishedVersion(ctx context.Context, c
 	return s.repo.GetPublishedVersion(ctx, companyID, templateID)
 }
 
+// ResolveUnitQueueDisplay returns the current published queue-display
+// projection for a public unit. Missing or unusable assignments are handled by
+// the HTTP layer as legacy mode.
+func (s *ScreenLayoutTemplateService) ResolveUnitQueueDisplay(ctx context.Context, unitID, profile string) (*TerminalExperienceManifest, error) {
+	version, variantID, err := s.repo.ResolveUnitQueueDisplayPublishedVersion(ctx, unitID, profile)
+	if err != nil {
+		return nil, err
+	}
+	if version == nil || version.PublishedAt.IsZero() {
+		return nil, ErrExperiencePublishedDefinitionInvalid
+	}
+	publishedAt := version.PublishedAt
+	return &TerminalExperienceManifest{
+		Mode:        TerminalExperienceModeExperience,
+		TemplateID:  version.TemplateID,
+		VersionID:   version.ID,
+		Version:     version.Version,
+		VariantID:   variantID,
+		Definition:  version.Definition,
+		PublishedAt: &publishedAt,
+	}, nil
+}
+
+func (s *ScreenLayoutTemplateService) UpdateUnitQueueDisplayExperience(ctx context.Context, companyID, unitID string, assignment repository.UnitExperienceAssignment) error {
+	return s.repo.UpdateUnitWithExperience(ctx, companyID, unitID, assignment)
+}
+
 func (s *ScreenLayoutTemplateService) ResolveTerminalPublishedVersion(ctx context.Context, companyID, terminalID string) (*models.ExperienceTemplateVersion, string, error) {
 	return s.repo.ResolveTerminalPublishedVersion(ctx, companyID, terminalID)
 }

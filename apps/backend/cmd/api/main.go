@@ -432,6 +432,7 @@ func run() error {
 	companyVisitorSMSHandler := handlers.NewCompanyVisitorSMSHandler(companyRepo, userRepo, deploymentSaaSSettingsService, queueFunnelRepo)
 	screenLayoutTemplateService := services.NewScreenLayoutTemplateService(screenLayoutTemplateRepo, desktopTerminalRepo)
 	screenLayoutTemplateHandler := handlers.NewScreenLayoutTemplateHandler(screenLayoutTemplateService, userRepo)
+	unitExperienceHandler := handlers.NewUnitExperienceHandler(screenLayoutTemplateService, userRepo)
 	experienceRuntimeHandler := handlers.NewExperienceRuntimeHandler(screenLayoutTemplateService)
 	onecSettingsHandler := handlers.NewOneCSettingsHandler(companyRepo, onecSettingsRepo)
 	commerceMLExchangeHandler := handlers.NewCommerceMLExchangeHandler(companyRepo, invoiceRepo, onecSettingsRepo, onecSessionStore)
@@ -625,6 +626,7 @@ func run() error {
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/playlists/{playlistId}/public", signageHandler.GetPlaylistPublic)
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/public-screen-announcements", signageHandler.ListAnnouncementsPublic)
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/feeds/{feedId}/data", signageHandler.PublicFeedData)
+		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/queue-display-experience", unitExperienceHandler.Manifest)
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/queue-status", ticketHandler.GetUnitQueueStatus)
 		r.With(authmiddleware.VirtualQueueJoinRateLimit, authmiddleware.PublicAPIRateLimit).Post("/{unitId}/virtual-queue", ticketHandler.JoinVirtualQueue)
 		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/kiosk-visitor-survey", ticketHandler.PostKioskVisitorSurvey)
@@ -662,6 +664,7 @@ func run() error {
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Use(authmiddleware.RequireUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermUnitSettingsManage))
+			r.Patch("/{unitId}/queue-display-experience", unitExperienceHandler.Patch)
 			r.Get("/{unitId}/pre-registrations/slots", preRegHandler.GetAvailableSlots)
 			r.Post("/{unitId}/pre-registrations", preRegHandler.Create)
 		})
