@@ -27,6 +27,7 @@ import { LanguageSwitchWidget } from './widgets/language-switch-widget';
 import { TicketFormWidget } from './widgets/ticket-form-widget';
 import { TicketSuccessWidget } from './widgets/ticket-success-widget';
 import { IdentifyWidget } from './widgets/identify-widget';
+import { MediaWidget } from './widgets/media-widget';
 import { resolveServiceFlow } from '@/lib/experience/service-flow';
 import type { ExperienceFlowPages, ServiceModel } from '@quokkaq/shared-types';
 
@@ -396,6 +397,9 @@ export function ExperienceWidgetRegistry({
         />
       );
     }
+  }
+  if (widget.type === 'media') {
+    return <MediaWidget config={widget.config} title={label} />;
   }
   if (surface === 'queue-display' && widget.type === 'called-tickets') {
     return <QueueDisplayCalls context={context} profile={profile} />;
