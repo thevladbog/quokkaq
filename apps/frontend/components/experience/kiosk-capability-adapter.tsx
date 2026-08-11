@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 
 export type KioskTicket = {
   id: string;
@@ -22,10 +22,28 @@ export type KioskCapabilityAdapter = {
   reset: () => void | Promise<void>;
 };
 
+const KioskCapabilityContext = createContext<KioskCapabilityAdapter | null>(
+  null
+);
+
 export function KioskCapabilityAdapterProvider({
+  adapter,
   children
 }: {
   children: ReactNode;
+  adapter: KioskCapabilityAdapter;
 }) {
-  return <>{children}</>;
+  return (
+    <KioskCapabilityContext.Provider value={adapter}>
+      {children}
+    </KioskCapabilityContext.Provider>
+  );
+}
+
+export function useKioskCapabilities(): KioskCapabilityAdapter {
+  const adapter = useContext(KioskCapabilityContext);
+  if (!adapter) {
+    throw new Error('Kiosk capability adapter is not configured');
+  }
+  return adapter;
 }
