@@ -283,6 +283,11 @@ export function ExperienceRenderer({
     countdownSec: sessionIdle?.countdownSec ?? 0,
     onSessionEnd: reset
   });
+  const { continueSession, showWarning } = idle;
+  const resetStation = useCallback(() => {
+    if (showWarning) continueSession();
+    (onStationReset ?? reset)();
+  }, [continueSession, onStationReset, reset, showWarning]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -304,7 +309,7 @@ export function ExperienceRenderer({
   );
   const liveSnapshot = normalizeExperienceLiveSnapshot(runtimeContext);
   const operational = resolveOperationalState(liveSnapshot);
-  const effectiveStationState: StationRuntimeState = idle.showWarning
+  const effectiveStationState: StationRuntimeState = showWarning
     ? 'timeout-warning'
     : stationState;
   const reportRuntimeError = adapters.onRuntimeError;
@@ -615,8 +620,8 @@ export function ExperienceRenderer({
           {operational.state === 'normal' && effectiveStationState !== 'active' ? (
             <StationRuntimeStateView
               state={effectiveStationState}
-              onContinue={idle.continueSession}
-              onReset={onStationReset ?? reset}
+              onContinue={continueSession}
+              onReset={resetStation}
             />
           ) : null}
         </>

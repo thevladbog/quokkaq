@@ -316,6 +316,27 @@ describe('ExperienceRenderer session and navigation', () => {
     expect(screen.queryByTestId('station-runtime-state')).toBeNull();
   });
 
+  it('closes the idle warning before delegating a custom station reset', () => {
+    vi.useFakeTimers();
+    const onStationReset = vi.fn();
+    render(
+      <ExperienceRenderer
+        template={navigationTemplate()}
+        variantId='display'
+        runtimeContext={baseContext}
+        adapters={{}}
+        sessionIdle={{ beforeWarningSec: 5, countdownSec: 10 }}
+        onStationReset={onStationReset}
+      />
+    );
+
+    act(() => vi.advanceTimersByTime(5_000));
+    fireEvent.click(screen.getByRole('button', { name: 'Start over' }));
+
+    expect(onStationReset).toHaveBeenCalledOnce();
+    expect(screen.queryByTestId('station-runtime-state')).toBeNull();
+  });
+
   it('rejects an unknown action before applying later actions', async () => {
     const template = navigationTemplate();
     template.pages[0]!.widgets[0]!.actions = [
