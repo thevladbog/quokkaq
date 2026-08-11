@@ -1,8 +1,12 @@
 package config
 
-import "testing"
+import (
+	"crypto/rand"
+	"encoding/base64"
+	"testing"
+)
 
-func TestJWTSecretFailsClosedWhenMissingOrWeak(t *testing.T) {
+func TestJWTSecretFailsClosedWhenMissingOrBelowMinimumLength(t *testing.T) {
 	t.Setenv("JWT_SECRET", "")
 	if _, err := JWTSecret(); err == nil {
 		t.Fatal("expected missing JWT_SECRET to fail")
@@ -10,19 +14,23 @@ func TestJWTSecretFailsClosedWhenMissingOrWeak(t *testing.T) {
 
 	t.Setenv("JWT_SECRET", "known-dev-secret")
 	if _, err := JWTSecret(); err == nil {
-		t.Fatal("expected weak JWT_SECRET to fail")
+		t.Fatal("expected below-minimum JWT_SECRET to fail")
 	}
 }
 
-func TestJWTSecretAcceptsStrongSecret(t *testing.T) {
-	const secret = "01234567890123456789012345678901"
+func TestJWTSecretAcceptsMinimumLengthSecret(t *testing.T) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		t.Fatal(err)
+	}
+	secret := base64.RawURLEncoding.EncodeToString(raw)
 	t.Setenv("JWT_SECRET", secret)
 	got, err := JWTSecret()
 	if err != nil {
 		t.Fatalf("JWTSecret() error = %v", err)
 	}
 	if got != secret {
-		t.Fatalf("JWTSecret() = %q, want configured secret", got)
+		t.Fatalf("JWTSecret() did not return configured secret")
 	}
 }
 

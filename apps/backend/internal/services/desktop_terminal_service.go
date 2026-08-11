@@ -23,6 +23,10 @@ import (
 const (
 	desktopTerminalCodeLen = 10
 	desktopTerminalJWTDays = 60
+	// Legacy terminals created before JWT_SECRET became mandatory used this pepper.
+	// It is accepted only during a successful bcrypt pairing-code verification and
+	// immediately replaced with the configured current pepper.
+	legacyTerminalCodePepper = "default_secret_please_change"
 )
 
 var (
@@ -344,11 +348,27 @@ func (s *desktopTerminalService) Bootstrap(pairingCode string) (token, unitID, d
 	}
 	digest := pairingCodeDigest(pepper, pairingCode)
 	t, e := s.repo.FindByPairingCodeDigest(digest)
+	legacyDigest := false
+	if errors.Is(e, gorm.ErrRecordNotFound) {
+		legacyDigest = true
+		legacyCandidate := pairingCodeDigest(legacyTerminalCodePepper, pairingCode)
+		if legacyCandidate != digest {
+			digest = legacyCandidate
+			t, e = s.repo.FindByPairingCodeDigest(digest)
+		} else {
+			legacyDigest = false
+		}
+	}
 	if e != nil || t.RevokedAt != nil {
 		return "", "", "", "", false, nil, "", ErrInvalidTerminalCode
 	}
 	if bcrypt.CompareHashAndPassword([]byte(t.SecretHash), []byte(strings.TrimSpace(pairingCode))) != nil {
 		return "", "", "", "", false, nil, "", ErrInvalidTerminalCode
+	}
+	if legacyDigest {
+		if err := s.repo.RewritePairingCodeDigest(t.ID, pairingCodeDigest(pepper, pairingCode)); err != nil {
+			return "", "", "", "", false, nil, "", ErrInvalidTerminalCode
+		}
 	}
 
 	tk := models.EffectiveTerminalKind(t)

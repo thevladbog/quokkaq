@@ -11,7 +11,8 @@ const minimumJWTSecretLength = 32
 var ErrJWTSecretNotConfigured = errors.New("JWT_SECRET must be configured with at least 32 characters")
 
 // JWTSecret returns the authentication secret without a predictable fallback.
-// A missing or weak secret must fail closed: otherwise anyone can mint valid JWTs.
+// This enforces the minimum-length configuration contract; operators must still
+// provide a cryptographically random value when configuring the environment.
 func JWTSecret() (string, error) {
 	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
 	if len(secret) < minimumJWTSecretLength {
