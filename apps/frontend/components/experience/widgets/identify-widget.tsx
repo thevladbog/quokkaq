@@ -6,7 +6,9 @@ import { KioskEmployeeIdFlow } from '@/components/kiosk/kiosk-employee-id-flow';
 import { KioskPhoneIdentificationModal } from '@/components/kiosk/kiosk-phone-identification-modal';
 import { KioskCustomIdentificationDialog } from '@/components/kiosk/kiosk-custom-identification-dialog';
 import { KioskIdOcrDialog } from '@/components/kiosk/kiosk-id-ocr-dialog';
+import { PreRegRedemptionModal } from '@/components/kiosk/PreRegRedemptionModal';
 import type { Service } from '@/lib/api';
+import type { Ticket } from '@/lib/api';
 
 /** Only identity facts allowed into the common condition evaluator. */
 export type RuntimeIdentity = {
@@ -23,6 +25,9 @@ export type IdentificationAdapter = {
   /** Resolves a user id to safe condition facts; raw credentials never leave the kiosk component. */
   resolveEmployee: (userId: string) => RuntimeIdentity;
   onDocumentData?: (data: Record<string, unknown>) => void;
+  preRegistration?: {
+    onSuccess: (ticket: Ticket) => void;
+  };
 };
 
 export function IdentifyWidget({
@@ -43,6 +48,33 @@ export function IdentifyWidget({
   onBack: () => void;
 }) {
   const mode = service.identificationMode ?? 'none';
+  if (mode === 'qr' && adapter.preRegistration) {
+    return (
+      <PreRegRedemptionModal
+        isOpen
+        onClose={onBack}
+        unitId={adapter.unitId}
+        showPhoneTab
+        onSuccess={(ticket) => {
+          adapter.preRegistration?.onSuccess(ticket);
+          onIdentified(
+            { isAuthenticated: true, isEmployee: false, groups: [] },
+            { preRegistrationTicket: ticket }
+          );
+        }}
+      />
+    );
+  }
+  if (mode === 'qr') {
+    return (
+      <div
+        role='alert'
+        className='flex h-full items-center justify-center p-6 text-center text-lg font-semibold'
+      >
+        Pre-registration scanning is unavailable on this station.
+      </div>
+    );
+  }
   if (mode === 'badge' || mode === 'login')
     return (
       <KioskEmployeeIdFlow
