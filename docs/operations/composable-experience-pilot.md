@@ -38,7 +38,7 @@ Automated browser checks are not hardware acceptance. Record each gate as `PASS`
 | Audio / TTS | NOT RUN | Requires the target speaker/browser policy |
 | Network loss and recovery | NOT RUN | Requires an instrumented station |
 
-The `ticket-station.spec.ts` and `queue-display-preview.spec.ts` placeholders intentionally skip until deterministic fixture hosts exist. A skipped browser test must not be reported as physical acceptance.
+The `ticket-station.spec.ts` and `queue-display-preview.spec.ts` placeholders remain skipped regardless of environment variables until deterministic fixture hosts and real assertions are implemented and validated. A skipped browser test must not be reported as physical acceptance.
 
 ## Incident evidence
 

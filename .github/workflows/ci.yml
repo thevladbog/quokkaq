@@ -37,6 +37,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: '📦 Enable Corepack'
         run: corepack enable
@@ -225,6 +226,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: '📦 Enable Corepack'
         run: corepack enable
@@ -416,6 +418,7 @@ jobs:
       - ci-sherif
       - ci-openapi
       - ci-frontend
+      - ci-experience-e2e
       - ci-backend
       - ci-backend-demoseed-smoke
       - ci-kiosk
@@ -452,6 +455,10 @@ jobs:
 
           if [ "$WEB" = "true" ]; then
             [ "${{ needs.ci-frontend.result }}" = "success" ] || fail "Job ci-frontend did not succeed (${{ needs.ci-frontend.result }})."
+          fi
+
+          if [ "$FE" = "true" ] || [ "$BE" = "true" ]; then
+            [ "${{ needs.ci-experience-e2e.result }}" = "success" ] || fail "Job ci-experience-e2e did not succeed (${{ needs.ci-experience-e2e.result }})."
           fi
 
           if [ "$BE" = "true" ]; then
