@@ -366,9 +366,157 @@ export const ticketStationIdentityTemplate: ExperienceTemplate = {
   ]
 };
 
+const employeeServiceAccess = {
+  when: {
+    kind: 'rule' as const,
+    field: 'identity.isEmployee' as const,
+    operator: 'is-true' as const
+  },
+  whenFalse: 'lock' as const
+};
+
+const employeeServiceBehavior = {
+  version: 1 as const,
+  dataRetentionDays: 1,
+  fields: [
+    {
+      key: 'request_reason',
+      label: { en: 'Reason for visit' },
+      type: 'text' as const,
+      required: true
+    }
+  ],
+  access: employeeServiceAccess
+};
+
+export const ticketStationEmployeeFlowTemplate: ExperienceTemplate = {
+  ...ticketStationTemplate,
+  id: 'e2e-ticket-station-employee-flow-experience',
+  flowPages: {
+    serviceFormPageId: 'service-form',
+    identityPageId: 'start',
+    confirmationPageId: 'confirmation',
+    successPageId: 'success'
+  },
+  pages: [
+    {
+      id: 'start',
+      name: 'Identity and services',
+      widgets: [
+        {
+          id: 'employee-identify',
+          type: 'identify',
+          config: { service: { identificationMode: 'badge' } },
+          actions: []
+        },
+        {
+          id: 'service-picker',
+          type: 'service-picker',
+          config: {
+            catalog: {
+              services: [
+                { id: 'service-1', label: 'General service' },
+                {
+                  id: 'employee-service',
+                  label: 'Employee services',
+                  identificationMode: 'badge',
+                  behavior: employeeServiceBehavior
+                }
+              ]
+            }
+          },
+          actions: [
+            {
+              type: 'set-session',
+              key: 'selectedServiceId',
+              value: { source: 'event', field: 'serviceId' }
+            },
+            { type: 'navigate', toPageId: 'service-form' }
+          ]
+        }
+      ],
+      layouts: {
+        portrait: {
+          placements: {
+            'employee-identify': { col: 1, row: 1, colSpan: 12, rowSpan: 6 },
+            'service-picker': { col: 1, row: 7, colSpan: 12, rowSpan: 11 }
+          }
+        }
+      }
+    },
+    {
+      id: 'service-form',
+      name: 'Service details',
+      widgets: [
+        {
+          id: 'service-form-widget',
+          type: 'ticket-form',
+          config: {
+            fields: employeeServiceBehavior.fields
+          },
+          actions: [{ type: 'navigate', toPageId: 'confirmation' }]
+        }
+      ],
+      layouts: {
+        portrait: {
+          placements: {
+            'service-form-widget': { col: 1, row: 1, colSpan: 12, rowSpan: 18 }
+          }
+        }
+      }
+    },
+    {
+      id: 'confirmation',
+      name: 'Confirmation',
+      widgets: [
+        {
+          id: 'confirmation-info',
+          type: 'rich-info',
+          config: {
+            body: { en: 'Ready to issue your ticket.' },
+            requireAcknowledgement: true
+          },
+          actions: [
+            { type: 'submit-ticket' },
+            { type: 'navigate', toPageId: 'success' }
+          ]
+        }
+      ],
+      layouts: {
+        portrait: {
+          placements: {
+            'confirmation-info': { col: 1, row: 1, colSpan: 12, rowSpan: 18 }
+          }
+        }
+      }
+    },
+    {
+      id: 'success',
+      name: 'Success',
+      widgets: [
+        {
+          id: 'ticket-success',
+          type: 'ticket-success',
+          config: {
+            success: { queueNumber: 'E-042', serviceName: 'Employee services' }
+          },
+          actions: [{ type: 'reset-session' }]
+        }
+      ],
+      layouts: {
+        portrait: {
+          placements: {
+            'ticket-success': { col: 1, row: 1, colSpan: 12, rowSpan: 18 }
+          }
+        }
+      }
+    }
+  ]
+};
+
 export async function installTicketStationApiFixtures(
   page: Page,
-  mode: 'picker' | 'identity' = 'picker'
+  mode: 'picker' | 'identity' | 'employee-flow' = 'picker'
 ) {
   await page.addInitScript(() => {
     localStorage.setItem(
@@ -426,6 +574,15 @@ export async function installTicketStationApiFixtures(
           name: 'General service',
           isLeaf: true,
           identificationMode: 'none'
+        },
+        {
+          id: 'employee-service',
+          unitId: 'kiosk-unit',
+          name: 'Employee services',
+          nameEn: 'Employee services',
+          isLeaf: true,
+          identificationMode: 'badge',
+          behavior: employeeServiceBehavior
         }
       ])
     });
@@ -451,7 +608,9 @@ export async function installTicketStationApiFixtures(
     const template =
       mode === 'identity'
         ? ticketStationIdentityTemplate
-        : ticketStationTemplate;
+        : mode === 'employee-flow'
+          ? ticketStationEmployeeFlowTemplate
+          : ticketStationTemplate;
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -469,6 +628,36 @@ export async function installTicketStationApiFixtures(
   await page.route('**/terminal/experience/ack', async (route) => {
     await route.fulfill({ status: 204 });
   });
+  if (mode === 'employee-flow') {
+    await page.route(
+      '**/units/kiosk-unit/employee-idp/resolve',
+      async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            matchStatus: 'matched',
+            userId: '11111111-1111-4111-8111-111111111111'
+          })
+        });
+      }
+    );
+    await page.route('**/units/kiosk-unit/tickets**', async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'ticket-employee-42',
+          queueNumber: 'E-042',
+          unitId: 'kiosk-unit',
+          serviceId: 'employee-service',
+          status: 'waiting',
+          createdAt: '2026-01-01T12:00:00Z',
+          service: { id: 'employee-service', name: 'Employee services' }
+        })
+      });
+    });
+  }
 }
 
 async function installQueueDisplayApiFixturesTail(page: Page) {

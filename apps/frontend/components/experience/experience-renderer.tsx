@@ -652,7 +652,12 @@ export function ExperienceRenderer({
           <ExperienceWidgetRegistry
             widget={widget}
             surface={template.surface}
-            context={runtimeContext}
+            context={{
+              ...runtimeContext,
+              identity: conditionContext.identity,
+              session: conditionContext.session,
+              live: conditionContext.live
+            }}
             profile={variant.profile}
             locked={!matches && widget.access?.whenFalse === 'lock'}
             onActivate={(event) => void activateWidget(widget, event)}
