@@ -29,7 +29,7 @@ This runbook covers the first composable-experience pilots for ticket stations a
 5. Confirm called-ticket updates continue through the existing WebSocket flow and that the experience renderer shows the same queue state as Legacy.
 6. To roll back, select **Legacy queue display** and save. If the manifest is unavailable, malformed, unpublished, or has the wrong surface, the display must also render Legacy automatically.
 
-The committed Playwright acceptance fixture uses a deterministic public unit and API responses rather than a live tenant or demo database. It covers the assigned experience at 1920×1080 and 1080×1920, plus Legacy fallback for both an explicitly legacy and an invalid manifest. This verifies the browser rendering contract and scroll bounds; it does not replace real-device acceptance.
+The committed Playwright acceptance suite uses deterministic API responses rather than a live tenant or demo database. It covers the builder workflow, an assigned queue-display experience at 1920×1080 and 1080×1920, Legacy fallback for both an explicitly legacy and an invalid manifest, and a paired ticket-station service picker at 820×1180. This verifies the browser rendering contract and scroll bounds; it does not replace real-device acceptance.
 
 The unit assignment endpoint is intentionally fail-safe: it accepts only a published `queue-display` template and a variant belonging to that published definition. Do not make a screen depend on a draft definition or copy manifest JSON into device configuration.
 
@@ -40,12 +40,12 @@ Automated browser checks are not hardware acceptance. Record each gate as `PASS`
 | Gate | Result | Evidence / notes |
 | --- | --- | --- |
 | Chromium builder workflow | PASS / FAIL / NOT RUN | Playwright report or CI run |
+| Ticket station: paired service picker | PASS / FAIL / NOT RUN | 820×1180; assigned manifest, service catalog and bounded viewport |
 | Queue display assigned unit: portrait profile | PASS / FAIL / NOT RUN | 9:16 or equivalent viewport; verify manifest and rendered widgets |
 | Queue display assigned unit: landscape profile | PASS / FAIL / NOT RUN | 16:9 or equivalent viewport; verify manifest and rendered widgets |
 | Queue display unit unassigned | PASS / FAIL / NOT RUN | Select Legacy; verify the pre-existing renderer is shown |
 | Invalid/unavailable manifest fallback | PASS / FAIL / NOT RUN | Simulate non-200 or invalid definition; verify Legacy |
 | Fixed viewport: 1920×1080 | PASS / FAIL / NOT RUN | screenshot and scroll/clipping result |
-| Fixed viewport: 1080×1920 | PASS / FAIL / NOT RUN | screenshot and scroll/clipping result |
 | Fixed viewport: 1080×1920 | PASS / FAIL / NOT RUN | screenshot and scroll/clipping result |
 | iPad Safari / PWA | NOT RUN | Requires a real iPad |
 | Tauri 1080×1920 station | NOT RUN | Requires the packaged desktop app |
@@ -55,7 +55,7 @@ Automated browser checks are not hardware acceptance. Record each gate as `PASS`
 | Audio / TTS | NOT RUN | Requires the target speaker/browser policy |
 | Network loss and recovery | NOT RUN | Requires an instrumented station |
 
-The `ticket-station.spec.ts` and `queue-display-preview.spec.ts` placeholders remain skipped regardless of environment variables until deterministic fixture hosts and real assertions are implemented and validated. A skipped browser test must not be reported as physical acceptance.
+The browser checks are deterministic contract tests, not physical acceptance. A passing Playwright test must not be reported as proof that iPad Safari, Tauri, printers, scanners, badge readers, audio, or network recovery work on target hardware.
 
 ## Incident evidence
 
