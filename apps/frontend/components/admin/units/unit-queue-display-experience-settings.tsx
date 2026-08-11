@@ -16,6 +16,8 @@ import {
 } from '@/lib/api/generated/units';
 import type { Unit } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Card,
   CardContent,
@@ -53,7 +55,6 @@ export function UnitQueueDisplayExperienceSettings({
     unit.experienceTemplateId ?? 'legacy'
   );
   const [variantId, setVariantId] = useState(unit.experienceVariantId ?? '');
-  const [saving, setSaving] = useState(false);
 
   const templatesQuery = useQuery({
     queryKey: getListScreenLayoutTemplatesQueryKey(),
@@ -88,6 +89,8 @@ export function UnitQueueDisplayExperienceSettings({
   }, [templatesQuery.data]);
 
   const selectedTemplate = templates.find((item) => item.id === templateId);
+  const assignedTemplateMissing =
+    templateId !== 'legacy' && !selectedTemplate && !templatesQuery.isLoading;
   const patchMutation = usePatchUnitQueueDisplayExperience();
 
   const save = () => {
@@ -99,13 +102,12 @@ export function UnitQueueDisplayExperienceSettings({
       );
       return;
     }
-    setSaving(true);
     patchMutation.mutate(
       {
         unitId,
         data: {
-          templateId: nextTemplateId ?? undefined,
-          variantId: nextVariantId ?? undefined
+          templateId: nextTemplateId,
+          variantId: nextVariantId
         }
       },
       {
@@ -122,8 +124,7 @@ export function UnitQueueDisplayExperienceSettings({
             t('save_error', {
               defaultValue: 'Could not save queue display assignment.'
             })
-          ),
-        onSettled: () => setSaving(false)
+          )
       }
     );
   };
@@ -165,9 +166,22 @@ export function UnitQueueDisplayExperienceSettings({
           </p>
         ) : null}
 
+        {assignedTemplateMissing ? (
+          <Alert variant='destructive'>
+            <AlertDescription>
+              {t('assigned_missing', {
+                defaultValue:
+                  'The assigned experience is no longer published. Select Legacy to clear this assignment.'
+              })}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
         <div className='grid gap-4 md:grid-cols-2'>
-          <label className='space-y-2 text-sm font-medium'>
-            <span>{t('template_label', { defaultValue: 'Experience' })}</span>
+          <div className='space-y-2'>
+            <Label htmlFor='queue-display-template'>
+              {t('template_label', { defaultValue: 'Experience' })}
+            </Label>
             <Select
               value={templateId}
               onValueChange={(value) => {
@@ -175,10 +189,17 @@ export function UnitQueueDisplayExperienceSettings({
                 setVariantId('');
               }}
             >
-              <SelectTrigger className='w-full'>
+              <SelectTrigger id='queue-display-template' className='w-full'>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                {assignedTemplateMissing ? (
+                  <SelectItem value={templateId} disabled>
+                    {t('assigned_missing_option', {
+                      defaultValue: 'Assigned experience (no longer published)'
+                    })}
+                  </SelectItem>
+                ) : null}
                 <SelectItem value='legacy'>
                   {t('legacy_option', { defaultValue: 'Legacy queue display' })}
                 </SelectItem>
@@ -189,18 +210,18 @@ export function UnitQueueDisplayExperienceSettings({
                 ))}
               </SelectContent>
             </Select>
-          </label>
+          </div>
 
-          <label className='space-y-2 text-sm font-medium'>
-            <span>
+          <div className='space-y-2'>
+            <Label htmlFor='queue-display-variant'>
               {t('variant_label', { defaultValue: 'Default display profile' })}
-            </span>
+            </Label>
             <Select
               value={variantId}
               onValueChange={setVariantId}
               disabled={!selectedTemplate}
             >
-              <SelectTrigger className='w-full'>
+              <SelectTrigger id='queue-display-variant' className='w-full'>
                 <SelectValue
                   placeholder={t('variant_placeholder', {
                     defaultValue: 'Select a profile'
@@ -215,7 +236,7 @@ export function UnitQueueDisplayExperienceSettings({
                 ))}
               </SelectContent>
             </Select>
-          </label>
+          </div>
         </div>
 
         <div className='flex items-center justify-between gap-4 border-t pt-4'>
@@ -228,9 +249,13 @@ export function UnitQueueDisplayExperienceSettings({
           <Button
             type='button'
             onClick={save}
-            disabled={saving || templatesQuery.isLoading}
+            disabled={
+              patchMutation.isPending ||
+              templatesQuery.isLoading ||
+              assignedTemplateMissing
+            }
           >
-            {saving ? (
+            {patchMutation.isPending ? (
               t('saving', { defaultValue: 'Saving…' })
             ) : (
               <>

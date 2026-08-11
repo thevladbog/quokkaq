@@ -121,6 +121,9 @@ export function useScreenRendererLiveData(unitId: string) {
   } = ticketsQuery;
 
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [browserOnline, setBrowserOnline] = useState(
+    () => typeof navigator === 'undefined' || navigator.onLine
+  );
   const [materials, setMaterials] = useState<Material[]>([]);
 
   const { data: unit, isLoading: isUnitLoading } = useUnit(unitId, {
@@ -150,6 +153,17 @@ export function useScreenRendererLiveData(unitId: string) {
 
   const [etaTicketRows, setEtaTicketRows] =
     useState<UnitETASnapshot['tickets']>(undefined);
+
+  useEffect(() => {
+    const onOnline = () => setBrowserOnline(true);
+    const onOffline = () => setBrowserOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
 
   useEffect(() => {
     if (!unitId) return;
@@ -378,6 +392,7 @@ export function useScreenRendererLiveData(unitId: string) {
     ticketsPending,
     ticketsError,
     currentTime,
+    browserOnline,
     contentSlides,
     queueStatus,
     calledTickets,

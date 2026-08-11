@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 	"quokkaq-go-backend/internal/testsupport"
@@ -18,14 +20,25 @@ import (
 type unitExperienceHandlerService struct {
 	manifest *services.TerminalExperienceManifest
 	err      error
+	update   func(repository.UnitExperienceAssignment)
 }
 
 func (s unitExperienceHandlerService) ResolveUnitQueueDisplay(context.Context, string, string) (*services.TerminalExperienceManifest, error) {
 	return s.manifest, s.err
 }
 
-func (unitExperienceHandlerService) UpdateUnitQueueDisplayExperience(context.Context, string, string, repository.UnitExperienceAssignment) error {
-	panic("unexpected assignment update")
+func (s unitExperienceHandlerService) UpdateUnitQueueDisplayExperience(_ context.Context, _, _ string, assignment repository.UnitExperienceAssignment) error {
+	if s.update == nil {
+		panic("unexpected assignment update")
+	}
+	s.update(assignment)
+	return s.err
+}
+
+type unitExperienceHandlerUserRepo struct{ testsupport.PanicUserRepo }
+
+func (unitExperienceHandlerUserRepo) ResolveCompanyIDForRequest(string, string) (string, error) {
+	return "company-a", nil
 }
 
 func unitExperienceManifestRequest(target string, params map[string]string) *http.Request {
@@ -95,5 +108,62 @@ func TestUnitExperienceHandler_ManifestRejectsUnknownProfile(t *testing.T) {
 	}
 	if body := w.Body.String(); body != "invalid profile\n" {
 		t.Fatalf("body = %q", body)
+	}
+}
+
+func unitExperiencePatchRequest(body string) *http.Request {
+	req := httptest.NewRequest(http.MethodPatch, "/units/unit-1/queue-display-experience", bytes.NewBufferString(body))
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("unitId", "unit-1")
+	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, "user-1")
+	return req.WithContext(ctx)
+}
+
+func TestUnitExperienceHandler_PatchRequiresExplicitAssignmentFields(t *testing.T) {
+	for _, body := range []string{"{}", "null", `{"templateId":null,"variantId":null}{"ignored":true}`} {
+		t.Run(body, func(t *testing.T) {
+			called := false
+			handler := NewUnitExperienceHandler(unitExperienceHandlerService{
+				update: func(repository.UnitExperienceAssignment) { called = true },
+			}, unitExperienceHandlerUserRepo{})
+			w := httptest.NewRecorder()
+			handler.Patch(w, unitExperiencePatchRequest(body))
+
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400", w.Code)
+			}
+			if called {
+				t.Fatal("assignment update was called for invalid body")
+			}
+		})
+	}
+}
+
+func TestUnitExperienceHandler_PatchAllowsExplicitClear(t *testing.T) {
+	var received repository.UnitExperienceAssignment
+	handler := NewUnitExperienceHandler(unitExperienceHandlerService{
+		update: func(assignment repository.UnitExperienceAssignment) { received = assignment },
+	}, unitExperienceHandlerUserRepo{})
+	w := httptest.NewRecorder()
+	handler.Patch(w, unitExperiencePatchRequest(`{"templateId":null,"variantId":null}`))
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204", w.Code)
+	}
+	if received.TemplateID != nil || received.VariantID != nil {
+		t.Fatalf("received assignment = %+v, want explicit clear", received)
+	}
+}
+
+func TestUnitExperienceHandler_PatchRejectsUnknownFields(t *testing.T) {
+	handler := NewUnitExperienceHandler(unitExperienceHandlerService{
+		update: func(repository.UnitExperienceAssignment) { t.Fatal("assignment update was called") },
+	}, unitExperienceHandlerUserRepo{})
+	w := httptest.NewRecorder()
+	handler.Patch(w, unitExperiencePatchRequest(`{"templateId":"template-1","variantId":"variant-1","extra":true}`))
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", w.Code)
 	}
 }

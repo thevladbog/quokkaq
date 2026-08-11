@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 
@@ -34,8 +36,8 @@ func NewUnitExperienceHandler(service unitExperienceService, userRepo repository
 }
 
 type UnitExperienceAssignmentRequest struct {
-	TemplateID *string `json:"templateId" swaggertype:"string"`
-	VariantID  *string `json:"variantId" swaggertype:"string"`
+	TemplateID *string `json:"templateId" swaggertype:"string" extensions:"x-nullable"`
+	VariantID  *string `json:"variantId" swaggertype:"string" extensions:"x-nullable"`
 }
 
 // PatchUnitQueueDisplayExperience godoc
@@ -49,6 +51,7 @@ type UnitExperienceAssignmentRequest struct {
 // @Param        body body UnitExperienceAssignmentRequest true "Queue-display assignment"
 // @Success      204
 // @Failure      400 {string} string "Invalid assignment"
+// @Failure      401 {string} string "Unauthorized"
 // @Failure      403 {string} string "Forbidden"
 // @Failure      404 {string} string "Unit or template not found"
 // @Failure      409 {string} string "Assignment is unavailable"
@@ -71,6 +74,30 @@ func (h *UnitExperienceHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxUnitExperienceAssignmentBodyBytes))
+	var raw json.RawMessage
+	if err := decoder.Decode(&raw); err != nil {
+		http.Error(w, "invalid assignment", http.StatusBadRequest)
+		return
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		http.Error(w, "invalid assignment", http.StatusBadRequest)
+		return
+	}
+	var fields map[string]json.RawMessage
+	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) || json.Unmarshal(raw, &fields) != nil || fields == nil {
+		http.Error(w, "invalid assignment", http.StatusBadRequest)
+		return
+	}
+	if _, ok := fields["templateId"]; !ok {
+		http.Error(w, "templateId is required", http.StatusBadRequest)
+		return
+	}
+	if _, ok := fields["variantId"]; !ok {
+		http.Error(w, "variantId is required", http.StatusBadRequest)
+		return
+	}
+	decoder = json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	var request UnitExperienceAssignmentRequest
 	if err := decoder.Decode(&request); err != nil {
@@ -120,7 +147,8 @@ func (h *UnitExperienceHandler) Patch(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        unitId path string true "Unit ID"
 // @Param        profile query string false "Viewport orientation" Enums(portrait, landscape)
-// @Success      200 {object} services.TerminalExperienceManifest
+// @Success      200 {object} TerminalExperienceManifestResponseDoc
+// @Failure      400 {string} string "Invalid profile"
 // @Failure      500 {string} string "Internal server error"
 // @Router       /units/{unitId}/queue-display-experience [get]
 func (h *UnitExperienceHandler) Manifest(w http.ResponseWriter, r *http.Request) {
@@ -148,6 +176,11 @@ func (h *UnitExperienceHandler) Manifest(w http.ResponseWriter, r *http.Request)
 	if manifest == nil {
 		manifest = &services.TerminalExperienceManifest{Mode: services.TerminalExperienceModeLegacy}
 	}
+	response, err := terminalExperienceManifestResponse(manifest)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(manifest)
+	_ = json.NewEncoder(w).Encode(response)
 }

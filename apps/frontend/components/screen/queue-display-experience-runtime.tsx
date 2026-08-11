@@ -17,6 +17,10 @@ interface QueueDisplayExperienceRuntimeProps {
   unit: Unit;
   calledTickets: Ticket[];
   currentTime: Date;
+  intlLocale: string;
+  queueLength: number;
+  isOpen: boolean;
+  isConnected: boolean;
   legacy: ReactNode;
 }
 
@@ -33,6 +37,10 @@ export function QueueDisplayExperienceRuntime({
   unit,
   calledTickets,
   currentTime,
+  intlLocale,
+  queueLength,
+  isOpen,
+  isConnected,
   legacy
 }: QueueDisplayExperienceRuntimeProps) {
   const locale = useLocale();
@@ -42,16 +50,48 @@ export function QueueDisplayExperienceRuntime({
     const calls = calledTickets.map(toCall);
     const display = {
       unitName: getUnitDisplayName(unit, locale),
-      nowLabel: formatAppTime(currentTime, locale),
+      nowLabel: formatAppTime(currentTime, intlLocale),
       primaryCall: calls[0],
       recentCalls: calls.slice(1)
     };
     return {
       identity: { isAuthenticated: false, isEmployee: false },
-      live: { isConnected: true, isOpen: true, queueLength: 0 },
+      live: { isConnected, isOpen, queueLength },
       display
     };
-  }, [calledTickets, currentTime, locale, unit]);
+  }, [
+    calledTickets,
+    currentTime,
+    intlLocale,
+    isConnected,
+    isOpen,
+    locale,
+    queueLength,
+    unit
+  ]);
+
+  const adapters = useMemo(
+    () => ({
+      audioCall: async (call: QueueDisplayCall) => {
+        if (
+          typeof window === 'undefined' ||
+          !window.speechSynthesis ||
+          typeof SpeechSynthesisUtterance === 'undefined'
+        )
+          return;
+        await new Promise<void>((resolve, reject) => {
+          const utterance = new SpeechSynthesisUtterance(
+            `${call.queueNumber}, ${call.counterName}`
+          );
+          utterance.onend = () => resolve();
+          utterance.onerror = () =>
+            reject(new Error('speech synthesis failed'));
+          window.speechSynthesis.speak(utterance);
+        });
+      }
+    }),
+    []
+  );
 
   if (manifest.isPending || manifest.data?.kind !== 'experience') {
     return <>{legacy}</>;
@@ -62,7 +102,7 @@ export function QueueDisplayExperienceRuntime({
       template={manifest.data.template}
       variantId={manifest.data.variantId}
       runtimeContext={runtimeContext}
-      adapters={{}}
+      adapters={adapters}
       mode='deployed'
     />
   );

@@ -1636,8 +1636,10 @@ export interface HandlersTransferRequest {
 }
 
 export interface HandlersUnitExperienceAssignmentRequest {
-  templateId?: string;
-  variantId?: string;
+  /** @nullable */
+  templateId?: string | null;
+  /** @nullable */
+  variantId?: string | null;
 }
 
 export interface HandlersUnitSummaryDTO {
@@ -3423,18 +3425,6 @@ export interface ServicesTenantHintResponse {
   next?: ServicesTenantHintResponseNext;
   ssoAvailable?: boolean;
   tenantSlug?: string;
-}
-
-export type ServicesTerminalExperienceManifestDefinition = { [key: string]: unknown };
-
-export interface ServicesTerminalExperienceManifest {
-  definition?: ServicesTerminalExperienceManifestDefinition;
-  mode?: string;
-  publishedAt?: string;
-  templateId?: string;
-  variantId?: string;
-  version?: number;
-  versionId?: string;
 }
 
 export interface ServicesTicketsByServiceItem {
@@ -7618,8 +7608,13 @@ export function useListSignageAnnouncementsPublic<TData = Awaited<ReturnType<typ
  * @summary Get a unit queue-display experience manifest
  */
 export type getUnitQueueDisplayExperienceResponse200 = {
-  data: ServicesTerminalExperienceManifest
+  data: HandlersTerminalExperienceManifestResponseDoc
   status: 200
+}
+
+export type getUnitQueueDisplayExperienceResponse400 = {
+  data: string
+  status: 400
 }
 
 export type getUnitQueueDisplayExperienceResponse500 = {
@@ -7630,7 +7625,7 @@ export type getUnitQueueDisplayExperienceResponse500 = {
 export type getUnitQueueDisplayExperienceResponseSuccess = (getUnitQueueDisplayExperienceResponse200) & {
   headers: Headers;
 };
-export type getUnitQueueDisplayExperienceResponseError = (getUnitQueueDisplayExperienceResponse500) & {
+export type getUnitQueueDisplayExperienceResponseError = (getUnitQueueDisplayExperienceResponse400 | getUnitQueueDisplayExperienceResponse500) & {
   headers: Headers;
 };
 
@@ -7763,6 +7758,11 @@ export type patchUnitQueueDisplayExperienceResponse400 = {
   status: 400
 }
 
+export type patchUnitQueueDisplayExperienceResponse401 = {
+  data: string
+  status: 401
+}
+
 export type patchUnitQueueDisplayExperienceResponse403 = {
   data: string
   status: 403
@@ -7781,7 +7781,7 @@ export type patchUnitQueueDisplayExperienceResponse409 = {
 export type patchUnitQueueDisplayExperienceResponseSuccess = (patchUnitQueueDisplayExperienceResponse204) & {
   headers: Headers;
 };
-export type patchUnitQueueDisplayExperienceResponseError = (patchUnitQueueDisplayExperienceResponse400 | patchUnitQueueDisplayExperienceResponse403 | patchUnitQueueDisplayExperienceResponse404 | patchUnitQueueDisplayExperienceResponse409) & {
+export type patchUnitQueueDisplayExperienceResponseError = (patchUnitQueueDisplayExperienceResponse400 | patchUnitQueueDisplayExperienceResponse401 | patchUnitQueueDisplayExperienceResponse403 | patchUnitQueueDisplayExperienceResponse404 | patchUnitQueueDisplayExperienceResponse409) & {
   headers: Headers;
 };
 

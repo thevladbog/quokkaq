@@ -50,7 +50,8 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     virtualQueueEnabled,
     queueUrl,
     config,
-    adConfig
+    adConfig,
+    browserOnline
   } = live;
 
   const screenTmpl: ScreenTemplate | null = useMemo(() => {
@@ -143,9 +144,6 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       className='bg-background text-foreground flex h-screen w-screen flex-col overflow-hidden'
       style={{ backgroundColor: bodyColor || undefined }}
     >
-      {annFullscreen.length > 0 && (
-        <ScreenFullscreenAnnouncementOverlay items={annFullscreen} />
-      )}
       {showDefaultUnitTopBar && (
         <div
           className='bg-card z-10 flex h-20 flex-none items-center justify-between border-b px-8 shadow-sm'
@@ -325,12 +323,21 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
   );
 
   return (
-    <QueueDisplayExperienceRuntime
-      unitId={unitId}
-      unit={unit}
-      calledTickets={calledTickets}
-      currentTime={currentTime}
-      legacy={legacyScreen}
-    />
+    <>
+      {annFullscreen.length > 0 && (
+        <ScreenFullscreenAnnouncementOverlay items={annFullscreen} />
+      )}
+      <QueueDisplayExperienceRuntime
+        unitId={unitId}
+        unit={unit}
+        calledTickets={calledTickets}
+        currentTime={currentTime}
+        intlLocale={intlLocale}
+        queueLength={queueStatus?.queueLength ?? waitingTicketsForScreen.length}
+        isOpen={queueStatus !== null}
+        isConnected={browserOnline}
+        legacy={legacyScreen}
+      />
+    </>
   );
 }

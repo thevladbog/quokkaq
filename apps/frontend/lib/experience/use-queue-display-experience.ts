@@ -14,7 +14,7 @@ function viewportProfile(): QueueDisplayProfile {
 }
 
 export function useQueueDisplayExperience(unitId: string) {
-  const [profile, setProfile] = useState<QueueDisplayProfile>(viewportProfile);
+  const [profile, setProfile] = useState<QueueDisplayProfile>('landscape');
 
   useEffect(() => {
     const update = () => setProfile(viewportProfile());
@@ -28,6 +28,8 @@ export function useQueueDisplayExperience(unitId: string) {
     queryFn: () => fetchQueueDisplayManifest(unitId, profile),
     enabled: Boolean(unitId),
     staleTime: 60_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: true,
     retry: false
   });
 

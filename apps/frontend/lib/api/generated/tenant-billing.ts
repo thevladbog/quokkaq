@@ -1609,8 +1609,10 @@ export interface HandlersTransferRequest {
 }
 
 export interface HandlersUnitExperienceAssignmentRequest {
-  templateId?: string;
-  variantId?: string;
+  /** @nullable */
+  templateId?: string | null;
+  /** @nullable */
+  variantId?: string | null;
 }
 
 export interface HandlersUnitSummaryDTO {
@@ -3396,18 +3398,6 @@ export interface ServicesTenantHintResponse {
   next?: ServicesTenantHintResponseNext;
   ssoAvailable?: boolean;
   tenantSlug?: string;
-}
-
-export type ServicesTerminalExperienceManifestDefinition = { [key: string]: unknown };
-
-export interface ServicesTerminalExperienceManifest {
-  definition?: ServicesTerminalExperienceManifestDefinition;
-  mode?: string;
-  publishedAt?: string;
-  templateId?: string;
-  variantId?: string;
-  version?: number;
-  versionId?: string;
 }
 
 export interface ServicesTicketsByServiceItem {

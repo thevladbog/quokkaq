@@ -1641,8 +1641,10 @@ components:
         handlers.UnitExperienceAssignmentRequest:
             properties:
                 templateId:
+                    nullable: true
                     type: string
                 variantId:
+                    nullable: true
                     type: string
             type: object
         handlers.UnitSummaryDTO:
@@ -4968,23 +4970,6 @@ components:
                 ssoAvailable:
                     type: boolean
                 tenantSlug:
-                    type: string
-            type: object
-        services.TerminalExperienceManifest:
-            properties:
-                definition:
-                    type: object
-                mode:
-                    type: string
-                publishedAt:
-                    type: string
-                templateId:
-                    type: string
-                variantId:
-                    type: string
-                version:
-                    type: integer
-                versionId:
                     type: string
             type: object
         services.TicketsByServiceItem:
@@ -16633,8 +16618,14 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/services.TerminalExperienceManifest'
+                                $ref: '#/components/schemas/handlers.TerminalExperienceManifestResponseDoc'
                     description: OK
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Invalid profile
                 "500":
                     content:
                         application/json:
@@ -16671,6 +16662,12 @@ paths:
                             schema:
                                 type: string
                     description: Invalid assignment
+                "401":
+                    content:
+                        application/json:
+                            schema:
+                                type: string
+                    description: Unauthorized
                 "403":
                     content:
                         application/json:
