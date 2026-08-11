@@ -987,7 +987,7 @@ func patchTerminalExperienceDeploymentContract(doc *openapi3.T) error {
 	}
 	manifestCarrier.Discriminator = &openapi3.Discriminator{
 		PropertyName: "mode",
-		Mapping: openapi3.StringMap[openapi3.MappingRef]{
+		Mapping: map[string]openapi3.MappingRef{
 			"legacy":     {Ref: "#/components/schemas/handlers.LegacyManifest"},
 			"experience": {Ref: "#/components/schemas/handlers.ExperienceManifest"},
 		},
@@ -1002,7 +1002,7 @@ func patchTerminalExperienceDeploymentContract(doc *openapi3.T) error {
 	}
 	ackCarrier.Discriminator = &openapi3.Discriminator{
 		PropertyName: "status",
-		Mapping: openapi3.StringMap[openapi3.MappingRef]{
+		Mapping: map[string]openapi3.MappingRef{
 			"applied":  {Ref: "#/components/schemas/handlers.AppliedExperienceAcknowledgement"},
 			"rejected": {Ref: "#/components/schemas/handlers.RejectedExperienceAcknowledgement"},
 		},
