@@ -21,6 +21,7 @@ export type StationRuntimeEvent =
   | 'go-online'
   | 'unavailable'
   | 'available'
+  | 'timeout-warning'
   | 'extend-time'
   | 'timeout';
 
@@ -38,6 +39,7 @@ const transitions: Record<
     reset: 'attract',
     'go-offline': 'offline',
     unavailable: 'temporarily-unavailable',
+    'timeout-warning': 'timeout-warning',
     timeout: 'attract'
   },
   submitting: {
@@ -53,7 +55,11 @@ const transitions: Record<
     reset: 'attract',
     timeout: 'attract'
   },
-  success: { reset: 'attract', timeout: 'attract' },
+  success: {
+    'print-start': 'success-printing',
+    reset: 'attract',
+    timeout: 'attract'
+  },
   'print-failed': {
     'print-succeeded': 'success',
     reset: 'attract',

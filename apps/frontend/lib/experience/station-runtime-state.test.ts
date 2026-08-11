@@ -43,6 +43,9 @@ describe('station runtime state machine', () => {
 
   it('handles offline, unavailable, timeout extension, and reset paths', () => {
     expect(nextStationRuntimeState('active', 'go-offline')).toBe('offline');
+    expect(nextStationRuntimeState('active', 'timeout-warning')).toBe(
+      'timeout-warning'
+    );
     expect(nextStationRuntimeState('offline', 'go-online')).toBe('active');
     expect(nextStationRuntimeState('active', 'unavailable')).toBe(
       'temporarily-unavailable'
