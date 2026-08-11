@@ -1,6 +1,6 @@
 # Composable experience pilot runbook
 
-This runbook covers the first ticket-station pilot. A published experience is immutable; a draft save never changes a device. The current browser acceptance suite covers the routed builder host and bounded desktop layout. Hardware acceptance remains a separate gate.
+This runbook covers the first composable-experience pilots for ticket stations and unit queue displays. A published experience is immutable; a draft save never changes a device. A queue display is opted in at the unit level, so sibling units can remain on Legacy while one screen is evaluated. Hardware acceptance remains a separate gate.
 
 ## Publish and assign
 
@@ -20,6 +20,17 @@ This runbook covers the first ticket-station pilot. A published experience is im
 - If a cached manifest is suspected to be stale, unassign first, reset the station's local experience cache, reload, and verify legacy mode before assigning again.
 - Preserve the terminal id, template/version ids, acknowledgement status, timestamp, browser/Tauri logs, and a screenshot of the visible state in the incident record. Never attach visitor identity, badge values, OCR output, phone numbers, or visitor tokens.
 
+## Queue-display pilot
+
+1. Create a `queue-display` experience with both portrait and landscape profiles when the unit may use different screen orientations.
+2. Save, validate, and publish the experience. Confirm that the published definition contains the intended pages, widgets, and queue-display data bindings.
+3. Open the unit's **Display** settings and assign the published experience and a default profile. The assignment is stored on the unit, not on an individual browser or screen URL.
+4. Verify the public unit manifest in both orientations. The runtime selects the requested orientation when available; otherwise it selects the deterministic compatible profile from the published definition.
+5. Confirm called-ticket updates continue through the existing WebSocket flow and that the experience renderer shows the same queue state as Legacy.
+6. To roll back, select **Legacy queue display** and save. If the manifest is unavailable, malformed, unpublished, or has the wrong surface, the display must also render Legacy automatically.
+
+The unit assignment endpoint is intentionally fail-safe: it accepts only a published `queue-display` template and a variant belonging to that published definition. Do not make a screen depend on a draft definition or copy manifest JSON into device configuration.
+
 ## Acceptance gates
 
 Automated browser checks are not hardware acceptance. Record each gate as `PASS`, `FAIL`, or `NOT RUN`:
@@ -27,6 +38,10 @@ Automated browser checks are not hardware acceptance. Record each gate as `PASS`
 | Gate | Result | Evidence / notes |
 | --- | --- | --- |
 | Chromium builder workflow | PASS / FAIL / NOT RUN | Playwright report or CI run |
+| Queue display assigned unit: portrait profile | PASS / FAIL / NOT RUN | 9:16 or equivalent viewport; verify manifest and rendered widgets |
+| Queue display assigned unit: landscape profile | PASS / FAIL / NOT RUN | 16:9 or equivalent viewport; verify manifest and rendered widgets |
+| Queue display unit unassigned | PASS / FAIL / NOT RUN | Select Legacy; verify the pre-existing renderer is shown |
+| Invalid/unavailable manifest fallback | PASS / FAIL / NOT RUN | Simulate non-200 or invalid definition; verify Legacy |
 | Fixed viewport: 820×1180 | PASS / FAIL / NOT RUN | screenshot and scroll/clipping result |
 | Fixed viewport: 1180×820 | PASS / FAIL / NOT RUN | screenshot and scroll/clipping result |
 | Fixed viewport: 1080×1920 | PASS / FAIL / NOT RUN | screenshot and scroll/clipping result |

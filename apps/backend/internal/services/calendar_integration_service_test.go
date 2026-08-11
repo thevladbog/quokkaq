@@ -43,6 +43,8 @@ CREATE TABLE units (
 	name_en text,
 	timezone text NOT NULL,
 	config text,
+	experience_template_id text,
+	experience_variant_id text,
 	skill_based_routing_enabled integer NOT NULL DEFAULT 0,
 	created_at datetime,
 	updated_at datetime

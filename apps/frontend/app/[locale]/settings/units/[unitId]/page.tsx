@@ -50,6 +50,7 @@ import {
 import { toast } from 'sonner';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { UnitQueueDisplayExperienceSettings } from '@/components/admin/units/unit-queue-display-experience-settings';
 
 interface UnitPageProps {
   params: Promise<{
@@ -458,6 +459,12 @@ export default function UnitPage({ params }: UnitPageProps) {
                 unitId={unitId}
                 currentConfig={unit.config || {}}
               />
+              <div className='mt-8'>
+                <UnitQueueDisplayExperienceSettings
+                  unitId={unitId}
+                  unit={unit}
+                />
+              </div>
             </PermissionGuard>
           </TabsContent>
 
@@ -754,6 +761,9 @@ export default function UnitPage({ params }: UnitPageProps) {
               unitId={unitId}
               currentConfig={unit.config || {}}
             />
+            <div className='mt-8'>
+              <UnitQueueDisplayExperienceSettings unitId={unitId} unit={unit} />
+            </div>
           </PermissionGuard>
         </TabsContent>
         <TabsContent value='kiosk' className='mt-6'>

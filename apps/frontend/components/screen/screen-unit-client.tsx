@@ -22,6 +22,7 @@ import {
   displayEstimateToCallMinutes,
   displayMaxWaitInQueueMinutes
 } from '@/lib/queue-eta-display';
+import { QueueDisplayExperienceRuntime } from '@/components/screen/queue-display-experience-runtime';
 
 interface ScreenUnitClientProps {
   unitId: string;
@@ -137,7 +138,7 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     );
   }
 
-  return (
+  const legacyScreen = (
     <div
       className='bg-background text-foreground flex h-screen w-screen flex-col overflow-hidden'
       style={{ backgroundColor: bodyColor || undefined }}
@@ -321,5 +322,15 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
         </div>
       )}
     </div>
+  );
+
+  return (
+    <QueueDisplayExperienceRuntime
+      unitId={unitId}
+      unit={unit}
+      calledTickets={calledTickets}
+      currentTime={currentTime}
+      legacy={legacyScreen}
+    />
   );
 }
