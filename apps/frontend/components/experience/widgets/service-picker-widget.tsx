@@ -69,10 +69,8 @@ export function ServicePickerWidget({
           kind: 'category' as const
         })),
       ...visibleEntries(services, conditionContext)
-        .filter((entry) =>
-          activeCategoryId
-            ? entry.categoryId === activeCategoryId
-            : !entry.categoryId
+        .filter(
+          (entry) => !activeCategoryId || entry.categoryId === activeCategoryId
         )
         .map((entry) => ({
           ...entry,
