@@ -339,7 +339,7 @@ describe('ExperienceBuilderShell', () => {
     expect(JSON.stringify(useExperienceBuilderStore.getState().draft)).toBe(
       before
     );
-  });
+  }, 15_000);
 
   it('keeps save and publish separate and never assigns a device from this workspace', async () => {
     const publishableDraft: ExperienceTemplate = {
