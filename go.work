@@ -1,4 +1,5 @@
 go 1.26.5
 
 use ./apps/backend
+
 use ./apps/kiosk-desktop/agent

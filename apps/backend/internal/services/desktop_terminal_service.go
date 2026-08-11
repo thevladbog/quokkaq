@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 
@@ -22,6 +23,10 @@ import (
 const (
 	desktopTerminalCodeLen = 10
 	desktopTerminalJWTDays = 60
+	// Legacy terminals created before JWT_SECRET became mandatory used this pepper.
+	// It is accepted only during a successful bcrypt pairing-code verification and
+	// immediately replaced with the configured current pepper.
+	legacyTerminalCodePepper = "default_secret_please_change"
 )
 
 var (
@@ -77,15 +82,11 @@ func NewDesktopTerminalService(
 	return &desktopTerminalService{repo: repo, unitRepo: unitRepo, counterRepo: counterRepo, experienceRepo: experienceRepo}
 }
 
-func (s *desktopTerminalService) codePepper() string {
+func (s *desktopTerminalService) codePepper() (string, error) {
 	if p := os.Getenv("TERMINAL_CODE_PEPPER"); p != "" {
-		return p
+		return p, nil
 	}
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		return "default_secret_please_change"
-	}
-	return secret
+	return config.JWTSecret()
 }
 
 func pairingCodeDigest(pepper, code string) string {
@@ -215,6 +216,10 @@ func (s *desktopTerminalService) Create(name *string, unitID, defaultLocale stri
 	if err := validateLocale(defaultLocale); err != nil {
 		return nil, "", err
 	}
+	pepper, err := s.codePepper()
+	if err != nil {
+		return nil, "", err
+	}
 
 	effectiveUnit, cPtr, outKind, err := s.resolveCounterBinding(unitID, contextUnitID, counterID, kind)
 	if err != nil {
@@ -228,7 +233,7 @@ func (s *desktopTerminalService) Create(name *string, unitID, defaultLocale stri
 		if err != nil {
 			return nil, "", err
 		}
-		digest := pairingCodeDigest(s.codePepper(), code)
+		digest := pairingCodeDigest(pepper, code)
 		hash, err := bcrypt.GenerateFromPassword([]byte(strings.TrimSpace(code)), bcrypt.DefaultCost)
 		if err != nil {
 			return nil, "", err
@@ -337,20 +342,40 @@ func (s *desktopTerminalService) Revoke(id string) error {
 }
 
 func (s *desktopTerminalService) Bootstrap(pairingCode string) (token, unitID, defaultLocale, appBaseURL string, kioskFullscreen bool, counterID *string, terminalKind string, err error) {
-	digest := pairingCodeDigest(s.codePepper(), pairingCode)
+	pepper, err := s.codePepper()
+	if err != nil {
+		return "", "", "", "", false, nil, "", err
+	}
+	digest := pairingCodeDigest(pepper, pairingCode)
 	t, e := s.repo.FindByPairingCodeDigest(digest)
+	legacyDigest := false
+	if errors.Is(e, gorm.ErrRecordNotFound) {
+		legacyDigest = true
+		legacyCandidate := pairingCodeDigest(legacyTerminalCodePepper, pairingCode)
+		if legacyCandidate != digest {
+			digest = legacyCandidate
+			t, e = s.repo.FindByPairingCodeDigest(digest)
+		} else {
+			legacyDigest = false
+		}
+	}
 	if e != nil || t.RevokedAt != nil {
 		return "", "", "", "", false, nil, "", ErrInvalidTerminalCode
 	}
 	if bcrypt.CompareHashAndPassword([]byte(t.SecretHash), []byte(strings.TrimSpace(pairingCode))) != nil {
 		return "", "", "", "", false, nil, "", ErrInvalidTerminalCode
 	}
+	if legacyDigest {
+		if err := s.repo.RewritePairingCodeDigest(t.ID, pairingCodeDigest(pepper, pairingCode)); err != nil {
+			return "", "", "", "", false, nil, "", ErrInvalidTerminalCode
+		}
+	}
 
 	tk := models.EffectiveTerminalKind(t)
 
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "default_secret_please_change"
+	secret, e := config.JWTSecret()
+	if e != nil {
+		return "", "", "", "", false, nil, "", e
 	}
 	exp := time.Now().Add(time.Hour * 24 * desktopTerminalJWTDays)
 	claims := jwt.MapClaims{

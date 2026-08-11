@@ -20,6 +20,29 @@ type bootstrapRevocationRaceRepository struct {
 	stored models.DesktopTerminal
 }
 
+type legacyPairingRepository struct {
+	bootstrapRevocationRaceRepository
+	legacyDigest string
+	rewrites     int
+}
+
+func (r *legacyPairingRepository) FindByPairingCodeDigest(digest string) (*models.DesktopTerminal, error) {
+	if digest != r.legacyDigest {
+		return nil, gorm.ErrRecordNotFound
+	}
+	row := r.stored
+	return &row, nil
+}
+
+func (r *legacyPairingRepository) RewritePairingCodeDigest(id, digest string) error {
+	if id != r.stored.ID {
+		return gorm.ErrRecordNotFound
+	}
+	r.stored.PairingCodeDigest = digest
+	r.rewrites++
+	return nil
+}
+
 var _ repository.DesktopTerminalRepository = (*bootstrapRevocationRaceRepository)(nil)
 
 func (r *bootstrapRevocationRaceRepository) Create(*models.DesktopTerminal) error { return nil }
@@ -71,13 +94,18 @@ func (r *bootstrapRevocationRaceRepository) FindByPairingCodeDigest(string) (*mo
 	return &snapshot, nil
 }
 
+func (r *bootstrapRevocationRaceRepository) RewritePairingCodeDigest(_ string, digest string) error {
+	r.stored.PairingCodeDigest = digest
+	return nil
+}
+
 func (r *bootstrapRevocationRaceRepository) Update(terminal *models.DesktopTerminal) error {
 	r.stored = *terminal
 	return nil
 }
 
 func TestDesktopTerminalService_BootstrapDoesNotRestoreConcurrentRevocation(t *testing.T) {
-	t.Setenv("JWT_SECRET", "bootstrap-stale-row-test")
+	t.Setenv("JWT_SECRET", "bootstrap-stale-row-test-secret-012345")
 	pairingCode := "23456789AB"
 	hash, err := bcrypt.GenerateFromPassword([]byte(pairingCode), bcrypt.MinCost)
 	if err != nil {
@@ -101,5 +129,36 @@ func TestDesktopTerminalService_BootstrapDoesNotRestoreConcurrentRevocation(t *t
 	}
 	if repo.stored.RevokedAt == nil || repo.stored.LastSeenAt != nil {
 		t.Fatalf("bootstrap restored stale terminal snapshot after revocation: %#v", repo.stored)
+	}
+}
+
+func TestDesktopTerminalService_BootstrapMigratesLegacyPairingDigest(t *testing.T) {
+	t.Setenv("JWT_SECRET", "current-terminal-secret-012345678901")
+	pairingCode := "23456789AB"
+	hash, err := bcrypt.GenerateFromPassword([]byte(pairingCode), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := &legacyPairingRepository{
+		bootstrapRevocationRaceRepository: bootstrapRevocationRaceRepository{stored: models.DesktopTerminal{
+			ID:                "legacy-terminal",
+			UnitID:            "unit-a",
+			Kind:              models.DesktopTerminalKindKiosk,
+			DefaultLocale:     "en",
+			SecretHash:        string(hash),
+			PairingCodeDigest: pairingCodeDigest("default_secret_please_change", pairingCode),
+		}},
+		legacyDigest: pairingCodeDigest("default_secret_please_change", pairingCode),
+	}
+
+	service := NewDesktopTerminalService(repo, nil, nil)
+	if _, _, _, _, _, _, _, err := service.Bootstrap(pairingCode); err != nil {
+		t.Fatalf("bootstrap legacy terminal: %v", err)
+	}
+	if repo.rewrites != 1 {
+		t.Fatalf("digest rewrites = %d, want 1", repo.rewrites)
+	}
+	if got := repo.stored.PairingCodeDigest; got != pairingCodeDigest("current-terminal-secret-012345678901", pairingCode) {
+		t.Fatalf("pairing digest was not migrated: %q", got)
 	}
 }

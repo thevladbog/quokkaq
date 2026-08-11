@@ -79,7 +79,7 @@ async function handle(req: NextRequest, ctx: RouteCtx): Promise<NextResponse> {
   } catch (e) {
     console.error('[api proxy]', upstreamBase(), e);
     return NextResponse.json(
-      { error: 'Upstream API unreachable', detail: String(e) },
+      { error: 'Upstream API unreachable' },
       { status: 502 }
     );
   }

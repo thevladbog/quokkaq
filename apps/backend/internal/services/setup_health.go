@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/sso/redisstore"
 	"quokkaq-go-backend/pkg/database"
 )
@@ -108,7 +109,7 @@ func smtpOpDeadline(ctx context.Context) time.Time {
 
 func smtpTLSConfig(host string) *tls.Config {
 	cfg := &tls.Config{MinVersion: tls.VersionTLS12, ServerName: host}
-	if os.Getenv("SMTP_TLS_INSECURE_SKIP_VERIFY") == "true" {
+	if config.AllowsInsecureDevTLS() && os.Getenv("SMTP_TLS_INSECURE_SKIP_VERIFY") == "true" {
 		cfg.InsecureSkipVerify = true
 	}
 	return cfg
