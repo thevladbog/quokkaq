@@ -17,6 +17,8 @@ import {
 } from '@/lib/experience/operational-state';
 import { ExperienceOperationalOverlay } from './experience-operational-overlay';
 import { ExperienceRuntimeShell } from './experience-runtime-shell';
+import { StationRuntimeStateView } from './station-runtime-state';
+import type { StationRuntimeState } from '@/lib/experience/station-runtime-state';
 import {
   ExperienceWidgetDiagnostic,
   ExperienceWidgetRegistry,
@@ -171,6 +173,8 @@ export type ExperienceRendererProps = {
   adapters: ExperienceRuntimeAdapters;
   initialPageId?: string;
   sessionTimeoutMs?: number;
+  stationState?: StationRuntimeState;
+  onStationReset?: () => void;
   mode?: 'editor' | 'preview' | 'deployed';
 };
 
@@ -217,6 +221,8 @@ export function ExperienceRenderer({
   adapters,
   initialPageId,
   sessionTimeoutMs,
+  stationState = 'active',
+  onStationReset,
   mode = 'deployed'
 }: ExperienceRendererProps) {
   const t = useTranslations('experience.runtime.task12');
@@ -584,11 +590,19 @@ export function ExperienceRenderer({
       }}
       onReset={reset}
       overlay={
-        <ExperienceOperationalOverlay
-          resolved={operational}
-          display={runtimeContext.display}
-          profile={variant.profile}
-        />
+        <>
+          <ExperienceOperationalOverlay
+            resolved={operational}
+            display={runtimeContext.display}
+            profile={variant.profile}
+          />
+          {operational.state === 'normal' && stationState !== 'active' ? (
+            <StationRuntimeStateView
+              state={stationState}
+              onReset={onStationReset}
+            />
+          ) : null}
+        </>
       }
       renderWidget={(widget) => {
         if (operational.state !== 'normal') return null;
