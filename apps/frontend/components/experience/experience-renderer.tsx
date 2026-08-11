@@ -62,6 +62,11 @@ export type ExperienceRuntimeError =
       code: 'adapter-unavailable' | 'adapter-failed';
       adapter: ExperienceRuntimeAdapterName;
       widgetId?: string;
+    }
+  | {
+      code: 'incomplete-service-flow';
+      slot: string;
+      widgetId?: string;
     };
 
 export type ExperienceActivationEvent = Partial<
@@ -616,6 +621,14 @@ export function ExperienceRenderer({
             onActivate={(event) => void activateWidget(widget, event)}
             session={runtime.session}
             ticketStation={adapters.ticketStation}
+            flowPages={template.flowPages}
+            onFlowError={(slot) =>
+              adapters.onRuntimeError?.({
+                code: 'incomplete-service-flow',
+                slot,
+                widgetId: widget.id
+              })
+            }
           />
         );
       }}

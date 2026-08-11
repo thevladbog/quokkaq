@@ -27,6 +27,8 @@ import { LanguageSwitchWidget } from './widgets/language-switch-widget';
 import { TicketFormWidget } from './widgets/ticket-form-widget';
 import { TicketSuccessWidget } from './widgets/ticket-success-widget';
 import { IdentifyWidget } from './widgets/identify-widget';
+import { resolveServiceFlow } from '@/lib/experience/service-flow';
+import type { ExperienceFlowPages, ServiceModel } from '@quokkaq/shared-types';
 
 export function isKnownExperienceWidget(
   type: unknown
@@ -255,7 +257,9 @@ export function ExperienceWidgetRegistry({
   profile,
   locked,
   onActivate,
-  ticketStation
+  ticketStation,
+  flowPages,
+  onFlowError
 }: {
   widget: ExperienceWidget;
   surface: ExperienceSurface;
@@ -265,6 +269,8 @@ export function ExperienceWidgetRegistry({
   onActivate: (event: ExperienceActivationEvent) => void;
   session: ExperienceRuntimeSession;
   ticketStation?: ExperienceTicketStationAdapters;
+  flowPages?: ExperienceFlowPages;
+  onFlowError?: (slot: string) => void;
 }) {
   const label = String(
     widget.config.label ?? widget.config.title ?? widget.type
@@ -278,11 +284,38 @@ export function ExperienceWidgetRegistry({
         profile={profile}
         locked={locked}
         onSelectService={(service) =>
-          onActivate({
-            serviceId: service.id,
-            ...(service.categoryId ? { categoryId: service.categoryId } : {}),
-            ...(service.locale ? { locale: service.locale } : {})
-          })
+          (() => {
+            const configured = widget.config.catalog;
+            const rawServices =
+              configured &&
+              typeof configured === 'object' &&
+              !Array.isArray(configured)
+                ? (configured as Record<string, unknown>).services
+                : undefined;
+            const rawService = Array.isArray(rawServices)
+              ? rawServices.find(
+                  (candidate) =>
+                    candidate &&
+                    typeof candidate === 'object' &&
+                    (candidate as Record<string, unknown>).id === service.id
+                )
+              : undefined;
+            if (flowPages && rawService && typeof rawService === 'object') {
+              const resolution = resolveServiceFlow(
+                rawService as ServiceModel,
+                flowPages
+              );
+              if (!resolution.ok) {
+                onFlowError?.(resolution.slot);
+                return;
+              }
+            }
+            onActivate({
+              serviceId: service.id,
+              ...(service.categoryId ? { categoryId: service.categoryId } : {}),
+              ...(service.locale ? { locale: service.locale } : {})
+            });
+          })()
         }
         onSelectCategory={(category) => onActivate({ categoryId: category.id })}
       />
