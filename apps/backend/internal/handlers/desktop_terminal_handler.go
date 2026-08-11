@@ -75,13 +75,50 @@ type CreateDesktopTerminalRequest struct {
 
 // UpdateDesktopTerminalRequest is the body for PATCH /desktop-terminals/{id}.
 type UpdateDesktopTerminalRequest struct {
-	Name            *string `json:"name"`
-	UnitID          string  `json:"unitId"`
-	DefaultLocale   string  `json:"defaultLocale"`
-	KioskFullscreen bool    `json:"kioskFullscreen"`
-	ContextUnitID   *string `json:"contextUnitId"`
-	CounterID       *string `json:"counterId"`
-	Kind            *string `json:"kind,omitempty"`
+	Name                 *string                `json:"name"`
+	UnitID               string                 `json:"unitId"`
+	DefaultLocale        string                 `json:"defaultLocale"`
+	KioskFullscreen      bool                   `json:"kioskFullscreen"`
+	ContextUnitID        *string                `json:"contextUnitId"`
+	CounterID            *string                `json:"counterId"`
+	Kind                 *string                `json:"kind,omitempty"`
+	ExperienceTemplateID optionalNullableString `json:"experienceTemplateId" swaggertype:"string"`
+	ExperienceVariantID  optionalNullableString `json:"experienceVariantId" swaggertype:"string"`
+}
+
+// UpdateDesktopTerminalRequestDoc is the generated-client contract for PATCH.
+// Runtime decoding uses UpdateDesktopTerminalRequest to preserve omitted vs null.
+type UpdateDesktopTerminalRequestDoc struct {
+	Name                 *string `json:"name,omitempty"`
+	UnitID               string  `json:"unitId"`
+	DefaultLocale        string  `json:"defaultLocale"`
+	KioskFullscreen      bool    `json:"kioskFullscreen"`
+	ContextUnitID        *string `json:"contextUnitId,omitempty" extensions:"x-nullable"`
+	CounterID            *string `json:"counterId,omitempty" extensions:"x-nullable"`
+	Kind                 *string `json:"kind,omitempty" enums:"kiosk,counter_guest_survey,counter_board"`
+	ExperienceTemplateID *string `json:"experienceTemplateId,omitempty" extensions:"x-nullable"`
+	ExperienceVariantID  *string `json:"experienceVariantId,omitempty" extensions:"x-nullable"`
+}
+
+// optionalNullableString distinguishes omission from explicit null so PATCH can
+// preserve, assign, or unassign without accepting half assignments.
+type optionalNullableString struct {
+	Set   bool
+	Value *string
+}
+
+func (o *optionalNullableString) UnmarshalJSON(data []byte) error {
+	o.Set = true
+	if strings.TrimSpace(string(data)) == "null" {
+		o.Value = nil
+		return nil
+	}
+	var value string
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	o.Value = &value
+	return nil
 }
 
 // CreateDesktopTerminalResponse is returned after POST /desktop-terminals.
@@ -92,31 +129,83 @@ type CreateDesktopTerminalResponse struct {
 
 // DesktopTerminalJSON is the wire shape for a paired desktop terminal row.
 type DesktopTerminalJSON struct {
-	ID              string  `json:"id"`
-	UnitID          string  `json:"unitId"`
-	CounterID       *string `json:"counterId,omitempty"`
-	CounterName     string  `json:"counterName,omitempty"`
-	Kind            string  `json:"kind"`
-	Name            *string `json:"name,omitempty"`
-	DefaultLocale   string  `json:"defaultLocale"`
-	KioskFullscreen bool    `json:"kioskFullscreen"`
-	RevokedAt       *string `json:"revokedAt,omitempty"`
-	LastSeenAt      *string `json:"lastSeenAt,omitempty"`
-	CreatedAt       string  `json:"createdAt"`
-	UpdatedAt       string  `json:"updatedAt"`
-	UnitName        string  `json:"unitName,omitempty"`
+	ID                       string  `json:"id"`
+	UnitID                   string  `json:"unitId"`
+	CounterID                *string `json:"counterId,omitempty"`
+	CounterName              string  `json:"counterName,omitempty"`
+	Kind                     string  `json:"kind"`
+	Name                     *string `json:"name,omitempty"`
+	DefaultLocale            string  `json:"defaultLocale"`
+	KioskFullscreen          bool    `json:"kioskFullscreen"`
+	ExperienceTemplateID     *string `json:"experienceTemplateId,omitempty"`
+	ExperienceVariantID      *string `json:"experienceVariantId,omitempty"`
+	AppliedTemplateVersionID *string `json:"appliedTemplateVersionId,omitempty"`
+	AppliedTemplateAt        *string `json:"appliedTemplateAt,omitempty"`
+	ExperienceAckStatus      *string `json:"experienceAckStatus,omitempty"`
+	ExperienceAckReasonCode  *string `json:"experienceAckReasonCode,omitempty"`
+	ExperienceAckAt          *string `json:"experienceAckAt,omitempty"`
+	RevokedAt                *string `json:"revokedAt,omitempty"`
+	LastSeenAt               *string `json:"lastSeenAt,omitempty"`
+	CreatedAt                string  `json:"createdAt"`
+	UpdatedAt                string  `json:"updatedAt"`
+	UnitName                 string  `json:"unitName,omitempty"`
+}
+
+// DesktopTerminalResponseDoc is the explicit generated-client response shape.
+// Assignment and acknowledgement fields are optional and nullable; ack fields
+// remain server-controlled and therefore do not appear in the request DTO.
+type DesktopTerminalResponseDoc struct {
+	ID                       string  `json:"id"`
+	UnitID                   string  `json:"unitId"`
+	CounterID                *string `json:"counterId,omitempty" extensions:"x-nullable"`
+	CounterName              string  `json:"counterName,omitempty"`
+	Kind                     string  `json:"kind"`
+	Name                     *string `json:"name,omitempty" extensions:"x-nullable"`
+	DefaultLocale            string  `json:"defaultLocale"`
+	KioskFullscreen          bool    `json:"kioskFullscreen"`
+	ExperienceTemplateID     *string `json:"experienceTemplateId,omitempty" extensions:"x-nullable"`
+	ExperienceVariantID      *string `json:"experienceVariantId,omitempty" extensions:"x-nullable"`
+	AppliedTemplateVersionID *string `json:"appliedTemplateVersionId,omitempty" extensions:"x-nullable"`
+	AppliedTemplateAt        *string `json:"appliedTemplateAt,omitempty" extensions:"x-nullable"`
+	ExperienceAckStatus      *string `json:"experienceAckStatus,omitempty" extensions:"x-nullable"`
+	ExperienceAckReasonCode  *string `json:"experienceAckReasonCode,omitempty" extensions:"x-nullable"`
+	ExperienceAckAt          *string `json:"experienceAckAt,omitempty" extensions:"x-nullable"`
+	RevokedAt                *string `json:"revokedAt,omitempty" extensions:"x-nullable"`
+	LastSeenAt               *string `json:"lastSeenAt,omitempty" extensions:"x-nullable"`
+	CreatedAt                string  `json:"createdAt"`
+	UpdatedAt                string  `json:"updatedAt"`
+	UnitName                 string  `json:"unitName,omitempty"`
+}
+
+// CreateDesktopTerminalResponseDoc is the explicit generated-client create response.
+type CreateDesktopTerminalResponseDoc struct {
+	Terminal    DesktopTerminalResponseDoc `json:"terminal"`
+	PairingCode string                     `json:"pairingCode"`
 }
 
 func mapTerminalToJSON(t *models.DesktopTerminal) DesktopTerminalJSON {
 	out := DesktopTerminalJSON{
-		ID:              t.ID,
-		UnitID:          t.UnitID,
-		Kind:            models.EffectiveTerminalKind(t),
-		Name:            t.Name,
-		DefaultLocale:   t.DefaultLocale,
-		KioskFullscreen: t.KioskFullscreen,
-		CreatedAt:       t.CreatedAt.UTC().Format(time.RFC3339Nano),
-		UpdatedAt:       t.UpdatedAt.UTC().Format(time.RFC3339Nano),
+		ID:                       t.ID,
+		UnitID:                   t.UnitID,
+		Kind:                     models.EffectiveTerminalKind(t),
+		Name:                     t.Name,
+		DefaultLocale:            t.DefaultLocale,
+		KioskFullscreen:          t.KioskFullscreen,
+		ExperienceTemplateID:     t.ExperienceTemplateID,
+		ExperienceVariantID:      t.ExperienceVariantID,
+		AppliedTemplateVersionID: t.AppliedTemplateVersionID,
+		ExperienceAckStatus:      t.ExperienceAckStatus,
+		ExperienceAckReasonCode:  t.ExperienceAckReasonCode,
+		CreatedAt:                t.CreatedAt.UTC().Format(time.RFC3339Nano),
+		UpdatedAt:                t.UpdatedAt.UTC().Format(time.RFC3339Nano),
+	}
+	if t.AppliedTemplateAt != nil {
+		s := t.AppliedTemplateAt.UTC().Format(time.RFC3339Nano)
+		out.AppliedTemplateAt = &s
+	}
+	if t.ExperienceAckAt != nil {
+		s := t.ExperienceAckAt.UTC().Format(time.RFC3339Nano)
+		out.ExperienceAckAt = &s
 	}
 	if t.RevokedAt != nil {
 		s := t.RevokedAt.UTC().Format(time.RFC3339Nano)
@@ -147,7 +236,7 @@ func mapTerminalToJSON(t *models.DesktopTerminal) DesktopTerminalJSON {
 // @Produce      json
 // @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Param        body  body      CreateDesktopTerminalRequest  true  "Create payload"
-// @Success      201   {object}  CreateDesktopTerminalResponse
+// @Success      201   {object}  CreateDesktopTerminalResponseDoc
 // @Failure      400   {string}  string  "Bad request or company context required"
 // @Failure      401   {string}  string  "Unauthorized"
 // @Failure      403   {string}  string  "Forbidden"
@@ -234,7 +323,7 @@ func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) 
 // @Tags         DesktopTerminal
 // @Produce      json
 // @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
-// @Success      200  {array}   DesktopTerminalJSON
+// @Success      200  {array}   DesktopTerminalResponseDoc
 // @Failure      400  {string}  string  "Company context required"
 // @Failure      401  {string}  string  "Unauthorized"
 // @Failure      403  {string}  string  "Forbidden"
@@ -267,7 +356,7 @@ func (h *DesktopTerminalHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        id   path      string  true  "Terminal ID"
 // @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
-// @Success      200  {object}  DesktopTerminalJSON
+// @Success      200  {object}  DesktopTerminalResponseDoc
 // @Failure      400  {string}  string  "Company context required"
 // @Failure      401  {string}  string  "Unauthorized"
 // @Failure      403  {string}  string  "Forbidden"
@@ -294,18 +383,19 @@ func (h *DesktopTerminalHandler) GetByID(w http.ResponseWriter, r *http.Request)
 // Update godoc
 // @ID           updateDesktopTerminal
 // @Summary      Update desktop terminal
-// @Description  Patches name, locale, kiosk fullscreen, and optionally counter binding. Body may include `kind` (kiosk | counter_guest_survey | counter_board) with `counterId`/`contextUnitId` when changing bindings; metadata-only updates omit counter fields.
+// @Description  Patches terminal metadata and optionally assigns an experience. Omit both experience fields to preserve; provide both strings to assign; provide both null to unassign. Acknowledgement fields are server-controlled.
 // @Tags         DesktopTerminal
 // @Accept       json
 // @Produce      json
 // @Param        id    path      string                        true  "Terminal ID"
 // @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
-// @Param        body  body      UpdateDesktopTerminalRequest  true  "Update payload"
+// @Param        body  body      UpdateDesktopTerminalRequestDoc  true  "Update payload"
 // @Success      204   "No Content"
 // @Failure      400   {string}  string  "Bad request or company context required"
 // @Failure      401   {string}  string  "Unauthorized"
 // @Failure      403   {string}  string  "Forbidden"
 // @Failure      404   {string}  string  "Not found"
+// @Failure      409   {string}  string  "Published template conflict"
 // @Failure      500   {string}  string  "Internal Server Error"
 // @Router       /desktop-terminals/{id} [patch]
 // @Security     BearerAuth
@@ -344,16 +434,43 @@ func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Unit not found", http.StatusNotFound)
 		return
 	}
+	if req.ExperienceTemplateID.Set != req.ExperienceVariantID.Set {
+		http.Error(w, services.ErrExperienceAssignmentIncomplete.Error(), http.StatusBadRequest)
+		return
+	}
+	assignment := services.TerminalExperienceAssignment{}
+	if req.ExperienceTemplateID.Set {
+		if (req.ExperienceTemplateID.Value == nil) != (req.ExperienceVariantID.Value == nil) {
+			http.Error(w, services.ErrExperienceAssignmentIncomplete.Error(), http.StatusBadRequest)
+			return
+		}
+		assignment = services.TerminalExperienceAssignment{
+			Specified:  true,
+			TemplateID: req.ExperienceTemplateID.Value,
+			VariantID:  req.ExperienceVariantID.Value,
+		}
+	}
 
-	err = h.service.Update(id, req.Name, req.UnitID, req.DefaultLocale, req.KioskFullscreen, req.ContextUnitID, req.CounterID, req.Kind)
+	err = h.service.Update(companyID, id, req.Name, req.UnitID, req.DefaultLocale, req.KioskFullscreen, req.ContextUnitID, req.CounterID, req.Kind, assignment)
 	if errors.Is(err, services.ErrInvalidLocale) ||
 		errors.Is(err, services.ErrInvalidTerminalKind) ||
 		errors.Is(err, services.ErrCounterIDRequired) ||
 		errors.Is(err, services.ErrInvalidKindForCounter) ||
 		errors.Is(err, services.ErrTerminalKindRequiresRebinding) ||
 		errors.Is(err, services.ErrTerminalCounterContext) ||
-		errors.Is(err, services.ErrTerminalCounterMismatch) {
+		errors.Is(err, services.ErrTerminalCounterMismatch) ||
+		errors.Is(err, services.ErrExperienceAssignmentIncomplete) ||
+		errors.Is(err, services.ErrExperienceAssignmentIncompatible) ||
+		errors.Is(err, services.ErrExperienceVariantNotFound) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if errors.Is(err, services.ErrExperienceTemplateUnpublished) || errors.Is(err, services.ErrExperiencePublishedDefinitionInvalid) {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	if errors.Is(err, services.ErrExperienceTemplateNotFound) {
+		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
 	if errors.Is(err, services.ErrSurveyFeatureLocked) {

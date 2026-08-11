@@ -35,6 +35,19 @@ export interface HandlersAnnouncementRequest {
   text?: string;
 }
 
+export type HandlersAppliedExperienceAcknowledgementStatus = typeof HandlersAppliedExperienceAcknowledgementStatus[keyof typeof HandlersAppliedExperienceAcknowledgementStatus];
+
+
+export const HandlersAppliedExperienceAcknowledgementStatus = {
+  applied: 'applied',
+} as const;
+
+export interface HandlersAppliedExperienceAcknowledgement {
+  status: HandlersAppliedExperienceAcknowledgementStatus;
+  /** @minLength 1 */
+  versionId: string;
+}
+
 export interface HandlersAssignUnitRequest {
   permissions?: string[];
   unitId?: string;
@@ -113,6 +126,147 @@ export interface ModelsUnitOperationsPublic {
   phase?: string;
 }
 
+export type ModelsServiceBehaviorConditionCombinator = typeof ModelsServiceBehaviorConditionCombinator[keyof typeof ModelsServiceBehaviorConditionCombinator];
+
+
+export const ModelsServiceBehaviorConditionCombinator = {
+  and: 'and',
+  or: 'or',
+} as const;
+
+export type ModelsServiceBehaviorConditionField = typeof ModelsServiceBehaviorConditionField[keyof typeof ModelsServiceBehaviorConditionField];
+
+
+export const ModelsServiceBehaviorConditionField = {
+  identityisAuthenticated: 'identity.isAuthenticated',
+  identityisEmployee: 'identity.isEmployee',
+  identitygroups: 'identity.groups',
+  livequeueLength: 'live.queueLength',
+  liveisOpen: 'live.isOpen',
+  liveisConnected: 'live.isConnected',
+  sessionselectedServiceId: 'session.selectedServiceId',
+} as const;
+
+export type ModelsServiceBehaviorConditionKind = typeof ModelsServiceBehaviorConditionKind[keyof typeof ModelsServiceBehaviorConditionKind];
+
+
+export const ModelsServiceBehaviorConditionKind = {
+  rule: 'rule',
+  group: 'group',
+} as const;
+
+export type ModelsServiceBehaviorConditionOperator = typeof ModelsServiceBehaviorConditionOperator[keyof typeof ModelsServiceBehaviorConditionOperator];
+
+
+export const ModelsServiceBehaviorConditionOperator = {
+  eq: 'eq',
+  ne: 'ne',
+  gt: 'gt',
+  gte: 'gte',
+  lt: 'lt',
+  lte: 'lte',
+  contains: 'contains',
+  'not-contains': 'not-contains',
+  'is-true': 'is-true',
+  'is-false': 'is-false',
+} as const;
+
+export interface ModelsServiceBehaviorCondition {
+  children?: ModelsServiceBehaviorCondition[];
+  combinator?: ModelsServiceBehaviorConditionCombinator;
+  field?: ModelsServiceBehaviorConditionField;
+  kind: ModelsServiceBehaviorConditionKind;
+  operator?: ModelsServiceBehaviorConditionOperator;
+  value?: unknown;
+}
+
+export type ModelsServiceBehaviorAccessPolicyWhenFalse = typeof ModelsServiceBehaviorAccessPolicyWhenFalse[keyof typeof ModelsServiceBehaviorAccessPolicyWhenFalse];
+
+
+export const ModelsServiceBehaviorAccessPolicyWhenFalse = {
+  hide: 'hide',
+  lock: 'lock',
+} as const;
+
+export interface ModelsServiceBehaviorAccessPolicy {
+  when: ModelsServiceBehaviorCondition;
+  whenFalse: ModelsServiceBehaviorAccessPolicyWhenFalse;
+}
+
+export interface ModelsServiceBehaviorLocalizedText {[key: string]: string}
+
+export interface ModelsServiceBehaviorSelectOption {
+  key: string;
+  label: ModelsServiceBehaviorLocalizedText;
+}
+
+export type ModelsServiceBehaviorFieldType = typeof ModelsServiceBehaviorFieldType[keyof typeof ModelsServiceBehaviorFieldType];
+
+
+export const ModelsServiceBehaviorFieldType = {
+  text: 'text',
+  number: 'number',
+  phone: 'phone',
+  checkbox: 'checkbox',
+  select: 'select',
+} as const;
+
+export interface ModelsServiceBehaviorField {
+  key: string;
+  label: ModelsServiceBehaviorLocalizedText;
+  options?: ModelsServiceBehaviorSelectOption[];
+  required: boolean;
+  type: ModelsServiceBehaviorFieldType;
+}
+
+export interface ModelsServiceBehaviorInformation {
+  body: ModelsServiceBehaviorLocalizedText;
+  requireAcknowledgement?: boolean;
+}
+
+export type ModelsServiceBehaviorRouteMode = typeof ModelsServiceBehaviorRouteMode[keyof typeof ModelsServiceBehaviorRouteMode];
+
+
+export const ModelsServiceBehaviorRouteMode = {
+  auto: 'auto',
+  'page-slot': 'page-slot',
+} as const;
+
+export type ModelsServiceBehaviorRouteSlot = typeof ModelsServiceBehaviorRouteSlot[keyof typeof ModelsServiceBehaviorRouteSlot];
+
+
+export const ModelsServiceBehaviorRouteSlot = {
+  'service-info': 'service-info',
+  'service-form': 'service-form',
+  identity: 'identity',
+  confirmation: 'confirmation',
+} as const;
+
+export interface ModelsServiceBehaviorRoute {
+  mode: ModelsServiceBehaviorRouteMode;
+  slot?: ModelsServiceBehaviorRouteSlot;
+}
+
+export type ModelsServiceBehaviorVersion = typeof ModelsServiceBehaviorVersion[keyof typeof ModelsServiceBehaviorVersion];
+
+
+export const ModelsServiceBehaviorVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export interface ModelsServiceBehavior {
+  access?: ModelsServiceBehaviorAccessPolicy;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  dataRetentionDays?: number;
+  fields?: ModelsServiceBehaviorField[];
+  information?: ModelsServiceBehaviorInformation;
+  route?: ModelsServiceBehaviorRoute;
+  version: ModelsServiceBehaviorVersion;
+}
+
 /**
  * KioskDocumentSettings: JSON, e.g. { "retentionDays": 1–30 } for identificationMode=document.
  */
@@ -125,6 +279,8 @@ export type ModelsServiceKioskIdentificationConfig = { [key: string]: unknown };
 
 export interface ModelsService {
   backgroundColor?: string;
+  /** Behavior is optional portable station flow configuration. It complements, but never replaces, identification mode. */
+  behavior?: ModelsServiceBehavior;
   /** CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).
   When non-empty (after trim), it must be unique per unit — enforced by DB partial unique index and create/update validation. */
   calendarSlotKey?: string;
@@ -462,25 +618,43 @@ export interface HandlersCreateDesktopTerminalRequest {
   unitId?: string;
 }
 
-export interface HandlersDesktopTerminalJSON {
-  counterId?: string;
+export interface HandlersDesktopTerminalResponseDoc {
+  /** @nullable */
+  appliedTemplateAt?: string | null;
+  /** @nullable */
+  appliedTemplateVersionId?: string | null;
+  /** @nullable */
+  counterId?: string | null;
   counterName?: string;
   createdAt?: string;
   defaultLocale?: string;
+  /** @nullable */
+  experienceAckAt?: string | null;
+  /** @nullable */
+  experienceAckReasonCode?: string | null;
+  /** @nullable */
+  experienceAckStatus?: string | null;
+  /** @nullable */
+  experienceTemplateId?: string | null;
+  /** @nullable */
+  experienceVariantId?: string | null;
   id?: string;
   kind?: string;
   kioskFullscreen?: boolean;
-  lastSeenAt?: string;
-  name?: string;
-  revokedAt?: string;
+  /** @nullable */
+  lastSeenAt?: string | null;
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  revokedAt?: string | null;
   unitId?: string;
   unitName?: string;
   updatedAt?: string;
 }
 
-export interface HandlersCreateDesktopTerminalResponse {
+export interface HandlersCreateDesktopTerminalResponseDoc {
   pairingCode?: string;
-  terminal?: HandlersDesktopTerminalJSON;
+  terminal?: HandlersDesktopTerminalResponseDoc;
 }
 
 export type HandlersCreateFeedRequestConfig = { [key: string]: unknown };
@@ -534,9 +708,20 @@ export interface HandlersCreateScheduleRequest {
 
 export type HandlersCreateScreenLayoutTemplateRequestDefinition = { [key: string]: unknown };
 
+export type HandlersCreateScreenLayoutTemplateRequestSurface = typeof HandlersCreateScreenLayoutTemplateRequestSurface[keyof typeof HandlersCreateScreenLayoutTemplateRequestSurface];
+
+
+export const HandlersCreateScreenLayoutTemplateRequestSurface = {
+  'ticket-station': 'ticket-station',
+  'queue-display': 'queue-display',
+  'counter-display': 'counter-display',
+  'visitor-mobile': 'visitor-mobile',
+} as const;
+
 export interface HandlersCreateScreenLayoutTemplateRequest {
   definition?: HandlersCreateScreenLayoutTemplateRequestDefinition;
   name?: string;
+  surface?: HandlersCreateScreenLayoutTemplateRequestSurface;
 }
 
 export interface HandlersTenantRoleUnitJSON {
@@ -608,6 +793,25 @@ export interface HandlersDaDataFindPartyByInnRequest {
 export interface HandlersDaDataPassthroughRequest { [key: string]: unknown }
 
 export interface HandlersDaDataUpstreamResponse { [key: string]: unknown }
+
+export type HandlersExperienceManifestDefinition = { [key: string]: unknown };
+
+export type HandlersExperienceManifestMode = typeof HandlersExperienceManifestMode[keyof typeof HandlersExperienceManifestMode];
+
+
+export const HandlersExperienceManifestMode = {
+  experience: 'experience',
+} as const;
+
+export interface HandlersExperienceManifest {
+  definition: HandlersExperienceManifestDefinition;
+  mode: HandlersExperienceManifestMode;
+  publishedAt: string;
+  templateId: string;
+  variantId: string;
+  version: number;
+  versionId: string;
+}
 
 export interface HandlersFeaturesFlags {
   dadata?: boolean;
@@ -716,6 +920,17 @@ export interface HandlersKioskVisitorSurveyRequest {
   emoji?: string;
   score?: number;
   ticketId?: string;
+}
+
+export type HandlersLegacyManifestMode = typeof HandlersLegacyManifestMode[keyof typeof HandlersLegacyManifestMode];
+
+
+export const HandlersLegacyManifestMode = {
+  legacy: 'legacy',
+} as const;
+
+export interface HandlersLegacyManifest {
+  mode: HandlersLegacyManifestMode;
 }
 
 export interface HandlersLoginLinkResponse {
@@ -1079,6 +1294,25 @@ export interface HandlersRegisterUserRequest {
   token: string;
 }
 
+export type HandlersRejectedExperienceAcknowledgementStatus = typeof HandlersRejectedExperienceAcknowledgementStatus[keyof typeof HandlersRejectedExperienceAcknowledgementStatus];
+
+
+export const HandlersRejectedExperienceAcknowledgementStatus = {
+  rejected: 'rejected',
+} as const;
+
+export interface HandlersRejectedExperienceAcknowledgement {
+  /**
+     * @minLength 1
+     * @maxLength 64
+     * @pattern ^[a-z0-9]+(?:[._-][a-z0-9]+)*$
+     */
+  reasonCode: string;
+  status: HandlersRejectedExperienceAcknowledgementStatus;
+  /** @minLength 1 */
+  versionId: string;
+}
+
 export interface HandlersRemoveUnitRequest {
   unitId?: string;
 }
@@ -1108,6 +1342,113 @@ export interface HandlersSaasVendorResponse {
   counterparty?: HandlersSaasVendorResponseCounterparty;
   name?: string;
   paymentAccounts?: HandlersSaasVendorResponsePaymentAccountsItem[];
+}
+
+export type HandlersServiceCreateRequestKioskDocumentSettings = { [key: string]: unknown };
+
+export type HandlersServiceCreateRequestKioskIdentificationConfig = { [key: string]: unknown };
+
+export interface HandlersServiceCreateRequest {
+  backgroundColor?: string;
+  behavior?: ModelsServiceBehavior | null;
+  calendarSlotKey?: string;
+  children?: ModelsService[];
+  description?: string;
+  descriptionEn?: string;
+  descriptionRu?: string;
+  duration?: number;
+  gridCol?: number;
+  gridColSpan?: number;
+  gridRow?: number;
+  gridRowSpan?: number;
+  iconKey?: string;
+  id?: string;
+  identificationMode?: string;
+  imageUrl?: string;
+  isLeaf?: boolean;
+  kioskDocumentSettings?: HandlersServiceCreateRequestKioskDocumentSettings;
+  kioskIdentificationConfig?: HandlersServiceCreateRequestKioskIdentificationConfig;
+  maxServiceTime?: number;
+  maxWaitingTime?: number;
+  name?: string;
+  nameEn?: string;
+  nameRu?: string;
+  numberSequence?: string;
+  offerIdentification?: boolean;
+  parentId?: string;
+  prebook?: boolean;
+  prefix?: string;
+  restrictedServiceZoneId?: string;
+  sortOrder?: number;
+  textColor?: string;
+  unitId?: string;
+}
+
+/**
+ * @nullable
+ */
+export type HandlersServiceUpdateRequestKioskDocumentSettings = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type HandlersServiceUpdateRequestKioskIdentificationConfig = { [key: string]: unknown } | null;
+
+export interface HandlersServiceUpdateRequest {
+  /** @nullable */
+  backgroundColor?: string | null;
+  behavior?: ModelsServiceBehavior | null;
+  /** @nullable */
+  calendarSlotKey?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  descriptionEn?: string | null;
+  /** @nullable */
+  descriptionRu?: string | null;
+  /** @nullable */
+  duration?: number | null;
+  /** @nullable */
+  gridCol?: number | null;
+  /** @nullable */
+  gridColSpan?: number | null;
+  /** @nullable */
+  gridRow?: number | null;
+  /** @nullable */
+  gridRowSpan?: number | null;
+  /** @nullable */
+  iconKey?: string | null;
+  identificationMode?: string;
+  /** @nullable */
+  imageUrl?: string | null;
+  isLeaf?: boolean;
+  /** @nullable */
+  kioskDocumentSettings?: HandlersServiceUpdateRequestKioskDocumentSettings;
+  /** @nullable */
+  kioskIdentificationConfig?: HandlersServiceUpdateRequestKioskIdentificationConfig;
+  /** @nullable */
+  maxServiceTime?: number | null;
+  /** @nullable */
+  maxWaitingTime?: number | null;
+  name?: string;
+  /** @nullable */
+  nameEn?: string | null;
+  /** @nullable */
+  nameRu?: string | null;
+  /** @nullable */
+  numberSequence?: string | null;
+  offerIdentification?: boolean;
+  /** @nullable */
+  parentId?: string | null;
+  prebook?: boolean;
+  /** @nullable */
+  prefix?: string | null;
+  /** @nullable */
+  restrictedServiceZoneId?: string | null;
+  sortOrder?: number;
+  /** @nullable */
+  textColor?: string | null;
+  unitId?: string;
 }
 
 /**
@@ -1149,6 +1490,10 @@ export interface HandlersTerminalBootstrapResponse {
   token?: string;
   unitId?: string;
 }
+
+export type HandlersTerminalExperienceAckRequestDoc = HandlersAppliedExperienceAcknowledgement | HandlersRejectedExperienceAcknowledgement;
+
+export type HandlersTerminalExperienceManifestResponseDoc = HandlersLegacyManifest | HandlersExperienceManifest;
 
 export interface HandlersTestSMSIntegrationRequest {
   /** Phone number in E.164 format to send the test SMS to. */
@@ -1252,11 +1597,26 @@ export interface HandlersUpdateCounterRequest {
   serviceZoneId?: string;
 }
 
-export interface HandlersUpdateDesktopTerminalRequest {
-  contextUnitId?: string;
-  counterId?: string;
+export type HandlersUpdateDesktopTerminalRequestDocKind = typeof HandlersUpdateDesktopTerminalRequestDocKind[keyof typeof HandlersUpdateDesktopTerminalRequestDocKind];
+
+
+export const HandlersUpdateDesktopTerminalRequestDocKind = {
+  kiosk: 'kiosk',
+  counter_guest_survey: 'counter_guest_survey',
+  counter_board: 'counter_board',
+} as const;
+
+export interface HandlersUpdateDesktopTerminalRequestDoc {
+  /** @nullable */
+  contextUnitId?: string | null;
+  /** @nullable */
+  counterId?: string | null;
   defaultLocale?: string;
-  kind?: string;
+  /** @nullable */
+  experienceTemplateId?: string | null;
+  /** @nullable */
+  experienceVariantId?: string | null;
+  kind?: HandlersUpdateDesktopTerminalRequestDocKind;
   kioskFullscreen?: boolean;
   name?: string;
   unitId?: string;
@@ -1271,9 +1631,20 @@ export interface HandlersUpdatePlaylistRequest {
 
 export type HandlersUpdateScreenLayoutTemplateRequestDefinition = { [key: string]: unknown };
 
+export type HandlersUpdateScreenLayoutTemplateRequestSurface = typeof HandlersUpdateScreenLayoutTemplateRequestSurface[keyof typeof HandlersUpdateScreenLayoutTemplateRequestSurface];
+
+
+export const HandlersUpdateScreenLayoutTemplateRequestSurface = {
+  'ticket-station': 'ticket-station',
+  'queue-display': 'queue-display',
+  'counter-display': 'counter-display',
+  'visitor-mobile': 'visitor-mobile',
+} as const;
+
 export interface HandlersUpdateScreenLayoutTemplateRequest {
   definition?: HandlersUpdateScreenLayoutTemplateRequestDefinition;
   name?: string;
+  surface?: HandlersUpdateScreenLayoutTemplateRequestSurface;
 }
 
 export interface HandlersUpdateStatusRequest {
@@ -2094,6 +2465,34 @@ export interface ModelsDayScheduleWithBookings {
   updatedAt?: string;
 }
 
+export type ModelsExperienceTemplateVersionDefinition = { [key: string]: unknown };
+
+export interface ModelsExperienceTemplateVersion {
+  definition?: ModelsExperienceTemplateVersionDefinition;
+  id?: string;
+  publishedAt?: string;
+  /** @nullable */
+  publishedBy?: string | null;
+  templateId?: string;
+  version?: number;
+}
+
+export interface ModelsExperienceTemplateVersionMetadata {
+  id?: string;
+  publishedAt?: string;
+  /** @nullable */
+  publishedBy?: string | null;
+  templateId?: string;
+  version?: number;
+}
+
+export interface ModelsExperienceTemplateVersionPage {
+  hasMore?: boolean;
+  items?: ModelsExperienceTemplateVersionMetadata[];
+  /** @nullable */
+  nextBeforeVersion: number | null;
+}
+
 export type ModelsExternalFeedCachedData = { [key: string]: unknown };
 
 export type ModelsExternalFeedConfig = { [key: string]: unknown };
@@ -2335,6 +2734,8 @@ export interface ModelsScreenLayoutTemplate {
   definition?: ModelsScreenLayoutTemplateDefinition;
   id?: string;
   name?: string;
+  publishedVersionId?: string;
+  surface?: string;
   updatedAt?: string;
 }
 

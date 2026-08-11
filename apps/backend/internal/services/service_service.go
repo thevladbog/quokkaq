@@ -99,6 +99,10 @@ func (s *serviceService) CreateService(service *models.Service) error {
 	if err := ValidateServiceKioskFields(service); err != nil {
 		return err
 	}
+	service.Behavior = models.CanonicalServiceBehavior(service.Behavior)
+	if err := ValidateServiceBehaviorJSON(service.Behavior.RawJSON()); err != nil {
+		return err
+	}
 	service.CalendarSlotKey = normalizeCalendarSlotKeyPtr(service.CalendarSlotKey)
 	if err := s.assertCalendarSlotKeyUnique(service.UnitID, service.CalendarSlotKey, ""); err != nil {
 		return err
@@ -158,6 +162,10 @@ func (s *serviceService) UpdateService(service *models.Service) error {
 	service.UnitID = existing.UnitID
 	syncServiceIdentificationFields(service)
 	if err := ValidateServiceKioskFields(service); err != nil {
+		return err
+	}
+	service.Behavior = models.CanonicalServiceBehavior(service.Behavior)
+	if err := ValidateServiceBehaviorJSON(service.Behavior.RawJSON()); err != nil {
 		return err
 	}
 

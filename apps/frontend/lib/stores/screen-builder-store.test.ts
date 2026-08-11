@@ -101,6 +101,52 @@ describe('useScreenBuilderStore', () => {
     expect(useScreenBuilderStore.getState().template.portrait.columns).toBe(8);
     expect(useScreenBuilderStore.getState().template.portrait.rows).toBe(8);
   });
+
+  it('duplicateWidget expands a full legacy grid to the first free row', () => {
+    useScreenBuilderStore.getState().initFrom(
+      {
+        layoutKind: 'cellGrid',
+        id: 'full-grid',
+        portrait: {
+          columns: 1,
+          rows: 1,
+          widgets: [
+            {
+              id: 'full',
+              type: 'clock',
+              config: {},
+              placement: { col: 1, row: 1, colSpan: 1, rowSpan: 1 }
+            }
+          ]
+        },
+        landscape: {
+          columns: 1,
+          rows: 1,
+          widgets: [
+            {
+              id: 'full',
+              type: 'clock',
+              config: {},
+              placement: { col: 1, row: 1, colSpan: 1, rowSpan: 1 }
+            }
+          ]
+        }
+      },
+      null
+    );
+
+    useScreenBuilderStore.getState().duplicateWidget('full');
+
+    const result = useScreenBuilderStore.getState().template;
+    expect(result.portrait.rows).toBe(2);
+    expect(result.landscape.rows).toBe(2);
+    expect(result.portrait.widgets.at(-1)?.placement).toEqual({
+      col: 1,
+      row: 2,
+      colSpan: 1,
+      rowSpan: 1
+    });
+  });
 });
 
 describe('newWidgetId', () => {

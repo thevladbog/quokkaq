@@ -34,6 +34,8 @@ import { XSmallIcon } from '@/src/components/ui/icons/akar-icons-x-small';
 import { useUpdateService } from '@/lib/hooks';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { serviceTitleForLocale } from '@/lib/utils';
+import { ServiceBehaviorEditor } from '@/components/admin/units/services/service-behavior-editor';
+import type { ServiceBehavior } from '@quokkaq/shared-types';
 import { toast } from 'sonner';
 import {
   SERVICE_GRID_COLS,
@@ -705,8 +707,15 @@ const ServiceEditor: React.FC<{
   service: ServiceWithPosition;
   onChange: (id: string, field: string, value: number | null) => void;
   onPositionChange: (id: string, row: number, col: number) => void;
+  onBehaviorSaved: (id: string, behavior: ServiceBehavior) => void;
   allServices: ServiceWithPosition[];
-}> = ({ service, onChange, onPositionChange, allServices }) => {
+}> = ({
+  service,
+  onChange,
+  onPositionChange,
+  onBehaviorSaved,
+  allServices
+}) => {
   if (service.gridRow === null || service.gridCol === null) return null;
 
   const maxColSpan = SERVICE_GRID_COLS - service.gridCol;
@@ -828,6 +837,13 @@ const ServiceEditor: React.FC<{
               {service.t?.('grid_configuration.overlap_warning')}
             </div>
           )}
+          {service.isLeaf !== false ? (
+            <ServiceBehaviorEditor
+              serviceId={service.id}
+              value={service.behavior ?? null}
+              onSaved={(behavior) => onBehaviorSaved(service.id, behavior)}
+            />
+          ) : null}
         </div>
       </CardContent>
     </Card>
@@ -1067,6 +1083,7 @@ const SimpleGrid: React.FC<{
     gridRowSpan: number
   ) => void;
   onPositionChange: (id: string, row: number, col: number) => void;
+  onBehaviorSaved: (id: string, behavior: ServiceBehavior) => void;
   dragPaletteLabel: string;
   dragPlacedLabel: string;
   resizeLabel: string;
@@ -1078,6 +1095,7 @@ const SimpleGrid: React.FC<{
   onPropertyChange,
   onGridSpanCommit,
   onPositionChange,
+  onBehaviorSaved,
   dragPaletteLabel,
   dragPlacedLabel,
   resizeLabel,
@@ -1309,6 +1327,7 @@ const SimpleGrid: React.FC<{
                                 service={service}
                                 onChange={onPropertyChange}
                                 onPositionChange={onPositionChange}
+                                onBehaviorSaved={onBehaviorSaved}
                                 allServices={placedServicesForTab}
                               />
                             </AccordionContent>
@@ -1426,6 +1445,7 @@ const ServiceGridWorkArea: React.FC<{
     gridRowSpan: number
   ) => void;
   onPositionChange: (id: string, row: number, col: number) => void;
+  onBehaviorSaved: (id: string, behavior: ServiceBehavior) => void;
 }> = ({
   services,
   lockedZoneScope,
@@ -1436,7 +1456,8 @@ const ServiceGridWorkArea: React.FC<{
   onAddService,
   onPropertyChange,
   onGridSpanCommit,
-  onPositionChange
+  onPositionChange,
+  onBehaviorSaved
 }) => {
   const servicesForGridEditor = useMemo(() => {
     if (lockedZoneScope) {
@@ -1462,6 +1483,7 @@ const ServiceGridWorkArea: React.FC<{
         onPropertyChange={onPropertyChange}
         onGridSpanCommit={onGridSpanCommit}
         onPositionChange={onPositionChange}
+        onBehaviorSaved={onBehaviorSaved}
         dragPaletteLabel={t('grid_configuration.drag_from_palette_hint')}
         dragPlacedLabel={t('grid_configuration.drag_placed_hint')}
         resizeLabel={t('grid_configuration.resize_corner_hint')}
@@ -1815,6 +1837,17 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({
     }
   };
 
+  const handleBehaviorSaved = useCallback(
+    (id: string, behavior: ServiceBehavior) => {
+      setServices((current) =>
+        current.map((service) =>
+          service.id === id ? { ...service, behavior } : service
+        )
+      );
+    },
+    []
+  );
+
   return (
     <div className='grid grid-cols-12 gap-6'>
       {!unitId && (
@@ -1848,6 +1881,7 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({
                 onPropertyChange={handlePropertyChange}
                 onGridSpanCommit={handleGridSpanCommit}
                 onPositionChange={handlePositionChange}
+                onBehaviorSaved={handleBehaviorSaved}
               />
             ) : (
               <NoUnitSelected t={t} />

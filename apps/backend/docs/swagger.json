@@ -59,6 +59,26 @@
                 },
                 "type": "object"
             },
+            "handlers.AppliedExperienceAcknowledgement": {
+                "additionalProperties": false,
+                "properties": {
+                    "status": {
+                        "enum": [
+                            "applied"
+                        ],
+                        "type": "string"
+                    },
+                    "versionId": {
+                        "minLength": 1,
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "versionId",
+                    "status"
+                ],
+                "type": "object"
+            },
             "handlers.AssignUnitRequest": {
                 "properties": {
                     "permissions": {
@@ -294,13 +314,13 @@
                 },
                 "type": "object"
             },
-            "handlers.CreateDesktopTerminalResponse": {
+            "handlers.CreateDesktopTerminalResponseDoc": {
                 "properties": {
                     "pairingCode": {
                         "type": "string"
                     },
                     "terminal": {
-                        "$ref": "#/components/schemas/handlers.DesktopTerminalJSON"
+                        "$ref": "#/components/schemas/handlers.DesktopTerminalResponseDoc"
                     }
                 },
                 "type": "object"
@@ -404,6 +424,15 @@
                     },
                     "name": {
                         "example": "Lobby wide",
+                        "type": "string"
+                    },
+                    "surface": {
+                        "enum": [
+                            "ticket-station",
+                            "queue-display",
+                            "counter-display",
+                            "visitor-mobile"
+                        ],
                         "type": "string"
                     }
                 },
@@ -549,9 +578,18 @@
                 "additionalProperties": true,
                 "type": "object"
             },
-            "handlers.DesktopTerminalJSON": {
+            "handlers.DesktopTerminalResponseDoc": {
                 "properties": {
+                    "appliedTemplateAt": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "appliedTemplateVersionId": {
+                        "nullable": true,
+                        "type": "string"
+                    },
                     "counterId": {
+                        "nullable": true,
                         "type": "string"
                     },
                     "counterName": {
@@ -561,6 +599,26 @@
                         "type": "string"
                     },
                     "defaultLocale": {
+                        "type": "string"
+                    },
+                    "experienceAckAt": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "experienceAckReasonCode": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "experienceAckStatus": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "experienceTemplateId": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "experienceVariantId": {
+                        "nullable": true,
                         "type": "string"
                     },
                     "id": {
@@ -573,12 +631,15 @@
                         "type": "boolean"
                     },
                     "lastSeenAt": {
+                        "nullable": true,
                         "type": "string"
                     },
                     "name": {
+                        "nullable": true,
                         "type": "string"
                     },
                     "revokedAt": {
+                        "nullable": true,
                         "type": "string"
                     },
                     "unitId": {
@@ -591,6 +652,45 @@
                         "type": "string"
                     }
                 },
+                "type": "object"
+            },
+            "handlers.ExperienceManifest": {
+                "additionalProperties": false,
+                "properties": {
+                    "definition": {
+                        "type": "object"
+                    },
+                    "mode": {
+                        "enum": [
+                            "experience"
+                        ],
+                        "type": "string"
+                    },
+                    "publishedAt": {
+                        "type": "string"
+                    },
+                    "templateId": {
+                        "type": "string"
+                    },
+                    "variantId": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "integer"
+                    },
+                    "versionId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "mode",
+                    "templateId",
+                    "versionId",
+                    "version",
+                    "variantId",
+                    "definition",
+                    "publishedAt"
+                ],
                 "type": "object"
             },
             "handlers.FeaturesFlags": {
@@ -844,6 +944,21 @@
                         "type": "string"
                     }
                 },
+                "type": "object"
+            },
+            "handlers.LegacyManifest": {
+                "additionalProperties": false,
+                "properties": {
+                    "mode": {
+                        "enum": [
+                            "legacy"
+                        ],
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "mode"
+                ],
                 "type": "object"
             },
             "handlers.LoginLinkResponse": {
@@ -1626,6 +1741,34 @@
                 ],
                 "type": "object"
             },
+            "handlers.RejectedExperienceAcknowledgement": {
+                "additionalProperties": false,
+                "properties": {
+                    "reasonCode": {
+                        "example": "renderer.timeout",
+                        "maxLength": 64,
+                        "minLength": 1,
+                        "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+                        "type": "string"
+                    },
+                    "status": {
+                        "enum": [
+                            "rejected"
+                        ],
+                        "type": "string"
+                    },
+                    "versionId": {
+                        "minLength": 1,
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "versionId",
+                    "status",
+                    "reasonCode"
+                ],
+                "type": "object"
+            },
             "handlers.RemoveUnitRequest": {
                 "properties": {
                     "unitId": {
@@ -1680,6 +1823,244 @@
                             "type": "object"
                         },
                         "type": "array"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.ServiceCreateRequest": {
+                "properties": {
+                    "backgroundColor": {
+                        "type": "string"
+                    },
+                    "behavior": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/models.ServiceBehavior"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "calendarSlotKey": {
+                        "type": "string"
+                    },
+                    "children": {
+                        "items": {
+                            "$ref": "#/components/schemas/models.Service"
+                        },
+                        "type": "array"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "descriptionEn": {
+                        "type": "string"
+                    },
+                    "descriptionRu": {
+                        "type": "string"
+                    },
+                    "duration": {
+                        "type": "integer"
+                    },
+                    "gridCol": {
+                        "type": "integer"
+                    },
+                    "gridColSpan": {
+                        "type": "integer"
+                    },
+                    "gridRow": {
+                        "type": "integer"
+                    },
+                    "gridRowSpan": {
+                        "type": "integer"
+                    },
+                    "iconKey": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "identificationMode": {
+                        "type": "string"
+                    },
+                    "imageUrl": {
+                        "type": "string"
+                    },
+                    "isLeaf": {
+                        "type": "boolean"
+                    },
+                    "kioskDocumentSettings": {
+                        "type": "object"
+                    },
+                    "kioskIdentificationConfig": {
+                        "type": "object"
+                    },
+                    "maxServiceTime": {
+                        "type": "integer"
+                    },
+                    "maxWaitingTime": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "nameEn": {
+                        "type": "string"
+                    },
+                    "nameRu": {
+                        "type": "string"
+                    },
+                    "numberSequence": {
+                        "type": "string"
+                    },
+                    "offerIdentification": {
+                        "type": "boolean"
+                    },
+                    "parentId": {
+                        "type": "string"
+                    },
+                    "prebook": {
+                        "type": "boolean"
+                    },
+                    "prefix": {
+                        "type": "string"
+                    },
+                    "restrictedServiceZoneId": {
+                        "type": "string"
+                    },
+                    "sortOrder": {
+                        "type": "integer"
+                    },
+                    "textColor": {
+                        "type": "string"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.ServiceUpdateRequest": {
+                "properties": {
+                    "backgroundColor": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "behavior": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/models.ServiceBehavior"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "calendarSlotKey": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "description": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "descriptionEn": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "descriptionRu": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "duration": {
+                        "nullable": true,
+                        "type": "integer"
+                    },
+                    "gridCol": {
+                        "nullable": true,
+                        "type": "integer"
+                    },
+                    "gridColSpan": {
+                        "nullable": true,
+                        "type": "integer"
+                    },
+                    "gridRow": {
+                        "nullable": true,
+                        "type": "integer"
+                    },
+                    "gridRowSpan": {
+                        "nullable": true,
+                        "type": "integer"
+                    },
+                    "iconKey": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "identificationMode": {
+                        "type": "string"
+                    },
+                    "imageUrl": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "isLeaf": {
+                        "type": "boolean"
+                    },
+                    "kioskDocumentSettings": {
+                        "nullable": true,
+                        "type": "object"
+                    },
+                    "kioskIdentificationConfig": {
+                        "nullable": true,
+                        "type": "object"
+                    },
+                    "maxServiceTime": {
+                        "nullable": true,
+                        "type": "integer"
+                    },
+                    "maxWaitingTime": {
+                        "nullable": true,
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "nameEn": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "nameRu": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "numberSequence": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "offerIdentification": {
+                        "type": "boolean"
+                    },
+                    "parentId": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "prebook": {
+                        "type": "boolean"
+                    },
+                    "prefix": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "restrictedServiceZoneId": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "sortOrder": {
+                        "type": "integer"
+                    },
+                    "textColor": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "unitId": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -1795,6 +2176,40 @@
                     }
                 },
                 "type": "object"
+            },
+            "handlers.TerminalExperienceAckRequestDoc": {
+                "discriminator": {
+                    "mapping": {
+                        "applied": "#/components/schemas/handlers.AppliedExperienceAcknowledgement",
+                        "rejected": "#/components/schemas/handlers.RejectedExperienceAcknowledgement"
+                    },
+                    "propertyName": "status"
+                },
+                "oneOf": [
+                    {
+                        "$ref": "#/components/schemas/handlers.AppliedExperienceAcknowledgement"
+                    },
+                    {
+                        "$ref": "#/components/schemas/handlers.RejectedExperienceAcknowledgement"
+                    }
+                ]
+            },
+            "handlers.TerminalExperienceManifestResponseDoc": {
+                "discriminator": {
+                    "mapping": {
+                        "experience": "#/components/schemas/handlers.ExperienceManifest",
+                        "legacy": "#/components/schemas/handlers.LegacyManifest"
+                    },
+                    "propertyName": "mode"
+                },
+                "oneOf": [
+                    {
+                        "$ref": "#/components/schemas/handlers.LegacyManifest"
+                    },
+                    {
+                        "$ref": "#/components/schemas/handlers.ExperienceManifest"
+                    }
+                ]
             },
             "handlers.TestSMSIntegrationRequest": {
                 "properties": {
@@ -2012,18 +2427,33 @@
                 },
                 "type": "object"
             },
-            "handlers.UpdateDesktopTerminalRequest": {
+            "handlers.UpdateDesktopTerminalRequestDoc": {
                 "properties": {
                     "contextUnitId": {
+                        "nullable": true,
                         "type": "string"
                     },
                     "counterId": {
+                        "nullable": true,
                         "type": "string"
                     },
                     "defaultLocale": {
                         "type": "string"
                     },
+                    "experienceTemplateId": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "experienceVariantId": {
+                        "nullable": true,
+                        "type": "string"
+                    },
                     "kind": {
+                        "enum": [
+                            "kiosk",
+                            "counter_guest_survey",
+                            "counter_board"
+                        ],
                         "type": "string"
                     },
                     "kioskFullscreen": {
@@ -2065,6 +2495,15 @@
                     },
                     "name": {
                         "example": "Lobby wide",
+                        "type": "string"
+                    },
+                    "surface": {
+                        "enum": [
+                            "ticket-station",
+                            "queue-display",
+                            "counter-display",
+                            "visitor-mobile"
+                        ],
                         "type": "string"
                     }
                 },
@@ -3465,6 +3904,72 @@
                 },
                 "type": "object"
             },
+            "models.ExperienceTemplateVersion": {
+                "properties": {
+                    "definition": {
+                        "type": "object"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "publishedAt": {
+                        "type": "string"
+                    },
+                    "publishedBy": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "templateId": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "models.ExperienceTemplateVersionMetadata": {
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "publishedAt": {
+                        "type": "string"
+                    },
+                    "publishedBy": {
+                        "nullable": true,
+                        "type": "string"
+                    },
+                    "templateId": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "models.ExperienceTemplateVersionPage": {
+                "properties": {
+                    "hasMore": {
+                        "type": "boolean"
+                    },
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/models.ExperienceTemplateVersionMetadata"
+                        },
+                        "type": "array"
+                    },
+                    "nextBeforeVersion": {
+                        "nullable": true,
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "nextBeforeVersion"
+                ],
+                "type": "object"
+            },
             "models.ExternalFeed": {
                 "properties": {
                     "cachedData": {
@@ -4267,6 +4772,12 @@
                     "name": {
                         "type": "string"
                     },
+                    "publishedVersionId": {
+                        "type": "string"
+                    },
+                    "surface": {
+                        "type": "string"
+                    },
                     "updatedAt": {
                         "type": "string"
                     }
@@ -4277,6 +4788,14 @@
                 "properties": {
                     "backgroundColor": {
                         "type": "string"
+                    },
+                    "behavior": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/models.ServiceBehavior"
+                            }
+                        ],
+                        "description": "Behavior is optional portable station flow configuration. It complements, but never replaces, identification mode."
                     },
                     "calendarSlotKey": {
                         "description": "CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).\nWhen non-empty (after trim), it must be unique per unit — enforced by DB partial unique index and create/update validation.",
@@ -4386,6 +4905,210 @@
                         "type": "string"
                     }
                 },
+                "type": "object"
+            },
+            "models.ServiceBehavior": {
+                "properties": {
+                    "access": {
+                        "$ref": "#/components/schemas/models.ServiceBehaviorAccessPolicy"
+                    },
+                    "dataRetentionDays": {
+                        "maximum": 30,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "fields": {
+                        "items": {
+                            "$ref": "#/components/schemas/models.ServiceBehaviorField"
+                        },
+                        "type": "array"
+                    },
+                    "information": {
+                        "$ref": "#/components/schemas/models.ServiceBehaviorInformation"
+                    },
+                    "route": {
+                        "$ref": "#/components/schemas/models.ServiceBehaviorRoute"
+                    },
+                    "version": {
+                        "enum": [
+                            1
+                        ],
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "version"
+                ],
+                "type": "object"
+            },
+            "models.ServiceBehaviorAccessPolicy": {
+                "properties": {
+                    "when": {
+                        "$ref": "#/components/schemas/models.ServiceBehaviorCondition"
+                    },
+                    "whenFalse": {
+                        "enum": [
+                            "hide",
+                            "lock"
+                        ],
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "when",
+                    "whenFalse"
+                ],
+                "type": "object"
+            },
+            "models.ServiceBehaviorCondition": {
+                "properties": {
+                    "children": {
+                        "items": {
+                            "$ref": "#/components/schemas/models.ServiceBehaviorCondition"
+                        },
+                        "type": "array"
+                    },
+                    "combinator": {
+                        "enum": [
+                            "and",
+                            "or"
+                        ],
+                        "type": "string"
+                    },
+                    "field": {
+                        "enum": [
+                            "identity.isAuthenticated",
+                            "identity.isEmployee",
+                            "identity.groups",
+                            "live.queueLength",
+                            "live.isOpen",
+                            "live.isConnected",
+                            "session.selectedServiceId"
+                        ],
+                        "type": "string"
+                    },
+                    "kind": {
+                        "enum": [
+                            "rule",
+                            "group"
+                        ],
+                        "type": "string"
+                    },
+                    "operator": {
+                        "enum": [
+                            "eq",
+                            "ne",
+                            "gt",
+                            "gte",
+                            "lt",
+                            "lte",
+                            "contains",
+                            "not-contains",
+                            "is-true",
+                            "is-false"
+                        ],
+                        "type": "string"
+                    },
+                    "value": {}
+                },
+                "required": [
+                    "kind"
+                ],
+                "type": "object"
+            },
+            "models.ServiceBehaviorField": {
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "$ref": "#/components/schemas/models.ServiceBehaviorLocalizedText"
+                    },
+                    "options": {
+                        "items": {
+                            "$ref": "#/components/schemas/models.ServiceBehaviorSelectOption"
+                        },
+                        "type": "array"
+                    },
+                    "required": {
+                        "type": "boolean"
+                    },
+                    "type": {
+                        "enum": [
+                            "text",
+                            "number",
+                            "phone",
+                            "checkbox",
+                            "select"
+                        ],
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "key",
+                    "label",
+                    "required",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "models.ServiceBehaviorInformation": {
+                "properties": {
+                    "body": {
+                        "$ref": "#/components/schemas/models.ServiceBehaviorLocalizedText"
+                    },
+                    "requireAcknowledgement": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "body"
+                ],
+                "type": "object"
+            },
+            "models.ServiceBehaviorLocalizedText": {
+                "additionalProperties": {
+                    "type": "string"
+                },
+                "type": "object"
+            },
+            "models.ServiceBehaviorRoute": {
+                "properties": {
+                    "mode": {
+                        "enum": [
+                            "auto",
+                            "page-slot"
+                        ],
+                        "type": "string"
+                    },
+                    "slot": {
+                        "enum": [
+                            "service-info",
+                            "service-form",
+                            "identity",
+                            "confirmation"
+                        ],
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "mode"
+                ],
+                "type": "object"
+            },
+            "models.ServiceBehaviorSelectOption": {
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "$ref": "#/components/schemas/models.ServiceBehaviorLocalizedText"
+                    }
+                },
+                "required": [
+                    "key",
+                    "label"
+                ],
                 "type": "object"
             },
             "models.ServiceSlot": {
@@ -10126,6 +10849,16 @@
                         },
                         "description": "Bad request"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
                     "403": {
                         "content": {
                             "application/json": {
@@ -10135,6 +10868,16 @@
                             }
                         },
                         "description": "Forbidden"
+                    },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Request body too large"
                     },
                     "500": {
                         "content": {
@@ -10176,6 +10919,16 @@
                     "204": {
                         "description": "No Content"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
                     "403": {
                         "content": {
                             "application/json": {
@@ -10195,6 +10948,16 @@
                             }
                         },
                         "description": "Not found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Template is assigned to a terminal"
                     },
                     "500": {
                         "content": {
@@ -10263,6 +11026,264 @@
                         },
                         "description": "Bad request"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Surface conflict"
+                    },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Request body too large"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update a screen layout template",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/screen-layout-templates/{templateId}/publish": {
+            "post": {
+                "description": "Validates the tenant-owned mutable draft and atomically creates a new immutable published version.",
+                "operationId": "PublishScreenLayoutTemplate",
+                "parameters": [
+                    {
+                        "description": "Template ID",
+                        "in": "path",
+                        "name": "templateId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.ExperienceTemplateVersion"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Draft is not publishable"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Version conflict"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Publish the current experience template draft",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/screen-layout-templates/{templateId}/versions": {
+            "get": {
+                "description": "Returns metadata only in descending version order; immutable definitions are excluded from history pages.",
+                "operationId": "ListScreenLayoutTemplateVersions",
+                "parameters": [
+                    {
+                        "description": "Template ID",
+                        "in": "path",
+                        "name": "templateId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Page size (default 20, maximum 100)",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Return versions lower than this version number",
+                        "in": "query",
+                        "name": "beforeVersion",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.ExperienceTemplateVersionPage"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Invalid pagination"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
                     "404": {
                         "content": {
                             "application/json": {
@@ -10289,7 +11310,122 @@
                         "BearerAuth": []
                     }
                 ],
-                "summary": "Update a screen layout template",
+                "summary": "List published experience template versions",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/screen-layout-templates/{templateId}/versions/{versionId}/restore": {
+            "post": {
+                "description": "Copies one tenant-owned historical definition into a new immutable latest version and advances the published pointer.",
+                "operationId": "RestoreScreenLayoutTemplateVersion",
+                "parameters": [
+                    {
+                        "description": "Template ID",
+                        "in": "path",
+                        "name": "templateId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Historical version ID",
+                        "in": "path",
+                        "name": "versionId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.ExperienceTemplateVersion"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Historical definition is not publishable"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Version conflict"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Restore an experience template version",
                 "tags": [
                     "companies"
                 ]
@@ -12655,7 +13791,7 @@
                             "application/json": {
                                 "schema": {
                                     "items": {
-                                        "$ref": "#/components/schemas/handlers.DesktopTerminalJSON"
+                                        "$ref": "#/components/schemas/handlers.DesktopTerminalResponseDoc"
                                     },
                                     "type": "array"
                                 }
@@ -12744,7 +13880,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/handlers.CreateDesktopTerminalResponse"
+                                    "$ref": "#/components/schemas/handlers.CreateDesktopTerminalResponseDoc"
                                 }
                             }
                         },
@@ -12840,7 +13976,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/handlers.DesktopTerminalJSON"
+                                    "$ref": "#/components/schemas/handlers.DesktopTerminalResponseDoc"
                                 }
                             }
                         },
@@ -12908,7 +14044,7 @@
                 ]
             },
             "patch": {
-                "description": "Patches name, locale, kiosk fullscreen, and optionally counter binding. Body may include `kind` (kiosk | counter_guest_survey | counter_board) with `counterId`/`contextUnitId` when changing bindings; metadata-only updates omit counter fields.",
+                "description": "Patches terminal metadata and optionally assigns an experience. Omit both experience fields to preserve; provide both strings to assign; provide both null to unassign. Acknowledgement fields are server-controlled.",
                 "operationId": "updateDesktopTerminal",
                 "parameters": [
                     {
@@ -12933,7 +14069,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/handlers.UpdateDesktopTerminalRequest"
+                                "$ref": "#/components/schemas/handlers.UpdateDesktopTerminalRequestDoc"
                             }
                         }
                     },
@@ -12984,6 +14120,16 @@
                             }
                         },
                         "description": "Not found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Published template conflict"
                     },
                     "500": {
                         "content": {
@@ -16473,7 +17619,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/models.Service"
+                                "$ref": "#/components/schemas/handlers.ServiceCreateRequest"
                             }
                         }
                     },
@@ -16541,6 +17687,16 @@
                             }
                         },
                         "description": "Conflict (duplicate calendar slot key for unit)"
+                    },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Request body too large"
                     },
                     "500": {
                         "content": {
@@ -16655,7 +17811,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/models.Service"
+                                "$ref": "#/components/schemas/handlers.ServiceUpdateRequest"
                             }
                         }
                     },
@@ -16703,6 +17859,16 @@
                             }
                         },
                         "description": "Conflict (e.g. unit change not allowed)"
+                    },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Request body too large"
                     },
                     "500": {
                         "content": {
@@ -18923,6 +20089,155 @@
                 "summary": "Update a template",
                 "tags": [
                     "templates"
+                ]
+            }
+        },
+        "/terminal/experience": {
+            "get": {
+                "description": "Returns legacy mode when no experience is assigned, otherwise the terminal's current immutable published experience. The terminal identity always comes from the terminal JWT subject.",
+                "operationId": "GetTerminalExperienceManifest",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.TerminalExperienceManifestResponseDoc"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Current assignment is unavailable"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get the terminal experience manifest",
+                "tags": [
+                    "TerminalExperience"
+                ]
+            }
+        },
+        "/terminal/experience/ack": {
+            "post": {
+                "description": "Records whether the authenticated terminal applied or rejected its currently published assigned version. Rejected deployments require a bounded machine-readable reasonCode and preserve the last successfully applied version; applied deployments forbid one.",
+                "operationId": "AcknowledgeTerminalExperienceManifest",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.TerminalExperienceAckRequestDoc"
+                            }
+                        }
+                    },
+                    "description": "Acknowledgement payload",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Invalid acknowledgement payload"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Version is not currently assigned and published"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Acknowledge the terminal experience manifest",
+                "tags": [
+                    "TerminalExperience"
                 ]
             }
         },

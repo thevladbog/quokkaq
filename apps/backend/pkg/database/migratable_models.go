@@ -53,6 +53,7 @@ func AllMigratableModels() []any {
 		&models.ExternalFeed{},
 		&models.ScreenAnnouncement{},
 		&models.ScreenLayoutTemplate{},
+		&models.ExperienceTemplateVersion{},
 		&models.Invitation{},
 		&models.MessageTemplate{},
 		&models.PasswordResetToken{},

@@ -50,6 +50,13 @@ func TestDemoseedRun_smokeOnFreshPostgres(t *testing.T) {
 	if err := database.RunVersionedMigrations(database.AllMigratableModels()...); err != nil {
 		t.Fatalf("migrations: %v", err)
 	}
+	var experienceRepairMigrations int64
+	if err := db.Table("migrations").Where("version = ?", "v1.8.19_experience_template_repairs").Count(&experienceRepairMigrations).Error; err != nil {
+		t.Fatalf("experience repair migration registry: %v", err)
+	}
+	if experienceRepairMigrations != 1 {
+		t.Fatalf("want v1.8.19 experience repair migration once, got %d", experienceRepairMigrations)
+	}
 	if err := subscriptionplanseed.UpsertSubscriptionPlans(db); err != nil {
 		t.Fatalf("seed plans: %v", err)
 	}

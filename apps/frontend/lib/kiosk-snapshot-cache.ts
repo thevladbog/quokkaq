@@ -3,6 +3,26 @@ import type { Service, Unit } from '@quokkaq/shared-types';
 const unitKey = (id: string) => `qq.kiosk.snapshot.unit.${id}`;
 const treeKey = (id: string) => `qq.kiosk.snapshot.tree.${id}`;
 
+/**
+ * Shared browser-storage boundary for kiosk availability snapshots. Consumers
+ * keep their own namespaced keys and validate every cached value before use.
+ */
+export type KioskSnapshotStorage = Pick<
+  Storage,
+  'getItem' | 'setItem' | 'removeItem'
+>;
+
+export function getKioskSnapshotStorage(): KioskSnapshotStorage | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 /** Best-effort read cache for 5.5: shown when the API is temporarily unreachable after at least one successful load. */
 export function readCachedKioskUnit(unitId: string): Unit | null {
   if (typeof window === 'undefined') {

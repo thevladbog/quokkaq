@@ -11,6 +11,10 @@ import {
   type ScreenWidgetType
 } from '@quokkaq/shared-types';
 import { SCREEN_TEMPLATE_PRESETS } from '@/lib/screen-template-presets';
+import {
+  findDuplicatePlacement,
+  firstFreeCell
+} from '@/lib/screen-grid-editor';
 
 const HISTORY_CAP = 40;
 
@@ -62,40 +66,6 @@ function defaultEmptyTemplate(): ScreenTemplateCellGrid {
     portrait: clone(face),
     landscape: clone(face)
   };
-}
-
-function occupiedCells(
-  widgets: ScreenCellGridWidget[],
-  skipId?: string
-): Set<string> {
-  const s = new Set<string>();
-  for (const w of widgets) {
-    if (w.id === skipId) continue;
-    const { col, row, colSpan, rowSpan } = w.placement;
-    for (let c = col; c < col + colSpan; c++) {
-      for (let r = row; r < row + rowSpan; r++) {
-        s.add(`${c}:${r}`);
-      }
-    }
-  }
-  return s;
-}
-
-function firstFreeCell(
-  columns: number,
-  rows: number,
-  widgets: ScreenCellGridWidget[],
-  skipId?: string
-): { col: number; row: number } | null {
-  const occ = occupiedCells(widgets, skipId);
-  for (let r = 1; r <= rows; r++) {
-    for (let c = 1; c <= columns; c++) {
-      if (!occ.has(`${c}:${r}`)) {
-        return { col: c, row: r };
-      }
-    }
-  }
-  return null;
 }
 
 function defaultConfigForType(type: ScreenWidgetType): Record<string, unknown> {
@@ -407,48 +377,30 @@ export const useScreenBuilderStore = create<BuilderState>()(
             ...clone(copyLandscape),
             id: pid
           };
-          let spotP = firstFreeCell(
+          const duplicatePortrait = findDuplicatePlacement(
             s.template.portrait.columns,
             s.template.portrait.rows,
-            s.template.portrait.widgets
-          );
-          while (!spotP && s.template.portrait.rows < 48) {
-            s.template.portrait.rows += 1;
-            spotP = firstFreeCell(
-              s.template.portrait.columns,
-              s.template.portrait.rows,
-              s.template.portrait.widgets
-            );
-          }
-          let spotL = firstFreeCell(
+            s.template.portrait.widgets,
+            copyPortrait.placement,
+            48
+          ) ?? {
+            placement: { ...copyPortrait.placement },
+            rows: s.template.portrait.rows
+          };
+          const duplicateLandscape = findDuplicatePlacement(
             s.template.landscape.columns,
             s.template.landscape.rows,
-            s.template.landscape.widgets
-          );
-          while (!spotL && s.template.landscape.rows < 48) {
-            s.template.landscape.rows += 1;
-            spotL = firstFreeCell(
-              s.template.landscape.columns,
-              s.template.landscape.rows,
-              s.template.landscape.widgets
-            );
-          }
-          if (spotP) {
-            np.placement = {
-              col: spotP.col,
-              row: spotP.row,
-              colSpan: 1,
-              rowSpan: 1
-            };
-          }
-          if (spotL) {
-            nl.placement = {
-              col: spotL.col,
-              row: spotL.row,
-              colSpan: 1,
-              rowSpan: 1
-            };
-          }
+            s.template.landscape.widgets,
+            copyLandscape.placement,
+            48
+          ) ?? {
+            placement: { ...copyLandscape.placement },
+            rows: s.template.landscape.rows
+          };
+          s.template.portrait.rows = duplicatePortrait.rows;
+          s.template.landscape.rows = duplicateLandscape.rows;
+          np.placement = duplicatePortrait.placement;
+          nl.placement = duplicateLandscape.placement;
           s.template.portrait.widgets.push(np);
           s.template.landscape.widgets.push(nl);
           s.selection = { kind: 'widget', id: pid };

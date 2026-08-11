@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 const (
@@ -41,23 +43,38 @@ type DesktopTerminalService interface {
 	Create(name *string, unitID, defaultLocale string, kioskFullscreen bool, contextUnitID, counterID *string, kind string) (*models.DesktopTerminal, string, error)
 	ListForCompany(companyID string) ([]models.DesktopTerminal, error)
 	GetByID(id string) (*models.DesktopTerminal, error)
-	Update(id string, name *string, unitID, defaultLocale string, kioskFullscreen bool, contextUnitID, counterID *string, kind *string) error
+	Update(companyID, id string, name *string, unitID, defaultLocale string, kioskFullscreen bool, contextUnitID, counterID *string, kind *string, assignment TerminalExperienceAssignment) error
 	Revoke(id string) error
 	Bootstrap(pairingCode string) (token, unitID, defaultLocale, appBaseURL string, kioskFullscreen bool, counterID *string, terminalKind string, err error)
 }
 
+// TerminalExperienceAssignment is omitted for ordinary metadata updates, set
+// with two values for assignment, or set with two nil values for unassignment.
+// Applied/acknowledgement fields are intentionally not part of this input.
+type TerminalExperienceAssignment struct {
+	Specified  bool
+	TemplateID *string
+	VariantID  *string
+}
+
 type desktopTerminalService struct {
-	repo        repository.DesktopTerminalRepository
-	unitRepo    repository.UnitRepository
-	counterRepo repository.CounterRepository
+	repo           repository.DesktopTerminalRepository
+	unitRepo       repository.UnitRepository
+	counterRepo    repository.CounterRepository
+	experienceRepo repository.ScreenLayoutTemplateRepository
 }
 
 func NewDesktopTerminalService(
 	repo repository.DesktopTerminalRepository,
 	unitRepo repository.UnitRepository,
 	counterRepo repository.CounterRepository,
+	experienceRepos ...repository.ScreenLayoutTemplateRepository,
 ) DesktopTerminalService {
-	return &desktopTerminalService{repo: repo, unitRepo: unitRepo, counterRepo: counterRepo}
+	var experienceRepo repository.ScreenLayoutTemplateRepository
+	if len(experienceRepos) > 0 {
+		experienceRepo = experienceRepos[0]
+	}
+	return &desktopTerminalService{repo: repo, unitRepo: unitRepo, counterRepo: counterRepo, experienceRepo: experienceRepo}
 }
 
 func (s *desktopTerminalService) codePepper() string {
@@ -253,9 +270,12 @@ func (s *desktopTerminalService) GetByID(id string) (*models.DesktopTerminal, er
 	return s.repo.FindByID(id)
 }
 
-func (s *desktopTerminalService) Update(id string, name *string, unitID, defaultLocale string, kioskFullscreen bool, contextUnitID, counterID *string, kind *string) error {
+func (s *desktopTerminalService) Update(companyID, id string, name *string, unitID, defaultLocale string, kioskFullscreen bool, contextUnitID, counterID *string, kind *string, assignment TerminalExperienceAssignment) error {
 	if err := validateLocale(defaultLocale); err != nil {
 		return err
+	}
+	if assignment.Specified && (assignment.TemplateID == nil) != (assignment.VariantID == nil) {
+		return ErrExperienceAssignmentIncomplete
 	}
 	t, err := s.repo.FindByID(id)
 	if err != nil {
@@ -273,7 +293,7 @@ func (s *desktopTerminalService) Update(id string, name *string, unitID, default
 		t.Name = name
 		t.DefaultLocale = strings.ToLower(strings.TrimSpace(defaultLocale))
 		t.KioskFullscreen = kioskFullscreen
-		return s.repo.Update(t)
+		return s.persistTerminalUpdate(companyID, t, assignment)
 	}
 
 	kindStr := models.EffectiveTerminalKind(t)
@@ -291,17 +311,29 @@ func (s *desktopTerminalService) Update(id string, name *string, unitID, default
 	t.Kind = outKind
 	t.DefaultLocale = strings.ToLower(strings.TrimSpace(defaultLocale))
 	t.KioskFullscreen = kioskFullscreen
-	return s.repo.Update(t)
+	return s.persistTerminalUpdate(companyID, t, assignment)
+}
+
+func (s *desktopTerminalService) persistTerminalUpdate(companyID string, terminal *models.DesktopTerminal, assignment TerminalExperienceAssignment) error {
+	if s.experienceRepo == nil {
+		if assignment.Specified {
+			return errors.New("experience repository is not configured")
+		}
+		return s.repo.Update(terminal)
+	}
+	err := s.experienceRepo.UpdateTerminalWithExperience(context.Background(), companyID, terminal, repository.TerminalExperienceAssignment{
+		Specified:  assignment.Specified,
+		TemplateID: assignment.TemplateID,
+		VariantID:  assignment.VariantID,
+	})
+	if assignment.Specified && errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrExperienceTemplateNotFound
+	}
+	return err
 }
 
 func (s *desktopTerminalService) Revoke(id string) error {
-	t, err := s.repo.FindByID(id)
-	if err != nil {
-		return err
-	}
-	now := time.Now()
-	t.RevokedAt = &now
-	return s.repo.Update(t)
+	return s.repo.Revoke(context.Background(), id)
 }
 
 func (s *desktopTerminalService) Bootstrap(pairingCode string) (token, unitID, defaultLocale, appBaseURL string, kioskFullscreen bool, counterID *string, terminalKind string, err error) {
@@ -338,9 +370,10 @@ func (s *desktopTerminalService) Bootstrap(pairingCode string) (token, unitID, d
 		return "", "", "", "", false, nil, "", e
 	}
 
-	now := time.Now()
-	t.LastSeenAt = &now
-	_ = s.repo.Update(t)
+	// Bootstrap authenticated the terminal from the row that was read above,
+	// but revocation can happen immediately afterwards. Touch only last_seen_at
+	// with an active-row predicate instead of saving that stale full row back.
+	_ = s.repo.TouchLastSeen(context.Background(), t.ID)
 
 	base := os.Getenv("APP_BASE_URL")
 	if base == "" {

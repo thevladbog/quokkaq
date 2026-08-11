@@ -16,7 +16,14 @@ export const ScreenWidgetTypeSchema = z.enum([
   /** Footer strip with queue stats and virtual-queue QR */
   'screen-footer-qr',
   /** Standalone virtual-queue join QR (alignment in widget config). */
-  'join-queue-qr'
+  'join-queue-qr',
+  'service-picker',
+  'rich-info',
+  'ticket-form',
+  'identify',
+  'language-switch',
+  'ticket-success',
+  'media'
 ]);
 
 /** Styling for a layout region; avoids branching on template id in the screen renderer. */

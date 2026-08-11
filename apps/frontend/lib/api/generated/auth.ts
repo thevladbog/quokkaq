@@ -54,6 +54,19 @@ export interface HandlersAnnouncementRequest {
   text?: string;
 }
 
+export type HandlersAppliedExperienceAcknowledgementStatus = typeof HandlersAppliedExperienceAcknowledgementStatus[keyof typeof HandlersAppliedExperienceAcknowledgementStatus];
+
+
+export const HandlersAppliedExperienceAcknowledgementStatus = {
+  applied: 'applied',
+} as const;
+
+export interface HandlersAppliedExperienceAcknowledgement {
+  status: HandlersAppliedExperienceAcknowledgementStatus;
+  /** @minLength 1 */
+  versionId: string;
+}
+
 export interface HandlersAssignUnitRequest {
   permissions?: string[];
   unitId?: string;
@@ -132,6 +145,147 @@ export interface ModelsUnitOperationsPublic {
   phase?: string;
 }
 
+export type ModelsServiceBehaviorConditionCombinator = typeof ModelsServiceBehaviorConditionCombinator[keyof typeof ModelsServiceBehaviorConditionCombinator];
+
+
+export const ModelsServiceBehaviorConditionCombinator = {
+  and: 'and',
+  or: 'or',
+} as const;
+
+export type ModelsServiceBehaviorConditionField = typeof ModelsServiceBehaviorConditionField[keyof typeof ModelsServiceBehaviorConditionField];
+
+
+export const ModelsServiceBehaviorConditionField = {
+  identityisAuthenticated: 'identity.isAuthenticated',
+  identityisEmployee: 'identity.isEmployee',
+  identitygroups: 'identity.groups',
+  livequeueLength: 'live.queueLength',
+  liveisOpen: 'live.isOpen',
+  liveisConnected: 'live.isConnected',
+  sessionselectedServiceId: 'session.selectedServiceId',
+} as const;
+
+export type ModelsServiceBehaviorConditionKind = typeof ModelsServiceBehaviorConditionKind[keyof typeof ModelsServiceBehaviorConditionKind];
+
+
+export const ModelsServiceBehaviorConditionKind = {
+  rule: 'rule',
+  group: 'group',
+} as const;
+
+export type ModelsServiceBehaviorConditionOperator = typeof ModelsServiceBehaviorConditionOperator[keyof typeof ModelsServiceBehaviorConditionOperator];
+
+
+export const ModelsServiceBehaviorConditionOperator = {
+  eq: 'eq',
+  ne: 'ne',
+  gt: 'gt',
+  gte: 'gte',
+  lt: 'lt',
+  lte: 'lte',
+  contains: 'contains',
+  'not-contains': 'not-contains',
+  'is-true': 'is-true',
+  'is-false': 'is-false',
+} as const;
+
+export interface ModelsServiceBehaviorCondition {
+  children?: ModelsServiceBehaviorCondition[];
+  combinator?: ModelsServiceBehaviorConditionCombinator;
+  field?: ModelsServiceBehaviorConditionField;
+  kind: ModelsServiceBehaviorConditionKind;
+  operator?: ModelsServiceBehaviorConditionOperator;
+  value?: unknown;
+}
+
+export type ModelsServiceBehaviorAccessPolicyWhenFalse = typeof ModelsServiceBehaviorAccessPolicyWhenFalse[keyof typeof ModelsServiceBehaviorAccessPolicyWhenFalse];
+
+
+export const ModelsServiceBehaviorAccessPolicyWhenFalse = {
+  hide: 'hide',
+  lock: 'lock',
+} as const;
+
+export interface ModelsServiceBehaviorAccessPolicy {
+  when: ModelsServiceBehaviorCondition;
+  whenFalse: ModelsServiceBehaviorAccessPolicyWhenFalse;
+}
+
+export interface ModelsServiceBehaviorLocalizedText {[key: string]: string}
+
+export interface ModelsServiceBehaviorSelectOption {
+  key: string;
+  label: ModelsServiceBehaviorLocalizedText;
+}
+
+export type ModelsServiceBehaviorFieldType = typeof ModelsServiceBehaviorFieldType[keyof typeof ModelsServiceBehaviorFieldType];
+
+
+export const ModelsServiceBehaviorFieldType = {
+  text: 'text',
+  number: 'number',
+  phone: 'phone',
+  checkbox: 'checkbox',
+  select: 'select',
+} as const;
+
+export interface ModelsServiceBehaviorField {
+  key: string;
+  label: ModelsServiceBehaviorLocalizedText;
+  options?: ModelsServiceBehaviorSelectOption[];
+  required: boolean;
+  type: ModelsServiceBehaviorFieldType;
+}
+
+export interface ModelsServiceBehaviorInformation {
+  body: ModelsServiceBehaviorLocalizedText;
+  requireAcknowledgement?: boolean;
+}
+
+export type ModelsServiceBehaviorRouteMode = typeof ModelsServiceBehaviorRouteMode[keyof typeof ModelsServiceBehaviorRouteMode];
+
+
+export const ModelsServiceBehaviorRouteMode = {
+  auto: 'auto',
+  'page-slot': 'page-slot',
+} as const;
+
+export type ModelsServiceBehaviorRouteSlot = typeof ModelsServiceBehaviorRouteSlot[keyof typeof ModelsServiceBehaviorRouteSlot];
+
+
+export const ModelsServiceBehaviorRouteSlot = {
+  'service-info': 'service-info',
+  'service-form': 'service-form',
+  identity: 'identity',
+  confirmation: 'confirmation',
+} as const;
+
+export interface ModelsServiceBehaviorRoute {
+  mode: ModelsServiceBehaviorRouteMode;
+  slot?: ModelsServiceBehaviorRouteSlot;
+}
+
+export type ModelsServiceBehaviorVersion = typeof ModelsServiceBehaviorVersion[keyof typeof ModelsServiceBehaviorVersion];
+
+
+export const ModelsServiceBehaviorVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export interface ModelsServiceBehavior {
+  access?: ModelsServiceBehaviorAccessPolicy;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  dataRetentionDays?: number;
+  fields?: ModelsServiceBehaviorField[];
+  information?: ModelsServiceBehaviorInformation;
+  route?: ModelsServiceBehaviorRoute;
+  version: ModelsServiceBehaviorVersion;
+}
+
 /**
  * KioskDocumentSettings: JSON, e.g. { "retentionDays": 1–30 } for identificationMode=document.
  */
@@ -144,6 +298,8 @@ export type ModelsServiceKioskIdentificationConfig = { [key: string]: unknown };
 
 export interface ModelsService {
   backgroundColor?: string;
+  /** Behavior is optional portable station flow configuration. It complements, but never replaces, identification mode. */
+  behavior?: ModelsServiceBehavior;
   /** CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).
   When non-empty (after trim), it must be unique per unit — enforced by DB partial unique index and create/update validation. */
   calendarSlotKey?: string;
@@ -481,25 +637,43 @@ export interface HandlersCreateDesktopTerminalRequest {
   unitId?: string;
 }
 
-export interface HandlersDesktopTerminalJSON {
-  counterId?: string;
+export interface HandlersDesktopTerminalResponseDoc {
+  /** @nullable */
+  appliedTemplateAt?: string | null;
+  /** @nullable */
+  appliedTemplateVersionId?: string | null;
+  /** @nullable */
+  counterId?: string | null;
   counterName?: string;
   createdAt?: string;
   defaultLocale?: string;
+  /** @nullable */
+  experienceAckAt?: string | null;
+  /** @nullable */
+  experienceAckReasonCode?: string | null;
+  /** @nullable */
+  experienceAckStatus?: string | null;
+  /** @nullable */
+  experienceTemplateId?: string | null;
+  /** @nullable */
+  experienceVariantId?: string | null;
   id?: string;
   kind?: string;
   kioskFullscreen?: boolean;
-  lastSeenAt?: string;
-  name?: string;
-  revokedAt?: string;
+  /** @nullable */
+  lastSeenAt?: string | null;
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  revokedAt?: string | null;
   unitId?: string;
   unitName?: string;
   updatedAt?: string;
 }
 
-export interface HandlersCreateDesktopTerminalResponse {
+export interface HandlersCreateDesktopTerminalResponseDoc {
   pairingCode?: string;
-  terminal?: HandlersDesktopTerminalJSON;
+  terminal?: HandlersDesktopTerminalResponseDoc;
 }
 
 export type HandlersCreateFeedRequestConfig = { [key: string]: unknown };
@@ -553,9 +727,20 @@ export interface HandlersCreateScheduleRequest {
 
 export type HandlersCreateScreenLayoutTemplateRequestDefinition = { [key: string]: unknown };
 
+export type HandlersCreateScreenLayoutTemplateRequestSurface = typeof HandlersCreateScreenLayoutTemplateRequestSurface[keyof typeof HandlersCreateScreenLayoutTemplateRequestSurface];
+
+
+export const HandlersCreateScreenLayoutTemplateRequestSurface = {
+  'ticket-station': 'ticket-station',
+  'queue-display': 'queue-display',
+  'counter-display': 'counter-display',
+  'visitor-mobile': 'visitor-mobile',
+} as const;
+
 export interface HandlersCreateScreenLayoutTemplateRequest {
   definition?: HandlersCreateScreenLayoutTemplateRequestDefinition;
   name?: string;
+  surface?: HandlersCreateScreenLayoutTemplateRequestSurface;
 }
 
 export interface HandlersTenantRoleUnitJSON {
@@ -627,6 +812,25 @@ export interface HandlersDaDataFindPartyByInnRequest {
 export interface HandlersDaDataPassthroughRequest { [key: string]: unknown }
 
 export interface HandlersDaDataUpstreamResponse { [key: string]: unknown }
+
+export type HandlersExperienceManifestDefinition = { [key: string]: unknown };
+
+export type HandlersExperienceManifestMode = typeof HandlersExperienceManifestMode[keyof typeof HandlersExperienceManifestMode];
+
+
+export const HandlersExperienceManifestMode = {
+  experience: 'experience',
+} as const;
+
+export interface HandlersExperienceManifest {
+  definition: HandlersExperienceManifestDefinition;
+  mode: HandlersExperienceManifestMode;
+  publishedAt: string;
+  templateId: string;
+  variantId: string;
+  version: number;
+  versionId: string;
+}
 
 export interface HandlersFeaturesFlags {
   dadata?: boolean;
@@ -735,6 +939,17 @@ export interface HandlersKioskVisitorSurveyRequest {
   emoji?: string;
   score?: number;
   ticketId?: string;
+}
+
+export type HandlersLegacyManifestMode = typeof HandlersLegacyManifestMode[keyof typeof HandlersLegacyManifestMode];
+
+
+export const HandlersLegacyManifestMode = {
+  legacy: 'legacy',
+} as const;
+
+export interface HandlersLegacyManifest {
+  mode: HandlersLegacyManifestMode;
 }
 
 export interface HandlersLoginLinkResponse {
@@ -1098,6 +1313,25 @@ export interface HandlersRegisterUserRequest {
   token: string;
 }
 
+export type HandlersRejectedExperienceAcknowledgementStatus = typeof HandlersRejectedExperienceAcknowledgementStatus[keyof typeof HandlersRejectedExperienceAcknowledgementStatus];
+
+
+export const HandlersRejectedExperienceAcknowledgementStatus = {
+  rejected: 'rejected',
+} as const;
+
+export interface HandlersRejectedExperienceAcknowledgement {
+  /**
+     * @minLength 1
+     * @maxLength 64
+     * @pattern ^[a-z0-9]+(?:[._-][a-z0-9]+)*$
+     */
+  reasonCode: string;
+  status: HandlersRejectedExperienceAcknowledgementStatus;
+  /** @minLength 1 */
+  versionId: string;
+}
+
 export interface HandlersRemoveUnitRequest {
   unitId?: string;
 }
@@ -1127,6 +1361,113 @@ export interface HandlersSaasVendorResponse {
   counterparty?: HandlersSaasVendorResponseCounterparty;
   name?: string;
   paymentAccounts?: HandlersSaasVendorResponsePaymentAccountsItem[];
+}
+
+export type HandlersServiceCreateRequestKioskDocumentSettings = { [key: string]: unknown };
+
+export type HandlersServiceCreateRequestKioskIdentificationConfig = { [key: string]: unknown };
+
+export interface HandlersServiceCreateRequest {
+  backgroundColor?: string;
+  behavior?: ModelsServiceBehavior | null;
+  calendarSlotKey?: string;
+  children?: ModelsService[];
+  description?: string;
+  descriptionEn?: string;
+  descriptionRu?: string;
+  duration?: number;
+  gridCol?: number;
+  gridColSpan?: number;
+  gridRow?: number;
+  gridRowSpan?: number;
+  iconKey?: string;
+  id?: string;
+  identificationMode?: string;
+  imageUrl?: string;
+  isLeaf?: boolean;
+  kioskDocumentSettings?: HandlersServiceCreateRequestKioskDocumentSettings;
+  kioskIdentificationConfig?: HandlersServiceCreateRequestKioskIdentificationConfig;
+  maxServiceTime?: number;
+  maxWaitingTime?: number;
+  name?: string;
+  nameEn?: string;
+  nameRu?: string;
+  numberSequence?: string;
+  offerIdentification?: boolean;
+  parentId?: string;
+  prebook?: boolean;
+  prefix?: string;
+  restrictedServiceZoneId?: string;
+  sortOrder?: number;
+  textColor?: string;
+  unitId?: string;
+}
+
+/**
+ * @nullable
+ */
+export type HandlersServiceUpdateRequestKioskDocumentSettings = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type HandlersServiceUpdateRequestKioskIdentificationConfig = { [key: string]: unknown } | null;
+
+export interface HandlersServiceUpdateRequest {
+  /** @nullable */
+  backgroundColor?: string | null;
+  behavior?: ModelsServiceBehavior | null;
+  /** @nullable */
+  calendarSlotKey?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  descriptionEn?: string | null;
+  /** @nullable */
+  descriptionRu?: string | null;
+  /** @nullable */
+  duration?: number | null;
+  /** @nullable */
+  gridCol?: number | null;
+  /** @nullable */
+  gridColSpan?: number | null;
+  /** @nullable */
+  gridRow?: number | null;
+  /** @nullable */
+  gridRowSpan?: number | null;
+  /** @nullable */
+  iconKey?: string | null;
+  identificationMode?: string;
+  /** @nullable */
+  imageUrl?: string | null;
+  isLeaf?: boolean;
+  /** @nullable */
+  kioskDocumentSettings?: HandlersServiceUpdateRequestKioskDocumentSettings;
+  /** @nullable */
+  kioskIdentificationConfig?: HandlersServiceUpdateRequestKioskIdentificationConfig;
+  /** @nullable */
+  maxServiceTime?: number | null;
+  /** @nullable */
+  maxWaitingTime?: number | null;
+  name?: string;
+  /** @nullable */
+  nameEn?: string | null;
+  /** @nullable */
+  nameRu?: string | null;
+  /** @nullable */
+  numberSequence?: string | null;
+  offerIdentification?: boolean;
+  /** @nullable */
+  parentId?: string | null;
+  prebook?: boolean;
+  /** @nullable */
+  prefix?: string | null;
+  /** @nullable */
+  restrictedServiceZoneId?: string | null;
+  sortOrder?: number;
+  /** @nullable */
+  textColor?: string | null;
+  unitId?: string;
 }
 
 /**
@@ -1168,6 +1509,10 @@ export interface HandlersTerminalBootstrapResponse {
   token?: string;
   unitId?: string;
 }
+
+export type HandlersTerminalExperienceAckRequestDoc = HandlersAppliedExperienceAcknowledgement | HandlersRejectedExperienceAcknowledgement;
+
+export type HandlersTerminalExperienceManifestResponseDoc = HandlersLegacyManifest | HandlersExperienceManifest;
 
 export interface HandlersTestSMSIntegrationRequest {
   /** Phone number in E.164 format to send the test SMS to. */
@@ -1271,11 +1616,26 @@ export interface HandlersUpdateCounterRequest {
   serviceZoneId?: string;
 }
 
-export interface HandlersUpdateDesktopTerminalRequest {
-  contextUnitId?: string;
-  counterId?: string;
+export type HandlersUpdateDesktopTerminalRequestDocKind = typeof HandlersUpdateDesktopTerminalRequestDocKind[keyof typeof HandlersUpdateDesktopTerminalRequestDocKind];
+
+
+export const HandlersUpdateDesktopTerminalRequestDocKind = {
+  kiosk: 'kiosk',
+  counter_guest_survey: 'counter_guest_survey',
+  counter_board: 'counter_board',
+} as const;
+
+export interface HandlersUpdateDesktopTerminalRequestDoc {
+  /** @nullable */
+  contextUnitId?: string | null;
+  /** @nullable */
+  counterId?: string | null;
   defaultLocale?: string;
-  kind?: string;
+  /** @nullable */
+  experienceTemplateId?: string | null;
+  /** @nullable */
+  experienceVariantId?: string | null;
+  kind?: HandlersUpdateDesktopTerminalRequestDocKind;
   kioskFullscreen?: boolean;
   name?: string;
   unitId?: string;
@@ -1290,9 +1650,20 @@ export interface HandlersUpdatePlaylistRequest {
 
 export type HandlersUpdateScreenLayoutTemplateRequestDefinition = { [key: string]: unknown };
 
+export type HandlersUpdateScreenLayoutTemplateRequestSurface = typeof HandlersUpdateScreenLayoutTemplateRequestSurface[keyof typeof HandlersUpdateScreenLayoutTemplateRequestSurface];
+
+
+export const HandlersUpdateScreenLayoutTemplateRequestSurface = {
+  'ticket-station': 'ticket-station',
+  'queue-display': 'queue-display',
+  'counter-display': 'counter-display',
+  'visitor-mobile': 'visitor-mobile',
+} as const;
+
 export interface HandlersUpdateScreenLayoutTemplateRequest {
   definition?: HandlersUpdateScreenLayoutTemplateRequestDefinition;
   name?: string;
+  surface?: HandlersUpdateScreenLayoutTemplateRequestSurface;
 }
 
 export interface HandlersUpdateStatusRequest {
@@ -2113,6 +2484,34 @@ export interface ModelsDayScheduleWithBookings {
   updatedAt?: string;
 }
 
+export type ModelsExperienceTemplateVersionDefinition = { [key: string]: unknown };
+
+export interface ModelsExperienceTemplateVersion {
+  definition?: ModelsExperienceTemplateVersionDefinition;
+  id?: string;
+  publishedAt?: string;
+  /** @nullable */
+  publishedBy?: string | null;
+  templateId?: string;
+  version?: number;
+}
+
+export interface ModelsExperienceTemplateVersionMetadata {
+  id?: string;
+  publishedAt?: string;
+  /** @nullable */
+  publishedBy?: string | null;
+  templateId?: string;
+  version?: number;
+}
+
+export interface ModelsExperienceTemplateVersionPage {
+  hasMore?: boolean;
+  items?: ModelsExperienceTemplateVersionMetadata[];
+  /** @nullable */
+  nextBeforeVersion: number | null;
+}
+
 export type ModelsExternalFeedCachedData = { [key: string]: unknown };
 
 export type ModelsExternalFeedConfig = { [key: string]: unknown };
@@ -2354,6 +2753,8 @@ export interface ModelsScreenLayoutTemplate {
   definition?: ModelsScreenLayoutTemplateDefinition;
   id?: string;
   name?: string;
+  publishedVersionId?: string;
+  surface?: string;
   updatedAt?: string;
 }
 
@@ -3149,6 +3550,17 @@ state: string;
 };
 
 export type CompleteCompanyOnboarding200 = {[key: string]: boolean};
+
+export type ListScreenLayoutTemplateVersionsParams = {
+/**
+ * Page size (default 20, maximum 100)
+ */
+limit?: number;
+/**
+ * Return versions lower than this version number
+ */
+beforeVersion?: number;
+};
 
 export type ListCompanyUsersParams = {
 /**
@@ -6111,9 +6523,19 @@ export type createScreenLayoutTemplateResponse400 = {
   status: 400
 }
 
+export type createScreenLayoutTemplateResponse401 = {
+  data: string
+  status: 401
+}
+
 export type createScreenLayoutTemplateResponse403 = {
   data: string
   status: 403
+}
+
+export type createScreenLayoutTemplateResponse413 = {
+  data: string
+  status: 413
 }
 
 export type createScreenLayoutTemplateResponse500 = {
@@ -6124,7 +6546,7 @@ export type createScreenLayoutTemplateResponse500 = {
 export type createScreenLayoutTemplateResponseSuccess = (createScreenLayoutTemplateResponse201) & {
   headers: Headers;
 };
-export type createScreenLayoutTemplateResponseError = (createScreenLayoutTemplateResponse400 | createScreenLayoutTemplateResponse403 | createScreenLayoutTemplateResponse500) & {
+export type createScreenLayoutTemplateResponseError = (createScreenLayoutTemplateResponse400 | createScreenLayoutTemplateResponse401 | createScreenLayoutTemplateResponse403 | createScreenLayoutTemplateResponse413 | createScreenLayoutTemplateResponse500) & {
   headers: Headers;
 };
 
@@ -6206,6 +6628,11 @@ export type deleteScreenLayoutTemplateResponse204 = {
   status: 204
 }
 
+export type deleteScreenLayoutTemplateResponse401 = {
+  data: string
+  status: 401
+}
+
 export type deleteScreenLayoutTemplateResponse403 = {
   data: string
   status: 403
@@ -6216,6 +6643,11 @@ export type deleteScreenLayoutTemplateResponse404 = {
   status: 404
 }
 
+export type deleteScreenLayoutTemplateResponse409 = {
+  data: string
+  status: 409
+}
+
 export type deleteScreenLayoutTemplateResponse500 = {
   data: string
   status: 500
@@ -6224,7 +6656,7 @@ export type deleteScreenLayoutTemplateResponse500 = {
 export type deleteScreenLayoutTemplateResponseSuccess = (deleteScreenLayoutTemplateResponse204) & {
   headers: Headers;
 };
-export type deleteScreenLayoutTemplateResponseError = (deleteScreenLayoutTemplateResponse403 | deleteScreenLayoutTemplateResponse404 | deleteScreenLayoutTemplateResponse500) & {
+export type deleteScreenLayoutTemplateResponseError = (deleteScreenLayoutTemplateResponse401 | deleteScreenLayoutTemplateResponse403 | deleteScreenLayoutTemplateResponse404 | deleteScreenLayoutTemplateResponse409 | deleteScreenLayoutTemplateResponse500) & {
   headers: Headers;
 };
 
@@ -6310,9 +6742,29 @@ export type updateScreenLayoutTemplateResponse400 = {
   status: 400
 }
 
+export type updateScreenLayoutTemplateResponse401 = {
+  data: string
+  status: 401
+}
+
+export type updateScreenLayoutTemplateResponse403 = {
+  data: string
+  status: 403
+}
+
 export type updateScreenLayoutTemplateResponse404 = {
   data: string
   status: 404
+}
+
+export type updateScreenLayoutTemplateResponse409 = {
+  data: string
+  status: 409
+}
+
+export type updateScreenLayoutTemplateResponse413 = {
+  data: string
+  status: 413
 }
 
 export type updateScreenLayoutTemplateResponse500 = {
@@ -6323,7 +6775,7 @@ export type updateScreenLayoutTemplateResponse500 = {
 export type updateScreenLayoutTemplateResponseSuccess = (updateScreenLayoutTemplateResponse200) & {
   headers: Headers;
 };
-export type updateScreenLayoutTemplateResponseError = (updateScreenLayoutTemplateResponse400 | updateScreenLayoutTemplateResponse404 | updateScreenLayoutTemplateResponse500) & {
+export type updateScreenLayoutTemplateResponseError = (updateScreenLayoutTemplateResponse400 | updateScreenLayoutTemplateResponse401 | updateScreenLayoutTemplateResponse403 | updateScreenLayoutTemplateResponse404 | updateScreenLayoutTemplateResponse409 | updateScreenLayoutTemplateResponse413 | updateScreenLayoutTemplateResponse500) & {
   headers: Headers;
 };
 
@@ -6396,6 +6848,394 @@ export const useUpdateScreenLayoutTemplate = <TError = string,
         TContext
       > => {
       return useMutation(getUpdateScreenLayoutTemplateMutationOptions(options), queryClient);
+    }
+
+/**
+ * Validates the tenant-owned mutable draft and atomically creates a new immutable published version.
+ * @summary Publish the current experience template draft
+ */
+export type publishScreenLayoutTemplateResponse201 = {
+  data: ModelsExperienceTemplateVersion
+  status: 201
+}
+
+export type publishScreenLayoutTemplateResponse400 = {
+  data: string
+  status: 400
+}
+
+export type publishScreenLayoutTemplateResponse401 = {
+  data: string
+  status: 401
+}
+
+export type publishScreenLayoutTemplateResponse403 = {
+  data: string
+  status: 403
+}
+
+export type publishScreenLayoutTemplateResponse404 = {
+  data: string
+  status: 404
+}
+
+export type publishScreenLayoutTemplateResponse409 = {
+  data: string
+  status: 409
+}
+
+export type publishScreenLayoutTemplateResponse500 = {
+  data: string
+  status: 500
+}
+
+export type publishScreenLayoutTemplateResponseSuccess = (publishScreenLayoutTemplateResponse201) & {
+  headers: Headers;
+};
+export type publishScreenLayoutTemplateResponseError = (publishScreenLayoutTemplateResponse400 | publishScreenLayoutTemplateResponse401 | publishScreenLayoutTemplateResponse403 | publishScreenLayoutTemplateResponse404 | publishScreenLayoutTemplateResponse409 | publishScreenLayoutTemplateResponse500) & {
+  headers: Headers;
+};
+
+export type publishScreenLayoutTemplateResponse = (publishScreenLayoutTemplateResponseSuccess | publishScreenLayoutTemplateResponseError)
+
+export const getPublishScreenLayoutTemplateUrl = (templateId: string,) => {
+
+
+
+
+  return `/companies/me/screen-layout-templates/${templateId}/publish`
+}
+
+export const publishScreenLayoutTemplate = async (templateId: string, options?: RequestInit): Promise<publishScreenLayoutTemplateResponse> => {
+
+  return orvalMutator<publishScreenLayoutTemplateResponse>(getPublishScreenLayoutTemplateUrl(templateId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPublishScreenLayoutTemplateMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishScreenLayoutTemplate>>, TError,{templateId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof publishScreenLayoutTemplate>>, TError,{templateId: string}, TContext> => {
+
+const mutationKey = ['publishScreenLayoutTemplate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof publishScreenLayoutTemplate>>, {templateId: string}> = (props) => {
+          const {templateId} = props ?? {};
+
+          return  publishScreenLayoutTemplate(templateId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PublishScreenLayoutTemplateMutationResult = NonNullable<Awaited<ReturnType<typeof publishScreenLayoutTemplate>>>
+
+    export type PublishScreenLayoutTemplateMutationError = string
+
+    /**
+ * @summary Publish the current experience template draft
+ */
+export const usePublishScreenLayoutTemplate = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishScreenLayoutTemplate>>, TError,{templateId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof publishScreenLayoutTemplate>>,
+        TError,
+        {templateId: string},
+        TContext
+      > => {
+      return useMutation(getPublishScreenLayoutTemplateMutationOptions(options), queryClient);
+    }
+
+/**
+ * Returns metadata only in descending version order; immutable definitions are excluded from history pages.
+ * @summary List published experience template versions
+ */
+export type listScreenLayoutTemplateVersionsResponse200 = {
+  data: ModelsExperienceTemplateVersionPage
+  status: 200
+}
+
+export type listScreenLayoutTemplateVersionsResponse400 = {
+  data: string
+  status: 400
+}
+
+export type listScreenLayoutTemplateVersionsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type listScreenLayoutTemplateVersionsResponse403 = {
+  data: string
+  status: 403
+}
+
+export type listScreenLayoutTemplateVersionsResponse404 = {
+  data: string
+  status: 404
+}
+
+export type listScreenLayoutTemplateVersionsResponse500 = {
+  data: string
+  status: 500
+}
+
+export type listScreenLayoutTemplateVersionsResponseSuccess = (listScreenLayoutTemplateVersionsResponse200) & {
+  headers: Headers;
+};
+export type listScreenLayoutTemplateVersionsResponseError = (listScreenLayoutTemplateVersionsResponse400 | listScreenLayoutTemplateVersionsResponse401 | listScreenLayoutTemplateVersionsResponse403 | listScreenLayoutTemplateVersionsResponse404 | listScreenLayoutTemplateVersionsResponse500) & {
+  headers: Headers;
+};
+
+export type listScreenLayoutTemplateVersionsResponse = (listScreenLayoutTemplateVersionsResponseSuccess | listScreenLayoutTemplateVersionsResponseError)
+
+export const getListScreenLayoutTemplateVersionsUrl = (templateId: string,
+    params?: ListScreenLayoutTemplateVersionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/companies/me/screen-layout-templates/${templateId}/versions?${stringifiedParams}` : `/companies/me/screen-layout-templates/${templateId}/versions`
+}
+
+export const listScreenLayoutTemplateVersions = async (templateId: string,
+    params?: ListScreenLayoutTemplateVersionsParams, options?: RequestInit): Promise<listScreenLayoutTemplateVersionsResponse> => {
+
+  return orvalMutator<listScreenLayoutTemplateVersionsResponse>(getListScreenLayoutTemplateVersionsUrl(templateId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListScreenLayoutTemplateVersionsQueryKey = (templateId: string,
+    params?: ListScreenLayoutTemplateVersionsParams,) => {
+    return [
+    `/companies/me/screen-layout-templates/${templateId}/versions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListScreenLayoutTemplateVersionsQueryOptions = <TData = Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>, TError = string>(templateId: string,
+    params?: ListScreenLayoutTemplateVersionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListScreenLayoutTemplateVersionsQueryKey(templateId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>> = ({ signal }) => listScreenLayoutTemplateVersions(templateId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(templateId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListScreenLayoutTemplateVersionsQueryResult = NonNullable<Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>>
+export type ListScreenLayoutTemplateVersionsQueryError = string
+
+
+export function useListScreenLayoutTemplateVersions<TData = Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>, TError = string>(
+ templateId: string,
+    params: undefined |  ListScreenLayoutTemplateVersionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>,
+          TError,
+          Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListScreenLayoutTemplateVersions<TData = Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>, TError = string>(
+ templateId: string,
+    params?: ListScreenLayoutTemplateVersionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>,
+          TError,
+          Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListScreenLayoutTemplateVersions<TData = Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>, TError = string>(
+ templateId: string,
+    params?: ListScreenLayoutTemplateVersionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List published experience template versions
+ */
+
+export function useListScreenLayoutTemplateVersions<TData = Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>, TError = string>(
+ templateId: string,
+    params?: ListScreenLayoutTemplateVersionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listScreenLayoutTemplateVersions>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListScreenLayoutTemplateVersionsQueryOptions(templateId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Copies one tenant-owned historical definition into a new immutable latest version and advances the published pointer.
+ * @summary Restore an experience template version
+ */
+export type restoreScreenLayoutTemplateVersionResponse201 = {
+  data: ModelsExperienceTemplateVersion
+  status: 201
+}
+
+export type restoreScreenLayoutTemplateVersionResponse400 = {
+  data: string
+  status: 400
+}
+
+export type restoreScreenLayoutTemplateVersionResponse401 = {
+  data: string
+  status: 401
+}
+
+export type restoreScreenLayoutTemplateVersionResponse403 = {
+  data: string
+  status: 403
+}
+
+export type restoreScreenLayoutTemplateVersionResponse404 = {
+  data: string
+  status: 404
+}
+
+export type restoreScreenLayoutTemplateVersionResponse409 = {
+  data: string
+  status: 409
+}
+
+export type restoreScreenLayoutTemplateVersionResponse500 = {
+  data: string
+  status: 500
+}
+
+export type restoreScreenLayoutTemplateVersionResponseSuccess = (restoreScreenLayoutTemplateVersionResponse201) & {
+  headers: Headers;
+};
+export type restoreScreenLayoutTemplateVersionResponseError = (restoreScreenLayoutTemplateVersionResponse400 | restoreScreenLayoutTemplateVersionResponse401 | restoreScreenLayoutTemplateVersionResponse403 | restoreScreenLayoutTemplateVersionResponse404 | restoreScreenLayoutTemplateVersionResponse409 | restoreScreenLayoutTemplateVersionResponse500) & {
+  headers: Headers;
+};
+
+export type restoreScreenLayoutTemplateVersionResponse = (restoreScreenLayoutTemplateVersionResponseSuccess | restoreScreenLayoutTemplateVersionResponseError)
+
+export const getRestoreScreenLayoutTemplateVersionUrl = (templateId: string,
+    versionId: string,) => {
+
+
+
+
+  return `/companies/me/screen-layout-templates/${templateId}/versions/${versionId}/restore`
+}
+
+export const restoreScreenLayoutTemplateVersion = async (templateId: string,
+    versionId: string, options?: RequestInit): Promise<restoreScreenLayoutTemplateVersionResponse> => {
+
+  return orvalMutator<restoreScreenLayoutTemplateVersionResponse>(getRestoreScreenLayoutTemplateVersionUrl(templateId,versionId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRestoreScreenLayoutTemplateVersionMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreScreenLayoutTemplateVersion>>, TError,{templateId: string;versionId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof restoreScreenLayoutTemplateVersion>>, TError,{templateId: string;versionId: string}, TContext> => {
+
+const mutationKey = ['restoreScreenLayoutTemplateVersion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof restoreScreenLayoutTemplateVersion>>, {templateId: string;versionId: string}> = (props) => {
+          const {templateId,versionId} = props ?? {};
+
+          return  restoreScreenLayoutTemplateVersion(templateId,versionId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RestoreScreenLayoutTemplateVersionMutationResult = NonNullable<Awaited<ReturnType<typeof restoreScreenLayoutTemplateVersion>>>
+
+    export type RestoreScreenLayoutTemplateVersionMutationError = string
+
+    /**
+ * @summary Restore an experience template version
+ */
+export const useRestoreScreenLayoutTemplateVersion = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreScreenLayoutTemplateVersion>>, TError,{templateId: string;versionId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof restoreScreenLayoutTemplateVersion>>,
+        TError,
+        {templateId: string;versionId: string},
+        TContext
+      > => {
+      return useMutation(getRestoreScreenLayoutTemplateVersionMutationOptions(options), queryClient);
     }
 
 /**

@@ -1,0 +1,225 @@
+package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+	"os"
+	"reflect"
+	"strings"
+	"testing"
+
+	"github.com/swaggo/swag"
+
+	"quokkaq-go-backend/internal/models"
+)
+
+type silentSwagLogger struct{}
+
+func (silentSwagLogger) Printf(string, ...interface{}) {}
+
+func TestExperienceOpenAPISourceAnnotationsAreGeneratable(t *testing.T) {
+	parser := swag.New(swag.SetDebugger(silentSwagLogger{}))
+	if err := parser.ParseAPI("../..", "cmd/api/main.go", 100); err != nil {
+		t.Fatalf("parse Swagger source: %v", err)
+	}
+	document := parser.GetSwagger()
+	tests := []struct {
+		path     string
+		method   string
+		statuses []int
+	}{
+		{path: "/companies/me/screen-layout-templates/{templateId}/publish", method: "post", statuses: []int{201, 400, 401, 403, 404, 409, 500}},
+		{path: "/companies/me/screen-layout-templates/{templateId}/versions", method: "get", statuses: []int{200, 400, 401, 403, 404, 500}},
+		{path: "/companies/me/screen-layout-templates/{templateId}/versions/{versionId}/restore", method: "post", statuses: []int{201, 400, 401, 403, 404, 409, 500}},
+		{path: "/companies/me/screen-layout-templates/{templateId}", method: "delete", statuses: []int{204, 401, 403, 404, 409, 500}},
+		{path: "/desktop-terminals/{id}", method: "patch", statuses: []int{204, 400, 401, 403, 404, 409, 500}},
+		{path: "/terminal/experience", method: "get", statuses: []int{200, 401, 403, 409, 500}},
+		{path: "/terminal/experience/ack", method: "post", statuses: []int{204, 400, 401, 403, 409, 500}},
+	}
+	for _, testCase := range tests {
+		pathItem, ok := document.Paths.Paths[testCase.path]
+		if !ok {
+			t.Errorf("missing generated path %s", testCase.path)
+			continue
+		}
+		operation := pathItem.Get
+		if testCase.method == "post" {
+			operation = pathItem.Post
+		}
+		if testCase.method == "delete" {
+			operation = pathItem.Delete
+		}
+		if testCase.method == "patch" {
+			operation = pathItem.Patch
+		}
+		if operation == nil {
+			t.Errorf("missing generated %s operation for %s", testCase.method, testCase.path)
+			continue
+		}
+		if strings.TrimSpace(operation.Summary) == "" || len(operation.Tags) == 0 {
+			t.Errorf("operation %s %s lacks summary/tags", testCase.method, testCase.path)
+		}
+		for _, status := range testCase.statuses {
+			if _, ok := operation.Responses.StatusCodeResponses[status]; !ok {
+				t.Errorf("operation %s %s lacks response %d", testCase.method, testCase.path, status)
+			}
+		}
+	}
+
+	updatePath := document.Paths.Paths["/desktop-terminals/{id}"].Patch
+	var requestRef string
+	for _, parameter := range updatePath.Parameters {
+		if parameter.In == "body" && parameter.Schema != nil {
+			requestRef = parameter.Schema.Ref.String()
+		}
+	}
+	if requestRef != "#/definitions/handlers.UpdateDesktopTerminalRequestDoc" {
+		t.Fatalf("terminal update request ref = %q", requestRef)
+	}
+	for _, schemaName := range []string{"handlers.UpdateDesktopTerminalRequestDoc", "handlers.DesktopTerminalResponseDoc"} {
+		schema, ok := document.Definitions[schemaName]
+		if !ok {
+			t.Fatalf("missing generated schema %s", schemaName)
+		}
+		for _, propertyName := range []string{"experienceTemplateId", "experienceVariantId"} {
+			property, ok := schema.Properties[propertyName]
+			if !ok {
+				t.Fatalf("%s missing property %s", schemaName, propertyName)
+			}
+			if nullable, _ := property.Extensions["x-nullable"].(bool); !nullable {
+				t.Errorf("%s.%s x-nullable = %v", schemaName, propertyName, property.Extensions["x-nullable"])
+			}
+			for _, required := range schema.Required {
+				if required == propertyName {
+					t.Errorf("%s.%s unexpectedly required", schemaName, propertyName)
+				}
+			}
+		}
+	}
+	for _, schemaName := range []string{"models.ExperienceTemplateVersion", "models.ExperienceTemplateVersionMetadata"} {
+		schema, ok := document.Definitions[schemaName]
+		if !ok {
+			t.Fatalf("missing generated schema %s", schemaName)
+		}
+		publisher, ok := schema.Properties["publishedBy"]
+		if !ok {
+			t.Fatalf("%s missing property publishedBy", schemaName)
+		}
+		if nullable, _ := publisher.Extensions["x-nullable"].(bool); !nullable {
+			t.Errorf("%s.publishedBy x-nullable = %v", schemaName, publisher.Extensions["x-nullable"])
+		}
+	}
+	manifestPath := document.Paths.Paths["/terminal/experience"].Get
+	manifestResponse, ok := manifestPath.Responses.StatusCodeResponses[http.StatusOK]
+	if !ok || manifestResponse.Schema == nil {
+		t.Fatal("terminal manifest source response lacks a schema")
+	}
+	if manifestResponse.Schema.Ref.String() != "#/definitions/handlers.TerminalExperienceManifestResponseDoc" {
+		t.Fatalf("terminal manifest response ref = %q", manifestResponse.Schema.Ref.String())
+	}
+	for _, schemaName := range []string{"handlers.LegacyManifest", "handlers.ExperienceManifest"} {
+		if _, ok := document.Definitions[schemaName]; !ok {
+			t.Fatalf("missing generated runtime variant schema %s", schemaName)
+		}
+	}
+	ackPath := document.Paths.Paths["/terminal/experience/ack"].Post
+	var ackRequestRef string
+	for _, parameter := range ackPath.Parameters {
+		if parameter.In == "body" && parameter.Schema != nil {
+			ackRequestRef = parameter.Schema.Ref.String()
+		}
+	}
+	if ackRequestRef != "#/definitions/handlers.TerminalExperienceAckRequestDoc" {
+		t.Fatalf("terminal acknowledgement request ref = %q", ackRequestRef)
+	}
+	for _, schemaName := range []string{"handlers.AppliedExperienceAcknowledgement", "handlers.RejectedExperienceAcknowledgement"} {
+		if _, ok := document.Definitions[schemaName]; !ok {
+			t.Fatalf("missing generated acknowledgement variant schema %s", schemaName)
+		}
+	}
+
+	experienceSource, err := os.ReadFile("experience_runtime_handler.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, marker := range []string{
+		"@Success      200 {object} TerminalExperienceManifestResponseDoc",
+		"@Param        body body TerminalExperienceAckRequestDoc true \"Acknowledgement payload\"",
+		"type LegacyManifest struct",
+		"type ExperienceManifest struct",
+		"type AppliedExperienceAcknowledgement struct",
+		"type RejectedExperienceAcknowledgement struct",
+	} {
+		if !strings.Contains(string(experienceSource), marker) {
+			t.Errorf("terminal runtime Swagger source lacks marker %q", marker)
+		}
+	}
+	pageSchema, ok := document.Definitions["models.ExperienceTemplateVersionPage"]
+	if !ok {
+		t.Fatal("missing generated schema models.ExperienceTemplateVersionPage")
+	}
+	nextCursor, ok := pageSchema.Properties["nextBeforeVersion"]
+	if !ok {
+		t.Fatal("version page missing nextBeforeVersion")
+	}
+	if nullable, _ := nextCursor.Extensions["x-nullable"].(bool); !nullable {
+		t.Errorf("models.ExperienceTemplateVersionPage.nextBeforeVersion x-nullable = %v", nextCursor.Extensions["x-nullable"])
+	}
+	required := false
+	for _, propertyName := range pageSchema.Required {
+		if propertyName == "nextBeforeVersion" {
+			required = true
+			break
+		}
+	}
+	if !required {
+		t.Error("models.ExperienceTemplateVersionPage.nextBeforeVersion must be required because runtime JSON always includes it")
+	}
+}
+
+func TestExperienceVersionPageAlwaysIncludesNullableCursor(t *testing.T) {
+	payload, err := json.Marshal(models.ExperienceTemplateVersionPage{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	value, present := decoded["nextBeforeVersion"]
+	if !present {
+		t.Fatalf("nextBeforeVersion absent from runtime JSON: %s", payload)
+	}
+	if value != nil {
+		t.Fatalf("nextBeforeVersion = %#v, want null", value)
+	}
+}
+
+func TestTerminalAssignmentOpenAPIDTOsAreOptionalNullableAndServerControlled(t *testing.T) {
+	requestType := reflect.TypeOf(UpdateDesktopTerminalRequestDoc{})
+	responseType := reflect.TypeOf(DesktopTerminalResponseDoc{})
+	for _, fieldName := range []string{"ExperienceTemplateID", "ExperienceVariantID"} {
+		for _, docType := range []reflect.Type{requestType, responseType} {
+			field, ok := docType.FieldByName(fieldName)
+			if !ok {
+				t.Fatalf("%s missing %s", docType.Name(), fieldName)
+			}
+			if field.Type.Kind() != reflect.Pointer || !strings.Contains(field.Tag.Get("json"), "omitempty") || field.Tag.Get("extensions") != "x-nullable" {
+				t.Errorf("%s.%s tags/type = %s %q %q, want optional nullable pointer", docType.Name(), fieldName, field.Type, field.Tag.Get("json"), field.Tag.Get("extensions"))
+			}
+		}
+	}
+	for _, serverField := range []string{"AppliedTemplateVersionID", "AppliedTemplateAt", "ExperienceAckStatus", "ExperienceAckReasonCode", "ExperienceAckAt"} {
+		if _, exists := requestType.FieldByName(serverField); exists {
+			t.Errorf("assignment request exposes server-controlled field %s", serverField)
+		}
+	}
+
+	source, err := os.ReadFile("desktop_terminal_handler.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(source), "@Param        body  body      UpdateDesktopTerminalRequestDoc") {
+		t.Fatal("terminal update annotation does not use explicit nullable request doc DTO")
+	}
+}

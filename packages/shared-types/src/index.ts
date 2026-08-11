@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  ServiceBehaviorSchema,
+  type ServiceBehavior
+} from './service-behavior';
 
 export {
   TENANT_SLUG_MIN_LEN,
@@ -132,6 +136,8 @@ export type ServiceModel = {
    * `capture` for `identificationMode=custom` may include e.g. `{ kind: "barcode", manualInputMode: "none"|"numeric"|"alphanumeric", numericMaxLength?: number, showOnScreenKeyboard?: boolean }`.
    */
   kioskIdentificationConfig?: unknown;
+  /** Optional Phase 1 composable station behavior; legacy identification remains separate. */
+  behavior?: ServiceBehavior;
   isLeaf?: boolean;
   /** Order within the unit for kiosk and lists; lower = earlier. */
   sortOrder?: number;
@@ -219,6 +225,7 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
     .optional(),
   kioskDocumentSettings: KioskDocumentSettingsSchema.optional(),
   kioskIdentificationConfig: KioskIdentificationConfigSchema.optional(),
+  behavior: ServiceBehaviorSchema.optional(),
   isLeaf: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
   gridRow: z.number().nullable().optional(),
@@ -785,6 +792,98 @@ export {
 } from './screen-template-layout';
 
 export { migrateRegionsToCellGrid } from './screen-template-migrate-regions';
+
+export {
+  ConditionFieldSchema,
+  ConditionOperatorSchema,
+  ConditionRuleSchema,
+  ConditionGroupSchema,
+  ConditionNodeSchema,
+  MAX_ACCESS_POLICY_CONDITION_NODES,
+  exceedsConditionNodeLimit,
+  AccessPolicySchema,
+  PageAccessPolicySchema,
+  ConditionContextSchema,
+  type ConditionField,
+  type ConditionOperator,
+  type ConditionRule,
+  type ConditionGroup,
+  type ConditionNode,
+  type AccessPolicy,
+  type PageAccessPolicy,
+  type ConditionContext
+} from './experience-condition';
+
+export {
+  ServiceBehaviorFieldSchema,
+  ServiceBehaviorInformationSchema,
+  ServiceBehaviorRouteSchema,
+  ServiceBehaviorSchema,
+  type ServiceBehavior
+} from './service-behavior';
+
+export {
+  ExperienceSurfaceSchema,
+  InteractionModeSchema,
+  ViewingDistanceSchema,
+  DeviceProfileSchema,
+  ExperienceGridSchema,
+  ExperienceLayoutVariantSchema,
+  WidgetActionSchema,
+  ExperienceWidgetToneSchema,
+  ExperienceThemeSchema,
+  ExperienceWidgetSchema,
+  ExperienceDraftWidgetSchema,
+  ExperiencePlacementSchema,
+  ExperiencePageLayoutSchema,
+  ExperiencePageSchema,
+  ExperienceFlowPagesSchema,
+  ExperienceDraftSchema,
+  ExperienceTemplateSchema,
+  EXPERIENCE_TEMPLATE_LIMITS,
+  type ExperienceSurface,
+  type DeviceProfile,
+  type ExperienceLayoutVariant,
+  type WidgetAction,
+  type ExperienceTheme,
+  type ExperienceWidget,
+  type ExperiencePage,
+  type ExperienceFlowPages,
+  type ExperienceTemplate
+} from './experience-template';
+
+export {
+  ExperienceNormalizationError,
+  experienceFromScreenTemplate,
+  experienceFromKioskConfig,
+  normalizeExperienceInput,
+  type ExperienceNormalizationErrorCode
+} from './experience-legacy';
+
+export {
+  LegacyAttractCompatibilitySchema,
+  type LegacyAttractCompatibility
+} from './experience-runtime';
+
+export {
+  validateExperienceForPublish,
+  EXPERIENCE_VALIDATION_MAX_ISSUES_PER_SEVERITY,
+  type ExperienceValidationErrorCode,
+  type ExperienceValidationWarningCode,
+  type ExperienceValidationIssueCode,
+  type ExperienceValidationPath,
+  type ExperienceValidationIssue,
+  type ExperienceValidationReport
+} from './experience-validation';
+
+export { experienceWidgetSupportsSurface } from './experience-capabilities';
+
+export {
+  KioskIdentificationModeSchema,
+  getKioskServiceIdentificationMode,
+  type KioskIdentificationMode,
+  type KioskIdentificationService
+} from './kiosk-service-identification';
 
 import {
   ScreenTemplateCellGridSchema,
