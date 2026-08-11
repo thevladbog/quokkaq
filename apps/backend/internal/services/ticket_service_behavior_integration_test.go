@@ -77,7 +77,7 @@ CREATE TABLE services (
 `).Error; err != nil {
 		t.Fatal(err)
 	}
-	behavior := `{"version":1,"fields":[{"key":"room","label":{"en":"Room"},"type":"text","required":true}],"dataRetentionDays":1}`
+	behavior := `{"version":1,"fields":[{"key":"room","label":{"en":"Room"},"type":"text","required":true}],"dataRetentionDays":1,"access":{"when":{"kind":"rule","field":"identity.isEmployee","operator":"is-true"},"whenFalse":"lock"}}`
 	if err := db.Exec(`INSERT INTO services (id, unit_id, name, identification_mode, behavior) VALUES (?, ?, ?, ?, ?)`, "service-behavior", "u1", "Behavior service", models.IdentificationModeBadge, behavior).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -102,6 +102,24 @@ CREATE TABLE services (
 		hub,
 		noopJobEnqueuer{},
 	), db
+}
+
+func TestTicketServiceBehaviorAccessRejectsAnonymousTicket(t *testing.T) {
+	service, _ := setupTicketBehaviorIntegration(t)
+	input := json.RawMessage(`{"form":{"room":"A-101"}}`)
+	_, err := service.CreateTicket("u1", "service-behavior", nil, nil, nil, &input, nil, nil)
+	if !errors.Is(err, ErrTicketKioskServiceAccessDenied) {
+		t.Fatalf("error = %v, want %v", err, ErrTicketKioskServiceAccessDenied)
+	}
+}
+
+func TestTicketServiceBehaviorAccessDoesNotRestrictStaffTicket(t *testing.T) {
+	service, _ := setupTicketBehaviorIntegration(t)
+	input := json.RawMessage(`{"form":{"room":"A-101"}}`)
+	actorUserID := "staff-user"
+	if _, err := service.CreateTicket("u1", "service-behavior", nil, nil, nil, &input, &actorUserID, nil); err != nil {
+		t.Fatalf("staff ticket creation returned error: %v", err)
+	}
 }
 
 func TestTicketServiceBehaviorFormWithBadgePersistsDocumentsDataAndExpiry(t *testing.T) {

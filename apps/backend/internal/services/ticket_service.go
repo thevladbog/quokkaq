@@ -146,6 +146,9 @@ var ErrTicketKioskIdentifiedUserConflict = errors.New("cannot combine kioskIdent
 // ErrTicketKioskIdentifiedUserMode is returned when the service is not configured for employee badge/login identification.
 var ErrTicketKioskIdentifiedUserMode = errors.New("service does not use employee identification for this ticket")
 
+// ErrTicketKioskServiceAccessDenied is returned when kiosk identity does not satisfy service behavior access.
+var ErrTicketKioskServiceAccessDenied = errors.New("kiosk service access denied")
+
 // ErrVisitorTagsCommentRequired is returned when operatorComment is empty after trim.
 var ErrVisitorTagsCommentRequired = errors.New("operatorComment is required")
 
@@ -514,6 +517,16 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 			}
 			if service.IdentificationMode != models.IdentificationModeLogin && service.IdentificationMode != models.IdentificationModeBadge {
 				return ErrTicketKioskIdentifiedUserMode
+			}
+		}
+		isKioskStationRequest := actorUserID == nil && funnelSourceOverride == nil
+		if isKioskStationRequest && service.Behavior != nil {
+			allowed, accessErr := EvaluateKioskServiceBehaviorAccess(service.Behavior, kid != nil)
+			if accessErr != nil {
+				return accessErr
+			}
+			if !allowed {
+				return ErrTicketKioskServiceAccessDenied
 			}
 		}
 		if HasRequestDocumentsData(documentsData) && kid != nil && !IsServiceBehaviorFormDocumentsData(service, documentsData) {
