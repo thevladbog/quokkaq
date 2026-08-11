@@ -19,6 +19,7 @@ import { ExperienceOperationalOverlay } from './experience-operational-overlay';
 import { ExperienceRuntimeShell } from './experience-runtime-shell';
 import { StationRuntimeStateView } from './station-runtime-state';
 import type { StationRuntimeState } from '@/lib/experience/station-runtime-state';
+import { useKioskSessionIdle } from '@/hooks/use-kiosk-session-idle';
 import {
   ExperienceWidgetDiagnostic,
   ExperienceWidgetRegistry,
@@ -173,6 +174,10 @@ export type ExperienceRendererProps = {
   adapters: ExperienceRuntimeAdapters;
   initialPageId?: string;
   sessionTimeoutMs?: number;
+  sessionIdle?: {
+    beforeWarningSec: number;
+    countdownSec: number;
+  };
   stationState?: StationRuntimeState;
   onStationReset?: () => void;
   mode?: 'editor' | 'preview' | 'deployed';
@@ -221,6 +226,7 @@ export function ExperienceRenderer({
   adapters,
   initialPageId,
   sessionTimeoutMs,
+  sessionIdle,
   stationState = 'active',
   onStationReset,
   mode = 'deployed'
@@ -271,6 +277,13 @@ export function ExperienceRenderer({
     markActivity();
   }, [commitRuntime, createSession, markActivity, template.startPageId]);
 
+  const idle = useKioskSessionIdle({
+    enabled: stationState === 'active' && sessionIdle !== undefined,
+    beforeWarningSec: sessionIdle?.beforeWarningSec ?? 0,
+    countdownSec: sessionIdle?.countdownSec ?? 0,
+    onSessionEnd: reset
+  });
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -281,16 +294,19 @@ export function ExperienceRenderer({
   }, []);
 
   useEffect(() => {
-    if (!sessionTimeoutMs || sessionTimeoutMs <= 0) return;
+    if (sessionIdle || !sessionTimeoutMs || sessionTimeoutMs <= 0) return;
     const timer = window.setTimeout(reset, sessionTimeoutMs);
     return () => window.clearTimeout(timer);
-  }, [activityEpoch, reset, sessionTimeoutMs]);
+  }, [activityEpoch, reset, sessionIdle, sessionTimeoutMs]);
 
   const page = template.pages.find(
     (candidate) => candidate.id === runtime.pageId
   );
   const liveSnapshot = normalizeExperienceLiveSnapshot(runtimeContext);
   const operational = resolveOperationalState(liveSnapshot);
+  const effectiveStationState: StationRuntimeState = idle.showWarning
+    ? 'timeout-warning'
+    : stationState;
   const reportRuntimeError = adapters.onRuntimeError;
   const audioAnnouncer = audioAnnouncerFor(template.id, adapters);
 
@@ -596,10 +612,11 @@ export function ExperienceRenderer({
             display={runtimeContext.display}
             profile={variant.profile}
           />
-          {operational.state === 'normal' && stationState !== 'active' ? (
+          {operational.state === 'normal' && effectiveStationState !== 'active' ? (
             <StationRuntimeStateView
-              state={stationState}
-              onReset={onStationReset}
+              state={effectiveStationState}
+              onContinue={idle.continueSession}
+              onReset={onStationReset ?? reset}
             />
           ) : null}
         </>
