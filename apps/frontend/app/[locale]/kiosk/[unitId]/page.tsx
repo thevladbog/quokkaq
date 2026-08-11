@@ -1338,6 +1338,7 @@ export default function UnitKioskPage() {
     createTicketForServiceRef.current = createTicketForService;
   }, [createTicketForService]);
 
+  const experienceLocale: 'en' | 'ru' = locale === 'ru' ? 'ru' : 'en';
   const experienceRuntimeAdapters = useMemo(
     () => ({
       submitTicket: async (session: { values: Record<string, unknown> }) => {
@@ -1381,7 +1382,7 @@ export default function UnitKioskPage() {
           ? {
               identification: {
                 unitId: kioskApiUnitId,
-                locale: locale === 'ru' ? 'ru' : 'en',
+                locale: experienceLocale,
                 employeeService: unitServicesTree.find((candidate) => {
                   const mode = getServiceIdentificationMode(candidate);
                   return mode === 'badge' || mode === 'login';
@@ -1405,7 +1406,7 @@ export default function UnitKioskPage() {
     [
       createTicketMutation,
       kioskApiUnitId,
-      locale,
+      experienceLocale,
       openTicketSuccessFlow,
       unitServicesTree
     ]
