@@ -1358,18 +1358,27 @@ export default function UnitKioskPage() {
             ? (identity as { userId?: unknown }).userId
             : undefined;
         const documentsData = session.values.documentsData;
+        const validDocumentsData =
+          documentsData &&
+          typeof documentsData === 'object' &&
+          !Array.isArray(documentsData)
+            ? (documentsData as Record<string, unknown>)
+            : undefined;
         const ticket =
           typeof kioskIdentifiedUserId === 'string' && kioskIdentifiedUserId
             ? await createTicketMutation.mutateAsync({
                 unitId: kioskApiUnitId,
                 serviceId: service.id,
-                kioskIdentifiedUserId
+                kioskIdentifiedUserId,
+                ...(validDocumentsData
+                  ? { documentsData: validDocumentsData }
+                  : {})
               })
-            : documentsData && typeof documentsData === 'object'
+            : validDocumentsData
               ? await createTicketMutation.mutateAsync({
                   unitId: kioskApiUnitId,
                   serviceId: service.id,
-                  documentsData: documentsData as Record<string, unknown>
+                  documentsData: validDocumentsData
                 })
               : await createTicketMutation.mutateAsync({
                   unitId: kioskApiUnitId,

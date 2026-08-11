@@ -1624,7 +1624,7 @@ export type CreateTicketInUnitMutationVariables =
       clientId?: never;
       visitorPhone?: never;
       visitorLocale?: never;
-      documentsData?: never;
+      documentsData?: Record<string, unknown>;
     }
   | {
       unitId: string;
