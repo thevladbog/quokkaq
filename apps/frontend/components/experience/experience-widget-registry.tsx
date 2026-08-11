@@ -4,9 +4,13 @@ import type {
   DeviceProfile,
   ExperienceSurface,
   ExperienceWidget,
-  ScreenWidgetType
+  ScreenWidgetType,
+  AccessPolicy
 } from '@quokkaq/shared-types';
-import { ScreenWidgetTypeSchema } from '@quokkaq/shared-types';
+import {
+  AccessPolicySchema,
+  ScreenWidgetTypeSchema
+} from '@quokkaq/shared-types';
 import { LockKeyhole, TriangleAlert } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -15,6 +19,9 @@ import type {
   ExperienceRuntimeContext
 } from './experience-renderer';
 import { cn } from '@/lib/utils';
+import { ServicePickerWidget } from './widgets/service-picker-widget';
+import { RichInfoWidget } from './widgets/rich-info-widget';
+import { LanguageSwitchWidget } from './widgets/language-switch-widget';
 
 export function isKnownExperienceWidget(
   type: unknown
@@ -40,9 +47,14 @@ type ExperienceServiceOption = {
   label: string;
   categoryId?: string;
   locale?: string;
+  access?: AccessPolicy;
 };
 
-type ExperienceCategoryOption = { id: string; label: string };
+type ExperienceCategoryOption = {
+  id: string;
+  label: string;
+  access?: AccessPolicy;
+};
 
 type ServicePickerOptions = {
   services: ExperienceServiceOption[];
@@ -80,6 +92,15 @@ function safeServicePickerOptions(
     return { services: [], categories: [] };
   }
   const configured = catalog as Record<string, unknown>;
+  const accessFor = (item: Record<string, unknown>) => {
+    const behavior = item.behavior;
+    const candidate =
+      behavior && typeof behavior === 'object' && !Array.isArray(behavior)
+        ? (behavior as Record<string, unknown>).access
+        : item.access;
+    const parsed = AccessPolicySchema.safeParse(candidate);
+    return parsed.success ? { access: parsed.data } : {};
+  };
   const serviceIds = new Set<string>();
   const services = Array.isArray(configured.services)
     ? configured.services.slice(0, 100).flatMap((candidate) => {
@@ -96,7 +117,8 @@ function safeServicePickerOptions(
             id,
             label,
             ...(categoryId ? { categoryId } : {}),
-            ...(locale ? { locale } : {})
+            ...(locale ? { locale } : {}),
+            ...accessFor(item)
           }
         ];
       })
@@ -110,71 +132,10 @@ function safeServicePickerOptions(
         const label = nonEmptyString(item.label);
         if (!id || !label || categoryIds.has(id)) return [];
         categoryIds.add(id);
-        return [{ id, label }];
+        return [{ id, label, ...accessFor(item) }];
       })
     : [];
   return { services, categories };
-}
-
-function ServicePicker({
-  widget,
-  locked,
-  onActivate
-}: {
-  widget: ExperienceWidget;
-  locked: boolean;
-  onActivate: (event: ExperienceActivationEvent) => void;
-}) {
-  const { services, categories } = safeServicePickerOptions(widget);
-  const t = useTranslations('experience.runtime.task12');
-  if (services.length === 0 && categories.length === 0) {
-    return (
-      <div
-        data-testid='service-picker-empty'
-        className='bg-card text-card-foreground flex h-full min-h-11 items-center justify-center rounded-xl border p-5 text-center text-lg font-semibold'
-      >
-        {t('servicePicker.empty', { default: 'No services available' })}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      data-testid='service-picker'
-      className='grid h-full min-h-0 grid-cols-1 gap-3 overflow-hidden p-1 sm:grid-cols-2'
-    >
-      {categories.map((option) => (
-        <button
-          key={`category-${option.id}`}
-          type='button'
-          disabled={locked}
-          data-testid='service-picker-category'
-          onClick={() => onActivate({ categoryId: option.id })}
-          className='bg-card text-card-foreground focus-visible:ring-ring flex min-h-14 w-full items-center justify-center overflow-hidden rounded-xl border p-4 text-center text-lg font-semibold shadow-sm outline-none focus-visible:ring-2 disabled:opacity-50'
-        >
-          <span className='truncate'>{option.label}</span>
-        </button>
-      ))}
-      {services.map((option) => (
-        <button
-          key={option.id}
-          type='button'
-          disabled={locked}
-          data-testid='service-picker-option'
-          onClick={() =>
-            onActivate({
-              serviceId: option.id,
-              ...(option.categoryId ? { categoryId: option.categoryId } : {}),
-              ...(option.locale ? { locale: option.locale } : {})
-            })
-          }
-          className='bg-card text-card-foreground focus-visible:ring-ring flex min-h-14 w-full items-center justify-center overflow-hidden rounded-xl border p-4 text-center text-lg font-semibold shadow-sm outline-none focus-visible:ring-2 disabled:opacity-50'
-        >
-          <span className='truncate'>{option.label}</span>
-        </button>
-      ))}
-    </div>
-  );
 }
 
 function QueueDisplayCalls({
@@ -302,7 +263,47 @@ export function ExperienceWidgetRegistry({
   );
   if (widget.type === 'service-picker') {
     return (
-      <ServicePicker widget={widget} locked={locked} onActivate={onActivate} />
+      <ServicePickerWidget
+        services={safeServicePickerOptions(widget).services}
+        categories={safeServicePickerOptions(widget).categories}
+        conditionContext={context}
+        profile={profile}
+        locked={locked}
+        onSelectService={(service) =>
+          onActivate({
+            serviceId: service.id,
+            ...(service.categoryId ? { categoryId: service.categoryId } : {}),
+            ...(service.locale ? { locale: service.locale } : {})
+          })
+        }
+        onSelectCategory={(category) => onActivate({ categoryId: category.id })}
+      />
+    );
+  }
+  if (widget.type === 'rich-info') {
+    const body = widget.config.body;
+    if (body && typeof body === 'object' && !Array.isArray(body)) {
+      return (
+        <RichInfoWidget
+          body={body as Record<string, string>}
+          locale='en'
+          requireAcknowledgement={widget.config.requireAcknowledgement === true}
+          onContinue={() => onActivate({})}
+        />
+      );
+    }
+  }
+  if (widget.type === 'language-switch') {
+    const locales = Array.isArray(widget.config.locales)
+      ? widget.config.locales.filter(
+          (locale): locale is string => typeof locale === 'string'
+        )
+      : ['en'];
+    return (
+      <LanguageSwitchWidget
+        locales={locales}
+        onChange={(locale) => onActivate({ locale })}
+      />
     );
   }
   if (surface === 'queue-display' && widget.type === 'called-tickets') {

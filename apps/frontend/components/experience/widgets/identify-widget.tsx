@@ -1,0 +1,104 @@
+'use client';
+
+import type { ServiceModel } from '@quokkaq/shared-types';
+
+import { KioskEmployeeIdFlow } from '@/components/kiosk/kiosk-employee-id-flow';
+import { KioskPhoneIdentificationModal } from '@/components/kiosk/kiosk-phone-identification-modal';
+import { KioskCustomIdentificationDialog } from '@/components/kiosk/kiosk-custom-identification-dialog';
+import { KioskIdOcrDialog } from '@/components/kiosk/kiosk-id-ocr-dialog';
+import type { Service } from '@/lib/api';
+
+/** Only identity facts allowed into the common condition evaluator. */
+export type RuntimeIdentity = {
+  isAuthenticated: boolean;
+  isEmployee: boolean;
+  groups: string[];
+  userId?: string;
+};
+
+export type IdentificationAdapter = {
+  unitId: string;
+  locale: 'en' | 'ru';
+  employeeService: Service;
+  /** Resolves a user id to safe condition facts; raw credentials never leave the kiosk component. */
+  resolveEmployee: (userId: string) => RuntimeIdentity;
+  onDocumentData?: (data: Record<string, unknown>) => void;
+};
+
+export function IdentifyWidget({
+  service,
+  adapter,
+  onIdentified,
+  onBack
+}: {
+  service: Pick<
+    ServiceModel,
+    'identificationMode' | 'kioskIdentificationConfig' | 'kioskDocumentSettings'
+  >;
+  adapter: IdentificationAdapter;
+  onIdentified: (identity: RuntimeIdentity) => void;
+  onBack: () => void;
+}) {
+  const mode = service.identificationMode ?? 'none';
+  if (mode === 'badge' || mode === 'login')
+    return (
+      <KioskEmployeeIdFlow
+        unitId={adapter.unitId}
+        service={adapter.employeeService}
+        mode={mode}
+        onBack={onBack}
+        onIdentified={(userId) => onIdentified(adapter.resolveEmployee(userId))}
+      />
+    );
+  if (mode === 'phone')
+    return (
+      <KioskPhoneIdentificationModal
+        isOpen
+        sessionKey={1}
+        isPending={false}
+        onSkip={onBack}
+        onConfirm={() =>
+          onIdentified({ isAuthenticated: true, isEmployee: false, groups: [] })
+        }
+      />
+    );
+  if (mode === 'custom')
+    return (
+      <KioskCustomIdentificationDialog
+        open
+        onOpenChange={(open) => {
+          if (!open) onBack();
+        }}
+        config={service.kioskIdentificationConfig}
+        locale={adapter.locale}
+        unitId={adapter.unitId}
+        onConfirm={(data: Record<string, unknown>) => {
+          adapter.onDocumentData?.(data);
+          onIdentified({
+            isAuthenticated: true,
+            isEmployee: false,
+            groups: []
+          });
+        }}
+        onSkip={onBack}
+      />
+    );
+  if (mode === 'document')
+    return (
+      <KioskIdOcrDialog
+        open
+        onOpenChange={(open) => !open && onBack()}
+        unitId={adapter.unitId}
+        preferNative
+        onUseText={(text) => {
+          adapter.onDocumentData?.({ document: text });
+          onIdentified({
+            isAuthenticated: true,
+            isEmployee: false,
+            groups: []
+          });
+        }}
+      />
+    );
+  return null;
+}
