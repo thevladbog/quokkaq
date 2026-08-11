@@ -377,6 +377,11 @@ export interface ModelsUnit {
   config?: ModelsUnitConfig;
   counters?: ModelsCounter[];
   createdAt?: string;
+  /** ExperienceTemplateID and ExperienceVariantID opt a public unit screen
+  into the published queue-display runtime. Both fields are intentionally
+  nullable and must be set or cleared together. */
+  experienceTemplateId?: string;
+  experienceVariantId?: string;
   id?: string;
   kind?: string;
   name?: string;
@@ -1582,6 +1587,13 @@ export interface HandlersTransferRequest {
   toServiceId?: string;
   toServiceZoneId?: string;
   toUserId?: string;
+}
+
+export interface HandlersUnitExperienceAssignmentRequest {
+  /** @nullable */
+  templateId?: string | null;
+  /** @nullable */
+  variantId?: string | null;
 }
 
 export interface HandlersUnitSummaryDTO {

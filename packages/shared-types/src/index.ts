@@ -1112,6 +1112,9 @@ export const UnitModelSchema = z.object({
   sortOrder: z.number().int().optional().default(0),
   timezone: z.string(),
   config: UnitConfigSchema.nullable().optional(),
+  /** Published composable queue-display assignment for this unit, if enabled. */
+  experienceTemplateId: z.string().nullable().optional(),
+  experienceVariantId: z.string().nullable().optional(),
   skillBasedRoutingEnabled: z.boolean().optional().default(false),
   services: z.array(ServiceModelSchema).optional(),
   operations: UnitOperationsPublicSchema.optional()

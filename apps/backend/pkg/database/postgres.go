@@ -3002,6 +3002,38 @@ CREATE INDEX idx_experience_template_versions_published_at
 		return fmt.Errorf("failed to run v1.8.19_experience_template_repairs migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.8.20_unit_queue_display_experience_assignment", func(db *gorm.DB) error {
+		return db.Exec(`
+ALTER TABLE units
+	ADD COLUMN IF NOT EXISTS experience_template_id text,
+	ADD COLUMN IF NOT EXISTS experience_variant_id text;
+CREATE INDEX IF NOT EXISTS idx_units_experience_template
+	ON units (experience_template_id)
+	WHERE experience_template_id IS NOT NULL;
+DO $$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_unit_experience_assignment_pair') THEN
+		ALTER TABLE units
+			ADD CONSTRAINT chk_unit_experience_assignment_pair
+			CHECK (
+				(experience_template_id IS NULL AND experience_variant_id IS NULL)
+				OR
+				(experience_template_id IS NOT NULL AND experience_variant_id IS NOT NULL)
+			);
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_unit_experience_template') THEN
+		ALTER TABLE units
+			ADD CONSTRAINT fk_unit_experience_template
+			FOREIGN KEY (experience_template_id) REFERENCES screen_layout_templates(id)
+			ON UPDATE CASCADE ON DELETE RESTRICT;
+	END IF;
+END $$;
+`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.20_unit_queue_display_experience_assignment migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

@@ -89,6 +89,11 @@ type Unit struct {
 	NameEn    *string         `gorm:"column:name_en" json:"nameEn,omitempty"`
 	Timezone  string          `gorm:"not null" json:"timezone"`
 	Config    json.RawMessage `gorm:"type:jsonb" json:"config,omitempty" swaggertype:"object"`
+	// ExperienceTemplateID and ExperienceVariantID opt a public unit screen
+	// into the published queue-display runtime. Both fields are intentionally
+	// nullable and must be set or cleared together.
+	ExperienceTemplateID *string `gorm:"column:experience_template_id;index" json:"experienceTemplateId,omitempty"`
+	ExperienceVariantID  *string `gorm:"column:experience_variant_id" json:"experienceVariantId,omitempty"`
 	// SkillBasedRoutingEnabled activates operator-service skill matching when calling the next ticket.
 	// When false (default) the system uses standard FIFO priority routing.
 	SkillBasedRoutingEnabled bool      `gorm:"column:skill_based_routing_enabled;not null;default:false" json:"skillBasedRoutingEnabled"`

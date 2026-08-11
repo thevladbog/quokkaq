@@ -316,3 +316,56 @@ WHERE table_schema = 'public' AND table_name = 'experience_template_versions' AN
 		t.Fatalf("v1.8.18 registry row changed on idempotent rerun from %s to %s", v1818AppliedAt, got)
 	}
 }
+
+func TestUnitQueueDisplayExperienceMigration_PersistsSafeNullableAssignment(t *testing.T) {
+	db := openExperienceMigrationPostgres(t)
+	if err := RunVersionedMigrations(AllMigratableModels()...); err != nil {
+		t.Fatalf("migrations: %v", err)
+	}
+
+	if migrationAppliedAt(t, db, "v1.8.20_unit_queue_display_experience_assignment").IsZero() {
+		t.Fatal("unit queue display assignment migration was not applied")
+	}
+
+	var columns int64
+	if err := db.Raw(`
+SELECT COUNT(*)
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'units'
+  AND column_name IN ('experience_template_id', 'experience_variant_id')
+`).Scan(&columns).Error; err != nil {
+		t.Fatal(err)
+	}
+	if columns != 2 {
+		t.Fatalf("unit experience assignment columns = %d, want 2", columns)
+	}
+
+	var pairConstraint string
+	if err := db.Raw(`
+SELECT pg_get_constraintdef(oid)
+FROM pg_constraint
+WHERE conname = 'chk_unit_experience_assignment_pair'
+`).Scan(&pairConstraint).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(pairConstraint, "experience_template_id IS NULL") || !strings.Contains(pairConstraint, "experience_variant_id IS NULL") {
+		t.Fatalf("unit assignment pair constraint = %q", pairConstraint)
+	}
+
+	var deleteAction string
+	if err := db.Raw(`SELECT confdeltype::text FROM pg_constraint WHERE conname = 'fk_unit_experience_template'`).Scan(&deleteAction).Error; err != nil {
+		t.Fatal(err)
+	}
+	if deleteAction != "r" {
+		t.Fatalf("unit assignment template delete action = %q, want restrict", deleteAction)
+	}
+
+	var rerunCount int64
+	if err := db.Table("migrations").Where("version = ?", "v1.8.20_unit_queue_display_experience_assignment").Count(&rerunCount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if rerunCount != 1 {
+		t.Fatalf("unit assignment migration rows = %d, want 1", rerunCount)
+	}
+}

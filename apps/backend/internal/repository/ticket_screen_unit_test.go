@@ -28,6 +28,8 @@ CREATE TABLE units (
 	name_en text,
 	timezone text NOT NULL DEFAULT 'UTC',
 	config text,
+	experience_template_id text,
+	experience_variant_id text,
 	created_at datetime,
 	updated_at datetime
 );

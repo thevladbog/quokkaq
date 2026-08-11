@@ -37,7 +37,9 @@ func newSupportReportListTestDB(t *testing.T) *gorm.DB {
 		)`,
 		`CREATE TABLE units (
 			id TEXT PRIMARY KEY,
-			company_id TEXT NOT NULL
+			company_id TEXT NOT NULL,
+			experience_template_id TEXT,
+			experience_variant_id TEXT
 		)`,
 		`CREATE TABLE user_units (
 			user_id TEXT NOT NULL,

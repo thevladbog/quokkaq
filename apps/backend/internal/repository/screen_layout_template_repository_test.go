@@ -134,6 +134,21 @@ func repositoryDefinition(id, variant string) json.RawMessage {
 	}`)
 }
 
+func queueRepositoryDefinition(id string) json.RawMessage {
+	return json.RawMessage(`{
+		"schemaVersion":1,
+		"id":"` + id + `",
+		"surface":"queue-display",
+		"startPageId":"queue",
+		"variants":[
+			{"id":"landscape","profile":{"id":"landscape-profile","name":"Landscape","width":1920,"height":1080,"interactionMode":"non-touch","viewingDistance":"far","safeArea":{"top":0,"right":0,"bottom":0,"left":0}},"grid":{"columns":12,"rows":12}},
+			{"id":"portrait","profile":{"id":"portrait-profile","name":"Portrait","width":1080,"height":1920,"interactionMode":"non-touch","viewingDistance":"far","safeArea":{"top":0,"right":0,"bottom":0,"left":0}},"grid":{"columns":8,"rows":12}}
+		],
+		"pages":[{"id":"queue","name":"Queue","widgets":[{"id":"called","type":"called-tickets","config":{},"actions":[]}],"layouts":{"landscape":{"placements":{"called":{"col":1,"row":1,"colSpan":12,"rowSpan":12}}},"portrait":{"placements":{"called":{"col":1,"row":1,"colSpan":8,"rowSpan":12}}}}}],
+		"flowPages":{},"theme":{"preset":"legacy-kiosk","tokens":{"header":"#123456","surface":"#abcdef","serviceGrid":"#Aa00fF"}}
+	}`)
+}
+
 func newExperienceRepositorySQLite(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(glebarezsqlite.Open(":memory:"), &gorm.Config{
@@ -151,7 +166,10 @@ CREATE TABLE users (
 );
 CREATE TABLE units (
 	id text PRIMARY KEY,
-	company_id text NOT NULL
+	company_id text NOT NULL,
+	experience_template_id text,
+	experience_variant_id text,
+	updated_at datetime
 );
 CREATE TABLE screen_layout_templates (
 	id text PRIMARY KEY,
@@ -222,6 +240,44 @@ INSERT INTO desktop_terminals (
 		t.Fatal(err)
 	}
 }
+
+func TestScreenLayoutTemplateRepository_UnitQueueDisplayAssignmentResolvesPublishedProfiles(t *testing.T) {
+	db := newExperienceRepositorySQLite(t)
+	repo := NewScreenLayoutTemplateRepositoryWithDB(db)
+	definition := queueRepositoryDefinition("queue-template")
+	if err := db.Exec(`
+INSERT INTO units (id, company_id) VALUES ('queue-unit', 'company-a');
+INSERT INTO screen_layout_templates (id, company_id, name, definition, surface, published_version_id)
+VALUES ('queue-template', 'company-a', 'Queue', ?, 'queue-display', 'queue-version');
+INSERT INTO experience_template_versions (id, template_id, version, definition, published_at)
+VALUES ('queue-version', 'queue-template', 1, ?, '2026-08-11T12:00:00Z');
+`, definition, definition).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.UpdateUnitWithExperience(context.Background(), "company-a", "queue-unit", UnitExperienceAssignment{
+		TemplateID: stringPointer("queue-template"),
+		VariantID:  stringPointer("landscape"),
+	}); err != nil {
+		t.Fatalf("assign unit experience: %v", err)
+	}
+
+	version, variantID, err := repo.ResolveUnitQueueDisplayPublishedVersion(context.Background(), "queue-unit", "portrait")
+	if err != nil {
+		t.Fatalf("resolve portrait experience: %v", err)
+	}
+	if version.ID != "queue-version" || variantID != "portrait" {
+		t.Fatalf("resolved version=%q variant=%q", version.ID, variantID)
+	}
+
+	if err := repo.UpdateUnitWithExperience(context.Background(), "company-a", "queue-unit", UnitExperienceAssignment{}); err != nil {
+		t.Fatalf("clear unit experience: %v", err)
+	}
+	if _, _, err := repo.ResolveUnitQueueDisplayPublishedVersion(context.Background(), "queue-unit", ""); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("cleared assignment error = %v, want record not found", err)
+	}
+}
+
+func stringPointer(value string) *string { return &value }
 
 func TestScreenLayoutTemplateRepository_PublishRestoreAreAtomicAndImmutable(t *testing.T) {
 	db := newExperienceRepositorySQLite(t)

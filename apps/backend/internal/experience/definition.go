@@ -4,11 +4,15 @@ package experience
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"math"
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 )
+
+var errInvalidVariantDefinition = errors.New("invalid experience definition")
 
 const (
 	SurfaceTicketStation  = "ticket-station"
@@ -1306,4 +1310,55 @@ func HasVariant(raw json.RawMessage, variantID string) (matched bool, err error)
 		}
 	}
 	return false, nil
+}
+
+// ResolveVariant returns the assigned variant unless a public display profile
+// requests another orientation. Orientation matching is derived from the
+// validated profile dimensions rather than tenant-authored variant names.
+// Candidate IDs are sorted so the fallback is deterministic across payload
+// order changes.
+func ResolveVariant(raw json.RawMessage, assignedID, profile string) (string, error) {
+	var envelope struct {
+		Variants []struct {
+			ID      string `json:"id"`
+			Profile *struct {
+				Width  definitionInteger `json:"width"`
+				Height definitionInteger `json:"height"`
+			} `json:"profile"`
+		} `json:"variants"`
+	}
+	if len(raw) == 0 || json.Unmarshal(raw, &envelope) != nil || len(envelope.Variants) == 0 || len(envelope.Variants) > maxDefinitionVariants {
+		return "", errInvalidVariantDefinition
+	}
+	type candidate struct {
+		id      string
+		matches bool
+	}
+	var assigned *candidate
+	var candidates []candidate
+	for _, variant := range envelope.Variants {
+		if strings.TrimSpace(variant.ID) == "" || variant.Profile == nil || !variant.Profile.Width.Valid || !variant.Profile.Height.Valid {
+			return "", errInvalidVariantDefinition
+		}
+		matches := profile == "" || (profile == "portrait" && variant.Profile.Height.Value > variant.Profile.Width.Value) || (profile == "landscape" && variant.Profile.Width.Value >= variant.Profile.Height.Value)
+		candidate := candidate{id: variant.ID, matches: matches}
+		if variant.ID == assignedID {
+			copy := candidate
+			assigned = &copy
+		}
+		if matches {
+			candidates = append(candidates, candidate)
+		}
+	}
+	if assigned == nil {
+		return "", errInvalidVariantDefinition
+	}
+	if profile == "" || assigned.matches {
+		return assigned.id, nil
+	}
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].id < candidates[j].id })
+	if len(candidates) == 0 {
+		return "", errInvalidVariantDefinition
+	}
+	return candidates[0].id, nil
 }

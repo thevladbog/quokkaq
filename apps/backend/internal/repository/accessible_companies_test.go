@@ -45,7 +45,9 @@ CREATE TABLE companies (
 );
 CREATE TABLE units (
 	id TEXT PRIMARY KEY,
-	company_id TEXT NOT NULL
+	company_id TEXT NOT NULL,
+	experience_template_id TEXT,
+	experience_variant_id TEXT
 );
 CREATE TABLE user_units (
 	id TEXT PRIMARY KEY,

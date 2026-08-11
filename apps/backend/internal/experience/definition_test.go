@@ -106,6 +106,37 @@ func TestExperienceDefinitionValidator_AcceptsBoundedEnvelope(t *testing.T) {
 	}
 }
 
+func TestResolveVariantSelectsRequestedOrientationDeterministically(t *testing.T) {
+	raw := json.RawMessage(`{"variants":[
+		{"id":"landscape-b","profile":{"width":1920,"height":1080}},
+		{"id":"portrait","profile":{"width":1080,"height":1920}},
+		{"id":"landscape-a","profile":{"width":1920,"height":1080}}
+	]}`)
+
+	got, err := ResolveVariant(raw, "landscape-b", "portrait")
+	if err != nil || got != "portrait" {
+		t.Fatalf("portrait variant = %q, %v", got, err)
+	}
+	got, err = ResolveVariant(raw, "landscape-b", "landscape")
+	if err != nil || got != "landscape-b" {
+		t.Fatalf("assigned landscape variant = %q, %v", got, err)
+	}
+	got, err = ResolveVariant(raw, "landscape-b", "")
+	if err != nil || got != "landscape-b" {
+		t.Fatalf("default variant = %q, %v", got, err)
+	}
+
+	raw = json.RawMessage(`{"variants":[
+		{"id":"z","profile":{"width":1080,"height":1920}},
+		{"id":"b","profile":{"width":1920,"height":1080}},
+		{"id":"a","profile":{"width":1920,"height":1080}}
+	]}`)
+	got, err = ResolveVariant(raw, "z", "landscape")
+	if err != nil || got != "a" {
+		t.Fatalf("deterministic fallback = %q, %v", got, err)
+	}
+}
+
 func TestExperienceDefinitionValidator_RejectsEnvelopeViolations(t *testing.T) {
 	tests := []struct {
 		name    string
