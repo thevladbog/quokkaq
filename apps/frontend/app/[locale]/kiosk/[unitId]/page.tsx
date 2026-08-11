@@ -134,6 +134,9 @@ import {
   persistKioskUnitSnapshot
 } from '@/lib/kiosk-snapshot-cache';
 import { toast } from 'sonner';
+import { ExperienceRenderer } from '@/components/experience/experience-renderer';
+import { TicketStationEntry } from '@/components/experience/ticket-station-entry';
+import { useTicketStationRuntime } from '@/lib/experience/ticket-station-runtime';
 
 const DEFAULT_TICKET_SUCCESS_AUTOCLOSE_SEC = 12;
 
@@ -142,6 +145,10 @@ export default function UnitKioskPage() {
   const params = useParams() as { unitId?: string };
   const unitId = params.unitId;
   const searchParams = useSearchParams();
+  const ticketStationRuntime = useTicketStationRuntime({
+    unitId,
+    pairingCode: searchParams.get('code')
+  });
   const [selectedServicePath, setSelectedServicePath] = useState<Service[]>([]);
   const [kioskAutolayoutPage, setKioskAutolayoutPage] = useState(0);
   const [, setMessage] = useState('');
@@ -1331,6 +1338,42 @@ export default function UnitKioskPage() {
     createTicketForServiceRef.current = createTicketForService;
   }, [createTicketForService]);
 
+  const experienceRuntimeAdapters = useMemo(
+    () => ({
+      submitTicket: async (session: { values: Record<string, unknown> }) => {
+        const serviceId = session.values.selectedServiceId;
+        if (typeof serviceId !== 'string' || !kioskApiUnitId) {
+          throw new Error('Experience session has no selected service');
+        }
+        const service = unitServicesTree?.find(
+          (candidate) => candidate.id === serviceId
+        );
+        if (!service) {
+          throw new Error('Experience selected service is unavailable');
+        }
+        const documentsData = session.values.documentsData;
+        const ticket =
+          documentsData && typeof documentsData === 'object'
+            ? await createTicketMutation.mutateAsync({
+                unitId: kioskApiUnitId,
+                serviceId: service.id,
+                documentsData: documentsData as Record<string, unknown>
+              })
+            : await createTicketMutation.mutateAsync({
+                unitId: kioskApiUnitId,
+                serviceId: service.id
+              });
+        openTicketSuccessFlow(ticket, service);
+      }
+    }),
+    [
+      createTicketMutation,
+      kioskApiUnitId,
+      openTicketSuccessFlow,
+      unitServicesTree
+    ]
+  );
+
   const onDocumentOcrUnsuccessful = useCallback(() => {
     const svc = pendingDocumentServiceRef.current;
     if (!svc) {
@@ -1492,7 +1535,7 @@ export default function UnitKioskPage() {
 
   const modalsDark = useHcSurfaces || kioskOnDarkBasePage;
 
-  return (
+  const legacyRuntime = (
     <KioskChromeProvider modalsDark={modalsDark}>
       <div
         className={cn(
@@ -2578,5 +2621,38 @@ export default function UnitKioskPage() {
         />
       </div>
     </KioskChromeProvider>
+  );
+
+  return (
+    <TicketStationEntry
+      terminalKind={ticketStationRuntime.terminalKind}
+      terminalToken={ticketStationRuntime.terminalToken}
+      manifest={ticketStationRuntime.manifest}
+      legacy={legacyRuntime}
+      loading={legacyRuntime}
+      renderExperience={(manifest) => (
+        <ExperienceRenderer
+          template={manifest.template}
+          variantId={manifest.variantId}
+          runtimeContext={{
+            identity: { isAuthenticated: false, isEmployee: false },
+            live: {
+              isOpen: !serverKioskFrozen,
+              isConnected: browserOnline,
+              queueLength: unitEtaSnapshot?.tickets?.length ?? 0
+            }
+          }}
+          adapters={experienceRuntimeAdapters}
+          sessionIdle={{
+            beforeWarningSec: Math.max(
+              1,
+              kioskCfg?.sessionIdleBeforeWarningSec ?? 90
+            ),
+            countdownSec: Math.max(1, kioskCfg?.sessionIdleCountdownSec ?? 30)
+          }}
+          mode='deployed'
+        />
+      )}
+    />
   );
 }
