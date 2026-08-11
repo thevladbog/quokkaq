@@ -211,6 +211,48 @@ jobs:
           check_name: '📊 Vitest (frontend)'
           comment_mode: ${{ github.event_name == 'pull_request' && 'always' || 'off' }}
 
+  ci-experience-e2e:
+    name: '🧭 Composable experience browser acceptance'
+    runs-on: ubuntu-latest
+    needs: affected
+    if: ${{ needs.affected.outputs.frontend == 'true' || needs.affected.outputs.backend == 'true' }}
+    permissions:
+      contents: read
+    env:
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
+      NEXT_PUBLIC_WS_URL: ws://127.0.0.1:3001
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: '📦 Enable Corepack'
+        run: corepack enable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: '📥 Install dependencies'
+        run: pnpm install --frozen-lockfile
+
+      - name: '🎭 Install Chromium'
+        run: pnpm --dir apps/frontend exec playwright install --with-deps chromium
+
+      - name: '🧭 Run composable experience browser suite'
+        run: pnpm nx e2e:experience frontend
+
+      - name: '📎 Upload browser diagnostics on failure'
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: composable-experience-playwright-diagnostics
+          path: |
+            apps/frontend/test-results/playwright
+            apps/frontend/playwright-report
+          if-no-files-found: ignore
+
   ci-backend:
     name: '🔧 Backend (build, test, lint)'
     runs-on: ubuntu-latest

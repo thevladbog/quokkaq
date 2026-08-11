@@ -333,7 +333,7 @@ export function ExperienceBuilderShell({
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <main
-        className='bg-muted/20 flex h-[min(900px,calc(100dvh-2rem))] min-h-[720px] min-w-[1024px] flex-col overflow-hidden rounded-xl border shadow-sm'
+        className='bg-muted/20 flex h-[min(900px,calc(100dvh-6rem))] min-h-0 max-w-full min-w-0 flex-col overflow-hidden rounded-xl border shadow-sm'
         aria-label={t('shell.label', { default: 'Experience builder' })}
       >
         <div className='bg-background flex min-h-14 items-center gap-3 border-b px-4'>
@@ -395,7 +395,7 @@ export function ExperienceBuilderShell({
             <ExperienceOperationFeedback error={saveError} />
           </div>
         ) : null}
-        <div className='grid min-h-0 flex-1 grid-cols-[248px_minmax(480px,1fr)_264px]'>
+        <div className='grid min-h-0 flex-1 grid-cols-[minmax(220px,248px)_minmax(360px,1fr)_minmax(220px,264px)]'>
           <ExperienceSidePanel
             template={draft}
             page={page}
