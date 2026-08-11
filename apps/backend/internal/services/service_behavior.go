@@ -427,17 +427,11 @@ func serviceBehaviorInt(raw json.RawMessage) (int, bool) {
 	} else if scale < 0 {
 		digits += strings.Repeat("0", -scale)
 	}
-	value, err := strconv.ParseInt(digits, 10, 64)
-	if err != nil {
-		return 0, false
-	}
 	if matches[1] == "-" {
-		if value == math.MinInt64 {
-			return 0, false
-		}
-		value = -value
+		digits = "-" + digits
 	}
-	if strconv.IntSize == 32 && (value < math.MinInt32 || value > math.MaxInt32) {
+	value, err := strconv.ParseInt(digits, 10, strconv.IntSize)
+	if err != nil {
 		return 0, false
 	}
 	return int(value), true
