@@ -48,7 +48,7 @@ func Verify(tokenString, unitID, userID string) ([]string, error) {
 			return nil, ErrInvalidToken
 		}
 		return []byte(secret), nil
-	}, jwt.WithIssuer("quokkaq-kiosk-identity"), jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
+	}, jwt.WithIssuer("quokkaq-kiosk-identity"), jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithExpirationRequired())
 	if err != nil || token == nil || !token.Valid || claims.UnitID != unitID || claims.Subject != userID {
 		return nil, ErrInvalidToken
 	}

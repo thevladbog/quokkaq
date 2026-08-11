@@ -82,6 +82,96 @@ type EmployeeIdpResolveResponse struct {
 	IdentityToken string   `json:"identityToken,omitempty"`
 }
 
+// EmployeeIdpSettingsPatch contains the mutable, non-secret IdP settings and
+// encrypted secret updates accepted by the unit settings endpoint.
+type EmployeeIdpSettingsPatch struct {
+	Enabled                 *bool
+	HTTPMethod              *string
+	UpstreamURL             *string
+	RequestBodyTemplate     *string
+	ResponseEmailPath       *string
+	ResponseDisplayNamePath *string
+	ResponseGroupsPath      *string
+	HeaderTemplatesJSON     *string
+	TimeoutMS               *int
+	SecretValues            map[string]string
+	SecretNamesToDelete     []string
+}
+
+// UpdateSettings persists a unit's Employee IdP configuration and returns its
+// safe persisted view together with the stored secret names.
+func (s *EmployeeIdpService) UpdateSettings(unitID string, req EmployeeIdpSettingsPatch) (*models.UnitEmployeeIdpSetting, []string, error) {
+	row, err := s.idpRepo.GetSettingByUnitID(unitID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, err
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		row = &models.UnitEmployeeIdpSetting{UnitID: unitID, HTTPMethod: "POST", HeaderTemplatesJSON: "[]", TimeoutMS: 10000}
+	}
+	if req.Enabled != nil {
+		row.Enabled = *req.Enabled
+	}
+	if req.HTTPMethod != nil {
+		row.HTTPMethod = *req.HTTPMethod
+	}
+	if req.UpstreamURL != nil {
+		row.UpstreamURL = *req.UpstreamURL
+	}
+	if req.RequestBodyTemplate != nil {
+		row.RequestBodyTemplate = *req.RequestBodyTemplate
+	}
+	if req.ResponseEmailPath != nil {
+		row.ResponseEmailPath = *req.ResponseEmailPath
+	}
+	if req.ResponseDisplayNamePath != nil {
+		row.ResponseDisplayNamePath = *req.ResponseDisplayNamePath
+	}
+	if req.ResponseGroupsPath != nil {
+		row.ResponseGroupsPath = *req.ResponseGroupsPath
+	}
+	if req.HeaderTemplatesJSON != nil {
+		row.HeaderTemplatesJSON = *req.HeaderTemplatesJSON
+	}
+	if req.TimeoutMS != nil {
+		row.TimeoutMS = *req.TimeoutMS
+	}
+	if err := s.idpRepo.SaveSetting(row); err != nil {
+		return nil, nil, err
+	}
+	for _, name := range req.SecretNamesToDelete {
+		if name = strings.TrimSpace(name); name != "" {
+			if err := s.idpRepo.DeleteSecret(unitID, name); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+	for name, plain := range req.SecretValues {
+		if strings.TrimSpace(name) == "" {
+			continue
+		}
+		enc, err := ssocrypto.EncryptAES256GCM([]byte(plain))
+		if err != nil {
+			return nil, nil, err
+		}
+		if err := s.idpRepo.UpsertSecret(&models.UnitEmployeeIdpSecret{UnitID: unitID, Name: name, Ciphertext: enc}); err != nil {
+			return nil, nil, err
+		}
+	}
+	row, err = s.idpRepo.GetSettingByUnitID(unitID)
+	if err != nil {
+		return nil, nil, err
+	}
+	secrets, err := s.idpRepo.ListSecrets(unitID)
+	if err != nil {
+		return nil, nil, err
+	}
+	names := make([]string, 0, len(secrets))
+	for i := range secrets {
+		names = append(names, secrets[i].Name)
+	}
+	return row, names, nil
+}
+
 // ResolveKiosk looks up a user; kind badge uses .Raw, login uses .Login in templates.
 func (s *EmployeeIdpService) ResolveKiosk(ctx context.Context, unitID string, body EmployeeIdpResolveRequest) (*EmployeeIdpResolveResponse, error) {
 	raw := strings.TrimSpace(body.Raw)

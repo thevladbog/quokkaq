@@ -1626,6 +1626,7 @@ export type CreateTicketInUnitMutationVariables =
       unitId: string;
       serviceId: string;
       kioskIdentifiedUserId: string;
+      kioskIdentityToken?: string;
       clientId?: never;
       visitorPhone?: never;
       visitorLocale?: never;

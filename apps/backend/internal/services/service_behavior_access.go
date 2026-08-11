@@ -73,9 +73,13 @@ func evaluateKioskServiceCondition(condition models.ServiceBehaviorCondition, em
 			if condition.Operator != "contains" && condition.Operator != "not-contains" {
 				return false, ErrKioskServiceAccessContextUnavailable
 			}
+			expected, ok := condition.Value.(string)
+			if !ok {
+				return false, ErrKioskServiceAccessContextUnavailable
+			}
 			found := false
 			for _, group := range groups {
-				if group == condition.Value {
+				if group == expected {
 					found = true
 					break
 				}
