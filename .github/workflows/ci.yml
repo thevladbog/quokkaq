@@ -34,7 +34,7 @@ jobs:
       backend: ${{ steps.check.outputs.backend }}
       kiosk: ${{ steps.check.outputs.kiosk }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -94,7 +94,7 @@ jobs:
       NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
       NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -121,7 +121,7 @@ jobs:
       NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
       NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -170,7 +170,7 @@ jobs:
       # Marketing `next build` uses NODE_ENV=production; there is no .env.local in CI — getMetadataBaseUrl() needs a canonical origin (see apps/marketing/lib/marketing-site-url.ts).
       NEXT_PUBLIC_MARKETING_SITE_URL: https://quokkaq.com
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -206,7 +206,7 @@ jobs:
 
       - name: '📊 Publish Vitest JUnit'
         if: always() && hashFiles('apps/frontend/test-results/vitest-junit.xml') != ''
-        uses: EnricoMi/publish-unit-test-result-action@v2.23.0
+        uses: EnricoMi/publish-unit-test-result-action@v2.24.0
         with:
           files: apps/frontend/test-results/vitest-junit.xml
           check_name: '📊 Vitest (frontend)'
@@ -269,7 +269,7 @@ jobs:
       NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
       NX_EXCLUDE_BACKEND: '*,!tag:platform:backend'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -296,7 +296,7 @@ jobs:
 
       - name: '📊 Publish Go JUnit'
         if: always() && hashFiles('apps/backend/test-results/go-junit.xml') != ''
-        uses: EnricoMi/publish-unit-test-result-action@v2.23.0
+        uses: EnricoMi/publish-unit-test-result-action@v2.24.0
         with:
           files: apps/backend/test-results/go-junit.xml
           check_name: '📊 Go (backend)'
@@ -327,7 +327,7 @@ jobs:
       TASK6_POSTGRES_URL: postgresql://quokkaq:quokkaq@localhost:5432/quokkaq?sslmode=disable
       TASK6_POSTGRES_ALLOW_RESET: '1'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v6
         with:
@@ -356,7 +356,7 @@ jobs:
       NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
       NX_EXCLUDE_KIOSK: '*,!tag:platform:desktop,!tag:scope:kiosk'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -404,7 +404,7 @@ jobs:
 
       - name: '📊 Publish Nextest JUnit'
         if: always() && hashFiles('apps/kiosk-desktop/src-tauri/target/nextest/ci/junit.xml') != ''
-        uses: EnricoMi/publish-unit-test-result-action@v2.23.0
+        uses: EnricoMi/publish-unit-test-result-action@v2.24.0
         with:
           files: apps/kiosk-desktop/src-tauri/target/nextest/ci/junit.xml
           check_name: '📊 Nextest (kiosk-desktop)'

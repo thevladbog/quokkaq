@@ -25,7 +25,7 @@ jobs:
     outputs:
       affected: ${{ steps.check.outputs.affected }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -60,7 +60,7 @@ jobs:
     outputs:
       new_version: ${{ steps.bump.outputs.new_version }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: release
           fetch-depth: 0
@@ -148,7 +148,7 @@ jobs:
     needs: version-bump
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: v${{ needs.version-bump.outputs.new_version }}-backend
 
